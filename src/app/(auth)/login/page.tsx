@@ -3,12 +3,12 @@
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Crosshair, Eye, EyeOff, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
+import { login } from "@/lib/services/auth.service"
 
 export default function LoginPage() {
     const router = useRouter()
@@ -22,30 +22,25 @@ export default function LoginPage() {
 
     async function handleLogin(e: React.FormEvent) {
         e.preventDefault()
+
         setError(null)
         setLoading(true)
 
-        const supabase = createClient()
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        const result = await login(email, password)
 
-        if (signInError) {
-            setError("Invalid email or password. Please try again.")
+        if (!result.success) {
+            setError(result.error)
             setLoading(false)
             return
         }
 
-        // Fetch role to redirect correctly
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("role")
-                .eq("id", user.id)
-                .single()
+        router.push(
+            result.role === "admin"
+                ? "/admin/dashboard"
+                : "/"
+        )
 
-            router.push(profile?.role === "admin" ? "/admin/dashboard" : "/")
-            router.refresh()
-        }
+        router.refresh()
     }
 
     return (
