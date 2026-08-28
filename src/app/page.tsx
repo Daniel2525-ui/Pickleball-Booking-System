@@ -1,69 +1,69 @@
-import Image from "next/image";
+import Link from "next/link";
+import { CalendarDays, MapPin, Crosshair } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex flex-col min-h-screen">
+      {/* Public Header */}
+      <header className="px-6 py-4 flex items-center justify-between border-b">
+        <div className="flex items-center gap-2">
+          <Crosshair />
+          <span className="font-bold text-xl tracking-tight">CrossHair Dinkers</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        <nav className="flex items-center gap-6">
+          <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4">Log in</Link>
+          <Link href="/book" className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+            Book a Court
+          </Link>
+        </nav>
+      </header>
+
+      {/* Hero Section */}
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24 relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
+        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight max-w-4xl mb-6">
+          Dink with precision. <br className="hidden md:block" />
+          <span className="text-primary">Play your game.</span>
+        </h1>
+
+        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10">
+          Welcome to CrossHair Dinkers, the premier pickleball venue. View live court availability and reserve your spot in seconds.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Link
+            href="/book"
+            className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-full text-lg font-semibold hover:bg-primary/90 transition-all shadow-lg hover:shadow-xl"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <CalendarDays className="size-5" />
+            View Availability
+          </Link>
+        </div>
+
+        {/* Venue Info Cards */}
+        <div className="mt-24 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl w-full text-left">
+          <div className="bg-card border p-6 rounded-2xl shadow-sm">
+            <h3 className="font-bold text-lg mb-2">Premium Courts</h3>
+            <p className="text-muted-foreground text-sm">Professional grade surfaces designed for the perfect bounce and player safety.</p>
+          </div>
+          <div className="bg-card border p-6 rounded-2xl shadow-sm">
+            <h3 className="font-bold text-lg mb-2">Easy Booking</h3>
+            <p className="text-muted-foreground text-sm">Real-time availability and instant reservations. Manage your bookings online.</p>
+          </div>
+          <div className="bg-card border p-6 rounded-2xl shadow-sm flex flex-col">
+            <h3 className="font-bold text-lg mb-2">Location</h3>
+            <p className="text-muted-foreground text-sm flex items-center gap-2 mt-auto">
+              <MapPin className="size-4" /> 123 Pickleball Ave, City
+            </p>
+          </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t py-8 text-center text-sm text-muted-foreground">
+        <p>&copy; {new Date().getFullYear()} CrossHair Dinkers. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
