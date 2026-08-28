@@ -6,11 +6,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <SidebarProvider>
       <AppSidebar />
       <main className="w-full min-h-screen flex flex-col">
-        <div className="p-2">
-            <SidebarTrigger />
+        <div className="p-3">
+          <SidebarTrigger />
         </div>
         <div className="flex-1">
-            {children}
+          {children}
         </div>
       </main>
     </SidebarProvider>

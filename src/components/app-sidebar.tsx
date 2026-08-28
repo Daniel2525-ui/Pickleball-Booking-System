@@ -10,9 +10,12 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Calendar, LayoutDashboard, Settings, User, SquareMinus, CreditCard, Clock, Crosshair } from "lucide-react"
+import { Calendar, LayoutDashboard, Settings, User, SquareMinus, CreditCard, Clock, Crosshair, LogOut } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import handleLogout from "@/app/services/auth.service"
+
 
 const items = [
     {
@@ -55,6 +58,13 @@ const items = [
 export default function AppSidebar() {
 
     const currentPath = usePathname();
+    const router = useRouter();
+
+    async function onLogout() {
+        await handleLogout()
+        router.push("/login")
+        router.refresh()
+    }
 
     return (
         <Sidebar>
@@ -87,7 +97,15 @@ export default function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter />
+            <SidebarFooter className="pb-5">
+                <Button
+                    className="gap-2 w-full"
+                    variant="destructive"
+                    onClick={onLogout}
+                >
+                    <LogOut className="size-4" /> Logout
+                </Button>
+            </SidebarFooter>
         </Sidebar>
     )
 }
