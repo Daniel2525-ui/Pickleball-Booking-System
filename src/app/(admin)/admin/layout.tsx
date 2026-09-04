@@ -1,5 +1,5 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import AppSidebar from "@/components/app-sidebar"
+import AppSidebar from "@/components/admin/app-sidebar"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,7 +7,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <AppSidebar />
       <main className="w-full min-h-screen flex flex-col">
         <div className="p-3">
-          <SidebarTrigger />
+          <SidebarTrigger className={"fixed"} />
         </div>
         <div className="flex-1">
           {children}

@@ -1,8 +1,15 @@
 import { createClient } from "@/lib/supabase/client"
 
+type LoginResult =
+    | { success: true; role: string }
+    | { success: false; error: string }
+
 /* Login */
 
-export async function login(email: string, password: string) {
+export async function login(
+    email: string,
+    password: string
+): Promise<LoginResult> {
     const supabase = createClient()
 
     try {

@@ -1,18 +1,21 @@
 import Link from "next/link";
 import { CalendarDays, MapPin, Crosshair } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Public Header */}
-      <header className="px-4 md:px-6 py-4 flex items-center justify-between border-b">
+      <header className="px-6 md:px-6 py-4 flex items-center justify-between border-b">
         <div className="flex items-center gap-2">
           <Crosshair className="size-5 md:size-6" />
           <span className="font-bold text-lg md:text-xl tracking-tight hidden sm:inline-block">Crosshair Dinkers</span>
           <span className="font-bold text-lg tracking-tight sm:hidden">CD</span>
         </div>
-        <nav className="flex items-center gap-4 md:gap-6">
-          <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4">Log in</Link>
+        <nav className="flex items-center md:gap-6">
+          <Link href="/login" className="text-sm font-medium">
+            <Button className={"text-black"} variant={"link"}>Login</Button>
+          </Link>
           <Link href="/login" className="bg-primary text-primary-foreground px-3 py-1.5 md:px-4 md:py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
             Book a Court
           </Link>

@@ -73,7 +73,7 @@ export default function AppSidebar() {
                         <Crosshair className="size-6" />
                     </div>
                     <div className="flex flex-col gap-1 leading-none">
-                        <span className="font-semibold text-lg tracking-tight">CrossHair Dinkers</span>
+                        <span className="font-semibold text-lg tracking-tight">Crosshair Dinkers</span>
                         <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Booking System</span>
                     </div>
                 </div>
