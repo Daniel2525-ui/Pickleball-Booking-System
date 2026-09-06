@@ -10,7 +10,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Calendar, LayoutDashboard, Settings, User, SquareMinus, CreditCard, Clock, Crosshair, LogOut } from "lucide-react"
+import { Calendar, LayoutDashboard, User, SquareMinus, CreditCard, Clock, Crosshair, LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -46,11 +46,6 @@ const items = [
         title: "Payments",
         url: "/admin/payments",
         icon: CreditCard,
-    },
-    {
-        title: "Settings",
-        url: "/admin/settings",
-        icon: Settings,
     },
 ]
 
