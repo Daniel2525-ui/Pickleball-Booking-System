@@ -196,6 +196,9 @@ export const todaysSchedule = async () => {
                 court_id,
                 courts (
                     name
+                ),
+                profiles:user_id (
+                    full_name
                 )
             `)
             .eq("booking_date", today)
@@ -209,3 +212,56 @@ export const todaysSchedule = async () => {
         throw error;
     }
 };
+
+/* Court Status */
+
+export const fetchCourtStatus = async () => {
+    const today = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Manila"
+    }).format(new Date());
+
+    try {
+        const { data: courts, error } = await supabase
+            .from("courts")
+            .select(`
+            id,
+            name,
+            status
+            `)
+            .order("name")
+
+        if (error) throw error;
+
+
+        const { data: bookings, error: bookingError } = await supabase
+            .from("bookings")
+            .select(`
+                court_id,
+                booking_date,
+                start_time,
+                end_time,
+                status
+                `)
+            .eq("booking_date", today)
+            .neq("status", "cancelled")
+
+        if (bookingError) throw bookingError;
+
+        return {
+            data: {
+                courts,
+                bookings,
+            },
+            error: null
+        }
+
+    } catch (error) {
+        console.error("Failed to fetch court status", error)
+
+        return {
+            data: null,
+            error,
+
+        }
+    }
+}

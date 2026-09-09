@@ -9,59 +9,48 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-
-type BookingStatus = "Ongoing" | "Upcoming" | "Completed" | "Cancelled";
-
-interface ScheduleEntry {
-  time: string;
-  court: string;
-  customer: string;
-  duration: string;
-  status: BookingStatus;
-}
-
-const scheduleData: ScheduleEntry[] = [
-  {
-    time: "2:00 PM",
-    court: "Court 1",
-    customer: "Juan Dela Cruz",
-    duration: "1 hour",
-    status: "Ongoing",
-  },
-  {
-    time: "3:00 PM",
-    court: "Court 3",
-    customer: "Maria Santos",
-    duration: "2 hours",
-    status: "Upcoming",
-  },
-  {
-    time: "4:00 PM",
-    court: "Court 2",
-    customer: "Pedro Garcia",
-    duration: "1 hour",
-    status: "Upcoming",
-  },
-  {
-    time: "5:00 PM",
-    court: "Court 5",
-    customer: "Mark Santos",
-    duration: "1 hour",
-    status: "Upcoming",
-  },
-];
+import { todaysSchedule } from "@/lib/services/dashboard.service";
 
 const statusVariant: Record<
-  BookingStatus,
+  string,
   "default" | "secondary" | "outline" | "destructive"
 > = {
+  confirmed: "secondary",
+  pending: "outline",
+  ongoing: "default",
+  cancelled: "destructive",
+  completed: "outline",
   Ongoing: "default",
   Upcoming: "secondary",
   Completed: "outline",
   Cancelled: "destructive",
 };
 
-export default function TodaysSchedule({ className }: { className?: string }) {
+export default async function TodaysSchedule({ className }: { className?: string }) {
+  const scheduleData = await todaysSchedule();
+
+  const formatTime = (timeStr: string) => {
+    if (!timeStr) return "";
+    const [hours, minutes] = timeStr.split(':');
+    const date = new Date();
+    date.setHours(parseInt(hours, 10));
+    date.setMinutes(parseInt(minutes, 10));
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  const calculateDuration = (start: string, end: string) => {
+    if (!start || !end) return "";
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    const diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+    const hours = Math.floor(diffMinutes / 60);
+    const mins = diffMinutes % 60;
+
+    if (hours > 0 && mins > 0) return `${hours} hr ${mins} min`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
+    return `${mins} min`;
+  };
+
   return (
     <Card className={className}>
       <CardHeader>
@@ -90,26 +79,38 @@ export default function TodaysSchedule({ className }: { className?: string }) {
               </tr>
             </thead>
             <tbody>
-              {scheduleData.map((entry) => (
-                <tr
-                  key={`${entry.time}-${entry.court}`}
-                  className="border-b last:border-0"
-                >
-                  <td className="py-3 pr-4 font-medium">{entry.time}</td>
-                  <td className="py-3 pr-4 text-muted-foreground">
-                    {entry.court}
-                  </td>
-                  <td className="py-3 pr-4">{entry.customer}</td>
-                  <td className="py-3 pr-4 text-muted-foreground">
-                    {entry.duration}
-                  </td>
-                  <td className="py-3">
-                    <Badge variant={statusVariant[entry.status]}>
-                      {entry.status}
-                    </Badge>
+              {scheduleData.length > 0 ? (
+                scheduleData.map((booking) => (
+                  <tr
+                    key={booking.id}
+                    className="border-b last:border-0"
+                  >
+                    <td className="py-3 pr-4 font-medium">{formatTime(booking.start_time)}</td>
+                    <td className="py-3 pr-4 text-muted-foreground">
+                      {/* @ts-ignore */}
+                      {booking.courts?.name || `Court ${booking.court_id}`}
+                    </td>
+                    <td className="py-3 pr-4">
+                      {/* @ts-ignore */}
+                      {booking.profiles ? (booking.profiles.full_name || "Unknown") : "Unknown"}
+                    </td>
+                    <td className="py-3 pr-4 text-muted-foreground">
+                      {calculateDuration(booking.start_time, booking.end_time)}
+                    </td>
+                    <td className="py-3">
+                      <Badge variant={statusVariant[booking.status] || "default"} className="capitalize">
+                        {booking.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                    No schedule for today.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
