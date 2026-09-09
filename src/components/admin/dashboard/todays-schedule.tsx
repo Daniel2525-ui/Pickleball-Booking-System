@@ -1,3 +1,4 @@
+"use client";
 import {
   Card,
   CardContent,
@@ -7,9 +8,10 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { todaysSchedule } from "@/lib/services/dashboard.service";
+import { useState, useEffect } from "react";
 
 const statusVariant: Record<
   string,
@@ -26,28 +28,63 @@ const statusVariant: Record<
   Cancelled: "destructive",
 };
 
-export default async function TodaysSchedule({ className }: { className?: string }) {
-  const scheduleData = await todaysSchedule();
+export default function TodaysSchedule({
+  className,
+}: {
+  className?: string;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [schedule, setSchedule] = useState<any[]>([]);
+
+  useEffect(() => {
+    const getSchedule = async () => {
+      try {
+        const data = await todaysSchedule();
+        setSchedule(data);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getSchedule();
+  }, []);
 
   const formatTime = (timeStr: string) => {
     if (!timeStr) return "";
-    const [hours, minutes] = timeStr.split(':');
+
+    const [hours, minutes] = timeStr.split(":");
+
     const date = new Date();
     date.setHours(parseInt(hours, 10));
     date.setMinutes(parseInt(minutes, 10));
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   const calculateDuration = (start: string, end: string) => {
     if (!start || !end) return "";
-    const [startH, startM] = start.split(':').map(Number);
-    const [endH, endM] = end.split(':').map(Number);
-    const diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+
+    const [startH, startM] = start.split(":").map(Number);
+    const [endH, endM] = end.split(":").map(Number);
+
+    const diffMinutes =
+      endH * 60 + endM - (startH * 60 + startM);
+
     const hours = Math.floor(diffMinutes / 60);
     const mins = diffMinutes % 60;
 
-    if (hours > 0 && mins > 0) return `${hours} hr ${mins} min`;
-    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
+    if (hours > 0 && mins > 0) {
+      return `${hours} hr ${mins} min`;
+    }
+
+    if (hours > 0) {
+      return `${hours} hour${hours > 1 ? "s" : ""}`;
+    }
+
     return `${mins} min`;
   };
 
@@ -57,15 +94,21 @@ export default async function TodaysSchedule({ className }: { className?: string
         <CardTitle className="text-base font-semibold">
           Today&apos;s Schedule
         </CardTitle>
+
         <CardAction>
           <Link href="/admin/schedules">
-            <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-xs text-muted-foreground"
+            >
               View All
               <ArrowRight className="size-3" />
             </Button>
           </Link>
         </CardAction>
       </CardHeader>
+
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -78,27 +121,55 @@ export default async function TodaysSchedule({ className }: { className?: string
                 <th className="pb-3 font-medium">Status</th>
               </tr>
             </thead>
+
             <tbody>
-              {scheduleData.length > 0 ? (
-                scheduleData.map((booking) => (
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="py-8 text-center text-muted-foreground"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <LoaderCircle className="size-5 animate-spin" />
+                      <span>Fetching today&apos;s schedule...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : schedule.length > 0 ? (
+                schedule.map((booking) => (
                   <tr
                     key={booking.id}
                     className="border-b last:border-0"
                   >
-                    <td className="py-3 pr-4 font-medium">{formatTime(booking.start_time)}</td>
-                    <td className="py-3 pr-4 text-muted-foreground">
-                      {/* @ts-ignore */}
-                      {booking.courts?.name || `Court ${booking.court_id}`}
+                    <td className="py-3 pr-4 font-medium">
+                      {formatTime(booking.start_time)}
                     </td>
+
+                    <td className="py-3 pr-4 text-muted-foreground">
+                      {booking.courts?.name ||
+                        `Court ${booking.court_id}`}
+                    </td>
+
                     <td className="py-3 pr-4">
-                      {/* @ts-ignore */}
-                      {booking.profiles ? (booking.profiles.full_name || "Unknown") : "Unknown"}
+                      {booking.profiles
+                        ? booking.profiles.full_name || "Unknown"
+                        : "Unknown"}
                     </td>
+
                     <td className="py-3 pr-4 text-muted-foreground">
-                      {calculateDuration(booking.start_time, booking.end_time)}
+                      {calculateDuration(
+                        booking.start_time,
+                        booking.end_time
+                      )}
                     </td>
+
                     <td className="py-3">
-                      <Badge variant={statusVariant[booking.status] || "default"} className="capitalize">
+                      <Badge
+                        variant={
+                          statusVariant[booking.status] || "default"
+                        }
+                        className="capitalize"
+                      >
                         {booking.status}
                       </Badge>
                     </td>
@@ -106,7 +177,10 @@ export default async function TodaysSchedule({ className }: { className?: string
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={5}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     No schedule for today.
                   </td>
                 </tr>
