@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import Link from "next/link";
-import { fetchRecentBookings } from "@/lib/services/recentBookings.service";
+import { fetchRecentBookings } from "@/lib/services/dashboard/recentBookings.service";
 import { useState, useEffect } from "react";
 
 type PaymentStatus = "Confirmed" | "Pending";

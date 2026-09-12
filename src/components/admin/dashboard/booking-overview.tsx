@@ -11,7 +11,7 @@ import { LoaderCircle } from "lucide-react";
 import {
   fetchBookingOverview,
   type DayData,
-} from "@/lib/services/bookingOverview.service";
+} from "@/lib/services/dashboard/bookingOverview.service";
 import { useEffect, useState } from "react";
 
 export default function BookingOverview({ className }: { className?: string }) {
