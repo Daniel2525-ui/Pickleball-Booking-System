@@ -145,18 +145,18 @@ export default function TodaysSchedule({
                       {formatTime(booking.start_time)}
                     </td>
 
-                    <td className="py-3 pr-4 text-muted-foreground">
+                    <td className="py-3 pr-4 font-medium">
                       {booking.courts?.name ||
                         `Court ${booking.court_id}`}
                     </td>
 
-                    <td className="py-3 pr-4">
+                    <td className="py-3 pr-4 font-medium">
                       {booking.profiles
                         ? booking.profiles.full_name || "Unknown"
                         : "Unknown"}
                     </td>
 
-                    <td className="py-3 pr-4 text-muted-foreground">
+                    <td className="py-3 pr-4 font-medium">
                       {calculateDuration(
                         booking.start_time,
                         booking.end_time
