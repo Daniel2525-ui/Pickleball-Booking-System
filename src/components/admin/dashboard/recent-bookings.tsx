@@ -31,7 +31,7 @@ const statusConfig: Record<
   Pending: { variant: "secondary", dotColor: "bg-amber-500" },
 };
 
-export default function RecentBookings({ className }: { className?: string }) {
+export default function RecentBookings() {
 
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([])
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,7 @@ export default function RecentBookings({ className }: { className?: string }) {
   }, [])
 
   return (
-    <Card className={className}>
+    <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold">
           Recent Bookings
