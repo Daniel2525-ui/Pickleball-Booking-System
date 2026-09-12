@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import Link from "next/link";
-import { todaysSchedule } from "@/lib/services/dashboard.service";
+import { todaysSchedule } from "@/lib/services/schedToday.service";
 import { useState, useEffect } from "react";
 
 const statusVariant: Record<

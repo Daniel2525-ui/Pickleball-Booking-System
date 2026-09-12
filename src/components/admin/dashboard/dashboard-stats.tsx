@@ -10,7 +10,7 @@ import {
   revenueToday,
   revenueYesterday,
   availableCourts,
-} from "@/lib/services/dashboard.service";
+} from "@/lib/services/dashboardCardStats.service";
 
 export default function DashboardStats() {
   const [todayBookingsCount, setTodayBookingsCount] = useState(0);

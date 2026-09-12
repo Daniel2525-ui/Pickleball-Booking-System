@@ -1,7 +1,7 @@
 "use client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CircleCheck, Clock, LoaderCircle } from "lucide-react";
-import { fetchCourtStatus } from "@/lib/services/dashboard.service";
+import { fetchCourtStatus } from "@/lib/services/courtStatus.service";
 import { useEffect, useState } from "react";
 
 type CourtStatusType = "Available" | "In Use";
