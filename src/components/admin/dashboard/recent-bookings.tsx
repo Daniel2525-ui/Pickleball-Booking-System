@@ -1,3 +1,5 @@
+"use client"
+
 import {
   Card,
   CardContent,
@@ -5,10 +7,11 @@ import {
   CardTitle,
   CardAction,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import Link from "next/link";
+import { fetchRecentBookings } from "@/lib/services/recentBookings.service";
+import { useState, useEffect } from "react";
 
 type PaymentStatus = "Confirmed" | "Pending";
 
@@ -20,44 +23,6 @@ interface RecentBooking {
   status: PaymentStatus;
 }
 
-const recentBookingsData: RecentBooking[] = [
-  {
-    customer: "Juan Dela Cruz",
-    court: "Court 2",
-    dateTime: "Today, 5:00 PM",
-    amount: "₱500",
-    status: "Confirmed",
-  },
-  {
-    customer: "Maria Santos",
-    court: "Court 4",
-    dateTime: "Today, 6:00 PM",
-    amount: "₱750",
-    status: "Confirmed",
-  },
-  {
-    customer: "Pedro Garcia",
-    court: "Court 1",
-    dateTime: "Tomorrow, 3:00 PM",
-    amount: "₱500",
-    status: "Pending",
-  },
-  {
-    customer: "Ana Reyes",
-    court: "Court 3",
-    dateTime: "Tomorrow, 4:00 PM",
-    amount: "₱500",
-    status: "Confirmed",
-  },
-  {
-    customer: "Carlos Mendoza",
-    court: "Court 5",
-    dateTime: "Tomorrow, 5:00 PM",
-    amount: "₱750",
-    status: "Pending",
-  },
-];
-
 const statusConfig: Record<
   PaymentStatus,
   { variant: "outline" | "secondary"; dotColor: string }
@@ -67,54 +32,101 @@ const statusConfig: Record<
 };
 
 export default function RecentBookings({ className }: { className?: string }) {
+
+  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([])
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadRecentBookings = async () => {
+      setLoading(true);
+
+      const { data } = await fetchRecentBookings();
+
+      if (data) {
+        setRecentBookings(data)
+      }
+
+      setLoading(false)
+    };
+
+    loadRecentBookings();
+  }, [])
+
   return (
     <Card className={className}>
       <CardHeader>
         <CardTitle className="text-base font-semibold">
           Recent Bookings
         </CardTitle>
+
         <CardAction>
           <Link href="/admin/bookings">
-            <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-xs text-muted-foreground"
+            >
               View All
               <ArrowRight className="size-3" />
             </Button>
           </Link>
         </CardAction>
       </CardHeader>
+
       <CardContent>
         <div className="space-y-0">
-          {recentBookingsData.map((booking, index) => {
-            const config = statusConfig[booking.status];
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-6">
+              <LoaderCircle className="size-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">
+                Fetching recent bookings...
+              </span>
+            </div>
+          ) : recentBookings.length === 0 ? (
+            <div className="flex items-center justify-center py-6">
+              <span className="text-sm text-muted-foreground">
+                No recent bookings yet.
+              </span>
+            </div>
+          ) : (
+            recentBookings.map((booking, index) => {
+              const config = statusConfig[booking.status];
 
-            return (
-              <div
-                key={`${booking.customer}-${booking.dateTime}`}
-                className={`flex items-center justify-between py-3 ${index < recentBookingsData.length - 1 ? "border-b" : ""
-                  }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{booking.customer}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {booking.court} · {booking.dateTime}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 pl-4">
-                  <span className="text-sm font-semibold">
-                    {booking.amount}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`inline-block size-1.5 rounded-full ${config.dotColor}`}
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {booking.status}
+              return (
+                <div
+                  key={`${booking.customer}-${booking.dateTime}`}
+                  className={`flex items-center justify-between py-3 ${index < recentBookings.length - 1 ? "border-b" : ""
+                    }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      {booking.customer}
+                    </p>
+
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {booking.court} · {booking.dateTime}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1 pl-4">
+                    <span className="text-sm font-semibold">
+                      {booking.amount}
                     </span>
+
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`inline-block size-1.5 rounded-full ${config.dotColor}`}
+                      />
+
+                      <span className="text-xs text-muted-foreground">
+                        {booking.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </CardContent>
     </Card>
