@@ -13,7 +13,7 @@ import Link from "next/link";
 import { fetchRecentBookings } from "@/lib/services/dashboard/recentBookings.service";
 import { useState, useEffect } from "react";
 
-type PaymentStatus = "Confirmed" | "Pending";
+type PaymentStatus = "Confirmed" | "Pending" | "Cancelled";
 
 interface RecentBooking {
   customer: string;
@@ -25,10 +25,11 @@ interface RecentBooking {
 
 const statusConfig: Record<
   PaymentStatus,
-  { variant: "outline" | "secondary"; dotColor: string }
+  { variant: "outline" | "secondary" | "destructive"; dotColor: string }
 > = {
   Confirmed: { variant: "outline", dotColor: "bg-emerald-500" },
   Pending: { variant: "secondary", dotColor: "bg-amber-500" },
+  Cancelled: { variant: "destructive", dotColor: "bg-rose-500" },
 };
 
 export default function RecentBookings() {

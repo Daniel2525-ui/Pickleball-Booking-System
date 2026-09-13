@@ -1,11 +1,10 @@
-import { BookingFilters, BookingsTable } from "@/components/admin/bookings";
+import BookingsContainer from "@/components/admin/bookings/bookings-container";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
 export default function BookingsPage() {
     return (
         <div className="flex flex-col gap-6 p-4 lg:p-8 w-full max-w-7xl mx-auto">
-            {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
@@ -19,12 +18,7 @@ export default function BookingsPage() {
                 </Button>
             </div>
 
-            {/* Main Content Area */}
-            <div className="flex flex-col gap-4 mt-2">
-                <BookingFilters />
-                <BookingsTable />
-            </div>
+            <BookingsContainer />
         </div>
-    )
+    );
 }
-

@@ -1,19 +1,24 @@
+import CourtsContainer from "@/components/admin/courts/courts-container";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+
 export default function CourtsPage() {
     return (
-        <div className="flex flex-col gap-4 p-4 lg:p-8 w-full max-w-6xl mx-auto">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Courts</h1>
-            </div>
-            <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-8">
-                <div className="flex h-[400px] shrink-0 items-center justify-center rounded-md border border-dashed">
-                    <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-                        <h3 className="mt-4 text-lg font-semibold">No courts configured</h3>
-                        <p className="mb-4 mt-2 text-sm text-muted-foreground">
-                            Add your pickleball courts here to start receiving bookings.
-                        </p>
-                    </div>
+        <div className="flex flex-col gap-6 p-4 lg:p-8 w-full max-w-7xl mx-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Courts</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Manage your pickleball courts, pricing, and availability.
+                    </p>
                 </div>
+                <Button className="w-full sm:w-auto gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Court
+                </Button>
             </div>
+
+            <CourtsContainer />
         </div>
-    )
+    );
 }

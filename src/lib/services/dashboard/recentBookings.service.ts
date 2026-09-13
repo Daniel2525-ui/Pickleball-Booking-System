@@ -6,8 +6,19 @@ export interface RecentBooking {
     court: string;
     dateTime: string;
     amount: string;
-    status: "Confirmed" | "Pending";
+    status: "Confirmed" | "Pending" | "Cancelled";
 }
+
+const formatTime12h = (timeStr?: string) => {
+    if (!timeStr) return "";
+    const [hoursStr, minutesStr] = timeStr.split(":");
+    let hours = parseInt(hoursStr, 10);
+    if (isNaN(hours)) return "";
+    const minutes = minutesStr || "00";
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    return `${hours}:${minutes} ${ampm}`;
+};
 
 export const fetchRecentBookings = async () => {
     try {
@@ -18,6 +29,7 @@ export const fetchRecentBookings = async () => {
                 created_at,
                 booking_date,
                 start_time,
+                end_time,
                 total_amount,
                 status,
                 court_id,
@@ -47,12 +59,19 @@ export const fetchRecentBookings = async () => {
                     day: "numeric",
                 })
                 : "";
-            const timePart = booking.start_time ? booking.start_time.slice(0, 5) : "";
-            const dateTimeStr = [datePart, timePart].filter(Boolean).join(" · ");
 
             const rawStatus = (booking.status || "").toLowerCase();
-            const status: "Confirmed" | "Pending" =
-                rawStatus === "confirmed" || rawStatus === "completed" ? "Confirmed" : "Pending";
+            const status: "Confirmed" | "Pending" | "Cancelled" =
+                rawStatus === "confirmed" || rawStatus === "completed"
+                    ? "Confirmed"
+                    : rawStatus === "cancelled"
+                        ? "Cancelled"
+                        : "Pending";
+
+            const startTime = formatTime12h(booking.start_time);
+            const endTime = formatTime12h(booking.end_time);
+            const timeRange = [startTime, endTime].filter(Boolean).join(" - ");
+            const dateTimeStr = [datePart, timeRange].filter(Boolean).join(" · ");
 
             return {
                 id: String(booking.id),

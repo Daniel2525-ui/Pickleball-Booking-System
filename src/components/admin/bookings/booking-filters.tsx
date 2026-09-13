@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useState, useEffect } from "react";
-import { fetchCourts, type CourtOption } from "@/lib/services/bookings/fetchCourt.service";
+import { fetchCourts, CourtOption } from "@/lib/services/bookings/fetchCourtFilter.service";
 
 interface BookingFiltersProps {
   onFilterChange?: (filters: { search: string; status: string; courtId: string }) => void;
@@ -20,8 +20,8 @@ interface BookingFiltersProps {
 export default function BookingFilters({ onFilterChange }: BookingFiltersProps = {}) {
 
   const [search, setSearch] = useState("")
-  const [status, setStatus] = useState("all")
-  const [courtId, setCourtId] = useState("all")
+  const [status, setStatus] = useState("All Statuses")
+  const [courtId, setCourtId] = useState("All Courts")
   const [courts, setCourts] = useState<CourtOption[]>([])
 
   useEffect(() => {
@@ -75,9 +75,9 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Statuses">All Statuses</SelectItem>
-            <SelectItem value="confirmed">Confirmed</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="Confirmed">Confirmed</SelectItem>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
 

@@ -18,84 +18,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, FileText, CheckCircle2, XCircle } from "lucide-react";
-
-// Mock Data
-const mockBookings = [
-  {
-    id: "BKG-1029",
-    customer: "Alex Johnson",
-    email: "alex.j@example.com",
-    court: "Court 1",
-    date: "Oct 24, 2026",
-    time: "10:00 AM - 11:30 AM",
-    amount: "₱750",
-    status: "Confirmed",
-  },
-  {
-    id: "BKG-1030",
-    customer: "Sarah Williams",
-    email: "swilliams@example.com",
-    court: "Court 2",
-    date: "Oct 24, 2026",
-    time: "11:00 AM - 1:00 PM",
-    amount: "₱1,000",
-    status: "Pending",
-  },
-  {
-    id: "BKG-1031",
-    customer: "Michael Brown",
-    email: "mbrown88@example.com",
-    court: "Court 3",
-    date: "Oct 24, 2026",
-    time: "2:00 PM - 3:30 PM",
-    amount: "₱750",
-    status: "Confirmed",
-  },
-  {
-    id: "BKG-1032",
-    customer: "Emily Davis",
-    email: "emily.d@example.com",
-    court: "Court 1",
-    date: "Oct 25, 2026",
-    time: "9:00 AM - 11:00 AM",
-    amount: "₱1,000",
-    status: "Cancelled",
-  },
-  {
-    id: "BKG-1033",
-    customer: "David Wilson",
-    email: "dwilson_pro@example.com",
-    court: "Court 4",
-    date: "Oct 25, 2026",
-    time: "4:00 PM - 6:00 PM",
-    amount: "₱1,000",
-    status: "Confirmed",
-  },
-  {
-    id: "BKG-1034",
-    customer: "Jessica Taylor",
-    email: "jtaylor99@example.com",
-    court: "Court 2",
-    date: "Oct 26, 2026",
-    time: "8:00 AM - 9:30 AM",
-    amount: "₱750",
-    status: "Pending",
-  },
-];
-
-const getStatusBadgeVariant = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "confirmed":
-      return "default"; // or custom emerald class if needed, but default is usually primary
-    case "pending":
-      return "secondary"; // amber-ish
-    case "cancelled":
-      return "destructive"; // red
-    default:
-      return "outline";
-  }
-};
+import { MoreHorizontal, FileText, CheckCircle2, XCircle, LoaderCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { fetchBookings, Booking } from "@/lib/services/bookings/bookingsData.service";
 
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
@@ -110,7 +35,33 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export default function BookingsTable() {
+interface BookingsTableProps {
+  filters?: {
+    search: string;
+    status: string;
+    courtId: string;
+  };
+}
+
+export default function BookingsTable({ filters }: BookingsTableProps = {}) {
+  const [bookingsData, setBookingsData] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadBookingsData = async () => {
+      setLoading(true);
+
+      const { data } = await fetchBookings(filters);
+
+      if (data) {
+        setBookingsData(data);
+      }
+      setLoading(false);
+    };
+    loadBookingsData();
+  }, [filters]);
+
+
   return (
     <div className="rounded-md border bg-card">
       <Table>
@@ -126,46 +77,57 @@ export default function BookingsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {mockBookings.length === 0 ? (
+          {loading ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center">
+              <TableCell colSpan={7} className="h-32 text-center">
+                <div className="flex flex-col items-center justify-center space-y-2 text-muted-foreground">
+                  <LoaderCircle className="h-6 w-6 animate-spin text-primary" />
+                  <span className="text-sm">Fetching Bookings Data...</span>
+                </div>
+              </TableCell>
+            </TableRow>
+          ) : bookingsData.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                 No bookings found.
               </TableCell>
             </TableRow>
           ) : (
-            mockBookings.map((booking) => (
-              <TableRow key={booking.id}>
-                <TableCell className="font-medium">{booking.id}</TableCell>
+            bookingsData.map((booking) => (
+              <TableRow key={booking.id} className="group transition-colors hover:bg-muted/50">
+                <TableCell className="font-medium text-xs text-muted-foreground">
+                  {booking.id.split('-')[0]} {/* Example: shorten UUID if needed, otherwise leave as booking.id */}
+                </TableCell>
+                <TableCell>
+                  <span className="font-medium">{booking.profiles?.full_name || "Unknown"}</span>
+                </TableCell>
+                <TableCell>{booking.courts?.name || "Unknown"}</TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-medium">{booking.customer}</span>
+                    <span>
+                      {new Date(booking.booking_date).toLocaleDateString("en-CA", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
                     <span className="text-xs text-muted-foreground">
-                      {booking.email}
+                      {booking.start_time} - {booking.end_time}
                     </span>
                   </div>
                 </TableCell>
-                <TableCell>{booking.court}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span>{booking.date}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {booking.time}
-                    </span>
-                  </div>
+                <TableCell className="font-medium">
+                  ₱{booking.total_amount?.toLocaleString() || 0}
                 </TableCell>
-                <TableCell>{booking.amount}</TableCell>
                 <TableCell>
-                  <Badge
-                    variant="outline"
-                    className={getStatusColor(booking.status)}
-                  >
-                    {booking.status}
+                  <Badge variant="outline" className={getStatusColor(booking.status)}>
+                    {booking.status ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1) : ""}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
+                      <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100">
                         <span className="sr-only">Open menu</span>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
@@ -177,13 +139,13 @@ export default function BookingsTable() {
                         View details
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      {booking.status === "Pending" && (
+                      {booking.status?.toLowerCase() === "pending" && (
                         <DropdownMenuItem className="cursor-pointer text-emerald-600 focus:text-emerald-600">
                           <CheckCircle2 className="mr-2 h-4 w-4" />
                           Confirm Booking
                         </DropdownMenuItem>
                       )}
-                      {booking.status !== "Cancelled" && (
+                      {booking.status?.toLowerCase() !== "cancelled" && (
                         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
                           <XCircle className="mr-2 h-4 w-4" />
                           Cancel Booking
