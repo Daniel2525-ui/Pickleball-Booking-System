@@ -10,12 +10,37 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchCourts, type CourtOption } from "@/lib/services/bookings/fetchCourt.service";
 
-export default function BookingFilters() {
+interface BookingFiltersProps {
+  onFilterChange?: (filters: { search: string; status: string; courtId: string }) => void;
+}
+
+export default function BookingFilters({ onFilterChange }: BookingFiltersProps = {}) {
 
   const [search, setSearch] = useState("")
-  const [bookingsData, setBookingsData] = useState([])
+  const [status, setStatus] = useState("all")
+  const [courtId, setCourtId] = useState("all")
+  const [courts, setCourts] = useState<CourtOption[]>([])
+
+  useEffect(() => {
+    const loadCourts = async () => {
+      const { data } = await fetchCourts();
+
+      setCourts(data)
+    }
+
+    loadCourts()
+  }, [])
+
+  const updateFilters = (newSearch: string, newStatus: string, newCourtId: string) => {
+    onFilterChange?.({
+      search: newSearch,
+      status: newStatus,
+      courtId: newCourtId
+    })
+  };
 
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
@@ -25,7 +50,11 @@ export default function BookingFilters() {
           <Input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearch(value);
+              updateFilters(value, status, courtId)
+            }}
             placeholder="Search by customer name or ID..."
             className="w-full pl-9 bg-background"
           />
@@ -33,7 +62,14 @@ export default function BookingFilters() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Select defaultValue="All Statuses">
+        <Select
+          value={status}
+          onValueChange={(value) => {
+            const newStatus = value || "All Statuses";
+            setStatus(newStatus);
+            updateFilters(search, newStatus, courtId)
+          }}
+          defaultValue="All Statuses">
           <SelectTrigger className="w-[140px] bg-background">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -45,16 +81,23 @@ export default function BookingFilters() {
           </SelectContent>
         </Select>
 
-        <Select defaultValue="All Courts">
+        <Select
+          value={courtId}
+          onValueChange={(value) => {
+            const newCourtId = value || "All Courts"
+            setCourtId(newCourtId)
+            updateFilters(search, status, newCourtId)
+          }}
+          defaultValue="All Courts">
           <SelectTrigger className="w-[140px] bg-background">
             <SelectValue placeholder="Court" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Courts">All Courts</SelectItem>
-            <SelectItem value="Court 1">Court 1</SelectItem>
-            <SelectItem value="Court 2">Court 2</SelectItem>
-            <SelectItem value="Court 3">Court 3</SelectItem>
-            <SelectItem value="Court 4">Court 4</SelectItem>
+            {courts.map((court) =>
+              <SelectItem key={court.id} value={court.name}>
+                {court.name}
+              </SelectItem>)}
           </SelectContent>
         </Select>
 
