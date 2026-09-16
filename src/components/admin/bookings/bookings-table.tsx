@@ -9,18 +9,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, FileText, CheckCircle2, XCircle, LoaderCircle } from "lucide-react";
+import { MoreHorizontal, CheckCircle2, XCircle, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchBookings, Booking } from "@/lib/services/bookings/bookingsData.service";
+import { formatTime12h } from "@/lib/utils/formatTime";
+import { removeBooking } from "@/lib/services/bookings/removeBooking.service";
 
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
@@ -40,6 +42,7 @@ interface BookingsTableProps {
     search: string;
     status: string;
     courtId: string;
+    dateTime: string;
   };
 }
 
@@ -61,13 +64,22 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     loadBookingsData();
   }, [filters]);
 
+  const handleDeleteBooking = async (id: string) => {
+    const prevData = bookingsData;
+    setBookingsData((prev) => prev.filter((booking) => booking.id !== id))
+
+    const { error } = await removeBooking(id)
+
+    if (error) {
+      setBookingsData(prevData)
+    }
+  }
 
   return (
     <div className="rounded-md border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">Booking ID</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Court</TableHead>
             <TableHead>Date & Time</TableHead>
@@ -93,11 +105,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
               </TableCell>
             </TableRow>
           ) : (
-            bookingsData.map((booking) => (
-              <TableRow key={booking.id} className="group transition-colors hover:bg-muted/50">
-                <TableCell className="font-medium text-xs text-muted-foreground">
-                  {booking.id.split('-')[0]} {/* Example: shorten UUID if needed, otherwise leave as booking.id */}
-                </TableCell>
+            bookingsData.map((booking, index) => (
+              <TableRow key={index} className="group transition-colors hover:bg-muted/50">
                 <TableCell>
                   <span className="font-medium">{booking.profiles?.full_name || "Unknown"}</span>
                 </TableCell>
@@ -112,7 +121,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                       })}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {booking.start_time} - {booking.end_time}
+                      {formatTime12h(booking.start_time)} - {formatTime12h(booking.end_time)}
                     </span>
                   </div>
                 </TableCell>
@@ -126,31 +135,27 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
-                    <DropdownMenuTrigger>
-                      <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
+                    <DropdownMenuTrigger render={<button type="button" className="inline-flex items-center justify-center rounded-lg h-8 w-8 p-0 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />}>
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem className="cursor-pointer">
-                        <FileText className="mr-2 h-4 w-4" />
-                        View details
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {booking.status?.toLowerCase() === "pending" && (
-                        <DropdownMenuItem className="cursor-pointer text-emerald-600 focus:text-emerald-600">
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Confirm Booking
-                        </DropdownMenuItem>
-                      )}
-                      {booking.status?.toLowerCase() !== "cancelled" && (
-                        <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        {booking.status?.toLowerCase() === "pending" && (
+                          <>
+                            <DropdownMenuItem className="cursor-pointer text-emerald-600 focus:text-emerald-600">
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Confirm Booking
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
+                        <DropdownMenuItem onClick={() => handleDeleteBooking(booking.id)} className="cursor-pointer text-destructive focus:text-destructive">
                           <XCircle className="mr-2 h-4 w-4" />
-                          Cancel Booking
+                          Delete Booking
                         </DropdownMenuItem>
-                      )}
+                      </DropdownMenuGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

@@ -13,8 +13,8 @@ export interface BookingFiltersState {
 export default function BookingsContainer() {
   const [filters, setFilters] = useState<BookingFiltersState>({
     search: "",
-    status: "all",
-    courtId: "all",
+    status: "All Statuses",
+    courtId: "All Courts",
   });
 
   return (

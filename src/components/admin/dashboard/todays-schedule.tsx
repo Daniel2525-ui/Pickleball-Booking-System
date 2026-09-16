@@ -12,6 +12,8 @@ import { ArrowRight, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { todaysSchedule } from "@/lib/services/dashboard/schedToday.service";
 import { useState, useEffect } from "react";
+import { formatTime12h } from "@/lib/utils/formatTime";
+import { calculateDuration } from "@/lib/helpers/totalDuration";
 
 const statusVariant: Record<
   string,
@@ -48,45 +50,6 @@ export default function TodaysSchedule({
 
     getSchedule();
   }, []);
-
-  const formatTime = (timeStr: string) => {
-    if (!timeStr) return "";
-
-    const [hours, minutes] = timeStr.split(":");
-
-    const date = new Date();
-    date.setHours(parseInt(hours, 10));
-    date.setMinutes(parseInt(minutes, 10));
-
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  const calculateDuration = (start: string, end: string) => {
-    if (!start || !end) return "";
-
-    const [startH, startM] = start.split(":").map(Number);
-    const [endH, endM] = end.split(":").map(Number);
-
-    const diffMinutes =
-      endH * 60 + endM - (startH * 60 + startM);
-
-    const hours = Math.floor(diffMinutes / 60);
-    const mins = diffMinutes % 60;
-
-    if (hours > 0 && mins > 0) {
-      return `${hours} hr ${mins} min`;
-    }
-
-    if (hours > 0) {
-      return `${hours} hour${hours > 1 ? "s" : ""}`;
-    }
-
-    return `${mins} min`;
-  };
 
   return (
     <Card className={className}>
@@ -142,7 +105,7 @@ export default function TodaysSchedule({
                     className="border-b last:border-0"
                   >
                     <td className="py-3 pr-4 font-medium">
-                      {formatTime(booking.start_time)}
+                      {`${formatTime12h(booking.start_time)} - ${formatTime12h(booking.end_time)}`}
                     </td>
 
                     <td className="py-3 pr-4 font-medium">

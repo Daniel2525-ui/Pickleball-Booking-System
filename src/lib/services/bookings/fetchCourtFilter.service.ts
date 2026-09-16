@@ -1,9 +1,5 @@
 import { supabase } from "@/lib/supabase";
-
-export interface CourtOption {
-    id: string,
-    name: string
-}
+import { CourtOption } from "./bookingsTypes";
 
 export const fetchCourts = async () => {
     try {

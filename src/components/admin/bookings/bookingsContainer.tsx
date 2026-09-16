@@ -7,8 +7,8 @@ import BookingsTable from "./bookings-table"
 export const BookingsContainer = () => {
     const [filters, setFilters] = useState({
         search: "",
-        status: "",
-        courtId: "",
+        status: "All Statuses",
+        courtId: "All Courts",
     })
 
     return (

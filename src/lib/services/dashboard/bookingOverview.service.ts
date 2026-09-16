@@ -1,10 +1,5 @@
 import { supabase } from "@/lib/supabase";
-
-export interface DayData {
-    day: string,
-    shortDay: string,
-    bookings: number;
-}
+import { DayData } from "./dashboardTypes";
 
 export const fetchBookingOverview = async () => {
     try {

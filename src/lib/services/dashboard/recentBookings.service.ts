@@ -1,24 +1,6 @@
 import { supabase } from "@/lib/supabase";
-
-export interface RecentBooking {
-    id: string;
-    customer: string;
-    court: string;
-    dateTime: string;
-    amount: string;
-    status: "Confirmed" | "Pending" | "Cancelled";
-}
-
-const formatTime12h = (timeStr?: string) => {
-    if (!timeStr) return "";
-    const [hoursStr, minutesStr] = timeStr.split(":");
-    let hours = parseInt(hoursStr, 10);
-    if (isNaN(hours)) return "";
-    const minutes = minutesStr || "00";
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-    return `${hours}:${minutes} ${ampm}`;
-};
+import { formatTime12h } from "@/lib/utils/formatTime";
+import { RecentBooking } from "./dashboardTypes";
 
 export const fetchRecentBookings = async () => {
     try {
