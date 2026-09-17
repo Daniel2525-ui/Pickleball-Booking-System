@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardHeader } from "@/components/ui/card";
-import { Court } from "@/lib/services/courts/courtsData.service";
+import { Court } from "@/lib/services/courts/courtsTypes";
 
 const STATUS_CONFIG: Record<
   string,

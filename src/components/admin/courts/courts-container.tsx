@@ -11,7 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CourtCard } from "./court-card";
-import { fetchCourtsData, Court } from "@/lib/services/courts/courtsData.service";
+import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
+import { Court } from "@/lib/services/courts/courtsTypes";
 
 export default function CourtsContainer() {
   const [search, setSearch] = useState("");
@@ -91,13 +92,16 @@ export default function CourtsContainer() {
         </Select>
       </div>
 
-      {/* Courts Grid */}
       {loading ? (
         <div className="flex h-48 items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground text-sm">
           <LoaderCircle className="h-4 w-4 animate-spin" />
           Fetching courts...
         </div>
       ) : filtered.length === 0 ? (
+        <div className="flex h-48 items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
+          No courts matched your search.
+        </div>
+      ) : courts.length === 0 ? (
         <div className="flex h-48 items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
           No courts added yet.
         </div>
