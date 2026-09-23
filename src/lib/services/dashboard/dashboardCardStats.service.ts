@@ -11,7 +11,7 @@ export const bookingsToday = async () => {
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("booking_date", today)
-            .neq("status", "cancelled")
+            .in("status", ["confirmed", "completed", "ongoing"]);
 
         if (error) throw error;
         return count ?? 0
@@ -33,7 +33,7 @@ export const bookingsYesterday = async () => {
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("booking_date", yesterday)
-            .neq("status", "cancelled");
+            .in("status", ["confirmed", "completed", "ongoing"]);
 
         if (error) throw error;
         return count ?? 0;
@@ -63,7 +63,7 @@ export const upcomingBookings = async () => {
             .select("*", { count: "exact", head: true })
             .gte("booking_date", today)
             .lte("booking_date", endDate)
-            .neq("status", "cancelled");
+            .in("status", ["confirmed", "completed", "ongoing"]);
 
         if (error) throw error;
 
@@ -84,7 +84,7 @@ export const revenueToday = async () => {
             .from("bookings")
             .select("total_amount")
             .eq("booking_date", today)
-            .neq("status", "cancelled")
+            .in("status", ["confirmed", "completed", "ongoing"]);
 
         if (error) throw error;
 
@@ -111,7 +111,7 @@ export const revenueYesterday = async () => {
             .from("bookings")
             .select("total_amount")
             .eq("booking_date", yesterday)
-            .neq("status", "cancelled");
+            .in("status", ["confirmed", "completed", "ongoing"]);
 
         if (error) throw error;
 
@@ -151,7 +151,7 @@ export const availableCourts = async () => {
             .from("bookings")
             .select("court_id, start_time, end_time")
             .eq("booking_date", today)
-            .neq("status", "cancelled")
+            .in("status", ["confirmed", "completed", "ongoing"])
             .lte("start_time", now)
             .gt("end_time", now);
 

@@ -23,6 +23,7 @@ export const todaysSchedule = async () => {
                 )
             `)
             .eq("booking_date", today)
+            .in("status", ["confirmed", "completed", "ongoing"])
             .order("start_time", { ascending: true });
 
         if (error) throw error;

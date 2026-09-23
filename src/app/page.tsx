@@ -16,7 +16,7 @@ export default function Home() {
           <Link href="/login" className="text-sm font-medium">
             <Button className={"text-black"} variant={"link"}>Login</Button>
           </Link>
-          <Link href="/login" className="bg-primary text-primary-foreground px-3 py-1.5 md:px-4 md:py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+          <Link href="/book" className="bg-primary text-primary-foreground px-3 py-1.5 md:px-4 md:py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
             Book a Court
           </Link>
         </nav>

@@ -18,6 +18,7 @@ export const fetchRecentBookings = async () => {
                 courts ( name ),
                 profiles:user_id ( full_name )       
             `)
+            .in("status", ["confirmed", "completed", "cancelled", "ongoing"])
             .order("created_at", {
                 ascending: false,
             })

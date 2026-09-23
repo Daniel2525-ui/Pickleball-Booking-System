@@ -7,16 +7,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useEffect, useState } from "react";
 
 interface CustomersTableProps {
   customers: Customer[];
 }
 
 export function CustomersTable({ customers }: CustomersTableProps) {
-
-  const [customerData, setCustomerData] = useState<Customer[]>([])
-
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-CA', {
       month: 'short',

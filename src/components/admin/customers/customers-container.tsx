@@ -3,44 +3,37 @@
 import { useState, useEffect } from "react";
 import { Search, LoaderCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { fetchMockCustomers } from "@/lib/services/customers/customersData";
 import { Customer } from "@/lib/services/customers/customersTypes";
 import { CustomersTable } from "./customers-table";
+import { fetchCustomers } from "@/lib/services/customers/fetchCustomers.service";
 
 export default function CustomersContainer() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadCustomers = async () => {
-      setLoading(true);
-      const { data } = await fetchMockCustomers();
+      setLoading(true)
+      const { data } = await fetchCustomers()
+
       if (data) {
-        setCustomers(data);
+        setCustomers(data)
       }
-      setLoading(false);
+
+      setLoading(false)
     };
 
     loadCustomers();
-  }, []);
+  }, [])
 
   const filtered = customers.filter((customer) => {
     const matchesSearch =
       !search ||
       customer.name.toLowerCase().includes(search.toLowerCase()) ||
-      customer.email.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "All" || customer.status === statusFilter;
+      customer.email.toLowerCase().includes(search.toLocaleLowerCase())
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
   const currentDate = new Date();
@@ -83,16 +76,6 @@ export default function CustomersContainer() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value || "All")}>
-          <SelectTrigger className="w-full sm:w-[160px] bg-background">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {loading ? (

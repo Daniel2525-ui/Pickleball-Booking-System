@@ -13,6 +13,7 @@ import Link from "next/link"
 export default function RegisterPage() {
     const router = useRouter()
     const [fullName, setFullName] = useState("")
+    const [phone, setPhone] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
@@ -38,11 +39,11 @@ export default function RegisterPage() {
         setLoading(true)
 
         const supabase = createClient()
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: authData, error: signUpError } = await supabase.auth.signUp({
             email,
             password,
             options: {
-                data: { full_name: fullName },
+                data: { full_name: fullName, phone },
             },
         })
 
@@ -87,6 +88,19 @@ export default function RegisterPage() {
                                 onChange={(e) => setFullName(e.target.value)}
                                 required
                                 autoComplete="name"
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="phone">Phone Number</Label>
+                            <Input
+                                id="phone"
+                                type="tel"
+                                placeholder="+63 917 123 4567"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                required
+                                autoComplete="tel"
                             />
                         </div>
 
