@@ -1,6 +1,6 @@
 import { OperatingHour } from "./operatingHoursInterface";
 
-const FULL_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /**
  * Helper to format 24h string to 12h AM/PM string.
@@ -24,8 +24,8 @@ export const formatTime12h = (timeStr: string): string => {
 export const generateTimeSlots = (selectedDate: Date, operatingHours: OperatingHour[]): string[] => {
     if (!operatingHours || !operatingHours.length) return [];
 
-    const dayName = FULL_DAYS[selectedDate.getDay()];
-    const todaySchedule = operatingHours.find((h) => h.day === dayName);
+    const dayName = weekDays[selectedDate.getDay()];
+    const todaySchedule = operatingHours.find((hour) => hour.day === dayName);
 
     if (!todaySchedule || !todaySchedule.isOpen || !todaySchedule.openTime || !todaySchedule.closeTime) {
         return [];

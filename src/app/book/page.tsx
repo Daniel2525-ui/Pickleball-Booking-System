@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Crosshair, LogOut } from "lucide-react";
+import { Crosshair, LogOut, Home as HomeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BookingContainer } from "@/components/customers/booking-container";
 import { createClient } from "@/lib/supabase/client";
@@ -39,14 +39,18 @@ export default function BookPage() {
       <header className="px-6 md:px-6 py-4 flex items-center justify-between border-b bg-card">
         <Link href="/" className="flex items-center gap-2">
           <Crosshair className="size-5 md:size-6 text-primary" />
-          <span className="font-bold text-lg md:text-xl tracking-tight">Crosshair Dinkers</span>
+          <span className="font-bold text-lg md:text-xl tracking-tight hidden sm:inline-block">Crosshair Dinkers</span>
+          <span className="font-bold text-lg tracking-tight sm:hidden">CD</span>
         </Link>
         <div className="flex items-center gap-4">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+              <HomeIcon className="size-4" />
+              <span className="hidden sm:inline">Home</span>
+            </Button>
+          </Link>
           {user ? (
             <>
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                {user.email}
-              </span>
               <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
                 <LogOut className="size-4" />
                 Logout

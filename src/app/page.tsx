@@ -1,8 +1,38 @@
+"use client";
+
 import Link from "next/link";
-import { CalendarDays, MapPin, Crosshair } from "lucide-react";
+import { CalendarDays, Crosshair, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { logout } from "@/lib/services/auth.service";
+import { User } from "@supabase/supabase-js";
+import { MapPin } from "lucide-react";
 
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Public Header */}
@@ -12,10 +42,17 @@ export default function Home() {
           <span className="font-bold text-lg md:text-xl tracking-tight hidden sm:inline-block">Crosshair Dinkers</span>
           <span className="font-bold text-lg tracking-tight sm:hidden">CD</span>
         </div>
-        <nav className="flex items-center md:gap-6">
-          <Link href="/login" className="text-sm font-medium">
-            <Button className={"text-black"} variant={"link"}>Login</Button>
-          </Link>
+        <nav className="flex items-center gap-2 md:gap-6">
+          {user ? (
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
+              <LogOut className="size-4" />
+              Logout
+            </Button>
+          ) : (
+            <Link href="/login" className="text-sm font-medium">
+              <Button className="text-black" variant="link">Login</Button>
+            </Link>
+          )}
           <Link href="/book" className="bg-primary text-primary-foreground px-3 py-1.5 md:px-4 md:py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
             Book a Court
           </Link>
@@ -26,21 +63,21 @@ export default function Home() {
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-16 md:py-24 relative overflow-hidden">
         {/* Subtle background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] md:w-[800px] md:h-[800px] bg-primary/5 rounded-full blur-[80px] md:blur-[120px] -z-10 pointer-events-none"></div>
-        <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight max-w-4xl mb-4 md:mb-6 leading-tight">
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tighter max-w-4xl mb-4 md:mb-6 leading-tight md:leading-[1.1] text-foreground">
           Dink with precision. <br className="hidden md:block" />
           <span className="text-primary">Play your game.</span>
         </h1>
 
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10">
+        <p className="text-lg md:text-xl text-muted-foreground/90 max-w-2xl mb-10 leading-relaxed font-medium">
           Welcome to Crosshair Dinkers, the premier pickleball venue. View live court availability and reserve your spot in seconds.
         </p>
 
         <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-4">
           <Link
             href="/book"
-            className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3 md:py-4 rounded-full text-base md:text-lg font-semibold hover:bg-primary/90 transition-all shadow-lg hover:shadow-xl w-full sm:w-auto"
+            className="group flex items-center justify-center gap-3 bg-primary text-primary-foreground px-8 py-3 md:py-4 rounded-full text-base md:text-lg font-bold hover:bg-primary/90 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto"
           >
-            <CalendarDays className="size-5" />
+            <CalendarDays className="size-5 group-hover:rotate-12 transition-transform" />
             View Availability
           </Link>
         </div>

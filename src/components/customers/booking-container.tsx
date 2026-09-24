@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn } from "lucide-react";
+import { LoaderCircle, LogIn, Calendar, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -109,6 +109,12 @@ export const BookingContainer = () => {
       return;
     }
 
+    // Unselect if clicking the already selected slot
+    if (selectedSlot?.court === courtName && selectedSlot?.time === time) {
+      setSelectedSlot(null);
+      return;
+    }
+
     const court = courts.find((c) => c.name === courtName);
 
     setSelectedSlot({
@@ -118,7 +124,6 @@ export const BookingContainer = () => {
       price: court?.price || 200, // Read the dynamically attached price
     });
     setIsBookingSuccess(false);
-    setIsDialogOpen(true);
   };
 
   const confirmBooking = async () => {
@@ -162,25 +167,81 @@ export const BookingContainer = () => {
 
   return (
     <>
-      <DateSelector
-        selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
-        operatingHours={operatingHours}
-      />
-
-      {timeSlots.length > 0 ? (
-        <CourtAvailabilityGrid
-          selectedDate={selectedDate}
-          courts={courtNames}
-          timeSlots={timeSlots}
-          onSlotClick={handleSlotClick}
-          getSlotStatus={getSlotStatus}
-        />
-      ) : (
-        <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed text-muted-foreground text-sm">
-          The venue is closed on this date. Please select another date.
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="lg:col-span-4 xl:col-span-3">
+          <DateSelector
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            operatingHours={operatingHours}
+          />
         </div>
-      )}
+
+        <div className="lg:col-span-8 xl:col-span-9">
+          {timeSlots.length > 0 ? (
+            <div className="space-y-6">
+              <CourtAvailabilityGrid
+                selectedDate={selectedDate}
+                courts={courtNames}
+                timeSlots={timeSlots}
+                onSlotClick={handleSlotClick}
+                getSlotStatus={getSlotStatus}
+                selectedSlot={selectedSlot}
+              />
+
+              {/* Selected Slot Summary */}
+              {selectedSlot && (
+                <div className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:w-[90%] sm:max-w-4xl z-50 bg-card border-t sm:border sm:rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] sm:shadow-2xl p-4 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 animate-in slide-in-from-bottom-8 duration-300">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 sm:hidden text-muted-foreground"
+                    onClick={() => setSelectedSlot(null)}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                  <div className="w-full sm:w-auto pr-8 sm:pr-0">
+                    <div className="flex items-center justify-between sm:justify-start gap-4 mb-2">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Selected Slot</h3>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+                      <p className="text-xl font-bold text-foreground">{selectedSlot.court}</p>
+                      <div className="flex items-center text-sm font-medium gap-1.5">
+                        <Calendar className="size-4" />
+                        <span className="font-bold">
+                          {selectedSlot.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-sm font-medium text-muted-foreground gap-1.5">
+                        <Clock className="size-4 text-green-600 dark:text-green-400 font-medium" />
+                        <span className="text-green-600 dark:text-green-400 font-medium">
+                          {selectedSlot.time}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:items-end w-full sm:w-auto gap-3">
+                    <div className="text-left sm:text-right">
+                      <p className="text-xs text-muted-foreground">Total Price</p>
+                      <p className="text-2xl font-bold text-foreground">₱{selectedSlot.price.toLocaleString()}</p>
+                    </div>
+                    <Button
+                      onClick={() => setIsDialogOpen(true)}
+                      size="lg"
+                      className="w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
+                    >
+                      Continue to Checkout
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed text-muted-foreground text-sm">
+              The venue is closed on this date. Please select another date.
+            </div>
+          )}
+        </div>
+      </div>
 
       <BookingModal
         isOpen={isDialogOpen}

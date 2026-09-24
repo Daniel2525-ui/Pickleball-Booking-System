@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import {
   Table,
@@ -18,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, CheckCircle2, XCircle, LoaderCircle } from "lucide-react";
+import { MoreHorizontal, CheckCircle2, XCircle, LoaderCircle, Calendar } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchBookings } from "@/lib/services/bookings/bookingsData.service";
 import { Booking } from "@/lib/services/bookings/bookingsTypes";
@@ -38,7 +39,7 @@ const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
 
-const COLUMN_COUNT = 6;
+const columnCount = 6;
 
 interface BookingsTableProps {
   filters?: {
@@ -69,7 +70,12 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
     setBookingsData((prev) => prev.filter((booking) => booking.id !== id));
 
     const { error } = await removeBooking(id);
-    if (error) setBookingsData(prevData);
+    if (error) {
+      setBookingsData(prevData);
+      toast.error("Failed to delete booking");
+    } else {
+      toast.success("Booking deleted successfully");
+    }
   };
 
   return (
@@ -88,7 +94,7 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={COLUMN_COUNT} className="h-32 text-center">
+              <TableCell colSpan={columnCount} className="h-32 text-center">
                 <div className="flex flex-col items-center justify-center space-y-2 text-muted-foreground">
                   <LoaderCircle className="h-6 w-6 animate-spin text-primary" />
                   <span className="text-sm">Fetching bookings data...</span>
@@ -97,8 +103,16 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
             </TableRow>
           ) : bookingsData.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={COLUMN_COUNT} className="h-24 text-center text-muted-foreground">
-                No bookings found.
+              <TableCell colSpan={columnCount} className="h-64 text-center">
+                <div className="flex flex-col items-center justify-center space-y-3">
+                  <div className="rounded-full bg-muted p-3">
+                    <Calendar className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div className="text-lg font-semibold">No bookings found</div>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    There are no bookings matching your current filters. Try adjusting your search criteria or wait for new bookings.
+                  </p>
+                </div>
               </TableCell>
             </TableRow>
           ) : (

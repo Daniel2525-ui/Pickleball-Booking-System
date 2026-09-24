@@ -10,8 +10,8 @@ interface DateSelectorProps {
   operatingHours: OperatingHour[];
 }
 
-const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const FULL_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const fullDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -62,14 +62,14 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
   }, [viewMonth, viewYear]);
 
   const isDayOpen = (date: Date): boolean => {
-    const dayName = FULL_DAYS[date.getDay()];
+    const dayName = fullDays[date.getDay()];
     const schedule = operatingHours.find((hour) => hour.day === dayName);
     return !!schedule?.isOpen;
   };
 
   const getScheduleForDate = (date: Date): OperatingHour | undefined => {
-    const dayName = FULL_DAYS[date.getDay()];
-    return operatingHours.find((h) => h.day === dayName);
+    const dayName = fullDays[date.getDay()];
+    return operatingHours.find((hour) => hour.day === dayName);
   };
 
   const selectedSchedule = getScheduleForDate(selectedDate);
@@ -101,7 +101,7 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
       </div>
 
       <div className="p-4 md:p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col gap-6">
           {/* Calendar Grid */}
           <div className="flex-1">
             {/* Month navigation */}
@@ -123,7 +123,7 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
 
             {/* Day-of-week headers */}
             <div className="grid grid-cols-7 gap-1 mb-1">
-              {DAYS_OF_WEEK.map((day) => (
+              {daysOfWeek.map((day) => (
                 <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
                   {day}
                 </div>
@@ -149,12 +149,12 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
                     disabled={disabled}
                     onClick={() => onSelectDate(date)}
                     className={`
-                      relative aspect-square rounded-xl flex flex-col items-center justify-center
+                      relative aspect-square w-full rounded-xl flex flex-col items-center justify-center
                       text-sm font-medium transition-all
                       ${disabled
                         ? "text-muted-foreground/30 cursor-not-allowed"
                         : isSelected
-                          ? "bg-primary text-primary-foreground shadow-md scale-105"
+                          ? "bg-primary text-primary-foreground shadow-md"
                           : isToday
                             ? "bg-primary/10 border-2 border-primary text-primary hover:bg-primary/20"
                             : "hover:bg-muted border border-transparent hover:border-border"
@@ -162,38 +162,15 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
                     `}
                   >
                     <span>{date.getDate()}</span>
-                    {!disabled && (
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full mt-0.5 ${open
-                          ? isSelected
-                            ? "bg-primary-foreground/80"
-                            : "bg-green-500"
-                          : isSelected
-                            ? "bg-primary-foreground/40"
-                            : "bg-muted-foreground/30"
-                          }`}
-                      />
-                    )}
                   </button>
                 );
               })}
             </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                Open
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-                Closed
-              </div>
-            </div>
           </div>
 
           {/* Selected Date Info Panel */}
-          <div className="lg:w-64 lg:border-l lg:pl-6">
+          <div className="w-full">
             <div className="rounded-xl border bg-muted/30 p-4">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 Selected Date

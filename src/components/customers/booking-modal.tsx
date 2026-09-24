@@ -1,4 +1,4 @@
-import { Clock, CheckCircle, MapPin, Calendar, LoaderCircle, AlertCircle } from "lucide-react";
+import { Clock, CheckCircle, MapPin, Calendar, LoaderCircle, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -86,9 +86,9 @@ export const BookingModal = ({
                 {isLoading ? (
                   <LoaderCircle className="size-4 animate-spin" />
                 ) : (
-                  <CheckCircle className="size-4" />
+                  <Lock className="size-4" />
                 )}
-                {isLoading ? "Redirecting..." : "Confirm & Pay"}
+                {isLoading ? "Redirecting..." : "Continue to Checkout"}
               </Button>
             </DialogFooter>
           </>

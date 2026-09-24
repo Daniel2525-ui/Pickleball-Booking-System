@@ -1,4 +1,5 @@
-import { Clock } from "lucide-react";
+import { Clock, Check } from "lucide-react";
+import { Slot } from "./types";
 
 interface CourtAvailabilityGridProps {
   selectedDate: Date;
@@ -6,6 +7,7 @@ interface CourtAvailabilityGridProps {
   timeSlots: string[];
   onSlotClick: (court: string, time: string) => void;
   getSlotStatus: (date: Date, court: string, time: string) => "available" | "booked" | "maintenance" | "closed";
+  selectedSlot?: Slot | null;
 }
 
 export const CourtAvailabilityGrid = ({
@@ -14,6 +16,7 @@ export const CourtAvailabilityGrid = ({
   timeSlots,
   onSlotClick,
   getSlotStatus,
+  selectedSlot,
 }: CourtAvailabilityGridProps) => {
   const colCount = courts.length;
 
@@ -26,11 +29,11 @@ export const CourtAvailabilityGrid = ({
         </h2>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="min-w-[800px]">
+      <div className="overflow-x-auto pb-2">
+        <div className="min-w-[600px] md:min-w-[800px]">
           {/* Grid Header */}
-          <div className="grid grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] border-b">
-            <div className="p-4 border-r bg-muted/10 font-medium text-sm flex items-center justify-center text-muted-foreground">
+          <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] border-b">
+            <div className="p-4 border-r font-medium text-sm flex items-center justify-center text-muted-foreground sticky left-0 z-20 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
               Time
             </div>
             <div
@@ -48,8 +51,8 @@ export const CourtAvailabilityGrid = ({
           {/* Grid Body */}
           <div className="divide-y">
             {timeSlots.map((time, timeIdx) => (
-              <div key={timeIdx} className="grid grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] hover:bg-muted/5 transition-colors">
-                <div className="p-2 border-r bg-muted/10 flex items-center justify-center text-xs md:text-sm text-center font-medium">
+              <div key={timeIdx} className="grid grid-cols-[110px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] hover:bg-muted/30 transition-colors group">
+                <div className="p-2 border-r flex items-center justify-center text-xs md:text-sm text-center font-medium sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:bg-muted/30 transition-colors">
                   {time}
                 </div>
                 <div
@@ -58,12 +61,22 @@ export const CourtAvailabilityGrid = ({
                 >
                   {courts.map((court, courtIdx) => {
                     const status = getSlotStatus(selectedDate, court, time);
+                    const isSelected = selectedSlot?.court === court && selectedSlot?.time === time;
+
                     return (
                       <div key={courtIdx} className="p-2 border-l first:border-l-0 h-full">
-                        {status === "available" ? (
+                        {isSelected ? (
                           <button
                             onClick={() => onSlotClick(court, time)}
-                            className="w-full h-full min-h-[48px] bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground rounded-lg transition-all text-xs md:text-sm font-medium flex items-center justify-center border border-primary/20 hover:shadow-md"
+                            className="w-full h-full min-h-[48px] bg-primary text-primary-foreground rounded-lg transition-all duration-200 text-xs md:text-sm font-semibold flex items-center justify-center gap-1.5 shadow-md hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          >
+                            <Check className="size-4" />
+                            Selected
+                          </button>
+                        ) : status === "available" ? (
+                          <button
+                            onClick={() => onSlotClick(court, time)}
+                            className="w-full h-full min-h-[48px] bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground rounded-lg transition-all duration-200 text-xs md:text-sm font-semibold flex items-center justify-center border border-primary/30 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           >
                             Available
                           </button>

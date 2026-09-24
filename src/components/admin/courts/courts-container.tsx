@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, LoaderCircle } from "lucide-react";
+import { Search, LoaderCircle, Map } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -122,12 +123,27 @@ export default function CourtsContainer() {
           Fetching courts...
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex h-48 items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
-          No courts matched your search.
+        <div className="flex h-64 flex-col items-center justify-center space-y-3 rounded-2xl border border-dashed bg-muted/20">
+          <div className="rounded-full bg-muted p-3">
+            <Search className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div className="text-lg font-semibold">No courts found</div>
+          <p className="text-sm text-muted-foreground max-w-sm text-center">
+            No courts matched your search criteria. Try adjusting your filters.
+          </p>
         </div>
       ) : courts.length === 0 ? (
-        <div className="flex h-48 items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
-          No courts added yet.
+        <div className="flex h-64 flex-col items-center justify-center space-y-3 rounded-2xl border border-dashed bg-muted/20">
+          <div className="rounded-full bg-muted p-3">
+            <Map className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div className="text-lg font-semibold">No courts added yet</div>
+          <p className="text-sm text-muted-foreground max-w-sm text-center">
+            You haven't added any courts to your facility. Add a court to start accepting bookings.
+          </p>
+          <Button onClick={() => setIsAddModalOpen(true)} className="mt-4">
+            Add Your First Court
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
