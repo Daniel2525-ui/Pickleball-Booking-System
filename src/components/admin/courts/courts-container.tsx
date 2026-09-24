@@ -141,9 +141,14 @@ export default function CourtsContainer() {
           <p className="text-sm text-muted-foreground max-w-sm text-center">
             You haven't added any courts to your facility. Add a court to start accepting bookings.
           </p>
-          <Button onClick={() => setIsAddModalOpen(true)} className="mt-4">
-            Add Your First Court
-          </Button>
+          <AddCourtModal 
+            onCourtAdded={loadCourts} 
+            trigger={
+              <Button className="mt-4">
+                Add Your First Court
+              </Button>
+            } 
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

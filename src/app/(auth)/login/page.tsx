@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Crosshair, Eye, EyeOff, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { login } from "@/lib/services/auth.service"
 
-export default function LoginPage() {
+function LoginContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const justRegistered = searchParams.get("registered") === "true"
@@ -138,5 +138,17 @@ export default function LoginPage() {
                 &copy; {new Date().getFullYear()} Crosshair Dinkers
             </p>
         </div>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <Loader2 className="size-8 animate-spin text-primary" />
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     )
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Calendar, Clock, MapPin, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function BookingSuccessPage() {
+function BookingSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
 
@@ -45,5 +45,17 @@ export default function BookingSuccessPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function BookingSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <BookingSuccessContent />
+    </Suspense>
   );
 }

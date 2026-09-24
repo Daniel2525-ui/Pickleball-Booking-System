@@ -24,9 +24,10 @@ import { addCourt } from "@/lib/services/courts/addCourt.service";
 
 interface AddCourtModalProps {
     onCourtAdded: () => void;
+    trigger?: React.ReactElement;
 }
 
-export const AddCourtModal = ({ onCourtAdded }: AddCourtModalProps) => {
+export const AddCourtModal = ({ onCourtAdded, trigger }: AddCourtModalProps) => {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [status, setStatus] = useState("active");
@@ -59,12 +60,14 @@ export const AddCourtModal = ({ onCourtAdded }: AddCourtModalProps) => {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={
-                <Button className="w-full sm:w-auto gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Court
-                </Button>
-            } />
+            <DialogTrigger 
+                render={trigger || (
+                    <Button className="w-full sm:w-auto gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add Court
+                    </Button>
+                )} 
+            />
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Add New Court</DialogTitle>
