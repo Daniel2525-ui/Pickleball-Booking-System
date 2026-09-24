@@ -13,26 +13,39 @@ import {
 import { CourtCard } from "./court-card";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { Court } from "@/lib/services/courts/courtsTypes";
+import { AddCourtModal } from "./addCourtModal";
+import { EditCourtModal } from "./editCourtModal";
+import { deleteCourt } from "@/lib/services/courts/deleteCourt.service";
 
 export default function CourtsContainer() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Courts");
   const [courts, setCourts] = useState<Court[]>([]);
   const [loading, setLoading] = useState(true);
+  const [courtToEdit, setCourtToEdit] = useState<Court | null>(null);
+
+  const loadCourts = async () => {
+    setLoading(true);
+    const { data } = await fetchCourtsData();
+    if (data) {
+      setCourts(data);
+    }
+    setLoading(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this court?")) return;
+    
+    const { error } = await deleteCourt(id);
+    if (error) {
+        alert("Failed to delete court");
+        return;
+    }
+    
+    loadCourts();
+  };
 
   useEffect(() => {
-    const loadCourts = async () => {
-      setLoading(true);
-
-      const { data } = await fetchCourtsData();
-
-      if (data) {
-        setCourts(data);
-      }
-
-      setLoading(false);
-    };
-
     loadCourts();
   }, []);
 
@@ -58,6 +71,17 @@ export default function CourtsContainer() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Courts</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your pickleball courts, pricing, and availability.
+          </p>
+        </div>
+        <AddCourtModal onCourtAdded={loadCourts} />
+      </div>
+
       {/* Summary Pills */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {stats.map((stat) => (
@@ -108,10 +132,22 @@ export default function CourtsContainer() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((court) => (
-            <CourtCard key={court.id} court={court} />
+            <CourtCard 
+              key={court.id} 
+              court={court} 
+              onEdit={(c) => setCourtToEdit(c)} 
+              onDelete={handleDelete} 
+            />
           ))}
         </div>
       )}
+      
+      <EditCourtModal 
+        court={courtToEdit} 
+        open={!!courtToEdit} 
+        onOpenChange={(open) => !open && setCourtToEdit(null)} 
+        onCourtUpdated={loadCourts} 
+      />
     </div>
   );
 }

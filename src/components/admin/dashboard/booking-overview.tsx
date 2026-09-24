@@ -9,10 +9,10 @@ import {
 } from "@/components/ui/card";
 import { LoaderCircle } from "lucide-react";
 import {
-  fetchBookingOverview,
-  type DayData,
+  fetchBookingOverview
 } from "@/lib/services/dashboard/bookingOverview.service";
 import { useEffect, useState } from "react";
+import { DayData } from "@/lib/services/dashboard/dashboardTypes";
 
 export default function BookingOverview({ className }: { className?: string }) {
   const [weekData, setWeekData] = useState<DayData[]>([]);
@@ -34,7 +34,7 @@ export default function BookingOverview({ className }: { className?: string }) {
     loadOverview();
   }, []);
 
-  const maxBookings = Math.max(...weekData.map((d) => d.bookings), 1);
+  const maxBookings = Math.max(...weekData.map((day) => day.bookings), 1);
 
   return (
     <Card className={className}>

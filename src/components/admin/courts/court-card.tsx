@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -21,11 +22,11 @@ import {
 import { Card, CardHeader } from "@/components/ui/card";
 import { Court } from "@/lib/services/courts/courtsTypes";
 
-const STATUS_CONFIG: Record<
+const statusConfig: Record<
   string,
   { label: string; className: string; barColor: string; Icon: React.ElementType }
 > = {
-  available: {
+  active: {
     label: "Available",
     className:
       "bg-emerald-500/15 text-emerald-700 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800",
@@ -55,7 +56,7 @@ interface CourtCardProps {
 }
 
 export function CourtCard({ court, onEdit, onDelete }: CourtCardProps) {
-  const status = STATUS_CONFIG[court.status?.toLowerCase()] ?? STATUS_CONFIG.available;
+  const status = statusConfig[court.status?.toLowerCase()] ?? statusConfig.available;
   const { label, className, barColor, Icon } = status;
 
   return (
@@ -74,30 +75,34 @@ export function CourtCard({ court, onEdit, onDelete }: CourtCardProps) {
             </Badge>
 
             <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
+                }
+              >
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Open menu</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem className="cursor-pointer" onClick={() => onEdit?.(court)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit Court
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                  onClick={() => onDelete?.(court.id)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Court
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => onEdit?.(court)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Court
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    onClick={() => onDelete?.(court.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Court
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

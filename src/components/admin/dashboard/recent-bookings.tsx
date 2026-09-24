@@ -95,7 +95,7 @@ export default function RecentBookings() {
 
               return (
                 <div
-                  key={`${booking.customer}-${booking.dateTime}`}
+                  key={`${booking.dateTime}`}
                   className={`flex items-center justify-between py-3 ${index < recentBookings.length - 1 ? "border-b" : ""
                     }`}
                 >

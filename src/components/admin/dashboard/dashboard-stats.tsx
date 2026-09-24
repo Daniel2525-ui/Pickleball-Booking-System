@@ -44,21 +44,19 @@ export default function DashboardStats() {
     fetchStats();
   }, []);
 
-  const bookingDiff = todayBookingsCount - yesterdayBookingsCount;
-  const bookingDesc =
-    bookingDiff > 0
-      ? `+${bookingDiff} from yesterday`
-      : bookingDiff < 0
-        ? `${bookingDiff} from yesterday`
-        : "Same as yesterday";
+  const describeDiff = (diff: number, suffix = "") =>
+    diff > 0 ? `+${diff}${suffix} from yesterday`
+      : diff < 0 ? `${diff}${suffix} from yesterday`
+        : `Same as yesterday`;
 
-  let revDesc = "0% from yesterday";
-  if (revYesterday === 0) {
-    revDesc = revToday > 0 ? "+100% from yesterday" : "No revenue recorded yesterday";
-  } else {
-    const pct = Math.round(((revToday - revYesterday) / revYesterday) * 100);
-    revDesc = pct >= 0 ? `+${pct}% from yesterday` : `${pct}% from yesterday`;
-  }
+  const bookingDesc = describeDiff(todayBookingsCount - yesterdayBookingsCount);
+
+  const revDesc =
+    revYesterday === 0
+      ? revToday > 0
+        ? "+100% from yesterday"
+        : "No revenue recorded yesterday"
+      : describeDiff(Math.round(((revToday - revYesterday) / revYesterday) * 100), "%");
 
   const stats = [
     {

@@ -10,12 +10,12 @@ interface OperatingHourRowProps {
   onTimeChange: (index: number, field: "openTime" | "closeTime", value: string) => void
 }
 
-export function OperatingHourRow({ hour, index, onToggle, onTimeChange }: OperatingHourRowProps) {
+export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: OperatingHourRowProps) => {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border bg-card/50 hover:bg-accent/5 transition-colors">
       <div className="flex items-center gap-4 w-full sm:w-48">
         <Switch
-          id={`toggle-${hour.day}`}
+          id={`${hour.day}`}
           checked={hour.isOpen}
           onCheckedChange={() => onToggle(index)}
         />

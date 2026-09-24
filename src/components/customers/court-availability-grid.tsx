@@ -5,7 +5,7 @@ interface CourtAvailabilityGridProps {
   courts: string[];
   timeSlots: string[];
   onSlotClick: (court: string, time: string) => void;
-  checkAvailability: (date: Date, court: string, time: string) => boolean;
+  getSlotStatus: (date: Date, court: string, time: string) => "available" | "booked" | "maintenance" | "closed";
 }
 
 export function CourtAvailabilityGrid({
@@ -13,7 +13,7 @@ export function CourtAvailabilityGrid({
   courts,
   timeSlots,
   onSlotClick,
-  checkAvailability,
+  getSlotStatus,
 }: CourtAvailabilityGridProps) {
   const colCount = courts.length;
 
@@ -57,10 +57,10 @@ export function CourtAvailabilityGrid({
                   style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}
                 >
                   {courts.map((court, courtIdx) => {
-                    const isAvailable = checkAvailability(selectedDate, court, time);
+                    const status = getSlotStatus(selectedDate, court, time);
                     return (
                       <div key={courtIdx} className="p-2 border-l first:border-l-0 h-full">
-                        {isAvailable ? (
+                        {status === "available" ? (
                           <button
                             onClick={() => onSlotClick(court, time)}
                             className="w-full h-full min-h-[48px] bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground rounded-lg transition-all text-xs md:text-sm font-medium flex items-center justify-center border border-primary/20 hover:shadow-md"
@@ -68,8 +68,8 @@ export function CourtAvailabilityGrid({
                             Available
                           </button>
                         ) : (
-                          <div className="w-full h-full min-h-[48px] bg-muted/50 rounded-lg flex items-center justify-center text-muted-foreground/40 text-xs cursor-not-allowed">
-                            Booked
+                          <div className="w-full h-full min-h-[48px] bg-muted/50 rounded-lg flex items-center justify-center text-muted-foreground/60 text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-wider">
+                            {status === "maintenance" ? "Maintenance" : status === "closed" ? "Closed" : "Booked"}
                           </div>
                         )}
                       </div>

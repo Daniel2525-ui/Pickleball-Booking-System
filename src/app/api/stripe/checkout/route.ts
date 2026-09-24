@@ -29,14 +29,32 @@ export async function POST(request: NextRequest) {
 
         // 2. Parse the booking details from the request body
         const body = await request.json();
-        const { court_id, court_name, booking_date, start_time, end_time, amount } = body;
+        const { court_id, booking_date, start_time, end_time } = body;
 
-        if (!court_id || !court_name || !booking_date || !start_time || !end_time || !amount) {
+        if (!court_id || !booking_date || !start_time || !end_time) {
             return Response.json(
                 { error: "Missing required booking details." },
                 { status: 400 }
             );
         }
+
+        // Fetch true court details from DB for security
+        const { data: court } = await supabase
+            .from("courts")
+            .select("name")
+            .eq("id", court_id)
+            .single();
+
+        if (!court) {
+            return Response.json(
+                { error: "Invalid court." },
+                { status: 400 }
+            );
+        }
+
+        const court_name = court.name;
+        // Calculate price dynamically (Premium courts: $20, Standard: $15)
+        const amount = court_name.includes("Premium") ? 2000 : 1500;
 
         // Ensure times have seconds for accurate DB string comparison (e.g. '08:00:00' vs '08:00')
         const startTimeDb = start_time.length === 5 ? `${start_time}:00` : start_time;
@@ -134,6 +152,7 @@ export async function POST(request: NextRequest) {
                 payment_id: payment.id,
             },
             customer_email: user.email,
+            expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // Expires in exactly 30 minutes
         });
 
         // 7. Store the Stripe session ID on the payment record

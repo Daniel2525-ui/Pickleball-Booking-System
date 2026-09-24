@@ -9,6 +9,7 @@ export const BookingsContainer = () => {
         search: "",
         status: "All Statuses",
         courtId: "All Courts",
+        dateTime: "",
     })
 
     return (

@@ -11,10 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useState, useEffect } from "react";
-import { fetchCourts, CourtOption } from "@/lib/services/bookings/fetchCourtFilter.service";
+import { fetchCourts } from "@/lib/services/bookings/fetchCourtFilter.service";
+import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 
 interface BookingFiltersProps {
-  onFilterChange?: (filters: { search: string; status: string; courtId: string }) => void;
+  onFilterChange?: (filters: { search: string; status: string; courtId: string; dateTime: string }) => void;
 }
 
 export default function BookingFilters({ onFilterChange }: BookingFiltersProps = {}) {
@@ -22,6 +23,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("All Statuses")
   const [courtId, setCourtId] = useState("All Courts")
+  const [dateTime, setDateTime] = useState("")
   const [courts, setCourts] = useState<CourtOption[]>([])
 
   useEffect(() => {
@@ -34,11 +36,12 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
     loadCourts()
   }, [])
 
-  const updateFilters = (newSearch: string, newStatus: string, newCourtId: string) => {
+  const updateFilters = (newSearch: string, newStatus: string, newCourtId: string, newDateTime: string) => {
     onFilterChange?.({
       search: newSearch,
       status: newStatus,
-      courtId: newCourtId
+      courtId: newCourtId,
+      dateTime: newDateTime
     })
   };
 
@@ -53,7 +56,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
             onChange={(e) => {
               const value = e.target.value;
               setSearch(value);
-              updateFilters(value, status, courtId)
+              updateFilters(value, status, courtId, dateTime)
             }}
             placeholder="Search by customer name or ID..."
             className="w-full pl-9 bg-background"
@@ -67,7 +70,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
           onValueChange={(value) => {
             const newStatus = value || "All Statuses";
             setStatus(newStatus);
-            updateFilters(search, newStatus, courtId)
+            updateFilters(search, newStatus, courtId, dateTime)
           }}
           defaultValue="All Statuses">
           <SelectTrigger className="w-[140px] bg-background">
@@ -86,7 +89,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
           onValueChange={(value) => {
             const newCourtId = value || "All Courts"
             setCourtId(newCourtId)
-            updateFilters(search, status, newCourtId)
+            updateFilters(search, status, newCourtId, dateTime)
           }}
           defaultValue="All Courts">
           <SelectTrigger className="w-[140px] bg-background">

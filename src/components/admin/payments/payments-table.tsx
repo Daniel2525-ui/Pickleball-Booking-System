@@ -15,20 +15,26 @@ import { fetchPayments } from "@/lib/services/payments/paymentsData.service";
 import { Payment } from "@/lib/services/payments/paymentsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 
-const getStatusColor = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "succeeded":
-      return "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50";
-    case "pending":
-      return "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/50";
-    case "failed":
-      return "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50";
-    case "refunded":
-      return "bg-blue-500/15 text-blue-700 hover:bg-blue-500/25 border-blue-200 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/50";
-    default:
-      return "";
-  }
+const statusStyles: Record<string, string> = {
+  succeeded: "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50",
+  pending: "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/50",
+  failed: "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50",
+  refunded: "bg-blue-500/15 text-blue-700 hover:bg-blue-500/25 border-blue-200 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/50",
 };
+
+const getStatusColor = (status: string) => statusStyles[status.toLowerCase()] ?? "";
+
+const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : "");
+
+const formatDate = (date: string | null | undefined, withTime = false) =>
+  date
+    ? new Date(date).toLocaleDateString("en-CA", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      ...(withTime && { hour: "2-digit", minute: "2-digit" }),
+    })
+    : "—";
 
 interface PaymentsTableProps {
   filters?: {
@@ -96,20 +102,10 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                     {payment.bookings?.profiles?.full_name || "Unknown"}
                   </span>
                 </TableCell>
-                <TableCell>
-                  {payment.bookings?.courts?.name || "—"}
-                </TableCell>
+                <TableCell>{payment.bookings?.courts?.name || "—"}</TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span>
-                      {payment.bookings?.booking_date
-                        ? new Date(payment.bookings.booking_date).toLocaleDateString("en-CA", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                        : "—"}
-                    </span>
+                    <span>{formatDate(payment.bookings?.booking_date)}</span>
                     {payment.bookings?.start_time && (
                       <span className="text-xs text-muted-foreground">
                         {formatTime12h(payment.bookings.start_time)} - {formatTime12h(payment.bookings.end_time)}
@@ -125,18 +121,12 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className={getStatusColor(payment.status)}>
-                    {payment.status ? payment.status.charAt(0).toUpperCase() + payment.status.slice(1) : ""}
+                    {capitalize(payment.status)}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   {payment.paid_at
-                    ? new Date(payment.paid_at).toLocaleDateString("en-CA", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
+                    ? formatDate(payment.paid_at, true)
                     : <span className="text-muted-foreground">—</span>}
                 </TableCell>
               </TableRow>

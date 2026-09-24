@@ -24,40 +24,9 @@ import { fetchBookingsForDate, BookingSlot } from "@/lib/services/bookings/fetch
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
-// Helper to format time (e.g. "13:00" -> "01:00 PM")
-const formatTime12h = (timeStr?: string) => {
-  if (!timeStr) return "";
-  const [hoursStr, minutesStr] = timeStr.split(":");
-  let hours = parseInt(hoursStr, 10);
-  if (isNaN(hours)) return "";
-  const minutes = minutesStr || "00";
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12 || 12;
-  const formattedHours = hours < 10 ? `0${hours}` : hours.toString();
-  return `${formattedHours}:${minutes} ${ampm}`;
-};
-
-// Convert "08:00 AM" back to "08:00" (24h) for comparison with DB times
-const to24h = (time12h: string): string => {
-  const match = time12h.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!match) return time12h;
-  let hours = parseInt(match[1], 10);
-  const minutes = match[2];
-  const period = match[3].toUpperCase();
-  if (period === "PM" && hours !== 12) hours += 12;
-  if (period === "AM" && hours === 12) hours = 0;
-  return `${hours < 10 ? "0" : ""}${hours}:${minutes}`;
-};
-
-const FULL_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-// Format date as YYYY-MM-DD for Supabase query
-const formatDateForDB = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
+import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
+import { checkSlotAvailability } from "@/lib/services/bookings/checkSlotAvailability.service";
+import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 
 export function BookingContainer() {
   const router = useRouter();
@@ -100,7 +69,7 @@ export function BookingContainer() {
       ]);
       if (hoursRes.data) setOperatingHours(hoursRes.data);
       if (courtsRes.data) {
-        setCourts(courtsRes.data.filter((c) => c.status !== "maintenance"));
+        setCourts(courtsRes.data);
       }
       setLoading(false);
     };
@@ -110,8 +79,7 @@ export function BookingContainer() {
   // Load bookings when selected date changes
   useEffect(() => {
     const loadBookings = async () => {
-      const dateStr = formatDateForDB(selectedDate);
-      const { data } = await fetchBookingsForDate(dateStr);
+      const { data } = await fetchBookingsForDate(selectedDate);
       setBookings(data);
     };
     loadBookings();
@@ -119,52 +87,21 @@ export function BookingContainer() {
 
   const courtNames = useMemo(() => courts.map((c) => c.name), [courts]);
 
-  const timeSlots = useMemo(() => {
-    if (!operatingHours.length) return [];
-
-    const dayName = FULL_DAYS[selectedDate.getDay()];
-    const todaySchedule = operatingHours.find((h) => h.day === dayName);
-
-    if (!todaySchedule || !todaySchedule.isOpen || !todaySchedule.openTime || !todaySchedule.closeTime) {
-      return [];
-    }
-
-    const openHour = parseInt(todaySchedule.openTime.split(":")[0], 10);
-    const closeHour = parseInt(todaySchedule.closeTime.split(":")[0], 10);
-
-    const slots = [];
-    for (let i = openHour; i < closeHour; i++) {
-      const start = formatTime12h(`${i < 10 ? "0" : ""}${i}:00`);
-      const end = formatTime12h(`${i + 1 < 10 ? "0" : ""}${i + 1}:00`);
-      slots.push(`${start} - ${end}`);
-    }
-    return slots;
-  }, [operatingHours, selectedDate]);
+  const timeSlots = useMemo(
+    () => generateTimeSlots(selectedDate, operatingHours),
+    [operatingHours, selectedDate]
+  );
 
   // Check if a slot is booked by comparing against real bookings
-  const checkAvailability = useCallback(
+  const getSlotStatus = useCallback(
     (_date: Date, courtName: string, timeRange: string) => {
-      const court = courts.find((c) => c.name === courtName);
-      if (!court) return false;
-
-      const [startStr, endStr] = timeRange.split(" - ");
-      const slotStart = to24h(startStr.trim());
-      const slotEnd = to24h(endStr.trim());
-
-      const isBooked = bookings.some((b) => {
-        if (b.court_id !== court.id) return false;
-        const bStart = b.start_time.slice(0, 5);
-        const bEnd = b.end_time.slice(0, 5);
-        return bStart < slotEnd && bEnd > slotStart;
-      });
-
-      return !isBooked;
+      return checkSlotAvailability(courtName, timeRange, courts, bookings);
     },
     [courts, bookings]
   );
 
   const handleSlotClick = (courtName: string, time: string) => {
-    if (!checkAvailability(selectedDate, courtName, time)) return;
+    if (getSlotStatus(selectedDate, courtName, time) !== "available") return;
 
     // If not logged in, show login prompt
     if (!user) {
@@ -176,7 +113,7 @@ export function BookingContainer() {
       date: selectedDate,
       court: courtName,
       time,
-      price: courtName.includes("Premium") ? 2000 : 1500,
+      price: 0, // Price calculation moved to backend for security
     });
     setIsBookingSuccess(false);
     setIsDialogOpen(true);
@@ -192,41 +129,14 @@ export function BookingContainer() {
       const court = courts.find(c => c.name === selectedSlot.court);
       if (!court) throw new Error("Court not found");
 
-      const dateStr = formatDateForDB(selectedSlot.date);
-      const [startStr, endStr] = selectedSlot.time.split(" - ");
-      const startTime24 = to24h(startStr.trim());
-      const endTime24 = to24h(endStr.trim());
-
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          court_id: court.id,
-          court_name: court.name,
-          booking_date: dateStr,
-          start_time: startTime24,
-          end_time: endTime24,
-          amount: selectedSlot.price,
-        }),
+      const url = await createCheckoutSession({
+        courtId: court.id,
+        courtName: court.name,
+        date: selectedSlot.date,
+        timeRange: selectedSlot.time,
       });
 
-      const contentType = res.headers.get("content-type");
-      let data;
-      if (contentType && contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        throw new Error("Server returned an invalid response.");
-      }
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to create checkout session");
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("No checkout URL returned");
-      }
+      window.location.href = url;
     } catch (err: any) {
       setCheckoutError(err.message || "An unexpected error occurred");
       setIsCheckoutLoading(false);
@@ -262,7 +172,7 @@ export function BookingContainer() {
           courts={courtNames}
           timeSlots={timeSlots}
           onSlotClick={handleSlotClick}
-          checkAvailability={checkAvailability}
+          getSlotStatus={getSlotStatus}
         />
       ) : (
         <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed text-muted-foreground text-sm">
