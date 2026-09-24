@@ -12,7 +12,7 @@ interface CustomersTableProps {
   customers: Customer[];
 }
 
-export function CustomersTable({ customers }: CustomersTableProps) {
+export const CustomersTable = ({ customers }: CustomersTableProps) => {
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-CA', {
       month: 'short',

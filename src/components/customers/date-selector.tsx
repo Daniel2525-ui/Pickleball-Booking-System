@@ -33,7 +33,7 @@ function isBeforeToday(date: Date) {
   return compare < today;
 }
 
-export function DateSelector({ selectedDate, onSelectDate, operatingHours }: DateSelectorProps) {
+export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: DateSelectorProps) => {
   const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
   const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
 

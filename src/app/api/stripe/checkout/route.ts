@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
+import { calculateCourtPrice } from "@/lib/services/courts/calculateCourtPrice.service";
 
 export async function POST(request: NextRequest) {
     let createdBookingId: string | null = null;
@@ -53,8 +54,9 @@ export async function POST(request: NextRequest) {
         }
 
         const court_name = court.name;
-        // Calculate price dynamically (Premium courts: $20, Standard: $15)
-        const amount = court_name.includes("Premium") ? 2000 : 1500;
+        
+        // Calculate price dynamically using our central service
+        const amount = calculateCourtPrice();
 
         // Ensure times have seconds for accurate DB string comparison (e.g. '08:00:00' vs '08:00')
         const startTimeDb = start_time.length === 5 ? `${start_time}:00` : start_time;

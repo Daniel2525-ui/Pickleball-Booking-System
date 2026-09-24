@@ -10,7 +10,7 @@ interface OperatingHoursCardProps {
   onTimeChange: (index: number, field: "openTime" | "closeTime", value: string) => void
 }
 
-export function OperatingHoursCard({ hours, errorMsg, onToggle, onTimeChange }: OperatingHoursCardProps) {
+export const OperatingHoursCard = ({ hours, errorMsg, onToggle, onTimeChange }: OperatingHoursCardProps) => {
   return (
     <Card>
       <CardHeader>

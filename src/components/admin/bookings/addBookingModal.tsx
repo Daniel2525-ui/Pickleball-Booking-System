@@ -30,7 +30,7 @@ interface AddBookingModalProps {
     onBookingAdded: () => void;
 }
 
-export function AddBookingModal({ onBookingAdded }: AddBookingModalProps) {
+export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

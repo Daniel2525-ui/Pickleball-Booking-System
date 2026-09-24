@@ -26,7 +26,7 @@ interface AddCourtModalProps {
     onCourtAdded: () => void;
 }
 
-export function AddCourtModal({ onCourtAdded }: AddCourtModalProps) {
+export const AddCourtModal = ({ onCourtAdded }: AddCourtModalProps) => {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [status, setStatus] = useState("active");

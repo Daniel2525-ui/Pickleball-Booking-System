@@ -29,7 +29,7 @@ interface EditCourtModalProps {
     onCourtUpdated: () => void;
 }
 
-export function EditCourtModal({ court, open, onOpenChange, onCourtUpdated }: EditCourtModalProps) {
+export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: EditCourtModalProps) => {
     const [name, setName] = useState("");
     const [status, setStatus] = useState("active");
     const [loading, setLoading] = useState(false);

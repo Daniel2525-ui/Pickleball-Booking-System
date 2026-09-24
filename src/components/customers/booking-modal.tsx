@@ -1,13 +1,12 @@
-import React from "react";
 import { Clock, CheckCircle, MapPin, Calendar, LoaderCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Slot } from "./types";
 
@@ -22,7 +21,7 @@ interface BookingModalProps {
   onCloseAndReset: () => void;
 }
 
-export function BookingModal({
+export const BookingModal = ({
   isOpen,
   onOpenChange,
   selectedSlot,
@@ -31,7 +30,8 @@ export function BookingModal({
   error,
   onConfirm,
   onCloseAndReset,
-}: BookingModalProps) {
+}: BookingModalProps) => {
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -43,7 +43,7 @@ export function BookingModal({
                 Review your booking details before proceeding to payment.
               </DialogDescription>
             </DialogHeader>
-            
+
             {selectedSlot && (
               <div className="bg-muted p-4 rounded-xl my-4 space-y-3">
                 <div className="flex items-start justify-between">
@@ -63,7 +63,7 @@ export function BookingModal({
                     <p className="text-xs text-muted-foreground">Total due</p>
                   </div>
                 </div>
-                
+
                 <div className="pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
                   <MapPin className="size-4" />
                   123 Pickleball Ave, Butuan City
@@ -101,8 +101,8 @@ export function BookingModal({
             <DialogDescription className="text-base mb-6">
               Your court has been successfully reserved. We've sent the details to your email.
             </DialogDescription>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={onCloseAndReset}
             >
               View My Bookings

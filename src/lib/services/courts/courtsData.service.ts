@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { Court } from "./courtsTypes";
+import { calculateCourtPrice } from "./calculateCourtPrice.service";
 
 export const fetchCourtsData = async () => {
     try {
@@ -34,10 +35,15 @@ export const fetchCourtsData = async () => {
         const occupiedCourtIds = new Set(activeBookings?.map(b => b.court_id) || []);
 
         const updatedCourts = (courts || []).map(court => {
+            let finalStatus = court.status;
             if ((court.status === "active" || court.status === "available") && occupiedCourtIds.has(court.id)) {
-                return { ...court, status: "occupied" };
+                finalStatus = "occupied";
             }
-            return court;
+            return { 
+                ...court, 
+                status: finalStatus,
+                price: calculateCourtPrice()
+            };
         });
 
         return { data: updatedCourts as Court[], error: null };

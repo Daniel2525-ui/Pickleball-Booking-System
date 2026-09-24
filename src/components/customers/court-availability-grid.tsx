@@ -8,13 +8,13 @@ interface CourtAvailabilityGridProps {
   getSlotStatus: (date: Date, court: string, time: string) => "available" | "booked" | "maintenance" | "closed";
 }
 
-export function CourtAvailabilityGrid({
+export const CourtAvailabilityGrid = ({
   selectedDate,
   courts,
   timeSlots,
   onSlotClick,
   getSlotStatus,
-}: CourtAvailabilityGridProps) {
+}: CourtAvailabilityGridProps) => {
   const colCount = courts.length;
 
   return (

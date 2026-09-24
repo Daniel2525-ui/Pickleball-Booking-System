@@ -55,7 +55,7 @@ interface CourtCardProps {
   onDelete?: (id: string) => void;
 }
 
-export function CourtCard({ court, onEdit, onDelete }: CourtCardProps) {
+export const CourtCard = ({ court, onEdit, onDelete }: CourtCardProps) => {
   const status = statusConfig[court.status?.toLowerCase()] ?? statusConfig.available;
   const { label, className, barColor, Icon } = status;
 

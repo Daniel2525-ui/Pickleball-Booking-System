@@ -28,7 +28,7 @@ import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.ser
 import { checkSlotAvailability } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 
-export function BookingContainer() {
+export const BookingContainer = () => {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -109,11 +109,13 @@ export function BookingContainer() {
       return;
     }
 
+    const court = courts.find((c) => c.name === courtName);
+
     setSelectedSlot({
       date: selectedDate,
       court: courtName,
       time,
-      price: 0, // Price calculation moved to backend for security
+      price: court?.price || 200, // Read the dynamically attached price
     });
     setIsBookingSuccess(false);
     setIsDialogOpen(true);
