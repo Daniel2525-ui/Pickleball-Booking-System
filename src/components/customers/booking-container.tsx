@@ -27,6 +27,7 @@ import { User } from "@supabase/supabase-js";
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
 import { checkSlotAvailability } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
+import BookingSuccessPage from "@/app/book/success/page";
 
 export const BookingContainer = () => {
   const router = useRouter();
@@ -95,7 +96,7 @@ export const BookingContainer = () => {
   // Check if a slot is booked by comparing against real bookings
   const getSlotStatus = useCallback(
     (_date: Date, courtName: string, timeRange: string) => {
-      return checkSlotAvailability(courtName, timeRange, courts, bookings);
+      return checkSlotAvailability(courtName, timeRange, courts, bookings, _date)
     },
     [courts, bookings]
   );

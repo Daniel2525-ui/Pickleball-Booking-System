@@ -90,7 +90,7 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="available">Available</SelectItem>
+                                <SelectItem value="active">Available</SelectItem>
                                 <SelectItem value="maintenance">Maintenance</SelectItem>
                             </SelectContent>
                         </Select>

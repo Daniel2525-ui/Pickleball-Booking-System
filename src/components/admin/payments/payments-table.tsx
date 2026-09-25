@@ -110,6 +110,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                         {formatTime12h(payment.bookings.start_time)} - {formatTime12h(payment.bookings.end_time)}
                       </span>
                     )}
+
                   </div>
                 </TableCell>
                 <TableCell className="font-medium">

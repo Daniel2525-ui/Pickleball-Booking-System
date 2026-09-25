@@ -1,12 +1,13 @@
 import { Clock, Check } from "lucide-react";
 import { Slot } from "./types";
+import { SlotStatus } from "@/lib/services/bookings/checkSlotAvailability.service";
 
 interface CourtAvailabilityGridProps {
   selectedDate: Date;
   courts: string[];
   timeSlots: string[];
   onSlotClick: (court: string, time: string) => void;
-  getSlotStatus: (date: Date, court: string, time: string) => "available" | "booked" | "maintenance" | "closed";
+  getSlotStatus: (date: Date, court: string, time: string) => SlotStatus;
   selectedSlot?: Slot | null;
 }
 
@@ -82,7 +83,7 @@ export const CourtAvailabilityGrid = ({
                           </button>
                         ) : (
                           <div className="w-full h-full min-h-[48px] bg-muted/50 rounded-lg flex items-center justify-center text-muted-foreground/60 text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-wider">
-                            {status === "maintenance" ? "Maintenance" : status === "closed" ? "Closed" : "Booked"}
+                            {status === "maintenance" ? "Maintenance" : status === "closed" ? "Closed" : status === "passed" ? "Passed" : "Booked"}
                           </div>
                         )}
                       </div>

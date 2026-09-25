@@ -112,7 +112,7 @@ export default function CourtsContainer() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Courts">All Courts</SelectItem>
-            <SelectItem value="available">Available</SelectItem>
+            <SelectItem value="active">Available</SelectItem>
             <SelectItem value="maintenance">Maintenance</SelectItem>
             <SelectItem value="occupied">Occupied</SelectItem>
           </SelectContent>

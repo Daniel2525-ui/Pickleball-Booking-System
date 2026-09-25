@@ -1,9 +1,6 @@
 import { Court } from "../courts/courtsTypes";
 import { BookingSlot } from "./fetchBookingsForDate.service";
 
-/**
- * Convert "08:00 AM" back to "08:00" (24h) for comparison with DB times
- */
 export const to24h = (time12h: string): string => {
     const match = time12h.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
     if (!match) return time12h;
@@ -15,16 +12,14 @@ export const to24h = (time12h: string): string => {
     return `${hours < 10 ? "0" : ""}${hours}:${minutes}`;
 };
 
-export type SlotStatus = "available" | "booked" | "maintenance" | "closed";
+export type SlotStatus = "available" | "booked" | "maintenance" | "closed" | "passed";
 
-/**
- * Checks if a specific time slot for a court is available, booked, or under maintenance.
- */
 export const checkSlotAvailability = (
     courtName: string,
     timeRange: string,
     courts: Court[],
-    bookings: BookingSlot[]
+    bookings: BookingSlot[],
+    date: Date
 ): SlotStatus => {
     const court = courts.find((c) => c.name === courtName);
     if (!court) return "closed";
@@ -34,6 +29,21 @@ export const checkSlotAvailability = (
     const [startStr, endStr] = timeRange.split(" - ");
     const slotStart = to24h(startStr.trim());
     const slotEnd = to24h(endStr.trim());
+
+    // 3. Add logic to check if the time slot has already passed
+    const now = new Date();
+    const isToday =
+        date.getDate() === now.getDate() &&
+        date.getMonth() === now.getMonth() &&
+        date.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+        // Get current time in "HH:MM" format
+        const currentTime = now.getHours().toString().padStart(2, "0") + ":" + now.getMinutes().toString().padStart(2, "0");
+        if (slotStart <= currentTime) {
+            return "passed";
+        }
+    }
 
     const isBooked = bookings.some((b) => {
         if (b.court_id !== court.id) return false;
