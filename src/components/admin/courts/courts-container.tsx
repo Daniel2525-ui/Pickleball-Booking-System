@@ -36,13 +36,13 @@ export default function CourtsContainer() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this court?")) return;
-    
+
     const { error } = await deleteCourt(id);
     if (error) {
-        alert("Failed to delete court");
-        return;
+      alert("Failed to delete court");
+      return;
     }
-    
+
     loadCourts();
   };
 
@@ -60,15 +60,17 @@ export default function CourtsContainer() {
 
   const counts = {
     total: courts.length,
-    available: courts.filter((c) => c.status === "available").length,
+    available: courts.filter((c) => c.status === "active").length,
     maintenance: courts.filter((c) => c.status === "maintenance").length,
     occupied: courts.filter((c) => c.status === "occupied").length,
   };
 
-  const stats = [{ label: "Total Courts", value: counts.total, color: "text-foreground" },
-  { label: "Available", value: counts.available, color: "text-emerald-600 dark:text-emerald-400" },
-  { label: "In Maintenance", value: counts.maintenance, color: "text-amber-600 dark:text-amber-400" },
-  { label: "Occupied", value: counts.occupied, color: "text-red-600 dark:text-red-400" },]
+  const stats = [
+    { label: "Total Courts", value: counts.total, color: "text-foreground" },
+    { label: "Available", value: counts.available, color: "text-emerald-600 dark:text-emerald-400" },
+    { label: "In Maintenance", value: counts.maintenance, color: "text-amber-600 dark:text-amber-400" },
+    { label: "Occupied", value: counts.occupied, color: "text-red-600 dark:text-red-400" },
+  ]
 
   return (
     <div className="flex flex-col gap-6">
@@ -141,33 +143,33 @@ export default function CourtsContainer() {
           <p className="text-sm text-muted-foreground max-w-sm text-center">
             You haven't added any courts to your facility. Add a court to start accepting bookings.
           </p>
-          <AddCourtModal 
-            onCourtAdded={loadCourts} 
+          <AddCourtModal
+            onCourtAdded={loadCourts}
             trigger={
               <Button className="mt-4">
                 Add Your First Court
               </Button>
-            } 
+            }
           />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((court) => (
-            <CourtCard 
-              key={court.id} 
-              court={court} 
-              onEdit={(c) => setCourtToEdit(c)} 
-              onDelete={handleDelete} 
+            <CourtCard
+              key={court.id}
+              court={court}
+              onEdit={(c) => setCourtToEdit(c)}
+              onDelete={handleDelete}
             />
           ))}
         </div>
       )}
-      
-      <EditCourtModal 
-        court={courtToEdit} 
-        open={!!courtToEdit} 
-        onOpenChange={(open) => !open && setCourtToEdit(null)} 
-        onCourtUpdated={loadCourts} 
+
+      <EditCourtModal
+        court={courtToEdit}
+        open={!!courtToEdit}
+        onOpenChange={(open) => !open && setCourtToEdit(null)}
+        onCourtUpdated={loadCourts}
       />
     </div>
   );

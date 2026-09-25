@@ -73,7 +73,6 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
             <TableHead>Court</TableHead>
             <TableHead>Booking Date</TableHead>
             <TableHead>Amount</TableHead>
-            <TableHead>Currency</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Paid At</TableHead>
           </TableRow>
@@ -81,7 +80,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-32 text-center">
+              <TableCell colSpan={6} className="h-32 text-center">
                 <div className="flex flex-col items-center justify-center space-y-2 text-muted-foreground">
                   <LoaderCircle className="h-6 w-6 animate-spin text-primary" />
                   <span className="text-sm">Fetching payments...</span>
@@ -90,7 +89,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
             </TableRow>
           ) : filtered.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                 No payments found.
               </TableCell>
             </TableRow>
@@ -115,9 +114,6 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                 </TableCell>
                 <TableCell className="font-medium">
                   ₱{payment.amount?.toLocaleString() || 0}
-                </TableCell>
-                <TableCell className="uppercase text-xs text-muted-foreground">
-                  {payment.currency || "PHP"}
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className={getStatusColor(payment.status)}>
