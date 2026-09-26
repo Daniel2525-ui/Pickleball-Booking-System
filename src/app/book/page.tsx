@@ -51,6 +51,11 @@ export default function BookPage() {
           </Link>
           {user ? (
             <>
+              <Link href="/my-bookings">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  My Bookings
+                </Button>
+              </Link>
               <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
                 <LogOut className="size-4" />
                 Logout

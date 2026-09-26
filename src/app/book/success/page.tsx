@@ -21,22 +21,25 @@ function BookingSuccessContent() {
           <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="size-10" />
           </div>
-          
+
           <div>
             <h1 className="text-2xl font-bold tracking-tight mb-2">Booking Confirmed!</h1>
             <p className="text-muted-foreground">
-              {sessionId 
+              {sessionId
                 ? "Your court has been successfully reserved and paid for. We've sent the details to your email."
                 : "Your court has been successfully reserved."}
             </p>
           </div>
 
           <div className="pt-6 border-t flex flex-col gap-3">
+            <Link href="/my-bookings" className="w-full">
+              <Button className="w-full">View My Bookings</Button>
+            </Link>
             <Link href="/book" className="w-full">
-              <Button className="w-full">Book Another Court</Button>
+              <Button variant="outline" className="w-full">Book Another Court</Button>
             </Link>
             <Link href="/" className="w-full">
-              <Button variant="outline" className="w-full gap-2">
+              <Button variant="ghost" className="w-full gap-2">
                 <ArrowLeft className="size-4" />
                 Return to Home
               </Button>

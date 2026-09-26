@@ -44,10 +44,17 @@ export default function Home() {
         </div>
         <nav className="flex items-center gap-2 md:gap-6">
           {user ? (
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
-              <LogOut className="size-4" />
-              Logout
-            </Button>
+            <>
+              <Link href="/my-bookings">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  My Bookings
+                </Button>
+              </Link>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
+                <LogOut className="size-4" />
+                Logout
+              </Button>
+            </>
           ) : (
             <Link href="/login" className="text-sm font-medium">
               <Button className="text-black" variant="link">Login</Button>

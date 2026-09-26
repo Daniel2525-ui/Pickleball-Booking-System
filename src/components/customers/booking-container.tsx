@@ -27,7 +27,6 @@ import { User } from "@supabase/supabase-js";
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
 import { checkSlotAvailability } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
-import BookingSuccessPage from "@/app/book/success/page";
 
 export const BookingContainer = () => {
   const router = useRouter();
