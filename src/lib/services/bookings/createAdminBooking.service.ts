@@ -9,11 +9,11 @@ export const createAdminBooking = async (
     amount: number
 ) => {
     try {
-        // Ensure time has seconds
+        /* Ensure time has seconds */
         const startTimeDb = start_time.length === 5 ? `${start_time}:00` : start_time;
         const endTimeDb = end_time.length === 5 ? `${end_time}:00` : end_time;
 
-        // Check for conflicts
+        /* Check for conflicts */
         const { data: conflicts } = await supabase
             .from("bookings")
             .select("id")
@@ -27,7 +27,7 @@ export const createAdminBooking = async (
             return { data: null, error: new Error("This time slot is no longer available.") };
         }
 
-        // Create booking
+        /* Create manual booking for walk in customers*/
         const { data: booking, error: bookingError } = await supabase
             .from("bookings")
             .insert({
@@ -44,7 +44,7 @@ export const createAdminBooking = async (
 
         if (bookingError) throw bookingError;
 
-        // Create payment
+        /* Create payment */
         const { error: paymentError } = await supabase
             .from("payments")
             .insert({
@@ -56,8 +56,11 @@ export const createAdminBooking = async (
             });
 
         if (paymentError) {
-            // Clean up if payment fails
-            await supabase.from("bookings").delete().eq("id", booking.id);
+            /* Clean up if payment fails */
+            await supabase
+                .from("bookings")
+                .delete()
+                .eq("id", booking.id);
             throw paymentError;
         }
 

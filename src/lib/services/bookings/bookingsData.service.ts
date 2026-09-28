@@ -30,7 +30,7 @@ export const fetchBookings = async (filters?: FetchBookingsFilters) => {
                 query = query.eq("status", filters.status.toLowerCase());
             }
 
-            // Filter by Court
+            // Filter by Courtx
             if (
                 filters.courtId &&
                 filters.courtId !== "All Courts" &&

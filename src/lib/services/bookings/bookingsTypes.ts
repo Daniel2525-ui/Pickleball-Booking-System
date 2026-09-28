@@ -9,7 +9,7 @@ export interface Booking {
     total_amount: number;
     created_at: string;
     updated_at: string;
-    // Joined fields from other tables
+
     profiles?: {
         full_name: string;
     };
