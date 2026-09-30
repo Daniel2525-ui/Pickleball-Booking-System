@@ -156,16 +156,12 @@ export const BookingContainer = () => {
     setCheckoutError(null);
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center gap-2 rounded-2xl border border-dashed text-muted-foreground text-sm">
-        <LoaderCircle className="h-4 w-4 animate-spin" />
-        Loading schedules...
-      </div>
-    );
-  }
-
-  return (
+  return loading ? (
+    <div className="flex h-64 items-center justify-center gap-2 rounded-2xl border border-dashed text-muted-foreground text-sm">
+      <LoaderCircle className="h-4 w-4 animate-spin" />
+      Loading schedules...
+    </div>
+  ) : (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <div className="lg:col-span-4 xl:col-span-3">

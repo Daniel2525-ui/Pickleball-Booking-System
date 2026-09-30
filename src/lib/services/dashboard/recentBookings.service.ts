@@ -4,6 +4,10 @@ import { RecentBooking } from "./dashboardTypes";
 
 export const fetchRecentBookings = async () => {
     try {
+        /* Recent Booking lease time */
+        const leaseDuration = 24 * 60 * 60 * 1000
+        const leaseTime = new Date(Date.now() - leaseDuration).toISOString();
+
         const { data, error } = await supabase
             .from("bookings")
             .select(`
@@ -19,6 +23,7 @@ export const fetchRecentBookings = async () => {
                 profiles:user_id ( full_name )       
             `)
             .in("status", ["confirmed", "completed", "cancelled", "ongoing"])
+            .gte("created_at", leaseTime)
             .order("created_at", {
                 ascending: false,
             })

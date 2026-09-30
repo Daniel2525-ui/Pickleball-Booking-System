@@ -15,7 +15,7 @@ export const fetchBookingsForDate = async (date: Date | string) => {
             const day = String(date.getDate()).padStart(2, "0");
             dateStr = `${year}-${month}-${day}`;
         }
-        
+
         const { data, error } = await supabase
             .from("bookings")
             .select("court_id, start_time, end_time")

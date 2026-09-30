@@ -42,11 +42,11 @@ export default function CustomersContainer() {
 
   const counts = {
     total: customers.length,
-    newThisMonth: customers.filter((c) => {
-      const joinedDate = new Date(c.joinedAt);
+    newThisMonth: customers.filter((customer) => {
+      const joinedDate = new Date(customer.joinedAt);
       return joinedDate.getMonth() === currentMonth && joinedDate.getFullYear() === currentYear;
     }).length,
-    repeat: customers.filter((c) => c.totalBookings > 1).length,
+    repeat: customers.filter((customer) => customer.totalBookings > 1).length,
   };
 
   const stats = [
