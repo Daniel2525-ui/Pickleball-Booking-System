@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { UserBooking, fetchUserBookings } from "@/lib/services/bookings/fetchUserBookings.service";
-import { Calendar, Clock, LoaderCircle } from "lucide-react";
+import { Calendar, Clock, LoaderCircle, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -53,6 +53,12 @@ export const BookingHistoryContainer = () => {
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-8">
       <div>
+        <Link href="/">
+          <Button variant="ghost" size="sm" className="mb-6 gap-2 -ml-2 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="size-4" />
+            Back to Home
+          </Button>
+        </Link>
         <h1 className="text-3xl font-bold tracking-tight">My Bookings</h1>
         <p className="text-muted-foreground mt-2">
           View your upcoming sessions and past booking history.
