@@ -9,10 +9,37 @@ import { Button } from "@/components/ui/button";
 function BookingSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const [isVerifying, setIsVerifying] = useState(true);
 
-  // In a real app, you might want to fetch the session from your API 
-  // to display the exact booking details on this page.
-  // For now, we'll just show a generic success message if there's a session ID.
+  useEffect(() => {
+    async function verifySession() {
+      if (!sessionId) {
+        setIsVerifying(false);
+        return;
+      }
+      try {
+        await fetch("/api/stripe/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+      } catch (err) {
+        console.error("Verification failed", err);
+      } finally {
+        setIsVerifying(false);
+      }
+    }
+    verifySession();
+  }, [sessionId]);
+
+  if (isVerifying) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="mt-4 text-muted-foreground">Verifying your payment...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">

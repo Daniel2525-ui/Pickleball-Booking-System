@@ -135,7 +135,7 @@ export const BookingHistoryContainer = () => {
                 <div className="flex flex-col items-start sm:items-end w-full sm:w-auto mt-2 sm:mt-0">
                   <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Total Paid</span>
                   <span className="text-xl font-bold">
-                    {booking.amount ? `₱${booking.amount.toLocaleString()}` : "₱---"}
+                    {booking.total_amount ? `₱${booking.total_amount.toLocaleString()}` : "₱---"}
                   </span>
                 </div>
               </div>

@@ -104,11 +104,11 @@ export async function POST(req: NextRequest) {
                 }
 
                 // If no conflicts, proceed with confirming the payment and booking
-                // Update payment to succeeded
+                // Update payment to paid
                 await supabase
                     .from("payments")
                     .update({
-                        status: "succeeded",
+                        status: "paid",
                         stripe_payment_id: session.payment_intent as string || null,
                         paid_at: new Date().toISOString()
                     })

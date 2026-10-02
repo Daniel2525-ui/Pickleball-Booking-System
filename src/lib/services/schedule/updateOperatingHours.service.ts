@@ -3,10 +3,7 @@ import { OperatingHour } from "@/components/admin/schedules/types";
 
 export const updateOperatingHours = async (hours: OperatingHour[]) => {
     try {
-        // Delete all existing rows
-        await supabase.from("operating_hours").delete().neq("id", 0);
-
-        // Insert fresh rows
+        // Insert or update rows based on the unique day_of_week constraint
         const payload = hours.map((hour) => ({
             day_of_week: hour.day,
             is_open: hour.isOpen,
@@ -16,11 +13,11 @@ export const updateOperatingHours = async (hours: OperatingHour[]) => {
 
         const { data, error } = await supabase
             .from("operating_hours")
-            .insert(payload)
+            .upsert(payload, { onConflict: 'day_of_week' })
             .select();
 
         if (error) {
-            console.error("Insert failed:", error.message);
+            console.error("Upsert failed:", error.message);
             return { data: null, error };
         }
 

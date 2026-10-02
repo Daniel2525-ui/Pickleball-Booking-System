@@ -7,7 +7,7 @@ export interface UserBooking {
     start_time: string,
     end_time: string,
     status: string,
-    amount?: number,
+    total_amount?: number,
     created_at: string,
     courts?: { name: string }
 }
@@ -23,7 +23,7 @@ export const fetchUserBookings = async (userId: string) => {
                 start_time,
                 end_time,
                 status,
-                amount,
+                total_amount,
                 created_at,
                     courts (
                         name
