@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { UserBooking, fetchUserBookings } from "@/lib/services/bookings/fetchUserBookings.service";
+import { formatTime12h } from "@/lib/utils/formatTime";
 import { Calendar, Clock, LoaderCircle, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ export const BookingHistoryContainer = () => {
   useEffect(() => {
     const loadBookings = async () => {
       setLoading(true);
+      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await fetchUserBookings(user.id);
@@ -127,7 +129,7 @@ export const BookingHistoryContainer = () => {
                     </div>
                     <div className="flex items-center gap-1.5 text-foreground font-medium">
                       <Clock className="size-4 text-muted-foreground" />
-                      {booking.start_time} - {booking.end_time}
+                      {formatTime12h(booking.start_time)} - {formatTime12h(booking.end_time)}
                     </div>
                   </div>
                 </div>

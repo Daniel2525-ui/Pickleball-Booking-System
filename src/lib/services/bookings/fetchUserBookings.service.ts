@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 export interface UserBooking {
     id: string,
@@ -14,6 +14,7 @@ export interface UserBooking {
 
 export const fetchUserBookings = async (userId: string) => {
     try {
+        const supabase = createClient();
         const { data, error } = await supabase
             .from("bookings")
             .select(`
