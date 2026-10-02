@@ -178,7 +178,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer id="contact" className="border-t py-12 text-center text-sm text-muted-foreground flex flex-col items-center justify-center gap-4">
+      <footer id="contact" className="border-t py-6 text-center text-sm text-muted-foreground flex flex-col items-center justify-center gap-4">
         <p className="mt-4">&copy; {new Date().getFullYear()} Crosshair Dinkers. All rights reserved.</p>
       </footer>
     </div>

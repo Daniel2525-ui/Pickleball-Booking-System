@@ -26,7 +26,7 @@ export const fetchCourtsData = async () => {
             .from("bookings")
             .select("court_id")
             .eq("booking_date", currentDate)
-            .eq("status", "confirmed")
+            .in("status", ["confirmed", "ongoing"])
             .lte("start_time", currentTime)
             .gt("end_time", currentTime);
 

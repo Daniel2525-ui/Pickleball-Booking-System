@@ -20,7 +20,7 @@ export const fetchBookingsForDate = async (date: Date | string) => {
             .from("bookings")
             .select("court_id, start_time, end_time")
             .eq("booking_date", dateStr)
-            .eq("status", "confirmed");
+            .in("status", ["confirmed", "completed", "ongoing", "pending"]);
 
         if (error) throw error;
         return { data: (data || []) as BookingSlot[], error: null };

@@ -19,7 +19,7 @@ export const createAdminBooking = async (
             .select("id")
             .eq("court_id", court_id)
             .eq("booking_date", booking_date)
-            .eq("status", "confirmed")
+            .in("status", ["confirmed", "completed", "ongoing", "pending"])
             .lt("start_time", endTimeDb)
             .gt("end_time", startTimeDb);
 

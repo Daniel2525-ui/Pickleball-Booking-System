@@ -22,7 +22,7 @@ export const fetchRecentBookings = async () => {
                 courts ( name ),
                 profiles:user_id ( full_name )       
             `)
-            .in("status", ["confirmed", "completed", "cancelled", "ongoing"])
+            .in("status", ["confirmed", "completed", "cancelled", "ongoing", "pending"])
             .gte("created_at", leaseTime)
             .order("created_at", {
                 ascending: false,
@@ -50,7 +50,7 @@ export const fetchRecentBookings = async () => {
 
             const rawStatus = (booking.status || "").toLowerCase();
             const status: "Confirmed" | "Pending" | "Cancelled" =
-                rawStatus === "confirmed" || rawStatus === "completed"
+                rawStatus === "confirmed" || rawStatus === "completed" || rawStatus === "ongoing"
                     ? "Confirmed"
                     : rawStatus === "cancelled"
                         ? "Cancelled"
