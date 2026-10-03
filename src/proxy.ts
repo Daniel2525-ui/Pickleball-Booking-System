@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
             .single()
 
         if (profile?.role !== 'admin') {
-            return NextResponse.redirect(new URL('/', request.url))
+            return NextResponse.redirect(new URL('/login', request.url))
         }
     }
 
@@ -40,8 +40,8 @@ export async function proxy(request: NextRequest) {
     if (request.nextUrl.pathname === '/login' && user) {
         const { data: profile } = await supabase
             .from('profiles').select('role').eq('id', user.id).single()
-        const dest = profile?.role === 'admin' ? '/admin/dashboard' : '/'
-        return NextResponse.redirect(new URL(dest, request.url))
+        const destination = profile?.role === 'admin' ? '/admin/dashboard' : '/login'
+        return NextResponse.redirect(new URL(destination, request.url))
     }
 
     return supabaseResponse
