@@ -11,8 +11,10 @@ export async function proxy(request: NextRequest) {
             cookies: {
                 getAll() { return request.cookies.getAll() },
                 setAll(cookiesToSet) {
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
                     cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options))
+                        supabaseResponse.cookies.set(name, value, options)
+                    )
                 },
             },
         }
@@ -40,7 +42,9 @@ export async function proxy(request: NextRequest) {
     if (request.nextUrl.pathname === '/login' && user) {
         const { data: profile } = await supabase
             .from('profiles').select('role').eq('id', user.id).single()
-        const destination = profile?.role === 'admin' ? '/admin/dashboard' : '/login'
+
+        // Prevent infinite redirect loop by sending non-admins to '/' instead of '/login'
+        const destination = profile?.role === 'admin' ? '/admin/dashboard' : '/'
         return NextResponse.redirect(new URL(destination, request.url))
     }
 
