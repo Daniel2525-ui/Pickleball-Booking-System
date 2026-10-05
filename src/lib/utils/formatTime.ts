@@ -1,4 +1,3 @@
-// lib/utils/formatTime.ts
 export const formatTime12h = (timeStr?: string) => {
     if (!timeStr) return "";
     const [hoursStr, minutesStr] = timeStr.split(":");

@@ -7,9 +7,10 @@ import {
   CardAction,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { todaysSchedule } from "@/lib/services/dashboard/schedToday.service";
 import { useState, useEffect } from "react";
 import { formatTime12h } from "@/lib/utils/formatTime";
@@ -87,17 +88,27 @@ export default function TodaysSchedule({
 
             <tbody>
               {loading ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="py-8 text-center text-muted-foreground"
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <LoaderCircle className="size-5 animate-spin" />
-                      <span>Fetching today&apos;s schedule...</span>
-                    </div>
-                  </td>
-                </tr>
+                <>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i} className="border-b last:border-0">
+                      <td className="py-4 pr-4">
+                        <Skeleton className="h-4 w-24" />
+                      </td>
+                      <td className="py-4 pr-4">
+                        <Skeleton className="h-4 w-20" />
+                      </td>
+                      <td className="py-4 pr-4">
+                        <Skeleton className="h-4 w-32" />
+                      </td>
+                      <td className="py-4 pr-4">
+                        <Skeleton className="h-4 w-16" />
+                      </td>
+                      <td className="py-4">
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </td>
+                    </tr>
+                  ))}
+                </>
               ) : schedule.length > 0 ? (
                 schedule.map((booking) => (
                   <tr

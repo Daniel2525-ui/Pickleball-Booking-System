@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, LoaderCircle, Map } from "lucide-react";
+import { Search, Map } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -120,9 +121,21 @@ export default function CourtsContainer() {
       </div>
 
       {loading ? (
-        <div className="flex h-48 items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground text-sm">
-          <LoaderCircle className="h-4 w-4 animate-spin" />
-          Fetching courts...
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+              <div className="h-1.5 w-full bg-muted" />
+              <div className="flex flex-col space-y-1.5 p-6 pb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <Skeleton className="h-5 w-24" />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex h-64 flex-col items-center justify-center space-y-3 rounded-2xl border border-dashed bg-muted/20">

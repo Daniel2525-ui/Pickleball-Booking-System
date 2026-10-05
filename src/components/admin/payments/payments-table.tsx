@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { LoaderCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { fetchPayments } from "@/lib/services/payments/paymentsData.service";
 import { Payment } from "@/lib/services/payments/paymentsTypes";
@@ -80,14 +80,23 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
         </TableHeader>
         <TableBody>
           {loading ? (
-            <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center">
-                <div className="flex flex-col items-center justify-center space-y-2 text-muted-foreground">
-                  <LoaderCircle className="h-6 w-6 animate-spin text-primary" />
-                  <span className="text-sm">Fetching payments...</span>
-                </div>
-              </TableCell>
-            </TableRow>
+            <>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                </TableRow>
+              ))}
+            </>
           ) : filtered.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">

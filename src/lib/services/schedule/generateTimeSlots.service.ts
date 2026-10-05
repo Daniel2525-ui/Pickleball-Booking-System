@@ -1,23 +1,9 @@
 import { OperatingHour } from "./operatingHoursInterface";
+import { formatTime12h } from "@/lib/utils/formatTime";
 
 const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-/**
- * Helper to format 24h string to 12h AM/PM string.
- * Example: "08:00" -> "08:00 AM"
- */
-export const formatTime12h = (timeStr: string): string => {
-    const [hoursStr, minutesStr] = timeStr.split(":");
-    let hours = parseInt(hoursStr, 10);
-    if (isNaN(hours)) return "";
-    const minutes = minutesStr || "00";
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-    const formattedHours = hours < 10 ? `0${hours}` : hours.toString();
-    return `${formattedHours}:${minutes} ${ampm}`;
-};
-
-/**
+/*
  * Generates an array of time slot strings (e.g. "08:00 AM - 09:00 AM")
  * for a given date based on operating hours.
  */

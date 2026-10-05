@@ -8,12 +8,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Users } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface CustomersTableProps {
   customers: Customer[];
+  loading?: boolean;
 }
 
-export const CustomersTable = ({ customers }: CustomersTableProps) => {
+export const CustomersTable = ({ customers, loading }: CustomersTableProps) => {
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-CA', {
       month: 'short',
@@ -34,7 +36,27 @@ export const CustomersTable = ({ customers }: CustomersTableProps) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {customers.length === 0 ? (
+          {loading ? (
+            <>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-4 w-8 ml-auto" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-4 w-24 ml-auto" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </>
+          ) : customers.length === 0 ? (
             <TableRow>
               <TableCell colSpan={4} className="h-64 text-center">
                 <div className="flex flex-col items-center justify-center space-y-3">

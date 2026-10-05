@@ -8,6 +8,7 @@ import { Calendar, Clock, LoaderCircle, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { BookingCardSkeleton } from "@/components/skeletons/booking-card-skeleton";
 
 export const BookingHistoryContainer = () => {
   const [loading, setLoading] = useState(true);
@@ -28,14 +29,7 @@ export const BookingHistoryContainer = () => {
     loadBookings();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center gap-2 text-muted-foreground text-sm">
-        <LoaderCircle className="h-4 w-4 animate-spin" />
-        Loading your bookings...
-      </div>
-    );
-  }
+
 
   const now = new Date();
 
@@ -85,7 +79,13 @@ export const BookingHistoryContainer = () => {
       </div>
 
       <div className="space-y-4">
-        {displayedBookings.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <BookingCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : displayedBookings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center border rounded-2xl bg-muted/20 border-dashed">
             <Calendar className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-semibold text-foreground">No bookings found</h3>

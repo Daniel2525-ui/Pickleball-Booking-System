@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
     // Protect /admin routes — must be logged in + admin role
     if (request.nextUrl.pathname.startsWith('/admin')) {
         if (!user) {
-            return NextResponse.redirect(new URL('/login', request.url))
+            return NextResponse.redirect(new URL('/', request.url))
         }
         const { data: profile } = await supabase
             .from('profiles')
@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
             .single()
 
         if (profile?.role !== 'admin') {
-            return NextResponse.redirect(new URL('/login', request.url))
+            return NextResponse.redirect(new URL('/', request.url))
         }
     }
 

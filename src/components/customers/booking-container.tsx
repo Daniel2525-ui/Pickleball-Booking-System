@@ -16,6 +16,7 @@ import { Slot } from "@/components/customers/types";
 import { DateSelector } from "@/components/customers/date-selector";
 import { CourtAvailabilityGrid } from "@/components/customers/court-availability-grid";
 import { BookingModal } from "@/components/customers/booking-modal";
+import { BookingScheduleSkeleton } from "@/components/skeletons/booking-schedule-skeleton";
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service";
 import { OperatingHour } from "@/components/admin/schedules/types";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
@@ -157,10 +158,7 @@ export const BookingContainer = () => {
   };
 
   return loading ? (
-    <div className="flex h-64 items-center justify-center gap-2 rounded-2xl border border-dashed text-muted-foreground text-sm">
-      <LoaderCircle className="h-4 w-4 animate-spin" />
-      Loading schedules...
-    </div>
+    <BookingScheduleSkeleton />
   ) : (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

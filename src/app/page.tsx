@@ -1,85 +1,11 @@
-"use client";
-
-import Link from "next/link";
-import { CalendarDays, Crosshair, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { logout } from "@/lib/services/auth.service";
-import { User } from "@supabase/supabase-js";
-import { MapPin } from "lucide-react";
+import { CalendarDays, Crosshair, MapPin } from "lucide-react";
 import { BookingContainer } from "@/components/customers/booking-container";
+import { PublicHeader } from "@/components/customers/public-header";
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleLogout = async () => {
-    await logout();
-    setUser(null);
-  };
-
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Public Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6 py-4 flex items-center justify-between">
-
-        {/* Left: Logo */}
-        <div className="flex-1 flex justify-start">
-          <a href="#home" className="flex items-center gap-2 w-fit">
-            <Crosshair className="size-5 md:size-6 text-primary" />
-            <span className="font-bold text-lg md:text-xl tracking-tight hidden lg:inline-block">Crosshair Dinkers</span>
-            <span className="font-bold text-lg tracking-tight lg:hidden">CD</span>
-          </a>
-        </div>
-
-        {/* Center: Nav Links */}
-        <nav className="hidden md:flex flex-1 justify-center items-center gap-6 lg:gap-8">
-          <a href="#home" className="text-sm font-medium hover:text-foreground transition-colors">
-            Home
-          </a>
-          <a href="#about" className="text-sm font-medium hover:text-foreground transition-colors">
-            About
-          </a>
-          {user && (
-            <Link href="/my-bookings" className="text-sm font-medium hover:text-foreground transition-colors">
-              My Bookings
-            </Link>
-          )}
-        </nav>
-
-        {/* Right: Actions */}
-        <div className="flex-1 flex justify-end items-center gap-2 md:gap-4">
-          {user ? (
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
-              <LogOut className="size-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
-          ) : (
-            <Link href="/login" className="text-sm font-medium">
-              <Button className="text-black" variant="link">Login</Button>
-            </Link>
-          )}
-          <a href="#booking" className="bg-primary text-primary-foreground px-3 py-1.5 md:px-4 md:py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors whitespace-nowrap">
-            Book a Court
-          </a>
-        </div>
-      </header>
+      <PublicHeader />
 
       <main className="flex-1 flex flex-col">
         {/* Hero Section */}

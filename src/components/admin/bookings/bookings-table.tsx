@@ -19,7 +19,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, CheckCircle2, XCircle, LoaderCircle, Calendar } from "lucide-react";
+import { MoreHorizontal, CheckCircle2, XCircle, Calendar } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { fetchBookings } from "@/lib/services/bookings/bookingsData.service";
 import { Booking } from "@/lib/services/bookings/bookingsTypes";
@@ -93,14 +94,25 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
         </TableHeader>
         <TableBody>
           {loading ? (
-            <TableRow>
-              <TableCell colSpan={columnCount} className="h-32 text-center">
-                <div className="flex flex-col items-center justify-center space-y-2 text-muted-foreground">
-                  <LoaderCircle className="h-6 w-6 animate-spin text-primary" />
-                  <span className="text-sm">Fetching bookings data...</span>
-                </div>
-              </TableCell>
-            </TableRow>
+            <>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-8 w-8 ml-auto rounded-md" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </>
           ) : bookingsData.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columnCount} className="h-64 text-center">

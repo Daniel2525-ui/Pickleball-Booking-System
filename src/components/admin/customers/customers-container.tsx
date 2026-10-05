@@ -79,10 +79,7 @@ export default function CustomersContainer() {
       </div>
 
       {loading ? (
-        <div className="flex h-48 items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground text-sm">
-          <LoaderCircle className="h-4 w-4 animate-spin" />
-          Fetching customers...
-        </div>
+        <CustomersTable customers={[]} loading={true} />
       ) : filtered.length === 0 ? (
         <div className="flex h-48 items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
           No customers matched your search.

@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { LoaderCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchBookingOverview
 } from "@/lib/services/dashboard/bookingOverview.service";
@@ -46,11 +46,8 @@ export default function BookingOverview({ className }: { className?: string }) {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="flex h-[200px] items-center justify-center gap-2">
-            <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">
-              Loading overview...
-            </span>
+          <div className="flex h-[200px] items-center justify-center pt-2">
+            <Skeleton className="h-full w-full rounded-md" />
           </div>
         ) : (
           <div className="flex items-end gap-3 pt-2" style={{ height: "200px" }}>

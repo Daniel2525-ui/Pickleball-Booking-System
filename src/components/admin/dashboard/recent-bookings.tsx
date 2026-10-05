@@ -8,8 +8,9 @@ import {
   CardAction,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fetchRecentBookings } from "@/lib/services/dashboard/recentBookings.service";
 import { useState, useEffect } from "react";
 
@@ -77,12 +78,20 @@ export default function RecentBookings() {
       <CardContent>
         <div className="space-y-0">
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-6">
-              <LoaderCircle className="size-4 animate-spin" />
-              <span className="text-sm text-muted-foreground">
-                Fetching recent bookings...
-              </span>
-            </div>
+            <>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between py-3 border-b last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <Skeleton className="h-4 w-24 mb-1" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                  <div className="flex flex-col items-end gap-1 pl-4">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+              ))}
+            </>
           ) : recentBookings.length === 0 ? (
             <div className="flex items-center justify-center py-6">
               <span className="text-sm text-muted-foreground">

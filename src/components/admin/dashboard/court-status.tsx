@@ -1,6 +1,7 @@
 "use client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CircleCheck, Clock, LoaderCircle } from "lucide-react";
+import { CircleCheck, Clock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCourtStatus } from "@/lib/services/dashboard/courtStatus.service";
 import { useEffect, useState } from "react";
 
@@ -58,11 +59,16 @@ export default function CourtStatus({ className }: { className?: string }) {
 
       <CardContent>
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-6">
-            <LoaderCircle className="size-4 animate-spin" />
-            <span className="text-sm text-muted-foreground">
-              Fetching Court Status...
-            </span>
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
+                <Skeleton className="size-8 rounded-md shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <Skeleton className="h-4 w-20 mb-1.5" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : courts.length === 0 ? (
           <div className="flex items-center justify-center py-6">

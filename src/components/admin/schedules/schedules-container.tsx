@@ -6,6 +6,7 @@ import { Save, LoaderCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { OperatingHoursCard } from "./operating-hours-card"
 import { OperatingHour } from "./types"
+import { ScheduleSkeleton } from "@/components/skeletons/schedule-skeleton"
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service"
 import { updateOperatingHours } from "@/lib/services/schedule/updateOperatingHours.service"
 
@@ -110,10 +111,7 @@ export const SchedulesContainer = () => {
   return (
     <div className="flex flex-col gap-6">
       {loading ? (
-        <div className="flex h-48 items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground text-sm">
-          <LoaderCircle className="h-4 w-4 animate-spin" />
-          Fetching operating hours...
-        </div>
+        <ScheduleSkeleton />
       ) : (
         <>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
