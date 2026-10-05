@@ -35,7 +35,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 const getStatusColor = (status: string) => STATUS_STYLES[status.toLowerCase()] ?? "";
 
-const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : "");
+const capitalize = (status: string) => (status ? status[0].toUpperCase() + status.slice(1) : "");
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });

@@ -74,9 +74,9 @@ export default function TodaysSchedule({
       </CardHeader>
 
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[400px]">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-card z-10">
               <tr className="border-b text-left text-xs text-muted-foreground">
                 <th className="pb-3 pr-4 font-medium">Time</th>
                 <th className="pb-3 pr-4 font-medium">Court</th>
