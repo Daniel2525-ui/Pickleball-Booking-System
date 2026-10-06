@@ -109,7 +109,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
                             </SelectTrigger>
                             <SelectContent>
                                 {customers.map(c => (
-                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                    <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

@@ -11,13 +11,13 @@ import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours
 import { updateOperatingHours } from "@/lib/services/schedule/updateOperatingHours.service"
 
 const defaultHours: OperatingHour[] = [
-  { day: "Monday", isOpen: true, openTime: "08:00", closeTime: "22:00" },
-  { day: "Tuesday", isOpen: true, openTime: "08:00", closeTime: "22:00" },
-  { day: "Wednesday", isOpen: true, openTime: "08:00", closeTime: "22:00" },
-  { day: "Thursday", isOpen: true, openTime: "08:00", closeTime: "22:00" },
-  { day: "Friday", isOpen: true, openTime: "08:00", closeTime: "23:00" },
-  { day: "Saturday", isOpen: true, openTime: "07:00", closeTime: "23:00" },
-  { day: "Sunday", isOpen: false, openTime: "", closeTime: "" },
+  { day_of_week: "Monday", is_open: true, open_time: "08:00", close_time: "22:00" },
+  { day_of_week: "Tuesday", is_open: true, open_time: "08:00", close_time: "22:00" },
+  { day_of_week: "Wednesday", is_open: true, open_time: "08:00", close_time: "22:00" },
+  { day_of_week: "Thursday", is_open: true, open_time: "08:00", close_time: "22:00" },
+  { day_of_week: "Friday", is_open: true, open_time: "08:00", close_time: "23:00" },
+  { day_of_week: "Saturday", is_open: true, open_time: "07:00", close_time: "23:00" },
+  { day_of_week: "Sunday", is_open: false, open_time: "", close_time: "" },
 ]
 
 const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -43,8 +43,8 @@ export const SchedulesContainer = () => {
       if (data.length > 0) {
         // Merge DB data on top of defaults so every day is always present
         const merged = defaultHours
-          .map((defaultDay) => data.find((d) => d.day === defaultDay.day) ?? defaultDay)
-          .sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day))
+          .map((defaultDay) => data.find((d) => d.day_of_week === defaultDay.day_of_week) ?? defaultDay)
+          .sort((a, b) => dayOrder.indexOf(a.day_of_week) - dayOrder.indexOf(b.day_of_week))
 
         setHours(merged)
       }
@@ -64,24 +64,24 @@ export const SchedulesContainer = () => {
 
   const handleToggle = (dayIndex: number) => {
     const current = hours[dayIndex]
-    const isOpen = !current.isOpen
+    const isOpen = !current.is_open
     // Set default times if turning on and they are empty
-    const needsDefaultTimes = isOpen && (!current.openTime || !current.closeTime)
+    const needsDefaultTimes = isOpen && (!current.open_time || !current.close_time)
 
     updateDay(dayIndex, {
-      isOpen,
-      ...(needsDefaultTimes && { openTime: "08:00", closeTime: "22:00" }),
+      is_open: isOpen,
+      ...(needsDefaultTimes && { open_time: "08:00", close_time: "22:00" }),
     })
   }
 
-  const handleTimeChange = (dayIndex: number, field: "openTime" | "closeTime", value: string) => {
+  const handleTimeChange = (dayIndex: number, field: "open_time" | "close_time", value: string) => {
     updateDay(dayIndex, { [field]: value })
   }
 
   const validateHours = (currentHours: OperatingHour[]) => {
     for (const hour of currentHours) {
-      if (hour.isOpen && hour.openTime && hour.closeTime && hour.closeTime <= hour.openTime) {
-        setErrorMsg(`${hour.day}: Closing time must be later than opening time.`)
+      if (hour.is_open && hour.open_time && hour.close_time && hour.close_time <= hour.open_time) {
+        setErrorMsg(`${hour.day_of_week}: Closing time must be later than opening time.`)
         return false
       }
     }

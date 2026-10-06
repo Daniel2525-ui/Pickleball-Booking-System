@@ -63,13 +63,13 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
 
   const isDayOpen = (date: Date): boolean => {
     const dayName = fullDays[date.getDay()];
-    const schedule = operatingHours.find((hour) => hour.day === dayName);
-    return !!schedule?.isOpen;
+    const schedule = operatingHours.find((hour) => hour.day_of_week === dayName);
+    return !!schedule?.is_open;
   };
 
   const getScheduleForDate = (date: Date): OperatingHour | undefined => {
     const dayName = fullDays[date.getDay()];
-    return operatingHours.find((hour) => hour.day === dayName);
+    return operatingHours.find((hour) => hour.day_of_week === dayName);
   };
 
   const selectedSchedule = getScheduleForDate(selectedDate);
@@ -184,11 +184,11 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
               </p>
 
               {selectedSchedule ? (
-                selectedSchedule.isOpen ? (
+                selectedSchedule.is_open ? (
                   <div className="mt-3 flex items-center gap-2 text-sm">
                     <Clock className="size-4 text-green-500" />
                     <span className="text-green-600 dark:text-green-400 font-medium">
-                      {formatTime12h(selectedSchedule.openTime)} – {formatTime12h(selectedSchedule.closeTime)}
+                      {formatTime12h(selectedSchedule.open_time)} – {formatTime12h(selectedSchedule.close_time)}
                     </span>
                   </div>
                 ) : (

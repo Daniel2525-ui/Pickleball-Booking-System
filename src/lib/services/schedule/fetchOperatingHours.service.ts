@@ -10,11 +10,9 @@ export const fetchOperatingHours = async () => {
         if (error) throw error;
 
         const formattedHours: OperatingHour[] = (data || []).map((item) => ({
-            id: item.id,
-            day: item.day_of_week,
-            isOpen: item.is_open,
-            openTime: item.open_time ? item.open_time.slice(0, 5) : "",
-            closeTime: item.close_time ? item.close_time.slice(0, 5) : "",
+            ...item,
+            open_time: item.open_time ? item.open_time.slice(0, 5) : "",
+            close_time: item.close_time ? item.close_time.slice(0, 5) : "",
         }));
 
         return { data: formattedHours, error: null };

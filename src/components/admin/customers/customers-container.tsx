@@ -30,7 +30,7 @@ export default function CustomersContainer() {
   const filtered = customers.filter((customer) => {
     const matchesSearch =
       !search ||
-      customer.name.toLowerCase().includes(search.toLowerCase()) ||
+      customer.full_name.toLowerCase().includes(search.toLowerCase()) ||
       customer.email.toLowerCase().includes(search.toLocaleLowerCase())
 
     return matchesSearch;
@@ -43,7 +43,7 @@ export default function CustomersContainer() {
   const counts = {
     total: customers.length,
     newThisMonth: customers.filter((customer) => {
-      const joinedDate = new Date(customer.joinedAt);
+      const joinedDate = new Date(customer.created_at);
       return joinedDate.getMonth() === currentMonth && joinedDate.getFullYear() === currentYear;
     }).length,
     repeat: customers.filter((customer) => customer.totalBookings > 1).length,

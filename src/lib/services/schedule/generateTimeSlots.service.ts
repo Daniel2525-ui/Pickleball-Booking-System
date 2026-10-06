@@ -11,14 +11,14 @@ export const generateTimeSlots = (selectedDate: Date, operatingHours: OperatingH
     if (!operatingHours || !operatingHours.length) return [];
 
     const dayName = weekDays[selectedDate.getDay()];
-    const todaySchedule = operatingHours.find((hour) => hour.day === dayName);
+    const todaySchedule = operatingHours.find((hour) => hour.day_of_week === dayName);
 
-    if (!todaySchedule || !todaySchedule.isOpen || !todaySchedule.openTime || !todaySchedule.closeTime) {
+    if (!todaySchedule || !todaySchedule.is_open || !todaySchedule.open_time || !todaySchedule.close_time) {
         return [];
     }
 
-    const openHour = parseInt(todaySchedule.openTime.split(":")[0], 10);
-    const closeHour = parseInt(todaySchedule.closeTime.split(":")[0], 10);
+    const openHour = parseInt(todaySchedule.open_time.split(":")[0], 10);
+    const closeHour = parseInt(todaySchedule.close_time.split(":")[0], 10);
 
     const slots = [];
     for (let i = openHour; i < closeHour; i++) {

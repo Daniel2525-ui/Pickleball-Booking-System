@@ -5,10 +5,10 @@ export const updateOperatingHours = async (hours: OperatingHour[]) => {
     try {
         // Insert or update rows based on the unique day_of_week constraint
         const payload = hours.map((hour) => ({
-            day_of_week: hour.day,
-            is_open: hour.isOpen,
-            open_time: hour.isOpen && hour.openTime ? hour.openTime : null,
-            close_time: hour.isOpen && hour.closeTime ? hour.closeTime : null,
+            day_of_week: hour.day_of_week,
+            is_open: hour.is_open,
+            open_time: hour.is_open && hour.open_time ? hour.open_time : null,
+            close_time: hour.is_open && hour.close_time ? hour.close_time : null,
         }));
 
         const { data, error } = await supabase

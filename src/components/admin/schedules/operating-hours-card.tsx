@@ -7,7 +7,7 @@ interface OperatingHoursCardProps {
   hours: OperatingHour[]
   errorMsg: string | null
   onToggle: (index: number) => void
-  onTimeChange: (index: number, field: "openTime" | "closeTime", value: string) => void
+  onTimeChange: (index: number, field: "open_time" | "close_time", value: string) => void
 }
 
 export const OperatingHoursCard = ({ hours, errorMsg, onToggle, onTimeChange }: OperatingHoursCardProps) => {
@@ -26,7 +26,7 @@ export const OperatingHoursCard = ({ hours, errorMsg, onToggle, onTimeChange }: 
         <div className="space-y-6">
           {hours.map((hour, i) => (
             <OperatingHourRow
-              key={hour.day}
+              key={hour.day_of_week}
               hour={hour}
               index={i}
               onToggle={onToggle}

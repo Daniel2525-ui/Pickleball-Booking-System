@@ -43,7 +43,6 @@ export async function proxy(request: NextRequest) {
         const { data: profile } = await supabase
             .from('profiles').select('role').eq('id', user.id).single()
 
-        // Prevent infinite redirect loop by sending non-admins to '/' instead of '/login'
         const destination = profile?.role === 'admin' ? '/admin/dashboard' : '/'
         return NextResponse.redirect(new URL(destination, request.url))
     }

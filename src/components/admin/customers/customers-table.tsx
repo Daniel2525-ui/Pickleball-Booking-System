@@ -73,7 +73,7 @@ export const CustomersTable = ({ customers, loading }: CustomersTableProps) => {
           ) : (
             customers.map((customer) => (
               <TableRow key={customer.id}>
-                <TableCell className="font-medium">{customer.name}</TableCell>
+                <TableCell className="font-medium">{customer.full_name}</TableCell>
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="text-sm">{customer.email}</span>
@@ -82,7 +82,7 @@ export const CustomersTable = ({ customers, loading }: CustomersTableProps) => {
                 </TableCell>
                 <TableCell className="text-right">{customer.totalBookings}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatDate(customer.joinedAt)}
+                  {formatDate(customer.created_at)}
                 </TableCell>
               </TableRow>
             ))

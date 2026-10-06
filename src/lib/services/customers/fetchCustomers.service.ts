@@ -18,11 +18,7 @@ export const fetchCustomers = async () => {
         if (error) throw error;
 
         const customers: Customer[] = (data || []).map((customer) => ({
-            id: customer.id,
-            name: customer.full_name,
-            email: customer.email,
-            phone: customer.phone,
-            joinedAt: customer.created_at,
+            ...customer,
             totalBookings: 0
         }))
 
