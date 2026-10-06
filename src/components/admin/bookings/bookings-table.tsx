@@ -80,117 +80,119 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
   };
 
   return (
-    <div className="rounded-md border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Customer</TableHead>
-            <TableHead>Court</TableHead>
-            <TableHead>Date & Time</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {loading ? (
-            <>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-3 w-32" />
-                    </div>
-                  </TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="h-8 w-8 ml-auto rounded-md" />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </>
-          ) : bookingsData.length === 0 ? (
+    <div className="rounded-md border bg-card overflow-hidden">
+      <div className="max-h-[600px] overflow-auto">
+        <Table>
+          <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
             <TableRow>
-              <TableCell colSpan={columnCount} className="h-64 text-center">
-                <div className="flex flex-col items-center justify-center space-y-3">
-                  <div className="rounded-full bg-muted p-3">
-                    <Calendar className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="text-lg font-semibold">No bookings found</div>
-                  <p className="text-sm text-muted-foreground max-w-sm">
-                    There are no bookings matching your current filters. Try adjusting your search criteria or wait for new bookings.
-                  </p>
-                </div>
-              </TableCell>
+              <TableHead>Customer</TableHead>
+              <TableHead>Court</TableHead>
+              <TableHead>Date & Time</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
-          ) : (
-            bookingsData.map((booking) => (
-              <TableRow key={booking.id} className="group transition-colors hover:bg-muted/50">
-                <TableCell>
-                  <span className="font-medium">{booking.profiles?.full_name || "Unknown"}</span>
-                </TableCell>
-                <TableCell>{booking.courts?.name || "Unknown"}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span>{formatDate(booking.booking_date)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatTime12h(booking.start_time)} - {formatTime12h(booking.end_time)}
-                    </span>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-32" />
+                      </div>
+                    </TableCell>
+                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="h-8 w-8 ml-auto rounded-md" />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </>
+            ) : bookingsData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columnCount} className="h-64 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <div className="rounded-full bg-muted p-3">
+                      <Calendar className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <div className="text-lg font-semibold">No bookings found</div>
+                    <p className="text-sm text-muted-foreground">
+                      There are no bookings matching your current filters. Try adjusting your search criteria or wait for new bookings.
+                    </p>
                   </div>
-                </TableCell>
-                <TableCell className="font-medium">
-                  ₱{booking.total_amount?.toLocaleString() || 0}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={getStatusColor(booking.status)}>
-                    {capitalize(booking.status)}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center rounded-lg h-8 w-8 p-0 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                      }
-                    >
-                      <span className="sr-only">Open menu</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuGroup>
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        {booking.status?.toLowerCase() === "pending" && (
-                          <>
-                            <DropdownMenuItem className="cursor-pointer text-emerald-600 focus:text-emerald-600">
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
-                              Confirm Booking
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                          </>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteBooking(booking.id)}
-                          className="cursor-pointer text-destructive focus:text-destructive"
-                        >
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Delete Booking
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              bookingsData.map((booking) => (
+                <TableRow key={booking.id} className="group transition-colors hover:bg-muted/50">
+                  <TableCell>
+                    <span className="font-medium">{booking.profiles?.full_name || "Unknown"}</span>
+                  </TableCell>
+                  <TableCell>{booking.courts?.name || "Unknown"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span>{formatDate(booking.booking_date)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatTime12h(booking.start_time)} - {formatTime12h(booking.end_time)}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    ₱{booking.total_amount?.toLocaleString() || 0}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={getStatusColor(booking.status)}>
+                      {capitalize(booking.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-lg h-8 w-8 p-0 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        }
+                      >
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          {booking.status?.toLowerCase() === "pending" && (
+                            <>
+                              <DropdownMenuItem className="cursor-pointer text-emerald-600 focus:text-emerald-600">
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Confirm Booking
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteBooking(booking.id)}
+                            className="cursor-pointer text-destructive focus:text-destructive"
+                          >
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Delete Booking
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

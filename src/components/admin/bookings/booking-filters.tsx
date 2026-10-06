@@ -103,11 +103,6 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
               </SelectItem>)}
           </SelectContent>
         </Select>
-
-        <Button variant="outline" size="icon" className="shrink-0 bg-background">
-          <SlidersHorizontal className="h-4 w-4" />
-          <span className="sr-only">More filters</span>
-        </Button>
       </div>
     </div>
   );

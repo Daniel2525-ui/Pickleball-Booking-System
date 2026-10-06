@@ -66,18 +66,19 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   });
 
   return (
-    <div className="rounded-md border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Customer</TableHead>
-            <TableHead>Court</TableHead>
-            <TableHead>Booking Date</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Paid At</TableHead>
-          </TableRow>
-        </TableHeader>
+    <div className="rounded-md border bg-card overflow-hidden">
+      <div className="max-h-[600px] overflow-auto">
+        <Table>
+          <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+            <TableRow>
+              <TableHead>Customer</TableHead>
+              <TableHead>Court</TableHead>
+              <TableHead>Booking Date</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Paid At</TableHead>
+            </TableRow>
+          </TableHeader>
         <TableBody>
           {loading ? (
             <>
@@ -140,7 +141,8 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
             ))
           )}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   );
 }

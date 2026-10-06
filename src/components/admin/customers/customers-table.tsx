@@ -26,15 +26,16 @@ export const CustomersTable = ({ customers, loading }: CustomersTableProps) => {
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead className="text-right">Total Bookings</TableHead>
-            <TableHead className="text-right">Joined</TableHead>
-          </TableRow>
-        </TableHeader>
+      <div className="max-h-[600px] overflow-auto">
+        <Table>
+          <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead className="text-right">Total Bookings</TableHead>
+              <TableHead className="text-right">Joined</TableHead>
+            </TableRow>
+          </TableHeader>
         <TableBody>
           {loading ? (
             <>
@@ -88,7 +89,8 @@ export const CustomersTable = ({ customers, loading }: CustomersTableProps) => {
             ))
           )}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   );
 }
