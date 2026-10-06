@@ -27,13 +27,13 @@ import { Booking } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { removeBooking } from "@/lib/services/bookings/removeBooking.service";
 
-const STATUS_STYLES: Record<string, string> = {
+const statusStyles: Record<string, string> = {
   confirmed: "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50",
   pending: "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/50",
   cancelled: "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50",
 };
 
-const getStatusColor = (status: string) => STATUS_STYLES[status.toLowerCase()] ?? "";
+const getStatusColor = (status: string) => statusStyles[status.toLowerCase()] ?? "";
 
 const capitalize = (status: string) => (status ? status[0].toUpperCase() + status.slice(1) : "");
 
