@@ -48,11 +48,11 @@ export const checkSlotAvailability = (
         }
     }
 
-    const isBooked = bookings.some((b) => {
-        if (b.court_id !== court.id) return false;
-        const bStart = b.start_time.slice(0, 5);
-        const bEnd = b.end_time.slice(0, 5);
-        return bStart < slotEnd && bEnd > slotStart;
+    const isBooked = bookings.some((booking) => {
+        if (booking.court_id !== court.id) return false;
+        const bookingStart = booking.start_time.slice(0, 5);
+        const bookingEnd = booking.end_time.slice(0, 5);
+        return bookingStart < slotEnd && bookingEnd > slotStart;
     });
 
     return isBooked ? "booked" : "available";

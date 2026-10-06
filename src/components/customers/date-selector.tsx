@@ -141,7 +141,7 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
                 const isSelected = isSameDay(date, selectedDate);
                 const isToday = isSameDay(date, today);
                 const open = isDayOpen(date);
-                const disabled = past;
+                const disabled = past || !open;
 
                 return (
                   <button
