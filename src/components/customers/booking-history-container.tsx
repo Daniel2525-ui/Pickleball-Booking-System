@@ -34,13 +34,13 @@ export const BookingHistoryContainer = () => {
   const now = new Date();
 
   // Split bookings into upcoming and past
-  const upcomingBookings = bookings.filter((b) => {
-    const bookingDateTime = new Date(`${b.booking_date}T${b.start_time}`);
+  const upcomingBookings = bookings.filter((booking) => {
+    const bookingDateTime = new Date(`${booking.booking_date}T${booking.start_time}`);
     return bookingDateTime >= now;
   });
 
-  const pastBookings = bookings.filter((b) => {
-    const bookingDateTime = new Date(`${b.booking_date}T${b.start_time}`);
+  const pastBookings = bookings.filter((booking) => {
+    const bookingDateTime = new Date(`${booking.booking_date}T${booking.start_time}`);
     return bookingDateTime < now;
   });
 
@@ -113,14 +113,14 @@ export const BookingHistoryContainer = () => {
                     <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
                       {booking.courts?.name || `Court ${booking.court_id}`}
                     </Badge>
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={
-                        booking.status === "confirmed" || booking.status === "paid" 
-                          ? "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50" 
+                        booking.status === "confirmed" || booking.status === "paid"
+                          ? "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50"
                           : booking.status === "pending"
-                          ? "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/50"
-                          : "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50"
+                            ? "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/50"
+                            : "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50"
                       }
                     >
                       {booking.status.toUpperCase()}
