@@ -16,20 +16,15 @@ import { useState, useEffect } from "react";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { calculateDuration } from "@/lib/helpers/totalDuration";
 
-const statusVariant: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  confirmed: "secondary",
-  pending: "outline",
-  ongoing: "default",
-  cancelled: "destructive",
-  completed: "outline",
-  Ongoing: "default",
-  Upcoming: "secondary",
-  Completed: "outline",
-  Cancelled: "destructive",
+const STATUS_STYLES: Record<string, string> = {
+  confirmed: "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50",
+  pending: "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/50",
+  ongoing: "bg-blue-500/15 text-blue-700 hover:bg-blue-500/25 border-blue-200 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/50",
+  cancelled: "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50",
+  completed: "bg-slate-500/15 text-slate-700 hover:bg-slate-500/25 border-slate-200 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-900/50",
 };
+
+const getStatusColor = (status: string) => STATUS_STYLES[status.toLowerCase()] ?? "bg-slate-500/15 text-slate-700 hover:bg-slate-500/25 border-slate-200 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-900/50";
 
 export default function TodaysSchedule({
   className,
@@ -139,10 +134,8 @@ export default function TodaysSchedule({
 
                     <td className="py-3">
                       <Badge
-                        variant={
-                          statusVariant[booking.status] || "default"
-                        }
-                        className="capitalize"
+                        variant="outline"
+                        className={`capitalize ${getStatusColor(booking.status)}`}
                       >
                         {booking.status}
                       </Badge>
