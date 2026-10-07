@@ -51,17 +51,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Booking Section */}
-        <section id="booking" className="scroll-mt-20 w-full flex flex-col items-center justify-center border-t bg-muted/10 py-16 md:py-24">
-          <div className="container mx-auto px-4 max-w-6xl w-full">
-            <div className="mb-10 text-center">
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">Book a Court</h2>
-              <p className="text-muted-foreground text-lg">Select a date and time to reserve your spot.</p>
-            </div>
-            <BookingContainer />
-          </div>
-        </section>
-
         {/* About Us Section */}
         <section id="about" className="scroll-mt-20 w-full flex flex-col items-center justify-center py-16 md:py-24 border-t">
           <div className="container mx-auto px-4 max-w-6xl flex flex-col md:flex-row items-center gap-12 md:gap-16">
@@ -101,6 +90,18 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Booking Section */}
+        <section id="booking" className="scroll-mt-20 w-full flex flex-col items-center justify-center border-t bg-muted/10 py-16 md:py-24">
+          <div className="container mx-auto px-4 max-w-6xl w-full">
+            <div className="mb-10 text-center">
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">Book a Court</h2>
+              <p className="text-muted-foreground text-lg">Select a date and time to reserve your spot.</p>
+            </div>
+            <BookingContainer />
+          </div>
+        </section>
+
       </main>
 
       {/* Footer */}

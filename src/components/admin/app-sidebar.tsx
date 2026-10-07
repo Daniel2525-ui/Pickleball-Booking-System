@@ -61,17 +61,21 @@ export default function AppSidebar() {
     }
 
     return (
-        <Sidebar>
-            <SidebarHeader className="pt-6 pb-4 px-4">
-                <div className="flex items-center gap-1">
-                    <div className="flex aspect-square size-10 items-center justify-center rounded-xl bg-black text-white dark:bg-white dark:text-black shadow-sm">
-                        <Crosshair className="size-6" />
-                    </div>
-                    <div className="flex flex-col gap-1 leading-none">
-                        <span className="font-semibold text-lg tracking-tight">Crosshair Dinkers</span>
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Booking System</span>
-                    </div>
-                </div>
+        <Sidebar collapsible="icon">
+            <SidebarHeader>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+                            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-black text-white dark:bg-white dark:text-black">
+                                <Crosshair className="size-5" />
+                            </div>
+                            <div className="grid flex-1 text-left text-sm leading-tight">
+                                <span className="truncate font-semibold">Crosshair Dinkers</span>
+                                <span className="truncate text-xs">Booking System</span>
+                            </div>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
             </SidebarHeader>
             <SidebarContent className="pt-4">
                 <SidebarGroup>
@@ -91,14 +95,15 @@ export default function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter className="pb-5">
-                <Button
-                    className="gap-2 w-full"
-                    variant="destructive"
-                    onClick={handleLogout}
-                >
-                    <LogOut className="size-4" /> Logout
-                </Button>
+            <SidebarFooter>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton onClick={handleLogout} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                            <LogOut />
+                            <span>Logout</span>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
             </SidebarFooter>
         </Sidebar>
     )

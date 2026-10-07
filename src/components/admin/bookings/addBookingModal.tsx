@@ -108,8 +108,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
                                 <SelectValue placeholder="Select Customer" />
                             </SelectTrigger>
                             <SelectContent>
-                                {customers.map(c => (
-                                    <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
+                                {customers.map(customer => (
+                                    <SelectItem key={customer.id} value={customer.id}>{customer.full_name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -122,8 +122,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
                                 <SelectValue placeholder="Select Court" />
                             </SelectTrigger>
                             <SelectContent>
-                                {courts.map(c => (
-                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                {courts.map(court => (
+                                    <SelectItem key={court.id} value={court.id}>{court.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
