@@ -6,11 +6,11 @@ export const fetchBookingOverview = async () => {
         const now = new Date();
         const currentDay = now.getDay();
 
-        const disanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+        const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
 
         const monday = new Date(now);
 
-        monday.setDate(now.getDate() + disanceToMonday);
+        monday.setDate(now.getDate() + distanceToMonday);
 
         const sunday = new Date(monday)
 
@@ -42,11 +42,11 @@ export const fetchBookingOverview = async () => {
             { day: "Sunday", shortDay: "Sun", bookings: 0 },
         ];
 
-        (bookings || []).forEach((b: { booking_date: string }) => {
-            if (!b.booking_date)
+        (bookings || []).forEach((booking: { booking_date: string }) => {
+            if (!booking.booking_date)
                 return;
 
-            const dateObj = new Date(b.booking_date + "T00:00:00");
+            const dateObj = new Date(booking.booking_date + "T00:00:00");
             const dayOfWeek = dateObj.getDay();
 
             const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;

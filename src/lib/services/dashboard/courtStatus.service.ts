@@ -27,7 +27,6 @@ export const fetchCourtStatus = async () => {
 
         if (error) throw error;
 
-
         const { data: bookings, error: bookingError } = await supabase
             .from("bookings")
             .select(`
