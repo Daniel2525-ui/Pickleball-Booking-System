@@ -37,7 +37,9 @@ export async function POST(req: NextRequest) {
                 .eq("id", bookingId)
                 .single();
 
-            if (booking && booking.status !== "confirmed") {
+            // Only promote bookings that are still pending. This prevents a revisit of the
+            // success URL from resurrecting a booking the customer has since cancelled.
+            if (booking && booking.status === "pending") {
                 // Confirm the payment
                 await supabase
                     .from("payments")
