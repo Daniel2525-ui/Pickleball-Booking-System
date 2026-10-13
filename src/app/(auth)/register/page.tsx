@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Crosshair, Eye, EyeOff, Loader2 } from "lucide-react"
+import { ArrowLeft, Crosshair, Eye, EyeOff, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -39,7 +39,7 @@ export default function RegisterPage() {
         setLoading(true)
 
         const supabase = createClient()
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        const { error: signUpError } = await supabase.auth.signUp({
             email,
             password,
             options: {
@@ -58,7 +58,22 @@ export default function RegisterPage() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-background">
+        <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-background">
+            {/* Back to Home Button */}
+            <Link
+                href="/"
+                className="absolute top-4 left-4 sm:top-8 sm:left-8"
+            >
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-muted-foreground hover:text-foreground"
+                >
+                    <ArrowLeft className="size-4" />
+                    Back to Home
+                </Button>
+            </Link>
+
             {/* Logo */}
             <div className="flex items-center gap-2 mb-8">
                 <div className="flex aspect-square size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
