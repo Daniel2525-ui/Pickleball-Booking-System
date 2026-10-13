@@ -19,13 +19,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, CheckCircle2, XCircle, Calendar } from "lucide-react";
+import { MoreHorizontal, CheckCircle2, XCircle, Calendar, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { fetchBookings } from "@/lib/services/bookings/bookingsData.service";
 import { Booking } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { removeBooking } from "@/lib/services/bookings/removeBooking.service";
+import { confirmBooking } from "@/lib/services/bookings/confirmBooking.service";
 
 const statusStyles: Record<string, string> = {
   confirmed: "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50",
@@ -55,6 +56,7 @@ interface BookingsTableProps {
 export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTableProps = {}) {
   const [bookingsData, setBookingsData] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadBookingsData = async () => {
@@ -66,7 +68,28 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
     loadBookingsData();
   }, [filters, refreshKey]);
 
-  const handleDeleteBooking = async (id: string) => {
+  const handleConfirmBooking = async (id: string) => {
+    if (actionLoadingId) return;
+    setActionLoadingId(id);
+
+    const { data, error } = await confirmBooking(id);
+    if (error || !data) {
+      toast.error((error as Error)?.message || "Failed to confirm booking");
+    } else {
+      setBookingsData((prev) =>
+        prev.map((booking) =>
+          booking.id === id ? { ...booking, status: "confirmed" } : booking
+        )
+      );
+      toast.success("Booking confirmed successfully");
+    }
+
+    setActionLoadingId(null);
+  };
+
+  const handleRemoveBooking = async (id: string) => {
+    if (actionLoadingId) return;
+    setActionLoadingId(id);
     const prevData = bookingsData;
     setBookingsData((prev) => prev.filter((booking) => booking.id !== id));
 
@@ -77,6 +100,7 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
     } else {
       toast.success("Booking deleted successfully");
     }
+    setActionLoadingId(null);
   };
 
   return (
@@ -169,15 +193,24 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           {booking.status?.toLowerCase() === "pending" && (
                             <>
-                              <DropdownMenuItem className="cursor-pointer text-emerald-600 focus:text-emerald-600">
-                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                              <DropdownMenuItem
+                                onClick={() => handleConfirmBooking(booking.id)}
+                                disabled={actionLoadingId === booking.id}
+                                className="cursor-pointer text-emerald-600 focus:text-emerald-600"
+                              >
+                                {actionLoadingId === booking.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                )}
                                 Confirm Booking
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                             </>
                           )}
                           <DropdownMenuItem
-                            onClick={() => handleDeleteBooking(booking.id)}
+                            onClick={() => handleRemoveBooking(booking.id)}
+                            disabled={actionLoadingId === booking.id}
                             className="cursor-pointer text-destructive focus:text-destructive"
                           >
                             <XCircle className="mr-2 h-4 w-4" />

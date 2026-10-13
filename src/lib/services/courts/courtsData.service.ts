@@ -10,18 +10,18 @@ export const fetchCourtsData = async () => {
             .order("name", { ascending: true });
 
         if (courtsError) throw courtsError;
-        
+
         // Find if any court is currently occupied
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, "0");
         const day = String(now.getDate()).padStart(2, "0");
         const currentDate = `${year}-${month}-${day}`;
-        
+
         const hours = String(now.getHours()).padStart(2, "0");
         const minutes = String(now.getMinutes()).padStart(2, "0");
         const currentTime = `${hours}:${minutes}:00`;
-        
+
         const { data: activeBookings, error: bookingsError } = await supabase
             .from("bookings")
             .select("court_id")
@@ -32,15 +32,15 @@ export const fetchCourtsData = async () => {
 
         if (bookingsError) throw bookingsError;
 
-        const occupiedCourtIds = new Set(activeBookings?.map(b => b.court_id) || []);
+        const occupiedCourtIds = new Set(activeBookings?.map(booking => booking.court_id) || []);
 
         const updatedCourts = (courts || []).map(court => {
             let finalStatus = court.status;
             if ((court.status === "active" || court.status === "available") && occupiedCourtIds.has(court.id)) {
                 finalStatus = "occupied";
             }
-            return { 
-                ...court, 
+            return {
+                ...court,
                 status: finalStatus,
                 price: calculateCourtPrice()
             };

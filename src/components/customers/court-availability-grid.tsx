@@ -23,11 +23,22 @@ export const CourtAvailabilityGrid = ({
 
   return (
     <div className="bg-card border rounded-2xl shadow-sm overflow-hidden flex-1">
-      <div className="p-4 border-b bg-muted/30">
+      <div className="p-4 border-b bg-muted/30 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Clock className="size-5 text-primary" />
           Available Times
         </h2>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-primary" /> Available
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-amber-500" /> Pending
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-muted-foreground/40" /> Booked
+          </span>
+        </div>
       </div>
 
       <div className="overflow-x-auto pb-2">
@@ -81,6 +92,10 @@ export const CourtAvailabilityGrid = ({
                           >
                             Available
                           </button>
+                        ) : status === "pending" ? (
+                          <div className="w-full h-full min-h-[48px] bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg flex items-center justify-center text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-wider">
+                            Pending
+                          </div>
                         ) : (
                           <div className="w-full h-full min-h-[48px] bg-muted/50 rounded-lg flex items-center justify-center text-muted-foreground/60 text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-wider">
                             {status === "maintenance" ? "Maintenance" : status === "closed" ? "Closed" : status === "passed" ? "Passed" : "Booked"}

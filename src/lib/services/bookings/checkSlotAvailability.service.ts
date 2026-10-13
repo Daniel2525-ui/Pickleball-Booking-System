@@ -16,7 +16,7 @@ export const to24h = (time12h: string): string => {
     return `${String(hours).padStart(2, "0")}:${minutes}`;
 };
 
-export type SlotStatus = "available" | "booked" | "maintenance" | "closed" | "passed";
+export type SlotStatus = "available" | "booked" | "pending" | "maintenance" | "closed" | "passed";
 
 export const checkSlotAvailability = (
     courtName: string,
@@ -48,12 +48,22 @@ export const checkSlotAvailability = (
         }
     }
 
-    const isBooked = bookings.some((booking) => {
+    const matchingBookings = bookings.filter((booking) => {
         if (booking.court_id !== court.id) return false;
         const bookingStart = booking.start_time.slice(0, 5);
         const bookingEnd = booking.end_time.slice(0, 5);
         return bookingStart < slotEnd && bookingEnd > slotStart;
     });
 
-    return isBooked ? "booked" : "available";
+    if (matchingBookings.length > 0) {
+        const hasConfirmed = matchingBookings.some(
+            (b) => (b.status || "").toLowerCase() !== "pending"
+        );
+        if (hasConfirmed) {
+            return "booked";
+        }
+        return "pending";
+    }
+
+    return "available";
 };

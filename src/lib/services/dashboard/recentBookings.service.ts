@@ -3,11 +3,8 @@ import { formatTime12h } from "@/lib/utils/formatTime";
 import { RecentBooking } from "./dashboardTypes";
 
 export const fetchRecentBookings = async () => {
-    try {
-        /* Recent Booking lease time */
-        const leaseDuration = 24 * 60 * 60 * 1000
-        const leaseTime = new Date(Date.now() - leaseDuration).toISOString();
 
+    try {
         const { data, error } = await supabase
             .from("bookings")
             .select(`
@@ -23,7 +20,6 @@ export const fetchRecentBookings = async () => {
                 profiles:user_id ( full_name )       
             `)
             .in("status", ["confirmed", "completed", "cancelled", "ongoing", "pending"])
-            .gte("created_at", leaseTime)
             .order("created_at", {
                 ascending: false,
             })
@@ -31,15 +27,9 @@ export const fetchRecentBookings = async () => {
 
         if (error) throw error;
 
-        // Transform Supabase rows into the formatted RecentBooking interface
         const formattedBookings: RecentBooking[] = (data || []).map((booking: any) => {
-            const customerName = Array.isArray(booking.profiles)
-                ? booking.profiles[0]?.full_name
-                : booking.profiles?.full_name || "Guest User";
-
-            const courtName = Array.isArray(booking.courts)
-                ? booking.courts[0]?.name
-                : booking.courts?.name || "Court";
+            const customerName = booking.profiles?.full_name || "Guest User";
+            const courtName = booking.courts?.name || "Court";
 
             const datePart = booking.booking_date
                 ? new Date(booking.booking_date + "T00:00:00").toLocaleDateString("en-US", {

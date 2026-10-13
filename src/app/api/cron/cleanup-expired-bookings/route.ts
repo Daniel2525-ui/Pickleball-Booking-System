@@ -44,9 +44,9 @@ export async function GET(request: Request) {
     let cancelledCount = 0;
 
     for (const booking of pendingBookings) {
-      // payments is an array if one-to-many, but in this schema it might be an array or object.
-      // Let's assume it's an array based on standard Supabase joins
-      const payments = Array.isArray(booking.payments) ? booking.payments : [booking.payments];
+      // In Supabase, a one-to-many join (booking -> payments) will always return an array
+      const payments = booking.payments || [];
+
       
       for (const payment of payments) {
         if (payment.stripe_session_id) {

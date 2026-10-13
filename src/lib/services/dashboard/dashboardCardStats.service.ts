@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase"
-/* Today's Bookings */
 
+/* Today's Bookings */
 export const bookingsToday = async () => {
     const today = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Manila",
@@ -44,7 +44,6 @@ export const bookingsYesterday = async () => {
 };
 
 /* Upcoming Bookings */
-
 export const upcomingBookings = async () => {
     const today = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Manila",
@@ -74,6 +73,8 @@ export const upcomingBookings = async () => {
     }
 };
 
+
+/* Today's Revenue */
 export const revenueToday = async () => {
     const today = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Manila",
@@ -127,7 +128,6 @@ export const revenueYesterday = async () => {
 };
 
 /* Available Courts */
-
 export const availableCourts = async () => {
     const today = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Manila",

@@ -4,6 +4,7 @@ export interface BookingSlot {
     court_id: string;
     start_time: string;
     end_time: string;
+    status?: string;
 }
 
 export const fetchBookingsForDate = async (date: Date | string) => {
@@ -18,7 +19,7 @@ export const fetchBookingsForDate = async (date: Date | string) => {
 
         const { data, error } = await supabase
             .from("bookings")
-            .select("court_id, start_time, end_time")
+            .select("court_id, start_time, end_time, status")
             .eq("booking_date", dateStr)
             .in("status", ["confirmed", "completed", "ongoing", "pending"]);
 

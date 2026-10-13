@@ -8,8 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState, useEffect } from "react";
 import { fetchCourts } from "@/lib/services/bookings/fetchCourtFilter.service";
 import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
