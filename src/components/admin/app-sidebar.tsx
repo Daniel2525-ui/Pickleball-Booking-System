@@ -1,22 +1,40 @@
-"use client"
+"use client";
+
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
+    SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { Calendar, LayoutDashboard, User, SquareMinus, CreditCard, Clock, Crosshair, LogOut } from "lucide-react"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { logout } from "@/lib/services/auth.service"
+    SidebarSeparator,
+} from "@/components/ui/sidebar";
+import {
+    LayoutDashboard,
+    CalendarDays,
+    Layers,
+    Users,
+    Clock,
+    CreditCard,
+    Crosshair,
+    LogOut,
+    ExternalLink,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { logout } from "@/lib/services/auth.service";
 
-const items = [
+interface NavItem {
+    title: string;
+    url: string;
+    icon: React.ComponentType<{ className?: string }>;
+}
+
+const operationsNav: NavItem[] = [
     {
         title: "Dashboard",
         url: "/admin/dashboard",
@@ -25,86 +43,148 @@ const items = [
     {
         title: "Bookings",
         url: "/admin/bookings",
-        icon: Calendar,
+        icon: CalendarDays,
     },
     {
         title: "Courts",
         url: "/admin/courts",
-        icon: SquareMinus,
+        icon: Layers,
     },
     {
-        title: "Customers",
-        url: "/admin/customers",
-        icon: User,
-    },
-    {
-        title: "Schedules",
+        title: "Operating Hours",
         url: "/admin/schedules",
         icon: Clock,
+    },
+];
+
+const managementNav: NavItem[] = [
+    {
+        title: "Customer Directory",
+        url: "/admin/customers",
+        icon: Users,
     },
     {
         title: "Payments",
         url: "/admin/payments",
         icon: CreditCard,
     },
-]
+];
 
 export default function AppSidebar() {
-
     const currentPath = usePathname();
     const router = useRouter();
 
     async function handleLogout() {
-        await logout()
-        router.push("/login")
-        router.refresh()
+        await logout();
+        router.push("/login");
+        router.refresh();
     }
 
     return (
         <Sidebar collapsible="icon">
+            {/* Sidebar Header / Brand Emblem */}
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-                            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-black text-white dark:bg-white dark:text-black">
-                                <Crosshair className="size-5" />
-                            </div>
-                            <div className="grid flex-1 text-left text-sm leading-tight">
-                                <span className="truncate font-semibold">Crosshair Dinkers</span>
-                                <span className="truncate text-xs">Booking System</span>
-                            </div>
-                        </SidebarMenuButton>
+                        <Link href="/admin/dashboard">
+                            <SidebarMenuButton
+                                size="lg"
+                                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group"
+                            >
+                                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200">
+                                    <Crosshair className="size-4.5 transition-transform group-hover:rotate-45" />
+                                </div>
+                                <div className="grid flex-1 text-left text-sm leading-tight">
+                                    <span className="truncate font-extrabold text-foreground">
+                                        Crosshair Dinkers
+                                    </span>
+                                    <span className="truncate text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                                        Venue Admin
+                                    </span>
+                                </div>
+                            </SidebarMenuButton>
+                        </Link>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
-            <SidebarContent className="pt-4">
+
+            <SidebarContent className="pt-2">
+                {/* Operations Section */}
                 <SidebarGroup>
+                    <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-3">
+                        Operations
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu className="gap-1">
-                            {items.map((item) => (
-                                <SidebarMenuItem key={item.title}>
-                                    <Link href={item.url}>
-                                        <SidebarMenuButton className="cursor-pointer py-5 [&>svg]:size-4" isActive={currentPath === item.url}>
-                                            <item.icon />
-                                            <span>{item.title}</span>
-                                        </SidebarMenuButton>
-                                    </Link>
-                                </SidebarMenuItem>
-                            ))}
+                            {operationsNav.map((item) => {
+                                const isActive = currentPath === item.url || currentPath.startsWith(`${item.url}/`);
+                                const Icon = item.icon;
+
+                                return (
+                                    <SidebarMenuItem key={item.title}>
+                                        <Link href={item.url}>
+                                            <SidebarMenuButton
+                                                className="cursor-pointer py-5 [&>svg]:size-4 font-medium transition-colors"
+                                                isActive={isActive}
+                                                tooltip={item.title}
+                                            >
+                                                <Icon className={isActive ? "text-primary" : "text-muted-foreground"} />
+                                                <span>{item.title}</span>
+                                            </SidebarMenuButton>
+                                        </Link>
+                                    </SidebarMenuItem>
+                                );
+                            })}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+
+                {/* Management & Finance Section */}
+                <SidebarGroup className="pt-2">
+                    <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-3">
+                        Management
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu className="gap-1">
+                            {managementNav.map((item) => {
+                                const isActive = currentPath === item.url || currentPath.startsWith(`${item.url}/`);
+                                const Icon = item.icon;
+
+                                return (
+                                    <SidebarMenuItem key={item.title}>
+                                        <Link href={item.url}>
+                                            <SidebarMenuButton
+                                                className="cursor-pointer py-5 [&>svg]:size-4 font-medium transition-colors"
+                                                isActive={isActive}
+                                                tooltip={item.title}
+                                            >
+                                                <Icon className={isActive ? "text-primary" : "text-muted-foreground"} />
+                                                <span>{item.title}</span>
+                                            </SidebarMenuButton>
+                                        </Link>
+                                    </SidebarMenuItem>
+                                );
+                            })}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
+
+            {/* Sidebar Footer / Logout */}
             <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton onClick={handleLogout} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                            <LogOut />
-                            <span>Logout</span>
+                        <SidebarMenuButton
+                            onClick={handleLogout}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 font-semibold cursor-pointer py-5"
+                            tooltip="Sign out of Admin"
+                        >
+                            <LogOut className="size-4" />
+                            <span>Sign Out</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>
         </Sidebar>
-    )
+    );
 }

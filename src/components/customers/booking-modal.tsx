@@ -65,8 +65,8 @@ export const BookingModal = ({
                 </div>
 
                 <div className="pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="size-4" />
-                  123 Pickleball Ave, Butuan City
+                  <MapPin className="size-4 shrink-0 text-primary" />
+                  <span>Crosshair Dinkers, J.C. Aquino Ave, Butuan City</span>
                 </div>
               </div>
             )}

@@ -25,14 +25,16 @@ export default function BookingsContainer() {
   return (
     <div className="flex flex-col gap-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-              <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                  Manage all your pickleball court reservations.
-              </p>
-          </div>
-          <AddBookingModal onBookingAdded={() => setRefreshKey(prev => prev + 1)} />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/60">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+            Court Reservations
+          </h1>
+          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+            Monitor player reservations, manage slot confirmations, and record walk-in bookings.
+          </p>
+        </div>
+        <AddBookingModal onBookingAdded={() => setRefreshKey((prev) => prev + 1)} />
       </div>
 
       <div className="flex flex-col gap-4">

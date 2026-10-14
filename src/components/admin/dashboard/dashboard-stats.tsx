@@ -44,44 +44,54 @@ export default function DashboardStats() {
     fetchStats();
   }, []);
 
-  const describeDiff = (diff: number, suffix = "") =>
-    diff > 0 ? `+${diff}${suffix} from yesterday`
-      : diff < 0 ? `${diff}${suffix} from yesterday`
-        : `Same as yesterday`;
+  const bookingDiff = todayBookingsCount - yesterdayBookingsCount;
+  const bookingDesc =
+    bookingDiff > 0
+      ? `+${bookingDiff} booking${bookingDiff === 1 ? "" : "s"} vs yesterday`
+      : bookingDiff < 0
+      ? `${bookingDiff} booking${bookingDiff === -1 ? "" : "s"} vs yesterday`
+      : `Same volume as yesterday`;
 
-  const bookingDesc = describeDiff(todayBookingsCount - yesterdayBookingsCount);
-
+  const revDiff = revToday - revYesterday;
   const revDesc =
     revYesterday === 0
       ? revToday > 0
-        ? "+100% from yesterday"
+        ? "First revenue recorded today"
         : "No revenue recorded yesterday"
-      : describeDiff(Math.round(((revToday - revYesterday) / revYesterday) * 100), "%");
+      : revDiff > 0
+      ? `+₱${revDiff.toLocaleString()} vs yesterday`
+      : revDiff < 0
+      ? `-₱${Math.abs(revDiff).toLocaleString()} vs yesterday`
+      : `Same revenue as yesterday`;
 
   const stats = [
     {
-      title: "Today's Bookings",
+      title: "Bookings Today",
       value: todayBookingsCount,
       description: bookingDesc,
       icon: CalendarCheck,
+      trendType: bookingDiff > 0 ? ("positive" as const) : bookingDiff < 0 ? ("negative" as const) : ("neutral" as const),
     },
     {
-      title: "Upcoming Bookings",
+      title: "Upcoming (7 Days)",
       value: upcomingBookingsCount,
-      description: "Scheduled for next 7 days",
+      description: "Confirmed player reservations",
       icon: CalendarDays,
+      trendType: "neutral" as const,
     },
     {
-      title: "Today's Revenue",
+      title: "Revenue Today",
       value: `₱${revToday.toLocaleString()}`,
       description: revDesc,
       icon: PhilippinePeso,
+      trendType: revDiff > 0 ? ("positive" as const) : revDiff < 0 ? ("negative" as const) : ("neutral" as const),
     },
     {
-      title: "Available Courts",
+      title: "Active Courts",
       value: `${courtStats.available} / ${courtStats.total}`,
-      description: `${courtStats.occupied} court${courtStats.occupied === 1 ? "" : "s"} currently occupied`,
+      description: `${courtStats.occupied} of ${courtStats.total} courts currently in play`,
       icon: CircleCheck,
+      trendType: "neutral" as const,
     },
   ];
 
@@ -93,4 +103,3 @@ export default function DashboardStats() {
     </div>
   );
 }
-

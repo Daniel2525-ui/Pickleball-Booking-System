@@ -19,27 +19,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, CheckCircle2, XCircle, Calendar, Loader2 } from "lucide-react";
+import { MoreHorizontal, CheckCircle2, XCircle, CalendarX, Loader2, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
-import { fetchBookings } from "@/lib/services/bookings/bookingsData.service";
+import { fetchBookings } from "@/lib/services/bookings/filterBookingsData.service";
 import { Booking } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { removeBooking } from "@/lib/services/bookings/removeBooking.service";
 import { confirmBooking } from "@/lib/services/bookings/confirmBooking.service";
 
 const statusStyles: Record<string, string> = {
-  confirmed: "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/50",
-  pending: "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/50",
-  cancelled: "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50",
+  confirmed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-semibold",
+  pending: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold",
+  cancelled: "bg-destructive/10 text-destructive border-destructive/20 font-semibold",
 };
 
-const getStatusColor = (status: string) => statusStyles[status.toLowerCase()] ?? "";
+const getStatusColor = (status: string) => statusStyles[status?.toLowerCase()] ?? "bg-muted text-muted-foreground";
 
 const capitalize = (status: string) => (status ? status[0].toUpperCase() + status.slice(1) : "");
 
 const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+  new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 const columnCount = 6;
 
@@ -74,14 +74,14 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
 
     const { data, error } = await confirmBooking(id);
     if (error || !data) {
-      toast.error((error as Error)?.message || "Failed to confirm booking");
+      toast.error((error as Error)?.message || "Failed to confirm reservation.");
     } else {
       setBookingsData((prev) =>
         prev.map((booking) =>
           booking.id === id ? { ...booking, status: "confirmed" } : booking
         )
       );
-      toast.success("Booking confirmed successfully");
+      toast.success("Reservation confirmed successfully.");
     }
 
     setActionLoadingId(null);
@@ -96,82 +96,86 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
     const { error } = await removeBooking(id);
     if (error) {
       setBookingsData(prevData);
-      toast.error("Failed to delete booking");
+      toast.error("Failed to delete reservation.");
     } else {
-      toast.success("Booking deleted successfully");
+      toast.success("Reservation deleted successfully.");
     }
     setActionLoadingId(null);
   };
 
   return (
-    <div className="rounded-md border bg-card overflow-hidden">
+    <div className="rounded-xl border border-border bg-card shadow-2xs overflow-hidden">
       <div className="max-h-[600px] overflow-auto">
         <Table>
-          <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+          <TableHeader className="sticky top-0 bg-card z-10 border-b border-border shadow-2xs">
             <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Court</TableHead>
-              <TableHead>Date & Time</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Player / Booker</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Court</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Match Schedule</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Total Fee</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Status</TableHead>
+              <TableHead className="text-right font-bold text-xs uppercase tracking-wider text-muted-foreground">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="divide-y divide-border/50">
             {loading ? (
-              <>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-3 w-32" />
-                      </div>
-                    </TableCell>
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-8 ml-auto rounded-md" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </>
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-8 w-8 ml-auto rounded-md" />
+                  </TableCell>
+                </TableRow>
+              ))
             ) : bookingsData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columnCount} className="h-64 text-center">
-                  <div className="flex flex-col items-center justify-center space-y-3">
-                    <div className="rounded-full bg-muted p-3">
-                      <Calendar className="h-6 w-6 text-muted-foreground" />
+                  <div className="flex flex-col items-center justify-center space-y-2.5 p-6">
+                    <div className="rounded-full bg-muted p-3 text-muted-foreground">
+                      <CalendarX className="h-6 w-6" />
                     </div>
-                    <div className="text-lg font-semibold">No bookings found</div>
-                    <p className="text-sm text-muted-foreground">
-                      There are no bookings matching your current filters. Try adjusting your search criteria or wait for new bookings.
+                    <div className="text-base font-bold text-foreground">No matching reservations found</div>
+                    <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+                      There are no court bookings matching your current filter criteria. Try adjusting the court selection or clearing the search.
                     </p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
               bookingsData.map((booking) => (
-                <TableRow key={booking.id} className="group transition-colors hover:bg-muted/50">
-                  <TableCell>
-                    <span className="font-medium">{booking.profiles?.full_name || "Unknown"}</span>
+                <TableRow key={booking.id} className="group transition-colors hover:bg-muted/30">
+                  <TableCell className="font-semibold text-foreground text-sm">
+                    {booking.profiles?.full_name || "Guest Player"}
                   </TableCell>
-                  <TableCell>{booking.courts?.name || "Unknown"}</TableCell>
+                  <TableCell>
+                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-bold text-xs">
+                      {booking.courts?.name || `Court ${booking.court_id}`}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span>{formatDate(booking.booking_date)}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatTime12h(booking.start_time)} - {formatTime12h(booking.end_time)}
+                      <span className="font-medium text-foreground text-xs sm:text-sm">
+                        {formatDate(booking.booking_date)}
+                      </span>
+                      <span className="text-xs text-muted-foreground mt-0.5">
+                        {formatTime12h(booking.start_time)} – {formatTime12h(booking.end_time)}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">
-                    ₱{booking.total_amount?.toLocaleString() || 0}
+                  <TableCell className="font-black text-foreground text-sm">
+                    ₱{booking.total_amount ? booking.total_amount.toLocaleString() : "0"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={getStatusColor(booking.status)}>
+                    <Badge variant="outline" className={`text-xs capitalize ${getStatusColor(booking.status)}`}>
                       {capitalize(booking.status)}
                     </Badge>
                   </TableCell>
@@ -186,24 +190,26 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
                         }
                       >
                         <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
+                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuGroup>
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                            Actions
+                          </DropdownMenuLabel>
                           {booking.status?.toLowerCase() === "pending" && (
                             <>
                               <DropdownMenuItem
                                 onClick={() => handleConfirmBooking(booking.id)}
                                 disabled={actionLoadingId === booking.id}
-                                className="cursor-pointer text-emerald-600 focus:text-emerald-600"
+                                className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
                               >
                                 {actionLoadingId === booking.id ? (
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
                                   <CheckCircle2 className="mr-2 h-4 w-4" />
                                 )}
-                                Confirm Booking
+                                Confirm Reservation
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                             </>
@@ -211,10 +217,10 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
                           <DropdownMenuItem
                             onClick={() => handleRemoveBooking(booking.id)}
                             disabled={actionLoadingId === booking.id}
-                            className="cursor-pointer text-destructive focus:text-destructive"
+                            className="cursor-pointer text-destructive focus:text-destructive text-xs font-semibold"
                           >
                             <XCircle className="mr-2 h-4 w-4" />
-                            Delete Booking
+                            Delete Reservation
                           </DropdownMenuItem>
                         </DropdownMenuGroup>
                       </DropdownMenuContent>

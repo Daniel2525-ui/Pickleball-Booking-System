@@ -176,7 +176,7 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
                 Selected Date
               </p>
               <p className="text-lg font-bold">
-                {selectedDate.toLocaleDateString("en-CA", {
+                {selectedDate.toLocaleDateString("en-US", {
                   weekday: "long",
                   month: "long",
                   day: "numeric",

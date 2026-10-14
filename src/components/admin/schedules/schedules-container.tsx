@@ -91,7 +91,7 @@ export const SchedulesContainer = () => {
 
   const handleSave = async () => {
     if (!validateHours(hours)) {
-      toast.error("Please fix the validation errors before saving.")
+      toast.error("Please resolve highlighted schedule errors before saving.")
       return
     }
 
@@ -114,14 +114,25 @@ export const SchedulesContainer = () => {
         <ScheduleSkeleton />
       ) : (
         <>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <Button onClick={handleSave} disabled={saving} className="shrink-0 gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-card border shadow-xs">
+            <div className="text-sm">
+              <span className="font-semibold text-foreground">Real-Time Sync:</span>{" "}
+              <span className="text-muted-foreground">
+                Updated operating hours immediately reflect on the player booking calendar.
+              </span>
+            </div>
+
+            <Button
+              onClick={handleSave}
+              disabled={saving || !!errorMsg}
+              className="shrink-0 gap-2 w-full sm:w-auto font-medium"
+            >
               {saving ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving Schedule..." : "Save Operating Hours"}
             </Button>
           </div>
 

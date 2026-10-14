@@ -8,9 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  fetchBookingOverview
-} from "@/lib/services/dashboard/bookingOverview.service";
+import { fetchBookingOverview } from "@/lib/services/dashboard/bookingOverview.service";
 import { useEffect, useState } from "react";
 import { DayData } from "@/lib/services/dashboard/dashboardTypes";
 import { supabase } from "@/lib/supabase";
@@ -41,7 +39,6 @@ export default function BookingOverview({ className }: { className?: string }) {
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings" },
         () => {
-          // Re-fetch when a booking is added, updated, or deleted
           fetchBookingOverview().then(({ data }) => {
             if (data) setWeekData(data);
           });
@@ -54,48 +51,61 @@ export default function BookingOverview({ className }: { className?: string }) {
     };
   }, []);
 
-  // Use a minimum max-scale (e.g., 5 or 10) so the bars can visually "grow" from smaller numbers.
-  // Otherwise, the highest day will ALWAYS be 100% height, showing no visual progress.
+  const totalWeekBookings = weekData.reduce((acc, curr) => acc + curr.bookings, 0);
   const maxBookings = Math.max(...weekData.map((day) => day.bookings), 10);
 
   return (
-    <Card className={`flex flex-col ${className || ""}`}>
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">
-          Booking Overview
-        </CardTitle>
-        <CardDescription>This week</CardDescription>
+    <Card className={`flex flex-col border border-border shadow-2xs ${className || ""}`}>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <div>
+          <CardTitle className="text-base font-bold text-foreground">
+            Weekly Booking Volume
+          </CardTitle>
+          <CardDescription className="text-xs text-muted-foreground mt-0.5">
+            Total player reservations across the current week
+          </CardDescription>
+        </div>
+
+        <div className="text-right">
+          <span className="text-lg font-black text-foreground">
+            {loading ? "..." : totalWeekBookings}
+          </span>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Total Matches
+          </p>
+        </div>
       </CardHeader>
+
       <CardContent className="flex-1 flex flex-col pb-6">
         {loading ? (
-          <div className="flex flex-1 min-h-[200px] items-center justify-center pt-2">
-            <Skeleton className="h-full w-full rounded-md" />
+          <div className="flex flex-1 min-h-[220px] items-center justify-center pt-2">
+            <Skeleton className="h-full w-full rounded-xl" />
           </div>
         ) : (
-          <div className="flex gap-3 pt-2 flex-1 min-h-[200px]">
+          <div className="flex gap-2 sm:gap-3 pt-4 flex-1 min-h-[220px] items-end">
             {weekData.map((day) => {
-              const heightPercent = (day.bookings / maxBookings) * 100;
+              const heightPercent = Math.max((day.bookings / maxBookings) * 100, 4);
 
               return (
                 <div
                   key={day.day}
-                  className="group flex flex-1 flex-col items-center gap-2 h-full"
+                  className="group flex flex-1 flex-col items-center gap-2 h-full justify-end"
                 >
-                  {/* Value label */}
-                  <span className="text-xs font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                  {/* Value count - visible for clarity */}
+                  <span className="text-xs font-bold text-foreground">
                     {day.bookings}
                   </span>
 
-                  {/* Bar */}
-                  <div className="relative w-full flex-1">
+                  {/* Volume Bar */}
+                  <div className="relative w-full h-[150px] flex items-end justify-center bg-muted/40 rounded-lg p-1 overflow-hidden">
                     <div
-                      className="absolute bottom-0 w-full rounded-md bg-primary/80 transition-colors group-hover:bg-primary"
-                      style={{ height: `${heightPercent}%`, minHeight: "4px" }}
+                      className="w-full rounded-md bg-primary/75 group-hover:bg-primary transition-all duration-300"
+                      style={{ height: `${heightPercent}%` }}
                     />
                   </div>
 
                   {/* Day label */}
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase">
                     {day.shortDay}
                   </span>
                 </div>

@@ -1,14 +1,26 @@
+import { Metadata } from "next";
+import { CreditCard } from "lucide-react";
 import PaymentsContainer from "@/components/admin/payments/payments-container";
+
+export const metadata: Metadata = {
+  title: "Payments & Transactions | Admin",
+  description: "View and audit customer payment transactions, Stripe checkout records, and booking revenue for Crosshair Dinkers.",
+};
 
 export default function PaymentsPage() {
   return (
-    <div className="flex flex-col gap-4 p-4 lg:p-8 w-full max-w-6xl mx-auto">
+    <div className="flex flex-col gap-6 p-4 lg:p-8 w-full max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Payments & Transactions</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            View and track all payment transactions.
+            Audit player payments, monitor online checkout status, and review transaction history across all courts.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border shrink-0 self-start sm:self-auto">
+          <CreditCard className="h-3.5 w-3.5 text-primary" />
+          <span>Gateway: Stripe & Walk-in Records</span>
         </div>
       </div>
 
@@ -16,3 +28,4 @@ export default function PaymentsPage() {
     </div>
   );
 }
+

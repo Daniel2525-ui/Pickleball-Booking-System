@@ -7,13 +7,13 @@
  */
 
 /** Statuses a customer is allowed to cancel. */
-export const CUSTOMER_CANCELLABLE_STATUSES = ["pending", "confirmed"] as const;
+export const customerCancellableStatuses = ["pending", "confirmed"] as const;
 
 /** Exact status value stored in the database for cancelled bookings. */
 export const CANCELLED_STATUS = "cancelled";
 
 /** Venue timezone offset (Asia/Manila, UTC+8, no DST). Booking dates/times are stored in venue local time. */
-const VENUE_UTC_OFFSET = "+08:00";
+const venueUtcOffset = "+08:00";
 
 interface CancellableBookingFields {
     status: string;
@@ -24,7 +24,7 @@ interface CancellableBookingFields {
 /** Returns the booking's start as an absolute instant, interpreting date/time in venue local time. */
 export const getBookingStart = (booking: Pick<CancellableBookingFields, "booking_date" | "start_time">) => {
     const time = booking.start_time.length === 5 ? `${booking.start_time}:00` : booking.start_time.slice(0, 8);
-    return new Date(`${booking.booking_date}T${time}${VENUE_UTC_OFFSET}`);
+    return new Date(`${booking.booking_date}T${time}${venueUtcOffset}`);
 };
 
 /**
@@ -38,7 +38,7 @@ export const getCancellationBlockReason = (
 
     if (status === CANCELLED_STATUS) return "This booking has already been cancelled.";
 
-    if (!(CUSTOMER_CANCELLABLE_STATUSES as readonly string[]).includes(status)) {
+    if (!(customerCancellableStatuses as readonly string[]).includes(status)) {
         return `Bookings with status "${booking.status}" can no longer be cancelled.`;
     }
 

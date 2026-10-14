@@ -24,7 +24,7 @@ export const todaysSchedule = async () => {
             `)
             .eq("booking_date", today)
             .in("status", ["confirmed", "completed", "ongoing"])
-            .order("start_time", { ascending: true });
+            .order("start_time", { ascending: true }); /* We want the earliest bookings appear first */
 
         if (error) throw error;
 

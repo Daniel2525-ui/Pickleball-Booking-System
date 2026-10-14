@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, LoaderCircle } from "lucide-react";
+import { Search, X, Users, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Customer } from "@/lib/services/customers/customersTypes";
 import { CustomersTable } from "./customers-table";
 import { fetchCustomers } from "@/lib/services/customers/fetchCustomers.service";
+import StatCard from "@/components/admin/dashboard/stat-card";
 
 export default function CustomersContainer() {
   const [search, setSearch] = useState("");
@@ -14,31 +15,35 @@ export default function CustomersContainer() {
 
   useEffect(() => {
     const loadCustomers = async () => {
-      setLoading(true)
-      const { data } = await fetchCustomers()
+      setLoading(true);
+      const { data } = await fetchCustomers();
 
       if (data) {
-        setCustomers(data)
+        setCustomers(data);
       }
 
-      setLoading(false)
+      setLoading(false);
     };
 
     loadCustomers();
-  }, [])
+  }, []);
+
+  const normalizedSearch = search.trim().toLowerCase();
 
   const filtered = customers.filter((customer) => {
-    const matchesSearch =
-      !search ||
-      customer.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      customer.email.toLowerCase().includes(search.toLocaleLowerCase())
+    if (!normalizedSearch) return true;
 
-    return matchesSearch;
+    const nameMatch = customer.full_name?.toLowerCase().includes(normalizedSearch) ?? false;
+    const emailMatch = customer.email?.toLowerCase().includes(normalizedSearch) ?? false;
+    const phoneMatch = customer.phone?.toLowerCase().includes(normalizedSearch) ?? false;
+
+    return nameMatch || emailMatch || phoneMatch;
   });
 
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
+  const currentMonthName = currentDate.toLocaleDateString("en-US", { month: "long" });
 
   const counts = {
     total: customers.length,
@@ -46,51 +51,61 @@ export default function CustomersContainer() {
       const joinedDate = new Date(customer.created_at);
       return joinedDate.getMonth() === currentMonth && joinedDate.getFullYear() === currentYear;
     }).length,
-    repeat: customers.filter((customer) => customer.totalBookings > 1).length,
   };
-
-  const stats = [
-    { label: "Total Customers", value: counts.total, color: "text-foreground" },
-    { label: "New This Month", value: counts.newThisMonth, color: "text-emerald-600 dark:text-emerald-400" },
-    { label: "Repeat Customers", value: counts.repeat, color: "text-blue-600 dark:text-blue-400" },
-  ];
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {stats.map((stat) => (
-          <div key={stat.label} className="rounded-xl border bg-card px-4 py-3 shadow-sm">
-            <p className="text-xs text-muted-foreground">{stat.label}</p>
-            <p className={`text-2xl font-bold mt-0.5 ${stat.color}`}>{stat.value}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <StatCard
+          title="Total Customers"
+          value={loading ? "—" : counts.total}
+          description="Total registered customer accounts in the system"
+          icon={Users}
+        />
+        <StatCard
+          title="New This Month"
+          value={loading ? "—" : counts.newThisMonth}
+          description={`Accounts registered in ${currentMonthName} ${currentYear}`}
+          icon={UserPlus}
+        />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md w-full">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="Search customers by name or email..."
-            className="pl-9 bg-background"
+            placeholder="Search by name, email, or phone..."
+            aria-label="Search customers by name, email, or phone"
+            className="pl-9 pr-8 bg-background"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-sm"
+              aria-label="Clear customer search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
+
+        {search && (
+          <div className="text-xs text-muted-foreground">
+            Showing <span className="font-semibold text-foreground">{filtered.length}</span> of {customers.length}{" "}
+            {customers.length === 1 ? "customer" : "customers"}
+          </div>
+        )}
       </div>
 
-      {loading ? (
-        <CustomersTable customers={[]} loading={true} />
-      ) : filtered.length === 0 ? (
-        <div className="flex h-48 items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
-          No customers matched your search.
-        </div>
-      ) : customers.length === 0 ? (
-        <div className="flex h-48 items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
-          No customers signed in yet.
-        </div>
-      ) : (
-        <CustomersTable customers={filtered} />
-      )}
+      <CustomersTable
+        customers={filtered}
+        loading={loading}
+        searchQuery={search}
+        onClearSearch={() => setSearch("")}
+      />
     </div>
   );
 }

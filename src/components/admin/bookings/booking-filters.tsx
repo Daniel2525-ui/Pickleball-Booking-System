@@ -14,66 +14,75 @@ import { fetchCourts } from "@/lib/services/bookings/fetchCourtFilter.service";
 import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 
 interface BookingFiltersProps {
-  onFilterChange?: (filters: { search: string; status: string; courtId: string; dateTime: string }) => void;
+  onFilterChange?: (filters: {
+    search: string;
+    status: string;
+    courtId: string;
+    dateTime: string;
+  }) => void;
 }
 
 export default function BookingFilters({ onFilterChange }: BookingFiltersProps = {}) {
-
-  const [search, setSearch] = useState("")
-  const [status, setStatus] = useState("All Statuses")
-  const [courtId, setCourtId] = useState("All Courts")
-  const [dateTime, setDateTime] = useState("")
-  const [courts, setCourts] = useState<CourtOption[]>([])
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("All Statuses");
+  const [courtId, setCourtId] = useState("All Courts");
+  const [dateTime, setDateTime] = useState("");
+  const [courts, setCourts] = useState<CourtOption[]>([]);
 
   useEffect(() => {
     const loadCourts = async () => {
       const { data } = await fetchCourts();
+      setCourts(data);
+    };
 
-      setCourts(data)
-    }
+    loadCourts();
+  }, []);
 
-    loadCourts()
-  }, [])
-
-  const updateFilters = (newSearch: string, newStatus: string, newCourtId: string, newDateTime: string) => {
+  const updateFilters = (
+    newSearch: string,
+    newStatus: string,
+    newCourtId: string,
+    newDateTime: string
+  ) => {
     onFilterChange?.({
       search: newSearch,
       status: newStatus,
       courtId: newCourtId,
-      dateTime: newDateTime
-    })
+      dateTime: newDateTime,
+    });
   };
 
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
       <div className="flex flex-1 items-center space-x-2">
-        <div className="relative w-full md:max-w-sm flex items-center justify-center">
-          <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="relative w-full sm:max-w-sm flex items-center">
+          <Search className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
             value={search}
             onChange={(e) => {
               const value = e.target.value;
               setSearch(value);
-              updateFilters(value, status, courtId, dateTime)
+              updateFilters(value, status, courtId, dateTime);
             }}
-            placeholder="Search by customer name or ID..."
-            className="w-full pl-9 bg-background"
+            placeholder="Search by player name..."
+            className="w-full pl-9 bg-background h-9 text-xs sm:text-sm"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <Select
           value={status}
           onValueChange={(value) => {
             const newStatus = value || "All Statuses";
             setStatus(newStatus);
-            updateFilters(search, newStatus, courtId, dateTime)
+            updateFilters(search, newStatus, courtId, dateTime);
           }}
-          defaultValue="All Statuses">
-          <SelectTrigger className="w-[140px] bg-background">
-            <SelectValue placeholder="Status" />
+          defaultValue="All Statuses"
+        >
+          <SelectTrigger className="w-[140px] bg-background h-9 text-xs sm:text-sm font-medium">
+            <SelectValue placeholder="Status Filter" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Statuses">All Statuses</SelectItem>
@@ -86,20 +95,22 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
         <Select
           value={courtId}
           onValueChange={(value) => {
-            const newCourtId = value || "All Courts"
-            setCourtId(newCourtId)
-            updateFilters(search, status, newCourtId, dateTime)
+            const newCourtId = value || "All Courts";
+            setCourtId(newCourtId);
+            updateFilters(search, status, newCourtId, dateTime);
           }}
-          defaultValue="All Courts">
-          <SelectTrigger className="w-[140px] bg-background">
-            <SelectValue placeholder="Court" />
+          defaultValue="All Courts"
+        >
+          <SelectTrigger className="w-[140px] bg-background h-9 text-xs sm:text-sm font-medium">
+            <SelectValue placeholder="Court Filter" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Courts">All Courts</SelectItem>
-            {courts.map((court) =>
+            {courts.map((court) => (
               <SelectItem key={court.id} value={court.name}>
                 {court.name}
-              </SelectItem>)}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

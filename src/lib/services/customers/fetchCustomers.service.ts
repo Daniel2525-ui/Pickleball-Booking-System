@@ -17,12 +17,7 @@ export const fetchCustomers = async () => {
 
         if (error) throw error;
 
-        const customers: Customer[] = (data || []).map((customer) => ({
-            ...customer,
-            totalBookings: 0
-        }))
-
-        return { data: customers, error: null }
+        return { data: (data || []) as Customer[], error: null }
     } catch (error) {
         console.error("Failed to fetch customer data", error)
         return { data: [], error }

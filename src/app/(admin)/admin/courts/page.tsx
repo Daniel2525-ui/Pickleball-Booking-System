@@ -1,6 +1,4 @@
 import CourtsContainer from "@/components/admin/courts/courts-container";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 
 export default function CourtsPage() {
     return (
