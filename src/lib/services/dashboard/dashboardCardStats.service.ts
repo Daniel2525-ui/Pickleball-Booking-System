@@ -144,7 +144,7 @@ export const availableCourts = async () => {
     try {
         const { data: courts, error: courtsError } = await supabase
             .from("courts")
-            .select("id");
+            .select("id, status");
 
         if (courtsError) throw courtsError;
 
@@ -162,12 +162,18 @@ export const availableCourts = async () => {
             bookings.map((booking) => booking.court_id)
         );
 
-        const totalCourts = courts.length;
+        // Only courts that are active/available count towards available capacity
+        const playableCourts = (courts || []).filter((c) => {
+            const s = (c.status || "").toLowerCase();
+            return s === "active" || s === "available" || s === "";
+        });
+
+        const totalPlayable = playableCourts.length;
         const occupied = occupiedCourts.size;
-        const available = totalCourts - occupied;
+        const available = Math.max(0, totalPlayable - occupied);
 
         return {
-            total: totalCourts,
+            total: courts?.length ?? 0,
             occupied,
             available,
         };

@@ -62,12 +62,19 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
+                // If already confirmed or not pending, do not re-process (idempotency for webhook retries)
+                if (booking.status !== "pending") {
+                    console.log(`Booking ${bookingId} already has status '${booking.status}', skipping webhook processing.`);
+                    break;
+                }
+
                 // Check for double booking
                 const { data: conflicts } = await supabase
                     .from("bookings")
                     .select("id")
                     .eq("court_id", booking.court_id)
                     .eq("booking_date", booking.booking_date)
+                    .neq("id", booking.id)
                     .in("status", ["confirmed", "completed", "ongoing"])
                     .lt("start_time", booking.end_time)
                     .gt("end_time", booking.start_time);

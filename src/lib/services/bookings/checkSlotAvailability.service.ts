@@ -26,7 +26,7 @@ export const checkSlotAvailability = (
     date: Date,
     currentUserId?: string | null
 ): SlotStatus => {
-    const court = courts.find((c) => c.name === courtName);
+    const court = courts.find((court) => court.name === courtName);
     if (!court) return "closed";
     if (court.status === "maintenance") return "maintenance";
     if (court.status === "closed") return "closed";
@@ -35,16 +35,22 @@ export const checkSlotAvailability = (
     const slotStart = to24h(startStr.trim());
     const slotEnd = to24h(endStr.trim());
 
-    /* 3. Logic to check if the time slot has already passed */
-    const now = new Date();
-    const isToday =
-        date.getDate() === now.getDate() &&
-        date.getMonth() === now.getMonth() &&
-        date.getFullYear() === now.getFullYear();
+    /* 3. Logic to check if the time slot has already passed in facility timezone (Asia/Manila) */
+    const manilaToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+    const slotDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date);
 
-    if (isToday) {
-        const currentTime = now.getHours().toString().padStart(2, "0") + ":" + now.getMinutes().toString().padStart(2, "0");
-        if (slotStart <= currentTime) {
+    if (slotDateStr < manilaToday) {
+        return "passed";
+    }
+
+    if (slotDateStr === manilaToday) {
+        const currentManilaTime = new Date().toLocaleTimeString("en-GB", {
+            timeZone: "Asia/Manila",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+        });
+        if (slotStart <= currentManilaTime) {
             return "passed";
         }
     }
@@ -86,6 +92,7 @@ export const getSlotBooking = (
     const slotEnd = to24h(endStr.trim());
 
     return bookings.find((booking) => {
+
         if (booking.court_id !== court.id) return false;
         const bookingStart = booking.start_time.slice(0, 5);
         const bookingEnd = booking.end_time.slice(0, 5);

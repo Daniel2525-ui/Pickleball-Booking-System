@@ -9,14 +9,14 @@ const supabase = createClient(supabaseUrl, supabaseServiceRole);
 
 export async function GET(request: Request) {
   try {
-    // Basic security check to ensure this is called by Vercel Cron
+    // Security check to ensure this is called with valid Vercel Cron secret
     const authHeader = request.headers.get("authorization");
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Calculate cutoff time: 15 minutes ago
-    const cutoffTime = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    // Calculate cutoff time: 30 minutes ago (aligns with Stripe Checkout session expiry)
+    const cutoffTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
     // Find all pending bookings created before the cutoff time
     const { data: pendingBookings, error: fetchError } = await supabase

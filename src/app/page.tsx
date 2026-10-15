@@ -267,7 +267,7 @@ export default function Home() {
                   Reserve a Slot Now
                 </a>
                 <a
-                  href="https://maps.google.com"
+                  href="https://www.google.com/maps/search/?api=1&query=Crosshair+Dinkers+Butuan+City"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full sm:w-auto text-center px-6 py-3.5 rounded-xl border border-border font-semibold text-sm hover:bg-muted hover:border-primary/30 transition-all text-foreground"
@@ -312,10 +312,16 @@ export default function Home() {
             {/* Operating Hours */}
             <div className="space-y-2.5">
               <h4 className="font-bold text-xs uppercase tracking-wider text-foreground">Operating Schedule</h4>
-              <p className="text-xs text-foreground font-semibold">Monday – Sunday</p>
-              <p className="text-xs text-muted-foreground">7:00 AM – 10:00 PM</p>
-              <p className="text-[11px] text-muted-foreground/80 mt-1">
-                Asia/Manila (UTC+8) venue operational time.
+              <p className="text-xs text-foreground font-semibold">Standard Venue Hours</p>
+              <p className="text-xs text-muted-foreground">7:00 AM – 10:00 PM Daily</p>
+              <a
+                href="#booking"
+                className="inline-block text-[11px] font-semibold text-primary hover:underline underline-offset-4 mt-0.5"
+              >
+                View Live Date Schedule &rarr;
+              </a>
+              <p className="text-[10px] text-muted-foreground/80">
+                Philippine Standard Time (Asia/Manila).
               </p>
             </div>
 

@@ -152,12 +152,34 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 8. Create a fresh Stripe Checkout Session for this exact booking
+        // 8. Ensure payment record exists before creating Stripe session
         const baseUrl = request.nextUrl.origin;
         const amount = booking.total_amount || payment?.amount || 200;
         const courtName = (booking.courts as any)?.name || "Crosshair Dinkers Court";
-        const paymentRecordId = payment?.id;
+        let paymentRecordId = payment?.id;
 
+        if (!paymentRecordId) {
+            const { data: newPayment, error: createPaymentError } = await supabase
+                .from("payments")
+                .insert({
+                    booking_id: booking.id,
+                    amount,
+                    currency: "php",
+                    status: "pending",
+                })
+                .select("id")
+                .single();
+
+            if (createPaymentError || !newPayment) {
+                return Response.json(
+                    { error: "Could not create payment record for booking." },
+                    { status: 500 }
+                );
+            }
+            paymentRecordId = newPayment.id;
+        }
+
+        // 9. Create a fresh Stripe Checkout Session with verified payment_id in metadata
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
             line_items: [
@@ -178,31 +200,20 @@ export async function POST(request: NextRequest) {
             cancel_url: `${baseUrl}/book`,
             metadata: {
                 booking_id: booking.id,
-                payment_id: paymentRecordId || "",
+                payment_id: paymentRecordId,
             },
             customer_email: user.email,
             expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // Valid for 30 minutes
         });
 
-        // 9. Update the payment record with the new stripe_session_id
-        if (paymentRecordId) {
-            await supabase
-                .from("payments")
-                .update({
-                    stripe_session_id: session.id,
-                    status: "pending",
-                })
-                .eq("id", paymentRecordId);
-        } else {
-            // In case no payment row existed yet
-            await supabase.from("payments").insert({
-                booking_id: booking.id,
-                amount,
-                currency: "php",
-                status: "pending",
+        // 10. Update the payment record with the new stripe_session_id
+        await supabase
+            .from("payments")
+            .update({
                 stripe_session_id: session.id,
-            });
-        }
+                status: "pending",
+            })
+            .eq("id", paymentRecordId);
 
         return Response.json({ url: session.url });
     } catch (error: any) {

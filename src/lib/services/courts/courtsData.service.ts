@@ -11,16 +11,18 @@ export const fetchCourtsData = async () => {
 
         if (courtsError) throw courtsError;
 
-        // Find if any court is currently occupied
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const day = String(now.getDate()).padStart(2, "0");
-        const currentDate = `${year}-${month}-${day}`;
+        // Find if any court is currently occupied (in Asia/Manila timezone)
+        const currentDate = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Manila",
+        }).format(new Date());
 
-        const hours = String(now.getHours()).padStart(2, "0");
-        const minutes = String(now.getMinutes()).padStart(2, "0");
-        const currentTime = `${hours}:${minutes}:00`;
+        const currentTime = new Date().toLocaleTimeString("en-GB", {
+            timeZone: "Asia/Manila",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+        });
 
         const { data: activeBookings, error: bookingsError } = await supabase
             .from("bookings")

@@ -42,6 +42,13 @@ export const fetchCourtStatus = async () => {
         if (bookingError) throw bookingError;
 
         const courtsWithStatus = courts.map((court) => {
+            const normalizedStatus = (court.status || "").toLowerCase();
+            if (normalizedStatus === "maintenance") {
+                return { name: court.name, status: "Maintenance" as const };
+            }
+            if (normalizedStatus === "closed") {
+                return { name: court.name, status: "Closed" as const };
+            }
             const isOccupied = bookings.some(
                 (booking) =>
                     booking.court_id === court.id &&
@@ -52,7 +59,7 @@ export const fetchCourtStatus = async () => {
                 name: court.name,
                 status: (isOccupied ? "In Use" : "Available") as "In Use" | "Available",
             };
-        })
+        });
 
         return {
             data: { courts: courtsWithStatus },

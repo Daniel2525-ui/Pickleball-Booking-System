@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { calculateCourtPrice } from "@/lib/services/courts/calculateCourtPrice.service";
+import { getBookingStart } from "@/lib/services/bookings/cancelBooking.service";
 
 export async function POST(request: NextRequest) {
     let createdBookingId: string | null = null;
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
         // Fetch true court details from DB for security
         const { data: court } = await supabase
             .from("courts")
-            .select("name")
+            .select("name, status")
             .eq("id", court_id)
             .single();
 
@@ -53,14 +54,30 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        if (court.status === "maintenance" || court.status === "closed") {
+            return Response.json(
+                { error: "This court is currently not available for reservations." },
+                { status: 400 }
+            );
+        }
+
         const court_name = court.name;
         
-        // Calculate price dynamically using our central service
-        const amount = calculateCourtPrice();
-
         // Ensure times have seconds for accurate DB string comparison (e.g. '08:00:00' vs '08:00')
         const startTimeDb = start_time.length === 5 ? `${start_time}:00` : start_time;
         const endTimeDb = end_time.length === 5 ? `${end_time}:00` : end_time;
+
+        // Verify the requested match slot has not already started or passed
+        const startInstant = getBookingStart({ booking_date, start_time: startTimeDb });
+        if (Number.isNaN(startInstant.getTime()) || startInstant <= new Date()) {
+            return Response.json(
+                { error: "The requested time slot has already passed." },
+                { status: 400 }
+            );
+        }
+
+        // Calculate price dynamically using our central service
+        const amount = calculateCourtPrice();
 
         // 3. Check court availability (no overlapping confirmed bookings)
         const { data: conflicts } = await supabase

@@ -13,10 +13,9 @@ export const createCheckoutSession = async ({
     date,
     timeRange,
 }: CheckoutParams): Promise<string> => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const dateStr = `${year}-${month}-${day}`;
+    const dateStr = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Manila",
+    }).format(date);
 
     const [startStr, endStr] = timeRange.split(" - ");
     const startTime24 = to24h(startStr.trim());

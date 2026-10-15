@@ -26,19 +26,32 @@ export default function DashboardStats() {
 
   useEffect(() => {
     async function fetchStats() {
-      const today = await bookingsToday();
-      const yesterdayBookings = await bookingsYesterday();
-      const upcoming = await upcomingBookings();
-      const revenueTodayAmount = await revenueToday();
-      const revenueYesterdayAmount = await revenueYesterday();
-      const getCourtToday = await availableCourts();
+      try {
+        const [
+          today,
+          yesterdayBookings,
+          upcoming,
+          revenueTodayAmount,
+          revenueYesterdayAmount,
+          getCourtToday,
+        ] = await Promise.all([
+          bookingsToday(),
+          bookingsYesterday(),
+          upcomingBookings(),
+          revenueToday(),
+          revenueYesterday(),
+          availableCourts(),
+        ]);
 
-      setTodayBookingsCount(today);
-      setYesterdayBookingsCount(yesterdayBookings);
-      setUpcomingBookingsCount(upcoming);
-      setRevToday(revenueTodayAmount);
-      setRevYesterday(revenueYesterdayAmount);
-      setCourtStats(getCourtToday);
+        setTodayBookingsCount(today);
+        setYesterdayBookingsCount(yesterdayBookings);
+        setUpcomingBookingsCount(upcoming);
+        setRevToday(revenueTodayAmount);
+        setRevYesterday(revenueYesterdayAmount);
+        setCourtStats(getCourtToday);
+      } catch (err) {
+        console.error("Failed to load dashboard statistics:", err);
+      }
     }
 
     fetchStats();

@@ -6,6 +6,7 @@ import {
   Clock,
   ReceiptText,
   DollarSign,
+  RotateCcw,
 } from "lucide-react";
 import {
   Table,
@@ -90,7 +91,7 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
     .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
 
   const succeededCount = validPayments.filter(
-    (p) => p.status === "succeeded" || p.status === "paid"
+    (payment) => payment.status === "succeeded" || payment.status === "paid"
   ).length;
 
   const pendingCount = validPayments.filter((payment) => payment.status === "pending").length;
@@ -119,6 +120,13 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
         className:
           "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
         iconClassName: "text-amber-600 dark:text-amber-400",
+      },
+      refunded: {
+        label: "Refunded",
+        icon: RotateCcw,
+        className:
+          "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
+        iconClassName: "text-purple-600 dark:text-purple-400",
       },
     }[s];
 
