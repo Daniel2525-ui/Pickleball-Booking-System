@@ -349,10 +349,6 @@ export default function Home() {
               <a href="#faq" className="hover:text-foreground transition-colors">
                 Cancellation Policy
               </a>
-              <span>•</span>
-              <Link href="/login" className="hover:text-foreground transition-colors">
-                Staff Portal
-              </Link>
             </div>
           </div>
         </div>
