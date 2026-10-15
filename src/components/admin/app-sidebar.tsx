@@ -99,7 +99,7 @@ export default function AppSidebar() {
                                         Crosshair Dinkers
                                     </span>
                                     <span className="truncate text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
-                                        Venue Admin
+                                        Court Admin
                                     </span>
                                 </div>
                             </SidebarMenuButton>
