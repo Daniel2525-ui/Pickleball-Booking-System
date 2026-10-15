@@ -22,6 +22,15 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
+    // Strip misplaced spaces and non-digit characters, limit to 11 digits
+    let val = e.target.value.replace(/\D/g, "");
+    if (val.startsWith("639") && val.length === 12) {
+      val = "0" + val.slice(2);
+    }
+    setPhone(val.slice(0, 11));
+  }
+
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -36,6 +45,12 @@ export default function RegisterPage() {
       return;
     }
 
+    const sanitizedPhone = phone.replace(/\D/g, "");
+    if (sanitizedPhone.length !== 11) {
+      setError("Phone number must be exactly 11 digits.");
+      return;
+    }
+
     setLoading(true);
 
     const supabase = createClient();
@@ -43,7 +58,7 @@ export default function RegisterPage() {
       email: email.trim(),
       password,
       options: {
-        data: { full_name: fullName.trim(), phone: phone.trim() },
+        data: { full_name: fullName.trim(), phone: sanitizedPhone },
       },
     });
 
@@ -135,14 +150,17 @@ export default function RegisterPage() {
                 <Label htmlFor="phone" className="text-xs font-semibold text-foreground">
                   Mobile Number
                 </Label>
-                <span className="text-[11px] text-muted-foreground">For booking SMS alerts</span>
+                <span className="text-[11px] text-muted-foreground">11-digit mobile number</span>
               </div>
               <Input
                 id="phone"
                 type="tel"
-                placeholder="+63 917 123 4567"
+                inputMode="numeric"
+                pattern="[0-9]{11}"
+                maxLength={11}
+                placeholder="09171234567"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={handlePhoneChange}
                 required
                 autoComplete="tel"
                 className="h-10 text-sm"
