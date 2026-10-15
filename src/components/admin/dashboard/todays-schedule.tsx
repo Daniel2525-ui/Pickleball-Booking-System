@@ -72,7 +72,7 @@ export default function TodaysSchedule({
         </div>
 
         <CardAction>
-          <Link href="/admin/schedules">
+          <Link href="/admin/bookings">
             <Button
               variant="ghost"
               size="sm"

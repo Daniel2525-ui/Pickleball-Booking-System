@@ -10,6 +10,7 @@ import {
   Layers,
   SunMedium,
   Award,
+  CalendarDays,
 } from "lucide-react";
 import { BookingContainer } from "@/components/customers/booking-container";
 import { PublicHeader } from "@/components/customers/public-header";
@@ -31,53 +32,70 @@ export default function Home() {
           className="scroll-mt-20 w-full py-16 md:py-24 border-t bg-muted/15"
         >
           <div className="container mx-auto px-4 max-w-6xl">
-            <div className="text-center max-w-3xl mx-auto mb-14">
-              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3 text-foreground">
+            <div className="text-center max-w-3xl mx-auto mb-16 md:mb-20">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight mb-4 text-foreground">
                 How Booking Works
               </h2>
-              <p className="text-muted-foreground text-base md:text-lg">
+              <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
                 No phone calls, no waiting for replies. Check live availability and secure your court in three simple steps.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-              {/* Step 1 */}
-              <div className="bg-card border border-border/80 rounded-2xl p-6 md:p-8 flex flex-col relative shadow-xs hover:-translate-y-1.5 hover:shadow-lg hover:border-primary/50 transition-all duration-300 group">
-                <div className="size-11 rounded-xl bg-primary/10 border border-primary/20 text-primary font-black text-lg flex items-center justify-center mb-5 group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-200">
-                  1
-                </div>
-                <h3 className="text-xl font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
-                  Pick Your Date
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Select your desired playing day on our live operational calendar. View exact opening hours and venue schedule for that date.
-                </p>
-              </div>
+            <div className="relative">
+              {/* Underlying Connecting Track on Desktop */}
+              <div className="hidden md:block absolute top-12 left-[18%] right-[18%] h-[2px] border-t-2 border-dashed border-border/80 -z-0 pointer-events-none" />
 
-              {/* Step 2 */}
-              <div className="bg-card border border-border/80 rounded-2xl p-6 md:p-8 flex flex-col relative shadow-xs hover:-translate-y-1.5 hover:shadow-lg hover:border-primary/50 transition-all duration-300 group">
-                <div className="size-11 rounded-xl bg-primary/10 border border-primary/20 text-primary font-black text-lg flex items-center justify-center mb-5 group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-200">
-                  2
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 relative z-10">
+                {/* Step 1 */}
+                <div className="bg-card border border-border/80 rounded-2xl p-6 md:p-8 flex flex-col relative shadow-xs hover:-translate-y-1.5 hover:shadow-lg hover:border-primary/50 transition-all duration-300 group">
+                  <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 text-primary font-black text-xl flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-200 shadow-2xs">
+                    01
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
+                    Pick Your Date
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                    Select your desired playing day on our live operational calendar. View exact opening hours and venue schedule for that date.
+                  </p>
+                  <div className="mt-5 pt-4 border-t border-border/60 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                    <CalendarDays className="size-3.5 text-primary shrink-0" />
+                    <span>Live Venue Calendar</span>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
-                  Choose Court &amp; Slot
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Browse our real-time availability grid across Courts 1 to 4. Click any open green slot to see the price and match details.
-                </p>
-              </div>
 
-              {/* Step 3 */}
-              <div className="bg-card border border-border/80 rounded-2xl p-6 md:p-8 flex flex-col relative shadow-xs hover:-translate-y-1.5 hover:shadow-lg hover:border-primary/50 transition-all duration-300 group">
-                <div className="size-11 rounded-xl bg-primary/10 border border-primary/20 text-primary font-black text-lg flex items-center justify-center mb-5 group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-200">
-                  3
+                {/* Step 2 */}
+                <div className="bg-card border border-border/80 rounded-2xl p-6 md:p-8 flex flex-col relative shadow-xs hover:-translate-y-1.5 hover:shadow-lg hover:border-primary/50 transition-all duration-300 group">
+                  <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 text-primary font-black text-xl flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-200 shadow-2xs">
+                    02
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
+                    Choose Court &amp; Slot
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                    Browse our real-time availability grid across Courts 1 to 4. Click any open green slot to see the price and match details.
+                  </p>
+                  <div className="mt-5 pt-4 border-t border-border/60 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                    <Crosshair className="size-3.5 text-primary shrink-0" />
+                    <span>Courts 1–4 Matrix</span>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
-                  Confirm &amp; Play
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Check out securely in seconds. Your court reservation pass is issued immediately and accessible anytime under My Bookings.
-                </p>
+
+                {/* Step 3 */}
+                <div className="bg-card border border-border/80 rounded-2xl p-6 md:p-8 flex flex-col relative shadow-xs hover:-translate-y-1.5 hover:shadow-lg hover:border-primary/50 transition-all duration-300 group">
+                  <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 text-primary font-black text-xl flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-200 shadow-2xs">
+                    03
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
+                    Confirm &amp; Play
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                    Check out securely in seconds. Your court reservation pass is issued immediately and accessible anytime under My Bookings.
+                  </p>
+                  <div className="mt-5 pt-4 border-t border-border/60 flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                    <span>Instant Match Pass</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -87,7 +105,7 @@ export default function Home() {
         <section id="courts" className="scroll-mt-20 w-full py-16 md:py-24 border-t">
           <div className="container mx-auto px-4 max-w-6xl">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-              {/* Left Column: Visual Showcase */}
+              {/* Left Column: Visual Showcase with Tactical Reticles */}
               <div className="lg:col-span-6 relative">
                 <div className="aspect-16/10 rounded-2xl overflow-hidden border border-border bg-muted relative shadow-lg group">
                   <Image
@@ -97,13 +115,24 @@ export default function Home() {
                     className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     priority
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent pointer-events-none" />
 
-                  {/* Surface tag overlay */}
-                  <div className="absolute bottom-4 left-4 right-4 bg-background/90 backdrop-blur-md border border-border/80 rounded-xl p-3.5 flex items-center justify-between shadow-sm">
+                  {/* Corner Reticle Accents */}
+                  <div className="absolute top-3 left-3 size-4 border-t-2 border-l-2 border-primary/60 pointer-events-none" />
+                  <div className="absolute top-3 right-3 size-4 border-t-2 border-r-2 border-primary/60 pointer-events-none" />
+                  <div className="absolute bottom-16 left-3 size-4 border-b-2 border-l-2 border-primary/60 pointer-events-none" />
+                  <div className="absolute bottom-16 right-3 size-4 border-b-2 border-r-2 border-primary/60 pointer-events-none" />
+
+                  {/* Surface tag overlay - Direct, authoritative spec without kicker */}
+                  <div className="absolute bottom-4 left-4 right-4 bg-background/95 backdrop-blur-md border border-border/80 rounded-xl p-4 flex items-center justify-between shadow-sm">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-primary">Venue Spec</p>
-                      <p className="text-sm font-bold text-foreground">USAPA Regulation Sizing &amp; Net Standards</p>
+                      <h3 className="text-sm sm:text-base font-extrabold text-foreground">
+                        USAPA Regulation Court Standards
+                      </h3>
+                      <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                        <span className="inline-block size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        44′ × 20′ Tournament Sizing · 36″ Sidelines · 34″ Net
+                      </p>
                     </div>
                     <Award className="size-5 text-primary shrink-0" />
                   </div>
@@ -112,52 +141,56 @@ export default function Home() {
 
               {/* Right Column: Court Details */}
               <div className="lg:col-span-6 space-y-6">
-                <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-                  Engineered for the Perfect Dink
-                </h2>
-                <p className="text-base text-muted-foreground leading-relaxed">
-                  Whether you are sharpening your third-shot drop or competing in weekend matches, our Butuan City facility delivers a premier playing environment designed for safety, precision, and peak athletic performance.
-                </p>
+                <div>
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground">
+                    Engineered for the Perfect Dink
+                  </h2>
+                  <p className="mt-3 text-base text-muted-foreground leading-relaxed">
+                    Whether you are sharpening your third-shot drop or competing in weekend matches, our Butuan City facility delivers a premier playing environment designed for safety, precision, and peak athletic performance.
+                  </p>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div className="p-4 rounded-xl border bg-card/60 hover:border-primary/40 hover:bg-card/90 transition-all duration-200">
-                    <div className="flex items-center gap-2 text-primary font-bold text-sm mb-1.5">
-                      <Layers className="size-4" />
-                      Acrylic Cushion Surface
+                {/* Asymmetric Technical Feature Hierarchy */}
+                <div className="space-y-4 pt-1">
+                  {/* Hero Feature Card */}
+                  <div className="p-5 rounded-xl border border-primary/30 bg-primary/5 hover:border-primary/50 transition-all duration-200">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2.5 text-primary font-bold text-base">
+                        <Layers className="size-5" />
+                        Tournament-Grade Acrylic Cushion Surface
+                      </div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-primary px-2.5 py-0.5 rounded-md bg-primary/10 border border-primary/20 shrink-0">
+                        5-Layer Cushion
+                      </span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Multi-layered tournament coating ensures predictable ball response while reducing stress on knees and ankles.
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                      Engineered multi-layer acrylic coating delivers true, consistent ball bounce while significantly absorbing joint impact during high-speed lateral rallies and third-shot drops.
                     </p>
                   </div>
 
-                  <div className="p-4 rounded-xl border bg-card/60 hover:border-primary/40 hover:bg-card/90 transition-all duration-200">
-                    <div className="flex items-center gap-2 text-primary font-bold text-sm mb-1.5">
-                      <SunMedium className="size-4" />
-                      Anti-Glare Night LED
+                  {/* Supporting 2-Column Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="p-4 rounded-xl border border-border/80 bg-card hover:border-primary/40 transition-all duration-200">
+                      <div className="flex items-center gap-2 text-foreground font-bold text-sm mb-1.5">
+                        <SunMedium className="size-4 text-primary" />
+                        Anti-Glare Night LED
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed mb-2.5">
+                        High-lux overhead stadium fixtures eliminate shadows for optimal ball tracking during night play.
+                      </p>
+                      <span className="text-[11px] font-semibold text-primary">500 Lux Stadium Spec</span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      High-lux overhead stadium lighting provides shadowless court coverage for evening and night tournaments.
-                    </p>
-                  </div>
 
-                  <div className="p-4 rounded-xl border bg-card/60 hover:border-primary/40 hover:bg-card/90 transition-all duration-200">
-                    <div className="flex items-center gap-2 text-primary font-bold text-sm mb-1.5">
-                      <Award className="size-4" />
-                      Paddle &amp; Ball Rental
+                    <div className="p-4 rounded-xl border border-border/80 bg-card hover:border-primary/40 transition-all duration-200">
+                      <div className="flex items-center gap-2 text-foreground font-bold text-sm mb-1.5">
+                        <CheckCircle2 className="size-4 text-primary" />
+                        Equipment &amp; Amenities
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed mb-2.5">
+                        Tournament paddles, Franklin balls, hydration station, shaded seating, and clean locker rooms.
+                      </p>
+                      <span className="text-[11px] font-semibold text-primary">Full Venue Gear Included</span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      High-performance paddles and Franklin tournament balls available at the front counter.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl border bg-card/60 hover:border-primary/40 hover:bg-card/90 transition-all duration-200">
-                    <div className="flex items-center gap-2 text-primary font-bold text-sm mb-1.5">
-                      <CheckCircle2 className="size-4" />
-                      Player Lounge &amp; Amenities
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Shaded spectator seating, hydration station, clean restrooms, and secure equipment lockers.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -168,15 +201,22 @@ export default function Home() {
         {/* Real-Time Booking Engine Section */}
         <section
           id="booking"
-          className="scroll-mt-20 w-full flex flex-col items-center justify-center border-t bg-muted/10 py-16 md:py-24"
+          className="scroll-mt-20 w-full flex flex-col items-center justify-center border-t bg-muted/15 py-16 md:py-24 relative overflow-hidden"
         >
-          <div className="container mx-auto px-4 max-w-6xl w-full">
-            <div className="mb-10 text-center max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3 text-foreground">
+          {/* Subtle Ambient Glow behind Booking Engine */}
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-primary/5 rounded-full blur-[100px] pointer-events-none -z-0" />
+
+          <div className="container mx-auto px-4 max-w-6xl w-full relative z-10">
+            <div className="mb-12 text-center max-w-2xl mx-auto">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-4 shadow-2xs">
+                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                Live Booking Engine · Instant Conflict Locking
+              </div>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight mb-3 text-foreground">
                 Reserve Your Court
               </h2>
-              <p className="text-muted-foreground text-base md:text-lg">
-                Select your preferred date, click an available slot on the live grid, and confirm your reservation instantly.
+              <p className="text-muted-foreground text-base sm:text-lg leading-relaxed">
+                Select your date, click an available slot on the live operational grid, and secure your court in seconds.
               </p>
             </div>
 
@@ -187,34 +227,42 @@ export default function Home() {
         {/* Player FAQ Section */}
         <FAQSection />
 
-        {/* Location & Directions Card */}
-        <section id="location" className="scroll-mt-20 w-full py-16 border-t">
+        {/* Location & Directions Landmark Banner */}
+        <section id="location" className="scroll-mt-20 w-full py-16 md:py-24 border-t">
           <div className="container mx-auto px-4 max-w-6xl">
-            <div className="rounded-2xl border bg-card p-6 md:p-10 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
-              <div className="max-w-xl space-y-3">
-                <h3 className="text-2xl font-bold tracking-tight text-foreground">
+            <div className="rounded-2xl border border-border/80 bg-card p-6 md:p-10 shadow-sm relative overflow-hidden flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+              {/* Crosshair watermark in background */}
+              <Crosshair className="absolute -right-8 -bottom-8 size-48 text-primary/5 pointer-events-none" />
+
+              <div className="max-w-xl space-y-4 relative z-10">
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/60 border border-border/60 px-3 py-1 rounded-full">
+                  <MapPin className="size-3.5 text-primary" />
+                  <span>8°57′ N, 125°32′ E · Butuan City, Agusan Del Norte</span>
+                </div>
+
+                <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
                   Visit Crosshair Dinkers
                 </h3>
-                <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                  Located conveniently in the heart of Butuan City. Come by for open play, tournament sessions, or reserve a dedicated court with friends.
+                <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                  Located conveniently along J.C. Aquino Avenue in the heart of Butuan City. Come by for open play, tournament matches, or reserve a dedicated court with friends.
                 </p>
 
-                <div className="pt-2 flex flex-col gap-2 text-sm text-foreground">
-                  <div className="flex items-center gap-2.5">
-                    <MapPin className="size-4.5 text-primary shrink-0" />
-                    <span>Crosshair Dinkers Complex, J.C. Aquino Ave, Butuan City, Agusan Del Norte</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl border border-border/60 bg-muted/20">
+                    <MapPin className="size-4 text-primary shrink-0" />
+                    <span className="font-medium text-foreground">J.C. Aquino Ave, Butuan City</span>
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <Clock className="size-4.5 text-primary shrink-0" />
-                    <span>Open 7:00 AM – 10:00 PM Daily (Asia/Manila UTC+8)</span>
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl border border-border/60 bg-muted/20">
+                    <Clock className="size-4 text-primary shrink-0" />
+                    <span className="font-medium text-foreground">Open 7:00 AM – 10:00 PM Daily</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+              <div className="flex flex-col sm:flex-row items-center gap-3.5 w-full lg:w-auto relative z-10 shrink-0">
                 <a
                   href="#booking"
-                  className="w-full sm:w-auto text-center px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  className="w-full sm:w-auto text-center px-7 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-md hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                   Reserve a Slot Now
                 </a>
@@ -222,7 +270,7 @@ export default function Home() {
                   href="https://maps.google.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto text-center px-5 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-muted hover:border-primary/30 transition-all text-foreground"
+                  className="w-full sm:w-auto text-center px-6 py-3.5 rounded-xl border border-border font-semibold text-sm hover:bg-muted hover:border-primary/30 transition-all text-foreground"
                 >
                   Get Directions
                 </a>
