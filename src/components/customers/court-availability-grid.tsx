@@ -33,7 +33,7 @@ export const CourtAvailabilityGrid = ({
             <span className="size-2 rounded-full bg-primary" /> Available
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-amber-500" /> Pending
+            <span className="size-2 rounded-full bg-amber-500" /> Pending / Resume
           </span>
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-muted-foreground/40" /> Booked
@@ -91,6 +91,15 @@ export const CourtAvailabilityGrid = ({
                             className="w-full h-full min-h-[48px] bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground rounded-lg transition-all duration-200 text-xs md:text-sm font-semibold flex items-center justify-center border border-primary/30 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           >
                             Available
+                          </button>
+                        ) : status === "user_pending" ? (
+                          <button
+                            onClick={() => onSlotClick(court, time)}
+                            className="w-full h-full min-h-[48px] bg-amber-500/15 hover:bg-amber-500 text-amber-800 dark:text-amber-300 hover:text-white rounded-lg transition-all duration-200 text-xs md:text-sm font-bold flex items-center justify-center gap-1.5 border border-amber-500/40 hover:border-amber-500 shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                            title="Your pending reservation. Click to resume payment or cancel."
+                          >
+                            <Clock className="size-3.5" />
+                            Resume
                           </button>
                         ) : status === "pending" ? (
                           <div className="w-full h-full min-h-[48px] bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg flex items-center justify-center text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-wider">

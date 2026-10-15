@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn, Calendar, Clock, X } from "lucide-react";
+import { LoaderCircle, LogIn, Calendar, Clock, X, CreditCard, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -26,8 +27,10 @@ import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
-import { checkSlotAvailability } from "@/lib/services/bookings/checkSlotAvailability.service";
+import { checkSlotAvailability, getSlotBooking } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
+import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
+import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 
 export const BookingContainer = () => {
   const router = useRouter();
@@ -77,14 +80,24 @@ export const BookingContainer = () => {
     loadInitialData();
   }, []);
 
+  const [pendingBookingToResume, setPendingBookingToResume] = useState<{
+    bookingId: string;
+    courtName: string;
+    time: string;
+    date: Date;
+  } | null>(null);
+  const [isResumingGridBooking, setIsResumingGridBooking] = useState(false);
+  const [isCancellingGridBooking, setIsCancellingGridBooking] = useState(false);
+
   // Load bookings when selected date changes
-  useEffect(() => {
-    const loadBookings = async () => {
-      const { data } = await fetchBookingsForDate(selectedDate);
-      setBookings(data);
-    };
-    loadBookings();
+  const refreshBookings = useCallback(async () => {
+    const { data } = await fetchBookingsForDate(selectedDate);
+    setBookings(data);
   }, [selectedDate]);
+
+  useEffect(() => {
+    refreshBookings();
+  }, [refreshBookings]);
 
   const courtNames = useMemo(() => courts.map((c) => c.name), [courts]);
 
@@ -96,13 +109,29 @@ export const BookingContainer = () => {
   // Check if a slot is booked by comparing against real bookings
   const getSlotStatus = useCallback(
     (_date: Date, courtName: string, timeRange: string) => {
-      return checkSlotAvailability(courtName, timeRange, courts, bookings, _date)
+      return checkSlotAvailability(courtName, timeRange, courts, bookings, _date, user?.id);
     },
-    [courts, bookings]
+    [courts, bookings, user?.id]
   );
 
   const handleSlotClick = (courtName: string, time: string) => {
-    if (getSlotStatus(selectedDate, courtName, time) !== "available") return;
+    const status = getSlotStatus(selectedDate, courtName, time);
+
+    // If user clicked their own pending slot, allow them to resume or cancel
+    if (status === "user_pending") {
+      const slotBooking = getSlotBooking(courtName, time, courts, bookings);
+      if (slotBooking?.id) {
+        setPendingBookingToResume({
+          bookingId: slotBooking.id,
+          courtName,
+          time,
+          date: selectedDate,
+        });
+        return;
+      }
+    }
+
+    if (status !== "available") return;
 
     // If not logged in, show login prompt
     if (!user) {
@@ -116,7 +145,7 @@ export const BookingContainer = () => {
       return;
     }
 
-    const court = courts.find((c) => c.name === courtName);
+    const court = courts.find((court) => court.name === courtName);
 
     setSelectedSlot({
       date: selectedDate,
@@ -125,6 +154,37 @@ export const BookingContainer = () => {
       price: court?.price || 200, // Read the dynamically attached price
     });
     setIsBookingSuccess(false);
+  };
+
+  const handleResumeGridBooking = async () => {
+    if (!pendingBookingToResume || isResumingGridBooking) return;
+    setIsResumingGridBooking(true);
+    toast.loading("Preparing checkout session...", { id: "resume-grid-booking" });
+
+    const { url, error } = await resumeBookingPayment(pendingBookingToResume.bookingId);
+    if (error || !url) {
+      toast.error(error?.message || "Failed to resume payment.", { id: "resume-grid-booking" });
+      setIsResumingGridBooking(false);
+      await refreshBookings();
+    } else {
+      toast.success("Redirecting to Stripe checkout...", { id: "resume-grid-booking" });
+      window.location.href = url;
+    }
+  };
+
+  const handleCancelGridBooking = async () => {
+    if (!pendingBookingToResume || isCancellingGridBooking) return;
+    setIsCancellingGridBooking(true);
+
+    const { error } = await cancelBooking(pendingBookingToResume.bookingId);
+    if (error) {
+      toast.error(error.message || "Failed to cancel reservation.");
+    } else {
+      toast.success("Court reservation cancelled. The slot is now available.");
+      setPendingBookingToResume(null);
+      await refreshBookings();
+    }
+    setIsCancellingGridBooking(false);
   };
 
   const confirmBooking = async () => {
@@ -264,6 +324,82 @@ export const BookingContainer = () => {
             <Button onClick={() => router.push("/login")} className="w-full sm:w-auto gap-2">
               <LogIn className="size-4" />
               Go to Login
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resume Pending Booking Dialog */}
+      <Dialog
+        open={pendingBookingToResume !== null}
+        onOpenChange={(open) => {
+          if (!open && !isResumingGridBooking && !isCancellingGridBooking) {
+            setPendingBookingToResume(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md" showCloseButton={!isResumingGridBooking && !isCancellingGridBooking}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Clock className="size-5 text-amber-500" />
+              Resume Court Reservation
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
+              You currently have an unfinished pending reservation for this court slot held under your account.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingBookingToResume && (
+            <div className="bg-muted/50 border border-border p-4 rounded-xl space-y-2.5 text-sm my-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-foreground text-base">{pendingBookingToResume.courtName}</span>
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Pending Payment
+                </span>
+              </div>
+              <div className="flex items-center text-muted-foreground gap-2">
+                <Calendar className="size-4 text-primary shrink-0" />
+                <span>
+                  {pendingBookingToResume.date.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+              <div className="flex items-center text-muted-foreground gap-2">
+                <Clock className="size-4 text-primary shrink-0" />
+                <span>{pendingBookingToResume.time}</span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2 mt-2">
+            <Button
+              variant="outline"
+              onClick={handleCancelGridBooking}
+              disabled={isCancellingGridBooking || isResumingGridBooking}
+              className="w-full sm:w-auto text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive font-semibold text-xs"
+            >
+              {isCancellingGridBooking ? (
+                <LoaderCircle className="size-3.5 animate-spin mr-1.5" />
+              ) : (
+                <XCircle className="size-3.5 mr-1.5" />
+              )}
+              {isCancellingGridBooking ? "Cancelling..." : "Cancel Reservation"}
+            </Button>
+            <Button
+              onClick={handleResumeGridBooking}
+              disabled={isCancellingGridBooking || isResumingGridBooking}
+              className="w-full sm:w-auto font-bold text-xs gap-1.5 shadow-sm"
+            >
+              {isResumingGridBooking ? (
+                <LoaderCircle className="size-3.5 animate-spin" />
+              ) : (
+                <CreditCard className="size-3.5" />
+              )}
+              {isResumingGridBooking ? "Connecting to Stripe..." : "Continue to Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

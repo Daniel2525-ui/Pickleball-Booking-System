@@ -237,7 +237,7 @@ export default function Home() {
               <div className="max-w-xl space-y-4 relative z-10">
                 <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/60 border border-border/60 px-3 py-1 rounded-full">
                   <MapPin className="size-3.5 text-primary" />
-                  <span>8°57′ N, 125°32′ E · Butuan City, Agusan Del Norte</span>
+                  <span>Butuan City, Agusan Del Norte</span>
                 </div>
 
                 <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">

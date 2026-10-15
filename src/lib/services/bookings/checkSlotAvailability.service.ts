@@ -16,14 +16,15 @@ export const to24h = (time12h: string): string => {
     return `${String(hours).padStart(2, "0")}:${minutes}`;
 };
 
-export type SlotStatus = "available" | "booked" | "pending" | "maintenance" | "closed" | "passed";
+export type SlotStatus = "available" | "booked" | "pending" | "user_pending" | "maintenance" | "closed" | "passed";
 
 export const checkSlotAvailability = (
     courtName: string,
     timeRange: string,
     courts: Court[],
     bookings: BookingSlot[],
-    date: Date
+    date: Date,
+    currentUserId?: string | null
 ): SlotStatus => {
     const court = courts.find((c) => c.name === courtName);
     if (!court) return "closed";
@@ -57,13 +58,37 @@ export const checkSlotAvailability = (
 
     if (matchingBookings.length > 0) {
         const hasConfirmed = matchingBookings.some(
-            (b) => (b.status || "").toLowerCase() !== "pending"
+            (booking) => (booking.status || "").toLowerCase() !== "pending"
         );
         if (hasConfirmed) {
             return "booked";
+        }
+        if (currentUserId && matchingBookings.some((booking) => booking.user_id === currentUserId)) {
+            return "user_pending";
         }
         return "pending";
     }
 
     return "available";
+};
+
+export const getSlotBooking = (
+    courtName: string,
+    timeRange: string,
+    courts: Court[],
+    bookings: BookingSlot[]
+): BookingSlot | undefined => {
+    const court = courts.find((court) => court.name === courtName);
+    if (!court) return undefined;
+
+    const [startStr, endStr] = timeRange.split(" - ");
+    const slotStart = to24h(startStr.trim());
+    const slotEnd = to24h(endStr.trim());
+
+    return bookings.find((booking) => {
+        if (booking.court_id !== court.id) return false;
+        const bookingStart = booking.start_time.slice(0, 5);
+        const bookingEnd = booking.end_time.slice(0, 5);
+        return bookingStart < slotEnd && bookingEnd > slotStart;
+    });
 };

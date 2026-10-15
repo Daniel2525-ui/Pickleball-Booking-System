@@ -9,15 +9,16 @@ import {
   Calendar,
   Clock,
   LoaderCircle,
-  ArrowLeft,
   XCircle,
   AlertTriangle,
   CheckCircle2,
   MapPin,
   CalendarDays,
+  CreditCard,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
 import {
   Dialog,
   DialogContent,
@@ -55,8 +56,30 @@ export const BookingHistoryContainer = () => {
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [bookingToCancel, setBookingToCancel] = useState<UserBooking | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [resumingId, setResumingId] = useState<string | null>(null);
   // Synchronous guard against double submission (state updates are not visible until re-render).
   const cancelInFlight = useRef(false);
+
+  const handleResumePayment = async (bookingId: string) => {
+    if (resumingId || cancellingId) return;
+    setResumingId(bookingId);
+    toast.loading("Preparing checkout session...", { id: "resume-payment-toast" });
+
+    const { url, error } = await resumeBookingPayment(bookingId);
+
+    if (error || !url) {
+      toast.error(error?.message || "Failed to resume payment. Please try again.", {
+        id: "resume-payment-toast",
+      });
+      setResumingId(null);
+      // Re-sync with the database to reflect any status changes
+      const latest = await fetchCurrentUserBookings();
+      if (latest) setBookings(latest);
+    } else {
+      toast.success("Redirecting to secure Stripe checkout...", { id: "resume-payment-toast" });
+      window.location.href = url;
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -118,16 +141,6 @@ export const BookingHistoryContainer = () => {
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-8">
       {/* Page Header */}
       <div>
-        <Link href="/">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mb-4 gap-2 -ml-2 text-muted-foreground hover:text-foreground text-xs sm:text-sm font-medium"
-          >
-            <ArrowLeft className="size-4" />
-            Back to Courts
-          </Button>
-        </Link>
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
           My Court Reservations
         </h1>
@@ -259,23 +272,42 @@ export const BookingHistoryContainer = () => {
                       {booking.total_amount ? `₱${booking.total_amount.toLocaleString()}` : "₱---"}
                     </span>
 
-                    {cancellable && (
-                      <Button
-                        id={`cancel-booking-${booking.id}`}
-                        variant="outline"
-                        size="sm"
-                        className="mt-3 gap-1.5 w-full sm:w-auto text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive font-semibold text-xs"
-                        onClick={() => setBookingToCancel(booking)}
-                        disabled={cancellingId !== null}
-                      >
-                        {cancellingId === booking.id ? (
-                          <LoaderCircle className="size-3.5 animate-spin" />
-                        ) : (
-                          <XCircle className="size-3.5" />
-                        )}
-                        {cancellingId === booking.id ? "Cancelling..." : "Cancel Reservation"}
-                      </Button>
-                    )}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mt-3 w-full sm:w-auto">
+                      {booking.status === "pending" && (
+                        <Button
+                          id={`resume-booking-${booking.id}`}
+                          size="sm"
+                          className="gap-1.5 shadow-sm hover:shadow font-bold text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+                          onClick={() => handleResumePayment(booking.id)}
+                          disabled={resumingId === booking.id || cancellingId !== null}
+                        >
+                          {resumingId === booking.id ? (
+                            <LoaderCircle className="size-3.5 animate-spin" />
+                          ) : (
+                            <CreditCard className="size-3.5" />
+                          )}
+                          {resumingId === booking.id ? "Connecting..." : "Continue Payment"}
+                        </Button>
+                      )}
+
+                      {cancellable && (
+                        <Button
+                          id={`cancel-booking-${booking.id}`}
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive font-semibold text-xs"
+                          onClick={() => setBookingToCancel(booking)}
+                          disabled={cancellingId !== null || resumingId === booking.id}
+                        >
+                          {cancellingId === booking.id ? (
+                            <LoaderCircle className="size-3.5 animate-spin" />
+                          ) : (
+                            <XCircle className="size-3.5" />
+                          )}
+                          {cancellingId === booking.id ? "Cancelling..." : "Cancel Reservation"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

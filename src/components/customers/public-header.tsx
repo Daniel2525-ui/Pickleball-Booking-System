@@ -44,18 +44,18 @@ export function PublicHeader() {
   };
 
   const navLinks = [
-    { label: "Home", href: "#home" },
-    { label: "How It Works", href: "#how-it-works" },
-    { label: "Courts & Amenities", href: "#courts" },
-    { label: "Book a Court", href: "#booking" },
-    { label: "Player FAQ", href: "#faq" },
+    { label: "Home", href: "/#home" },
+    { label: "How It Works", href: "/#how-it-works" },
+    { label: "Courts & Amenities", href: "/#courts" },
+    { label: "Book a Court", href: "/#booking" },
+    { label: "Player FAQ", href: "/#faq" },
   ];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/90 backdrop-blur-md px-4 md:px-8 py-3.5 flex items-center justify-between transition-colors">
       {/* Left: Logo */}
       <div className="flex items-center gap-6">
-        <a href="#home" className="flex items-center gap-2.5 group">
+        <Link href="/" className="flex items-center gap-2.5 group">
           <div className="size-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200">
             <Crosshair className="size-4.5 transition-transform group-hover:rotate-45" />
           </div>
@@ -68,19 +68,19 @@ export function PublicHeader() {
               Butuan City
             </span>
           </div>
-        </a>
+        </Link>
       </div>
 
       {/* Center: Desktop Nav Links */}
       <nav className="hidden lg:flex items-center gap-7">
         {navLinks.map((link) => (
-          <a
+          <Link
             key={link.href}
             href={link.href}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             {link.label}
-          </a>
+          </Link>
         ))}
 
         {user && (
@@ -124,13 +124,13 @@ export function PublicHeader() {
           </Link>
         )}
 
-        <a
-          href="#booking"
+        <Link
+          href="/#booking"
           className="hidden sm:inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-xs font-bold hover:bg-primary/90 transition-all shadow-sm hover:shadow"
         >
           <CalendarDays className="size-3.5" />
           Reserve Court
-        </a>
+        </Link>
 
         {/* Mobile Menu Hamburger */}
         <button
@@ -147,14 +147,14 @@ export function PublicHeader() {
         <div className="lg:hidden absolute top-full left-0 right-0 bg-background/98 border-b border-border shadow-xl backdrop-blur-lg px-5 py-5 flex flex-col gap-3 animate-in slide-in-from-top-2 duration-200">
           <div className="flex flex-col gap-1 border-b pb-3">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
                 className="py-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </div>
 
@@ -187,13 +187,13 @@ export function PublicHeader() {
               </Link>
             )}
 
-            <a
-              href="#booking"
+            <Link
+              href="/#booking"
               onClick={() => setMobileMenuOpen(false)}
               className="w-full py-2.5 text-center rounded-lg bg-primary text-primary-foreground text-sm font-bold shadow hover:bg-primary/90 transition-all"
             >
               Book a Court
-            </a>
+            </Link>
           </div>
         </div>
       )}
