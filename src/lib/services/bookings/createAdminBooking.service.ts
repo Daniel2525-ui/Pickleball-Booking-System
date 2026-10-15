@@ -51,7 +51,7 @@ export const createAdminBooking = async (
                 booking_id: booking.id,
                 amount,
                 currency: "php",
-                status: "succeeded",
+                status: "paid",
                 paid_at: new Date().toISOString()
             });
 
