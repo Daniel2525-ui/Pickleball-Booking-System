@@ -29,7 +29,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters) => {
                 query = query.eq("status", status);
             }
         } else {
-            query = query.not("status", "in", "(failed,refunded)");
+            query = query.not("status", "eq", "failed");
         }
 
         const { data, error } = await query;

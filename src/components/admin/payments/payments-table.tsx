@@ -69,10 +69,10 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
     loadPayments();
   }, [filters]);
 
-  // Filter out any failed and refunded payments
-  const validPayments = payments.filter((p) => {
-    const s = p.status?.toLowerCase() || "";
-    return s !== "failed" && s !== "refunded";
+  // Filter out any failed payments
+  const validPayments = payments.filter((payment) => {
+    const status = payment.status?.toLowerCase() || "";
+    return status !== "failed";
   });
 
   // Client-side search across customer name or court name
@@ -93,39 +93,54 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
     (p) => p.status === "succeeded" || p.status === "paid"
   ).length;
 
-  const pendingCount = validPayments.filter((p) => p.status === "pending").length;
+  const pendingCount = validPayments.filter((payment) => payment.status === "pending").length;
 
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase() || "";
-    switch (s) {
-      case "paid":
-      case "succeeded":
-        return (
-          <Badge
-            variant="outline"
-            className="gap-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 font-semibold"
-          >
-            <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-            <span>Succeeded</span>
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge
-            variant="outline"
-            className="gap-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20 font-semibold"
-          >
-            <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-            <span>Pending</span>
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline" className="capitalize">
-            {status || "Unknown"}
-          </Badge>
-        );
+
+    const config = {
+      paid: {
+        label: "Succeeded",
+        icon: CheckCircle2,
+        className:
+          "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+        iconClassName: "text-emerald-600 dark:text-emerald-400",
+      },
+      succeeded: {
+        label: "Succeeded",
+        icon: CheckCircle2,
+        className:
+          "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+        iconClassName: "text-emerald-600 dark:text-emerald-400",
+      },
+      pending: {
+        label: "Pending",
+        icon: Clock,
+        className:
+          "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+        iconClassName: "text-amber-600 dark:text-amber-400",
+      },
+    }[s];
+
+    if (!config) {
+      return (
+        <Badge variant="outline" className="capitalize">
+          {status || "Unknown"}
+        </Badge>
+      );
     }
+
+    const Icon = config.icon;
+
+    return (
+      <Badge
+        variant="outline"
+        className={`gap-1.5 font-semibold ${config.className}`}
+      >
+        <Icon className={`h-3 w-3 ${config.iconClassName}`} />
+        <span>{config.label}</span>
+      </Badge>
+    );
   };
 
   return (
