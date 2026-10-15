@@ -120,7 +120,12 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
             <Label className="text-xs font-semibold text-foreground">Select Player</Label>
             <Select value={userId} onValueChange={(value) => setUserId(value as string)}>
               <SelectTrigger className="h-9 text-xs sm:text-sm">
-                <SelectValue placeholder="Choose a registered player" />
+                <SelectValue placeholder="Choose a registered player">
+                  {(val) => {
+                    const cust = customers.find((customer) => customer.id === val);
+                    return cust ? cust.full_name : val;
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {customers.map((customer) => (
@@ -137,7 +142,12 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
             <Label className="text-xs font-semibold text-foreground">Assigned Court</Label>
             <Select value={courtId} onValueChange={(value) => setCourtId(value as string)}>
               <SelectTrigger className="h-9 text-xs sm:text-sm">
-                <SelectValue placeholder="Choose a court" />
+                <SelectValue placeholder="Choose a court">
+                  {(val) => {
+                    const court = courts.find((court) => court.id === val);
+                    return court ? court.name : val;
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {courts.map((court) => (

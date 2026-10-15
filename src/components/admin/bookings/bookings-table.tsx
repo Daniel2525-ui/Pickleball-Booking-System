@@ -144,7 +144,7 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
                       <CalendarX className="h-6 w-6" />
                     </div>
                     <div className="text-base font-bold text-foreground">No matching reservations found</div>
-                    <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       There are no court bookings matching your current filter criteria. Try adjusting the court selection or clearing the search.
                     </p>
                   </div>

@@ -64,7 +64,7 @@ const managementNav: NavItem[] = [
         icon: Users,
     },
     {
-        title: "Payments",
+        title: "Payments & Revenue",
         url: "/admin/payments",
         icon: CreditCard,
     },

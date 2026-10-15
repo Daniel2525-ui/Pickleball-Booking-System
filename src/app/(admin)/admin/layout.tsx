@@ -7,7 +7,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <AppSidebar />
       <main className="w-full min-h-screen flex flex-col">
         <div className="p-3">
-          <SidebarTrigger className={"fixed"} />
+          <SidebarTrigger className={"fixed z-30"} />
         </div>
         <div className="flex-1">
           {children}

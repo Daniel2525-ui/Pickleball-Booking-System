@@ -21,15 +21,15 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters) => {
             `)
             .order("created_at", { ascending: false });
 
-        if (filters) {
-            if (
-                filters.status &&
-                filters.status !== "All Statuses" &&
-                filters.status.toLowerCase() !== "all" &&
-                filters.status.trim() !== ""
-            ) {
-                query = query.eq("status", filters.status.toLowerCase());
+        if (filters?.status && filters.status !== "All Statuses" && filters.status.toLowerCase() !== "all" && filters.status.trim() !== "") {
+            const status = filters.status.toLowerCase();
+            if (status === "succeeded" || status === "paid") {
+                query = query.in("status", ["succeeded", "paid"]);
+            } else {
+                query = query.eq("status", status);
             }
+        } else {
+            query = query.not("status", "in", "(failed,refunded)");
         }
 
         const { data, error } = await query;

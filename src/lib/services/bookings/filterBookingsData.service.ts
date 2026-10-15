@@ -3,18 +3,29 @@ import { Booking, FetchBookingsFilters } from "./bookingsTypes";
 
 export const fetchBookings = async (filters?: FetchBookingsFilters) => {
     try {
-        // 1. Start base query with joins
-        // We join profiles to get the customer name, and courts to get the court name
+        const hasCourtFilter = Boolean(
+            filters?.courtId &&
+            filters.courtId !== "All Courts" &&
+            filters.courtId.toLowerCase() !== "all" &&
+            filters.courtId.trim() !== ""
+        );
+
+        const hasSearchFilter = Boolean(filters?.search?.trim());
+        const isCourtUuid =
+            hasCourtFilter &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                filters!.courtId!.trim()
+            );
+
+        const profilesJoin = hasSearchFilter ? "profiles!inner(full_name)" : "profiles(full_name)";
+        const courtsJoin = (!isCourtUuid && hasCourtFilter) ? "courts!inner(name)" : "courts(name)";
+
         let query = supabase
             .from("bookings")
             .select(`
                 *,
-                profiles (
-                    full_name
-                ),
-                courts (
-                    name
-                )
+                ${profilesJoin},
+                ${courtsJoin}
             `)
             .order("booking_date", { ascending: false });
 
@@ -30,21 +41,25 @@ export const fetchBookings = async (filters?: FetchBookingsFilters) => {
                 query = query.eq("status", filters.status.toLowerCase());
             }
 
-            // Filter by Courtx
-            if (
-                filters.courtId &&
-                filters.courtId !== "All Courts" &&
-                filters.courtId.toLowerCase() !== "all" &&
-                filters.courtId.trim() !== ""
-            ) {
-                // Since the dropdown passes the court name, we filter on the joined table
-                query = query.eq("courts.name", filters.courtId);
+            // Filter by Court
+            if (hasCourtFilter) {
+                if (isCourtUuid) {
+                    // Direct column match on bookings.court_id
+                    query = query.eq("court_id", filters.courtId!.trim());
+                } else {
+                    // Fallback if court name is passed
+                    query = query.ilike("courts.name", filters.courtId!.trim());
+                }
             }
 
             // Filter by Search (Customer Name)
-            if (filters.search) {
-                // Supabase allows filtering on joined tables like this:
-                query = query.ilike("profiles.full_name", `%${filters.search}%`);
+            if (hasSearchFilter) {
+                query = query.ilike("profiles.full_name", `%${filters.search!.trim()}%`);
+            }
+
+            // Filter by Date
+            if (filters.dateTime && filters.dateTime.trim() !== "") {
+                query = query.eq("booking_date", filters.dateTime.trim());
             }
         }
 

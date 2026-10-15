@@ -27,7 +27,6 @@ export default function PaymentsContainer() {
       <PaymentFilters
         filters={filters}
         onFilterChange={setFilters}
-        onReset={handleResetFilters}
       />
       <PaymentsTable filters={filters} onResetFilters={handleResetFilters} />
     </div>

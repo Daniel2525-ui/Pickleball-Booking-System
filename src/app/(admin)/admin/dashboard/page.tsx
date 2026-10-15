@@ -21,15 +21,15 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6 p-4 lg:p-8 w-full max-w-7xl mx-auto overflow-visible">
+    <div className="flex flex-col gap-6 px-4 lg:px-8 pb-4 lg:pb-8 pt-0 w-full max-w-7xl mx-auto overflow-visible">
       {/* Dashboard Operational Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/60">
+      <header className="sticky top-0 z-20 bg-background/95 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-6 pb-4 sm:pt-7 sm:pb-4 border-b border-border/60 -mx-4 px-4 lg:-mx-8 lg:px-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Facility Dashboard
+            Admin Dashboard
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Real-time court activity, daily match schedule, and venue metrics in Butuan City.
+            Court availability, daily booking schedules, and facility activity at Crosshair Dinkers.
           </p>
         </div>
 

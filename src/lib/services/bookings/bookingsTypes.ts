@@ -22,6 +22,7 @@ export interface FetchBookingsFilters {
     search?: string;
     status?: string;
     courtId?: string;
+    dateTime?: string;
 }
 
 export interface CourtOption {

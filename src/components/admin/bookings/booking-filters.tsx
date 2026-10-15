@@ -102,12 +102,18 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
           defaultValue="All Courts"
         >
           <SelectTrigger className="w-[140px] bg-background h-9 text-xs sm:text-sm font-medium">
-            <SelectValue placeholder="Court Filter" />
+            <SelectValue placeholder="Court Filter">
+              {(val) => {
+                if (!val || val === "All Courts") return "All Courts";
+                const court = courts.find((c) => c.id === val || c.name === val);
+                return court ? court.name : val;
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Courts">All Courts</SelectItem>
             {courts.map((court) => (
-              <SelectItem key={court.id} value={court.name}>
+              <SelectItem key={court.id} value={court.id}>
                 {court.name}
               </SelectItem>
             ))}

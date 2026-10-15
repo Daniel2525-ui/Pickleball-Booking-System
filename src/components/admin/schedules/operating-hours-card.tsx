@@ -11,7 +11,7 @@ interface OperatingHoursCardProps {
 }
 
 export const OperatingHoursCard = ({ hours, errorMsg, onToggle, onTimeChange }: OperatingHoursCardProps) => {
-  const openDaysCount = hours.filter((h) => h.is_open).length
+  const openDaysCount = hours.filter((hour) => hour.is_open).length
 
   return (
     <Card className="shadow-sm">
@@ -38,7 +38,6 @@ export const OperatingHoursCard = ({ hours, errorMsg, onToggle, onTimeChange }: 
           <div className="flex items-center gap-3 flex-1 justify-end">
             <span className="w-14 text-center">State</span>
             <span className="w-[17.5rem] text-center">Booking Window (Open — Close)</span>
-            <span className="w-20 text-right">Duration</span>
           </div>
         </div>
 

@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Clock,
-  XCircle,
-  RotateCcw,
   ReceiptText,
   DollarSign,
 } from "lucide-react";
@@ -36,9 +34,9 @@ interface PaymentsTableProps {
 const formatDate = (date: string | null | undefined, withTime = false) => {
   if (!date) return "—";
   try {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "—";
-    return d.toLocaleDateString("en-US", {
+    const day = new Date(date);
+    if (isNaN(day.getTime())) return "—";
+    return day.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -71,8 +69,14 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
     loadPayments();
   }, [filters]);
 
+  // Filter out any failed and refunded payments
+  const validPayments = payments.filter((p) => {
+    const s = p.status?.toLowerCase() || "";
+    return s !== "failed" && s !== "refunded";
+  });
+
   // Client-side search across customer name or court name
-  const filtered = payments.filter((p) => {
+  const filtered = validPayments.filter((p) => {
     if (!filters?.search?.trim()) return true;
     const term = filters.search.trim().toLowerCase();
     const name = p.bookings?.profiles?.full_name?.toLowerCase() || "";
@@ -81,15 +85,15 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
   });
 
   // Financial summary metrics
-  const totalVolume = payments
-    .filter((p) => p.status === "succeeded" || p.status === "paid")
-    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalVolume = validPayments
+    .filter((payment) => payment.status === "succeeded" || payment.status === "paid")
+    .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
 
-  const succeededCount = payments.filter(
+  const succeededCount = validPayments.filter(
     (p) => p.status === "succeeded" || p.status === "paid"
   ).length;
 
-  const pendingCount = payments.filter((p) => p.status === "pending").length;
+  const pendingCount = validPayments.filter((p) => p.status === "pending").length;
 
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase() || "";
@@ -113,26 +117,6 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
           >
             <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
             <span>Pending</span>
-          </Badge>
-        );
-      case "failed":
-        return (
-          <Badge
-            variant="outline"
-            className="gap-1.5 bg-destructive/10 text-destructive border-destructive/20 font-semibold"
-          >
-            <XCircle className="h-3 w-3 text-destructive" />
-            <span>Failed</span>
-          </Badge>
-        );
-      case "refunded":
-        return (
-          <Badge
-            variant="outline"
-            className="gap-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20 font-semibold"
-          >
-            <RotateCcw className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-            <span>Refunded</span>
           </Badge>
         );
       default:
@@ -187,7 +171,7 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
               <Skeleton className="h-7 w-16 mt-1" />
             ) : (
               <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
-                {payments.length}
+                {validPayments.length}
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-0.5">Recorded in current view</p>
@@ -247,7 +231,7 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
           <div>
             <h2 className="text-base font-semibold text-foreground">Transaction Records</h2>
             <p className="text-xs text-muted-foreground">
-              Showing {filtered.length} of {payments.length} transactions
+              Showing {filtered.length} of {validPayments.length} transactions
             </p>
           </div>
         </div>

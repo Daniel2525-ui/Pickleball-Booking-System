@@ -1,8 +1,7 @@
 "use client";
 
-import { Search, RotateCcw } from "lucide-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -14,18 +13,12 @@ import {
 interface PaymentFiltersProps {
   filters?: { search: string; status: string };
   onFilterChange: (filters: { search: string; status: string }) => void;
-  onReset?: () => void;
 }
 
 export default function PaymentFilters({
   filters = { search: "", status: "All Statuses" },
   onFilterChange,
-  onReset,
 }: PaymentFiltersProps) {
-  const isFiltered = Boolean(
-    filters.search.trim() || (filters.status && filters.status !== "All Statuses")
-  );
-
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
       <div className="relative flex-1">
@@ -64,22 +57,8 @@ export default function PaymentFilters({
             <SelectItem value="All Statuses">All Statuses</SelectItem>
             <SelectItem value="Succeeded">Succeeded (Paid)</SelectItem>
             <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="Failed">Failed</SelectItem>
-            <SelectItem value="Refunded">Refunded</SelectItem>
           </SelectContent>
         </Select>
-
-        {isFiltered && onReset && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onReset}
-            className="h-9 px-3 gap-1.5 text-xs text-muted-foreground hover:text-foreground shrink-0 border-dashed"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Reset</span>
-          </Button>
-        )}
       </div>
     </div>
   );

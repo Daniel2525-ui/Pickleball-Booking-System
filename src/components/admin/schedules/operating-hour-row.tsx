@@ -10,22 +10,8 @@ interface OperatingHourRowProps {
   onTimeChange: (index: number, field: "open_time" | "close_time", value: string) => void
 }
 
-function calculateDuration(openTime: string, closeTime: string): string | null {
-  if (!openTime || !closeTime) return null
-  const [openH, openM] = openTime.split(":").map(Number)
-  const [closeH, closeM] = closeTime.split(":").map(Number)
-  if (isNaN(openH) || isNaN(openM) || isNaN(closeH) || isNaN(closeM)) return null
-  const diffMinutes = closeH * 60 + closeM - (openH * 60 + openM)
-  if (diffMinutes <= 0) return null
-  const hours = Math.floor(diffMinutes / 60)
-  const mins = diffMinutes % 60
-  if (mins === 0) return `${hours} hrs`
-  return `${hours}h ${mins}m`
-}
-
 export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: OperatingHourRowProps) => {
   const switchId = `toggle-${hour.day_of_week}`
-  const duration = hour.is_open ? calculateDuration(hour.open_time, hour.close_time) : null
 
   return (
     <div
@@ -92,23 +78,13 @@ export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: Operat
               />
             </div>
           </div>
-
-          <div className="w-20 text-right">
-            {duration ? (
-              <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded">
-                {duration}
-              </span>
-            ) : (
-              <span className="text-xs text-destructive font-medium">Invalid</span>
-            )}
-          </div>
         </div>
       ) : (
         <div className="flex items-center gap-3 flex-1 justify-end">
           <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border">
             Closed
           </span>
-          <span className="text-xs text-muted-foreground italic sm:w-80 text-right">
+          <span className="text-xs text-muted-foreground italic sm:w-[17.5rem] text-center">
             Courts unavailable for customer bookings
           </span>
         </div>

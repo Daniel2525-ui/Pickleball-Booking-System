@@ -86,15 +86,15 @@ export default function TodaysSchedule({
       </CardHeader>
 
       <CardContent>
-        <div className="overflow-y-auto max-h-[300px] pr-1">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-card z-10">
-              <tr className="border-b border-border/80 text-left text-xs text-muted-foreground">
-                <th className="pb-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Time Slot</th>
-                <th className="pb-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Court</th>
-                <th className="pb-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Booked By</th>
-                <th className="pb-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Duration</th>
-                <th className="pb-2.5 font-semibold uppercase tracking-wider text-[11px] bg-card">Status</th>
+        <div className="overflow-auto max-h-[320px] pr-1.5 overscroll-contain [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+          <table className="w-full text-sm min-w-[540px]">
+            <thead className="sticky top-0 bg-card z-10 shadow-[0_1px_0_0_var(--color-border)]">
+              <tr className="text-left text-xs text-muted-foreground">
+                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Time Slot</th>
+                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Court</th>
+                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Booked By</th>
+                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Duration</th>
+                <th className="py-2.5 pr-2 font-semibold uppercase tracking-wider text-[11px] bg-card">Status</th>
               </tr>
             </thead>
 
@@ -143,7 +143,7 @@ export default function TodaysSchedule({
                       {calculateDuration(booking.start_time, booking.end_time)}
                     </td>
 
-                    <td className="py-3 whitespace-nowrap">
+                    <td className="py-3 pr-2 whitespace-nowrap">
                       <Badge
                         variant="outline"
                         className={`text-xs capitalize font-semibold ${getStatusColor(booking.status)}`}
