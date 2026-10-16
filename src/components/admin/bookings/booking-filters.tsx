@@ -103,10 +103,10 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
         >
           <SelectTrigger className="flex-1 sm:w-[140px] bg-background h-10 text-xs sm:text-sm font-medium">
             <SelectValue placeholder="Court Filter">
-              {(val) => {
-                if (!val || val === "All Courts") return "All Courts";
-                const court = courts.find((c) => c.id === val || c.name === val);
-                return court ? court.name : val;
+              {(value) => {
+                if (!value || value === "All Courts") return "All Courts";
+                const court = courts.find((court) => court.id === value || court.name === value);
+                return court ? court.name : value;
               }}
             </SelectValue>
           </SelectTrigger>
