@@ -1,3 +1,4 @@
+
 import { createClient } from "@/lib/supabase/client"
 
 type LoginResult =
@@ -19,41 +20,26 @@ export async function register(
     const supabase = createClient()
 
     try {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
             email: email.trim(),
             password,
             options: {
-                data: { full_name: fullName.trim(), phone },
+                data: {
+                    full_name: fullName.trim(),
+                    phone: phone.trim(),
+                },
             },
         })
 
-        if (signUpError) {
-            return {
-                success: false,
-                error: signUpError.message,
-            }
-        }
-
-        if (signUpData?.user?.id) {
-            // shortcut: pre-seed profile row on registration, upgrade to database trigger on auth.users
-            try {
-                await supabase.from("profiles").insert({
-                    id: signUpData.user.id,
-                    email: email.trim(),
-                    full_name: fullName.trim(),
-                    phone,
-                    role: "customer",
-                })
-            } catch {
-                // Unconfirmed session may prevent client insert; self-heals upon first login
-            }
+        if (error) {
+            return { success: false, error: error.message }
         }
 
         return { success: true }
     } catch {
         return {
             success: false,
-            error: "Unable to complete registration. Please check your connection and try again.",
+            error: "Unable to complete registration. Please try again.",
         }
     }
 }
@@ -67,72 +53,36 @@ export async function login(
     const supabase = createClient()
 
     try {
-        const {
-            data: authData,
-            error: authError,
-        } = await supabase.auth.signInWithPassword({
-            email,
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
             password,
         })
 
-        if (authError || !authData?.user) {
+        if (error || !data.user) {
             return {
                 success: false,
                 error: "Invalid email or password. Please try again.",
             }
         }
 
-        const user = authData.user
-
         const { data: profile, error: profileError } = await supabase
             .from("profiles")
             .select("role")
-            .eq("id", user.id)
+            .eq("id", data.user.id)
             .maybeSingle()
 
-        if (profileError) {
+        if (profileError || !profile?.role) {
             return {
                 success: false,
                 error: "Unable to retrieve user profile.",
             }
         }
 
-        let role = profile?.role
-
-        if (!role) {
-            // shortcut: self-heal missing profile row on client login, upgrade to database trigger on auth.users
-            const meta = user.user_metadata || {}
-            const { data: newProfile, error: insertError } = await supabase
-                .from("profiles")
-                .insert({
-                    id: user.id,
-                    email: user.email || email,
-                    full_name: (meta.full_name as string) || (meta.name as string) || email.split("@")[0],
-                    phone: (meta.phone as string) || "",
-                    role: "customer",
-                })
-                .select("role")
-                .single()
-
-
-            if (insertError || !newProfile) {
-                console.error("Failed to create missing user profile:", insertError)
-                return {
-                    success: false,
-                    error: "Unable to retrieve user profile.",
-                }
-            }
-
-            role = newProfile.role
-        }
-
         return {
             success: true,
-            role,
+            role: profile.role,
         }
-    } catch (error) {
-        console.error("Login error:", error)
-
+    } catch {
         return {
             success: false,
             error: "Something went wrong. Please try again.",
