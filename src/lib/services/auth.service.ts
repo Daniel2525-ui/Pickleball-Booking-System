@@ -4,6 +4,60 @@ type LoginResult =
     | { success: true; role: string }
     | { success: false; error: string }
 
+export type RegisterResult =
+    | { success: true }
+    | { success: false; error: string }
+
+/* Register */
+
+export async function register(
+    email: string,
+    password: string,
+    fullName: string,
+    phone: string
+): Promise<RegisterResult> {
+    const supabase = createClient()
+
+    try {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+                data: { full_name: fullName.trim(), phone },
+            },
+        })
+
+        if (signUpError) {
+            return {
+                success: false,
+                error: signUpError.message,
+            }
+        }
+
+        if (signUpData?.user?.id) {
+            // shortcut: pre-seed profile row on registration, upgrade to database trigger on auth.users
+            try {
+                await supabase.from("profiles").insert({
+                    id: signUpData.user.id,
+                    email: email.trim(),
+                    full_name: fullName.trim(),
+                    phone,
+                    role: "customer",
+                })
+            } catch {
+                // Unconfirmed session may prevent client insert; self-heals upon first login
+            }
+        }
+
+        return { success: true }
+    } catch {
+        return {
+            success: false,
+            error: "Unable to complete registration. Please check your connection and try again.",
+        }
+    }
+}
+
 /* Login */
 
 export async function login(
@@ -59,6 +113,7 @@ export async function login(
                 })
                 .select("role")
                 .single()
+
 
             if (insertError || !newProfile) {
                 console.error("Failed to create missing user profile:", insertError)
