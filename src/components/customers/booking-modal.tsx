@@ -78,11 +78,11 @@ export const BookingModal = ({
               </div>
             )}
 
-            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto" disabled={isLoading}>
+            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-2 mt-4">
+              <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-11 text-sm font-semibold" disabled={isLoading}>
                 Cancel
               </Button>
-              <Button onClick={onConfirm} className="w-full sm:w-auto gap-2" disabled={isLoading}>
+              <Button onClick={onConfirm} className="w-full sm:w-auto h-11 text-sm font-bold gap-2" disabled={isLoading}>
                 {isLoading ? (
                   <LoaderCircle className="size-4 animate-spin" />
                 ) : (
@@ -93,16 +93,16 @@ export const BookingModal = ({
             </DialogFooter>
           </>
         ) : (
-          <div className="py-8 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+          <div className="py-6 flex flex-col items-center justify-center text-center">
+            <div className="size-16 bg-emerald-500/10 text-emerald-600 rounded-full flex items-center justify-center mb-4">
               <CheckCircle className="size-8" />
             </div>
-            <DialogTitle className="text-xl mb-2">Booking Confirmed!</DialogTitle>
-            <DialogDescription className="text-base mb-6">
-              Your court has been successfully reserved. We've sent the details to your email.
+            <DialogTitle className="text-xl mb-2 font-bold">Booking Confirmed!</DialogTitle>
+            <DialogDescription className="text-sm mb-6 leading-relaxed">
+              Your court has been successfully reserved. We&apos;ve sent the details to your email.
             </DialogDescription>
             <Button
-              className="w-full"
+              className="w-full h-11 font-bold text-sm"
               onClick={onCloseAndReset}
             >
               View My Bookings

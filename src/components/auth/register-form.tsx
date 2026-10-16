@@ -114,7 +114,7 @@ export function RegisterForm() {
               onChange={(e) => setFullName(e.target.value)}
               required
               autoComplete="name"
-              className="h-10 text-sm"
+              className="h-11 text-base sm:text-sm"
             />
           </div>
 
@@ -137,7 +137,7 @@ export function RegisterForm() {
               onChange={handlePhoneChange}
               required
               autoComplete="tel"
-              className="h-10 text-sm"
+              className="h-11 text-base sm:text-sm"
             />
           </div>
 
@@ -154,7 +154,7 @@ export function RegisterForm() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="h-10 text-sm"
+              className="h-11 text-base sm:text-sm"
             />
           </div>
 
@@ -175,12 +175,12 @@ export function RegisterForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="new-password"
-                className="pr-10 h-10 text-sm"
+                className="pr-12 h-11 text-base sm:text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors size-9 flex items-center justify-center rounded-lg"
                 tabIndex={-1}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -203,12 +203,12 @@ export function RegisterForm() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 autoComplete="new-password"
-                className="pr-10 h-10 text-sm"
+                className="pr-12 h-11 text-base sm:text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors size-9 flex items-center justify-center rounded-lg"
                 tabIndex={-1}
                 aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
@@ -219,7 +219,7 @@ export function RegisterForm() {
 
           <Button
             type="submit"
-            className="w-full mt-2 h-10 font-bold text-sm shadow-sm hover:shadow transition-all"
+            className="w-full mt-2 h-11 font-bold text-sm shadow-sm hover:shadow transition-all"
             disabled={loading}
           >
             {loading ? (
