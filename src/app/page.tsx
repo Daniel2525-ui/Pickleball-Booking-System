@@ -72,7 +72,7 @@ export default function Home() {
                     Choose Court &amp; Slot
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-                    Browse our real-time availability grid across Courts 1 to 4. Click any open green slot to see the price and match details.
+                    Browse our real-time availability grid across Courts 1 to 4. Click any open slot to see the price and match details.
                   </p>
                   <div className="mt-5 pt-4 border-t border-border/60 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                     <Crosshair className="size-3.5 text-primary shrink-0" />

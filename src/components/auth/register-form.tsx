@@ -23,12 +23,12 @@ export function RegisterForm() {
   const [loading, setLoading] = useState(false);
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
-    // Strip misplaced spaces and non-digit characters, limit to 11 digits
-    let val = e.target.value.replace(/\D/g, "");
-    if (val.startsWith("639") && val.length === 12) {
-      val = "0" + val.slice(2);
-    }
-    setPhone(val.slice(0, 11));
+    const value = e.target.value.replace(/\D/g, "");
+    const phone = value.startsWith("639") && value.length === 12
+      ? "0" + value.slice(2)
+      : value;
+
+    setPhone(phone.slice(0, 11));
   }
 
   async function handleRegister(e: React.FormEvent) {
