@@ -129,13 +129,13 @@ function BookingSuccessContent() {
             </Link>
 
             <Link href="/#booking" className="w-full">
-              <Button variant="outline" className="w-full h-11 font-semibold text-sm">
+              <Button variant="outline" className="w-full h-10 font-semibold text-sm">
                 Reserve Another Court
               </Button>
             </Link>
 
             <Link href="/" className="w-full">
-              <Button variant="ghost" className="w-full h-11 text-xs font-semibold text-muted-foreground hover:text-foreground gap-1.5">
+              <Button variant="ghost" className="w-full h-9 text-xs font-medium text-muted-foreground hover:text-foreground gap-1.5">
                 <ArrowLeft className="size-3.5" />
                 Back to Home
               </Button>

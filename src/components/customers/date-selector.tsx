@@ -109,21 +109,14 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-full h-9 w-9"
+                className="rounded-full h-8 w-8"
                 onClick={prevMonth}
                 disabled={!canGoPrev}
-                aria-label="Previous month"
               >
                 <ChevronLeft className="size-4" />
               </Button>
-              <span className="text-sm sm:text-base font-bold text-foreground">{monthLabel}</span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="rounded-full h-9 w-9"
-                onClick={nextMonth}
-                aria-label="Next month"
-              >
+              <span className="text-sm font-semibold">{monthLabel}</span>
+              <Button variant="outline" size="icon" className="rounded-full h-8 w-8" onClick={nextMonth}>
                 <ChevronRight className="size-4" />
               </Button>
             </div>
@@ -131,7 +124,7 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
             {/* Day-of-week headers */}
             <div className="grid grid-cols-7 gap-1 mb-1">
               {daysOfWeek.map((day) => (
-                <div key={day} className="text-center text-[11px] sm:text-xs font-semibold text-muted-foreground py-1.5">
+                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
                   {day}
                 </div>
               ))}
@@ -156,8 +149,8 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
                     disabled={disabled}
                     onClick={() => onSelectDate(date)}
                     className={`
-                      relative aspect-square w-full min-h-[38px] sm:min-h-[44px] rounded-xl flex flex-col items-center justify-center
-                      text-xs sm:text-sm font-semibold transition-all touch-manipulation
+                      relative aspect-square w-full rounded-xl flex flex-col items-center justify-center
+                      text-sm font-medium transition-all
                       ${disabled
                         ? "text-muted-foreground/30 cursor-not-allowed"
                         : isSelected

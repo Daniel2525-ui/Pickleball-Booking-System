@@ -150,18 +150,18 @@ export const BookingHistoryContainer = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 sm:gap-3 border-b pb-4 overflow-x-auto whitespace-nowrap">
+      <div className="flex items-center gap-3 border-b pb-4 overflow-x-auto whitespace-nowrap">
         <Button
           variant={activeTab === "upcoming" ? "default" : "ghost"}
           onClick={() => setActiveTab("upcoming")}
-          className="rounded-full px-5 min-h-[44px] text-xs sm:text-sm font-semibold transition-all shrink-0"
+          className="rounded-full px-5 text-xs sm:text-sm font-semibold transition-all"
         >
           Upcoming Matches ({upcomingBookings.length})
         </Button>
         <Button
           variant={activeTab === "past" ? "default" : "ghost"}
           onClick={() => setActiveTab("past")}
-          className="rounded-full px-5 min-h-[44px] text-xs sm:text-sm font-semibold transition-all shrink-0"
+          className="rounded-full px-5 text-xs sm:text-sm font-semibold transition-all"
         >
           Past Sessions ({pastBookings.length})
         </Button>
@@ -277,7 +277,7 @@ export const BookingHistoryContainer = () => {
                         <Button
                           id={`resume-booking-${booking.id}`}
                           size="sm"
-                          className="gap-1.5 shadow-sm hover:shadow font-bold text-xs bg-primary hover:bg-primary/90 text-primary-foreground min-h-[44px] sm:min-h-[36px] w-full sm:w-auto justify-center"
+                          className="gap-1.5 shadow-sm hover:shadow font-bold text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
                           onClick={() => handleResumePayment(booking.id)}
                           disabled={resumingId === booking.id || cancellingId !== null}
                         >
@@ -295,7 +295,7 @@ export const BookingHistoryContainer = () => {
                           id={`cancel-booking-${booking.id}`}
                           variant="outline"
                           size="sm"
-                          className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive font-semibold text-xs min-h-[44px] sm:min-h-[36px] w-full sm:w-auto justify-center"
+                          className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive font-semibold text-xs"
                           onClick={() => setBookingToCancel(booking)}
                           disabled={cancellingId !== null || resumingId === booking.id}
                         >

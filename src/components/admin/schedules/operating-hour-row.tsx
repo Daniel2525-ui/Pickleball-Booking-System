@@ -48,43 +48,43 @@ export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: Operat
 
       {/* Time Range or Closed State */}
       {hour.is_open ? (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:justify-end w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 flex-1 justify-end">
           <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             Open
           </span>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="flex flex-col flex-1 sm:flex-initial">
+          <div className="flex items-center gap-2">
+            <div className="flex flex-col">
               <span className="sr-only">Opening Time</span>
               <Input
                 type="time"
                 value={hour.open_time}
                 onChange={(e) => onTimeChange(index, "open_time", e.target.value)}
                 aria-label={`${hour.day_of_week} opening time`}
-                className="w-full sm:w-32 h-10 text-sm font-semibold"
+                className="w-28 sm:w-32 h-9 text-sm"
               />
             </div>
 
-            <span className="text-muted-foreground text-xs sm:text-sm font-medium px-1">to</span>
+            <span className="text-muted-foreground text-xs sm:text-sm font-medium px-0.5">to</span>
 
-            <div className="flex flex-col flex-1 sm:flex-initial">
+            <div className="flex flex-col">
               <span className="sr-only">Closing Time</span>
               <Input
                 type="time"
                 value={hour.close_time}
                 onChange={(e) => onTimeChange(index, "close_time", e.target.value)}
                 aria-label={`${hour.day_of_week} closing time`}
-                className="w-full sm:w-32 h-10 text-sm font-semibold"
+                className="w-28 sm:w-32 h-9 text-sm"
               />
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-start sm:justify-end gap-3 flex-1 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/50">
+        <div className="flex items-center gap-3 flex-1 justify-end">
           <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border">
             Closed
           </span>
-          <span className="text-xs text-muted-foreground italic sm:w-[17.5rem] text-left sm:text-center">
+          <span className="text-xs text-muted-foreground italic sm:w-[17.5rem] text-center">
             Courts unavailable for customer bookings
           </span>
         </div>

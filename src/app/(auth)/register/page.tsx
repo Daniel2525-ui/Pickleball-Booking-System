@@ -7,11 +7,11 @@ export default function RegisterPage() {
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-background selection:bg-primary/20 selection:text-primary">
       {/* Back to Home Button */}
-      <Link href="/" className="absolute top-[max(1rem,env(safe-area-inset-top))] left-4 sm:top-8 sm:left-8">
+      <Link href="/" className="absolute top-4 left-4 sm:top-8 sm:left-8">
         <Button
           variant="ghost"
           size="sm"
-          className="gap-2 text-muted-foreground hover:text-foreground text-xs sm:text-sm font-medium min-h-[44px] px-3"
+          className="gap-2 text-muted-foreground hover:text-foreground text-xs sm:text-sm font-medium"
         >
           <ArrowLeft className="size-4" />
           Back to Courts

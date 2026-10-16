@@ -37,7 +37,7 @@ export default function PaymentFilters({
         />
       </div>
 
-      <div className="flex items-center gap-2 w-full sm:w-auto">
+      <div className="flex items-center gap-2">
         <Select
           value={filters.status || "All Statuses"}
           onValueChange={(value) =>

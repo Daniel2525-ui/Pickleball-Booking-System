@@ -171,7 +171,7 @@ export default function AppSidebar() {
             </SidebarContent>
 
             {/* Sidebar Footer / Logout */}
-            <SidebarFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton

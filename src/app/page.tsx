@@ -107,7 +107,7 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
               {/* Left Column: Visual Showcase with Tactical Reticles */}
               <div className="lg:col-span-6 relative">
-                <div className="aspect-4/3 sm:aspect-16/10 rounded-2xl overflow-hidden border border-border bg-muted relative shadow-lg group">
+                <div className="aspect-16/10 rounded-2xl overflow-hidden border border-border bg-muted relative shadow-lg group">
                   <Image
                     src="/images/court-venue.jpg"
                     alt="Crosshair Dinkers tournament pickleball court facility"
@@ -124,17 +124,17 @@ export default function Home() {
                   <div className="absolute bottom-16 right-3 size-4 border-b-2 border-r-2 border-primary/60 pointer-events-none" />
 
                   {/* Surface tag overlay - Direct, authoritative spec without kicker */}
-                  <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 bg-background/95 backdrop-blur-md border border-border/80 rounded-xl p-3 sm:p-4 flex items-center justify-between shadow-sm">
+                  <div className="absolute bottom-4 left-4 right-4 bg-background/95 backdrop-blur-md border border-border/80 rounded-xl p-4 flex items-center justify-between shadow-sm">
                     <div>
-                      <h3 className="text-xs sm:text-base font-extrabold text-foreground">
+                      <h3 className="text-sm sm:text-base font-extrabold text-foreground">
                         USAPA Regulation Court Standards
                       </h3>
-                      <p className="text-[11px] sm:text-xs text-muted-foreground flex items-center gap-1.5 sm:gap-2 mt-0.5">
-                        <span className="inline-block size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                        <span>44′ × 20′ Tournament Sizing · 36″ Sidelines · 34″ Net</span>
+                      <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                        <span className="inline-block size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        44′ × 20′ Tournament Sizing · 36″ Sidelines · 34″ Net
                       </p>
                     </div>
-                    <Award className="size-4 sm:size-5 text-primary shrink-0 ml-2" />
+                    <Award className="size-5 text-primary shrink-0" />
                   </div>
                 </div>
               </div>

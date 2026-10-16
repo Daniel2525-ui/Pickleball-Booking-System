@@ -259,65 +259,7 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
           </div>
         </div>
 
-        {/* Mobile Adaptive Transactions Cards (< md) */}
-        <div className="md:hidden divide-y divide-border/60">
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="p-4 space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-5 w-20 rounded-full" />
-                </div>
-                <Skeleton className="h-4 w-40" />
-                <div className="flex justify-between items-center pt-1">
-                  <Skeleton className="h-5 w-20" />
-                  <Skeleton className="h-3 w-28" />
-                </div>
-              </div>
-            ))
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-6 text-center space-y-2">
-              <ReceiptText className="size-8 text-muted-foreground" />
-              <h3 className="font-semibold text-foreground text-sm">No payment records found</h3>
-              <p className="text-xs text-muted-foreground">Try clearing your search or status filter.</p>
-            </div>
-          ) : (
-            filtered.map((payment) => (
-              <div key={payment.id} className="p-4 space-y-2 bg-card hover:bg-muted/15 transition-colors">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">
-                      {payment.bookings?.profiles?.full_name || "Guest Player"}
-                    </h4>
-                    <p className="text-xs text-muted-foreground">{payment.bookings?.courts?.name || "Court Booking"}</p>
-                  </div>
-                  {getStatusBadge(payment.status)}
-                </div>
-
-                <div className="flex items-center justify-between text-xs bg-muted/30 p-2.5 rounded-lg">
-                  <span className="font-semibold text-foreground">
-                    {payment.bookings?.courts?.name || "Court"} • {payment.bookings?.start_time ? formatTime12h(payment.bookings.start_time) : "—"}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {formatDate(payment.bookings?.booking_date)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-base font-black text-foreground">
-                    {formatCurrency(payment.amount)}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {formatDate(payment.created_at, true)}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Desktop High-Density Table (>= md) */}
-        <div className="hidden md:block max-h-[600px] overflow-auto">
+        <div className="max-h-[600px] overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-card z-10 shadow-xs border-b">
               <TableRow className="hover:bg-transparent">

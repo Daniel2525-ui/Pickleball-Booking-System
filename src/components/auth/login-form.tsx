@@ -88,7 +88,7 @@ export function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="h-11 text-base sm:text-sm"
+              className="h-10 text-sm"
             />
           </div>
 
@@ -108,12 +108,12 @@ export function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="pr-12 h-11 text-base sm:text-sm"
+                className="pr-10 h-10 text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors size-9 flex items-center justify-center rounded-lg"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
                 tabIndex={-1}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -124,7 +124,7 @@ export function LoginForm() {
 
           <Button
             type="submit"
-            className="w-full mt-2 h-11 font-bold text-sm shadow-sm hover:shadow transition-all"
+            className="w-full mt-2 h-10 font-bold text-sm shadow-sm hover:shadow transition-all"
             disabled={loading}
           >
             {loading ? (

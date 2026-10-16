@@ -244,45 +244,44 @@ export const BookingContainer = () => {
 
               {/* Selected Slot Summary */}
               {selectedSlot && (
-                <div className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:w-[90%] sm:max-w-4xl z-50 bg-card border-t sm:border sm:rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] sm:shadow-2xl p-4 sm:p-5 md:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 animate-in slide-in-from-bottom-8 duration-300">
+                <div className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:w-[90%] sm:max-w-4xl z-50 bg-card border-t sm:border sm:rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] sm:shadow-2xl p-4 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 animate-in slide-in-from-bottom-8 duration-300">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-2 right-2 sm:hidden text-muted-foreground size-8"
+                    className="absolute top-2 right-2 sm:hidden text-muted-foreground"
                     onClick={() => setSelectedSlot(null)}
-                    aria-label="Deselect court slot"
                   >
                     <X className="size-4" />
                   </Button>
                   <div className="w-full sm:w-auto pr-8 sm:pr-0">
-                    <div className="flex items-center justify-between sm:justify-start gap-4 mb-1 sm:mb-2">
-                      <h3 className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-wider">Selected Slot</h3>
+                    <div className="flex items-center justify-between sm:justify-start gap-4 mb-2">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Selected Slot</h3>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-6">
-                      <p className="text-lg sm:text-xl font-black text-foreground">{selectedSlot.court}</p>
-                      <div className="flex items-center text-xs sm:text-sm font-medium gap-1.5">
-                        <Calendar className="size-3.5 sm:size-4 text-primary" />
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+                      <p className="text-xl font-bold text-foreground">{selectedSlot.court}</p>
+                      <div className="flex items-center text-sm font-medium gap-1.5">
+                        <Calendar className="size-4" />
                         <span className="font-bold">
                           {selectedSlot.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                         </span>
                       </div>
-                      <div className="flex items-center text-xs sm:text-sm font-medium gap-1.5">
-                        <Clock className="size-3.5 sm:size-4 text-emerald-600 dark:text-emerald-400" />
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      <div className="flex items-center text-sm font-medium text-muted-foreground gap-1.5">
+                        <Clock className="size-4 text-green-600 dark:text-green-400 font-medium" />
+                        <span className="text-green-600 dark:text-green-400 font-medium">
                           {selectedSlot.time}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start w-full sm:w-auto gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
+                  <div className="flex flex-col sm:items-end w-full sm:w-auto gap-3">
                     <div className="text-left sm:text-right">
-                      <p className="text-[11px] text-muted-foreground">Total Price</p>
-                      <p className="text-xl sm:text-2xl font-black text-foreground">₱{selectedSlot.price.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">Total Price</p>
+                      <p className="text-2xl font-bold text-foreground">₱{selectedSlot.price.toLocaleString()}</p>
                     </div>
                     <Button
                       onClick={() => setIsDialogOpen(true)}
                       size="lg"
-                      className="min-h-[44px] sm:min-h-[48px] px-6 text-sm font-bold shadow-md hover:shadow-lg transition-all"
+                      className="w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
                     >
                       Continue to Checkout
                     </Button>

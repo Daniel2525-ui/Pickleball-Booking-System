@@ -91,7 +91,7 @@ export const CourtCard = ({ court, onEdit, onDelete }: CourtCardProps) => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-9 sm:size-8 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity rounded-lg"
+                    className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                   />
                 }
               >

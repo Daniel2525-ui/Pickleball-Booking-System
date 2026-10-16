@@ -71,7 +71,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+      <div className="flex items-center gap-2.5">
         <Select
           value={status}
           onValueChange={(value) => {
@@ -81,7 +81,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
           }}
           defaultValue="All Statuses"
         >
-          <SelectTrigger className="flex-1 sm:w-[140px] bg-background h-10 text-xs sm:text-sm font-medium">
+          <SelectTrigger className="w-[140px] bg-background h-9 text-xs sm:text-sm font-medium">
             <SelectValue placeholder="Status Filter" />
           </SelectTrigger>
           <SelectContent>
@@ -101,7 +101,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
           }}
           defaultValue="All Courts"
         >
-          <SelectTrigger className="flex-1 sm:w-[140px] bg-background h-10 text-xs sm:text-sm font-medium">
+          <SelectTrigger className="w-[140px] bg-background h-9 text-xs sm:text-sm font-medium">
             <SelectValue placeholder="Court Filter">
               {(val) => {
                 if (!val || val === "All Courts") return "All Courts";
