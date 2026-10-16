@@ -13,28 +13,22 @@ export async function login(
     const supabase = createClient()
 
     try {
-        const { error } = await supabase.auth.signInWithPassword({
+        const {
+            data: authData,
+            error: authError,
+        } = await supabase.auth.signInWithPassword({
             email,
             password,
         })
 
-        if (error) {
+        if (authError || !authData?.user) {
             return {
                 success: false,
                 error: "Invalid email or password. Please try again.",
             }
         }
 
-        const {
-            data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user) {
-            return {
-                success: false,
-                error: "Unable to retrieve user information.",
-            }
-        }
+        const user = authData.user
 
         const { data: profile, error: profileError } = await supabase
             .from("profiles")
@@ -42,16 +36,44 @@ export async function login(
             .eq("id", user.id)
             .maybeSingle()
 
-        if (profileError || !profile) {
+        if (profileError) {
             return {
                 success: false,
                 error: "Unable to retrieve user profile.",
             }
         }
 
+        let role = profile?.role
+
+        if (!role) {
+            // shortcut: self-heal missing profile row on client login, upgrade to database trigger on auth.users
+            const meta = user.user_metadata || {}
+            const { data: newProfile, error: insertError } = await supabase
+                .from("profiles")
+                .insert({
+                    id: user.id,
+                    email: user.email || email,
+                    full_name: (meta.full_name as string) || (meta.name as string) || email.split("@")[0],
+                    phone: (meta.phone as string) || "",
+                    role: "customer",
+                })
+                .select("role")
+                .single()
+
+            if (insertError || !newProfile) {
+                console.error("Failed to create missing user profile:", insertError)
+                return {
+                    success: false,
+                    error: "Unable to retrieve user profile.",
+                }
+            }
+
+            role = newProfile.role
+        }
+
         return {
             success: true,
-            role: profile.role,
+            role,
         }
     } catch (error) {
         console.error("Login error:", error)

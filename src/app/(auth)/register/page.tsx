@@ -53,23 +53,43 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: { full_name: fullName.trim(), phone: sanitizedPhone },
-      },
-    });
+    try {
+      const supabase = createClient();
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { full_name: fullName.trim(), phone: sanitizedPhone },
+        },
+      });
 
-    if (signUpError) {
-      setError(signUpError.message);
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      if (signUpData?.user?.id) {
+        // shortcut: pre-seed profile row on registration, upgrade to database trigger on auth.users
+        try {
+          await supabase.from("profiles").insert({
+            id: signUpData.user.id,
+            email: email.trim(),
+            full_name: fullName.trim(),
+            phone: sanitizedPhone,
+            role: "customer",
+          });
+        } catch {
+          // Unconfirmed session may prevent client insert; self-heals upon first login
+        }
+      }
+
+      // Redirect to login with a success message in the query string
+      router.push("/login?registered=true");
+    } catch (err) {
+      setError("Unable to complete registration. Please check your connection and try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Redirect to login with a success message in the query string
-    router.push("/login?registered=true");
   }
 
   return (
