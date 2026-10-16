@@ -132,6 +132,7 @@
         font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
         letter-spacing: -0.02em;
         text-rendering: optimizeLegibility;
+        -webkit-tap-highlight-color: transparent;
     }
 
     h1,
@@ -148,6 +149,40 @@
     select {
         letter-spacing: -0.02em;
     }
+
+    /* Prevent mobile browser text size adjust */
+    html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+}
+
+/* Safe-area utility classes for modern mobile displays with notches/indicators */
+.pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+    padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+/* Subtle, polished custom scrollbars for horizontal matrix and table containers */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: oklch(0.5 0.02 240 / 0.2);
+    border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0.02 240 / 0.35);
 }
 
 @media (prefers-reduced-motion: reduce) {

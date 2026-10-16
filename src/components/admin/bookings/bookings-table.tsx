@@ -27,6 +27,7 @@ import { Booking } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { removeBooking } from "@/lib/services/bookings/removeBooking.service";
 import { confirmBooking } from "@/lib/services/bookings/confirmBooking.service";
+import { Button } from "@/components/ui/button";
 
 const statusStyles: Record<string, string> = {
   confirmed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-semibold",
@@ -105,7 +106,94 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-2xs overflow-hidden">
-      <div className="max-h-[600px] overflow-auto">
+      {/* Mobile Adaptive Cards View (< md) */}
+      <div className="md:hidden divide-y divide-border/60">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-48" />
+              <div className="flex justify-between items-center pt-2">
+                <Skeleton className="h-5 w-16" />
+                <Skeleton className="h-8 w-24 rounded-lg" />
+              </div>
+            </div>
+          ))
+        ) : bookingsData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-6 text-center">
+            <CalendarX className="h-6 w-6 text-muted-foreground mb-2" />
+            <div className="text-sm font-bold text-foreground">No matching reservations found</div>
+            <p className="text-xs text-muted-foreground mt-1">Adjust your search or filter selection.</p>
+          </div>
+        ) : (
+          bookingsData.map((booking) => (
+            <div key={booking.id} className="p-4 space-y-2.5 bg-card hover:bg-muted/10 transition-colors">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-bold text-foreground text-sm">
+                    {booking.profiles?.full_name || "Guest Player"}
+                  </h3>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-bold text-[11px]">
+                      {booking.courts?.name || `Court ${booking.court_id}`}
+                    </span>
+                    <Badge variant="outline" className={`text-[10px] capitalize ${getStatusColor(booking.status)}`}>
+                      {capitalize(booking.status)}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-black text-foreground">
+                    ₱{booking.total_amount ? booking.total_amount.toLocaleString() : "0"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground flex items-center justify-between bg-muted/30 px-3 py-2 rounded-lg">
+                <span>{formatDate(booking.booking_date)}</span>
+                <span className="font-semibold text-foreground">
+                  {formatTime12h(booking.start_time)} – {formatTime12h(booking.end_time)}
+                </span>
+              </div>
+
+              {/* Mobile Direct Action Buttons */}
+              <div className="flex items-center gap-2 pt-1">
+                {booking.status?.toLowerCase() === "pending" && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleConfirmBooking(booking.id)}
+                    disabled={actionLoadingId === booking.id}
+                    className="flex-1 min-h-[40px] text-xs font-bold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {actionLoadingId === booking.id ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="size-3.5" />
+                    )}
+                    Confirm
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleRemoveBooking(booking.id)}
+                  disabled={actionLoadingId === booking.id}
+                  className="flex-1 min-h-[40px] text-xs font-semibold text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
+                >
+                  <XCircle className="size-3.5" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop High-Density Table View (>= md) */}
+      <div className="hidden md:block max-h-[600px] overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 bg-card z-10 border-b border-border shadow-2xs">
             <TableRow>

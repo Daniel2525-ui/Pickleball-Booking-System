@@ -90,7 +90,7 @@ export function HeroSection() {
         {/* Headline */}
         <motion.h1
           variants={itemVariants}
-          className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tighter max-w-4xl mb-5 leading-tight md:leading-[1.08] text-foreground"
+          className="text-3xl sm:text-5xl md:text-7xl font-extrabold tracking-tighter max-w-4xl mb-4 sm:mb-5 leading-[1.12] md:leading-[1.08] text-foreground"
         >
           Dink with precision. <br className="hidden sm:inline" />
           <span className="text-primary">Play your game.</span>
@@ -99,7 +99,7 @@ export function HeroSection() {
         {/* Supporting Copy */}
         <motion.p
           variants={itemVariants}
-          className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 leading-relaxed font-normal"
+          className="text-sm sm:text-lg md:text-xl text-muted-foreground max-w-2xl mb-8 sm:mb-10 leading-relaxed font-normal"
         >
           Welcome to Crosshair Dinkers, Butuan City&apos;s premier dedicated pickleball venue. View real-time court availability, reserve your time slot in seconds, and play on professional tournament surfaces.
         </motion.p>
@@ -107,11 +107,11 @@ export function HeroSection() {
         {/* Action Buttons */}
         <motion.div
           variants={itemVariants}
-          className="flex flex-col sm:flex-row w-full sm:w-auto items-center justify-center gap-3.5 mb-16"
+          className="flex flex-col sm:flex-row w-full sm:w-auto items-center justify-center gap-3 sm:gap-3.5 mb-12 sm:mb-16"
         >
           <a
             href="#booking"
-            className="group flex items-center justify-center gap-2.5 bg-primary text-primary-foreground px-7 py-3.5 rounded-xl text-sm md:text-base font-bold hover:bg-primary/90 transition-all shadow-md hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] w-full sm:w-auto"
+            className="group flex items-center justify-center gap-2.5 bg-primary text-primary-foreground px-6 sm:px-7 min-h-[48px] rounded-xl text-sm sm:text-base font-bold hover:bg-primary/90 transition-all shadow-md hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] w-full sm:w-auto"
           >
             <CalendarDays className="size-4.5 group-hover:rotate-6 transition-transform duration-200" />
             Book a Court Now
@@ -119,7 +119,7 @@ export function HeroSection() {
           </a>
           <a
             href="#how-it-works"
-            className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm md:text-base font-semibold border border-border bg-card/60 hover:bg-muted hover:border-primary/30 transition-all w-full sm:w-auto text-foreground"
+            className="flex items-center justify-center gap-2 px-6 min-h-[48px] rounded-xl text-sm sm:text-base font-semibold border border-border bg-card/60 hover:bg-muted hover:border-primary/30 transition-all w-full sm:w-auto text-foreground"
           >
             How It Works
           </a>
@@ -128,62 +128,62 @@ export function HeroSection() {
         {/* Metric Badges Strip */}
         <motion.div
           variants={containerVariants}
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 max-w-5xl w-full text-left"
+          className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 max-w-5xl w-full text-left"
         >
           <motion.div
             variants={statItemVariants}
             whileHover={{ y: -2 }}
             transition={{ duration: 0.2 }}
-            className="bg-card border border-border/70 p-4.5 md:p-5 rounded-xl shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
+            className="bg-card border border-border/70 p-3.5 sm:p-5 rounded-xl shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
           >
-            <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider mb-1.5">
-              <Layers className="size-3.5" />
+            <div className="flex items-center gap-1.5 sm:gap-2 text-primary text-[11px] sm:text-xs font-semibold uppercase tracking-wider mb-1 sm:mb-1.5">
+              <Layers className="size-3.5 shrink-0" />
               <span>Courts</span>
             </div>
-            <p className="text-xl md:text-2xl font-black text-foreground">4 Regulation</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Tournament acrylic cushion</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">4 Regulation</p>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">Tournament acrylic cushion</p>
           </motion.div>
 
           <motion.div
             variants={statItemVariants}
             whileHover={{ y: -2 }}
             transition={{ duration: 0.2 }}
-            className="bg-card border border-border/70 p-4.5 md:p-5 rounded-xl shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
+            className="bg-card border border-border/70 p-3.5 sm:p-5 rounded-xl shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
           >
-            <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider mb-1.5">
-              <Sparkles className="size-3.5" />
+            <div className="flex items-center gap-1.5 sm:gap-2 text-primary text-[11px] sm:text-xs font-semibold uppercase tracking-wider mb-1 sm:mb-1.5">
+              <Sparkles className="size-3.5 shrink-0" />
               <span>Court Rate</span>
             </div>
-            <p className="text-xl md:text-2xl font-black text-foreground">From ₱200/hr</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Transparent hourly rate</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">From ₱200/hr</p>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">Transparent hourly rate</p>
           </motion.div>
 
           <motion.div
             variants={statItemVariants}
             whileHover={{ y: -2 }}
             transition={{ duration: 0.2 }}
-            className="bg-card border border-border/70 p-4.5 md:p-5 rounded-xl shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
+            className="bg-card border border-border/70 p-3.5 sm:p-5 rounded-xl shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
           >
-            <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider mb-1.5">
-              <Clock className="size-3.5" />
+            <div className="flex items-center gap-1.5 sm:gap-2 text-primary text-[11px] sm:text-xs font-semibold uppercase tracking-wider mb-1 sm:mb-1.5">
+              <Clock className="size-3.5 shrink-0" />
               <span>Facility Hours</span>
             </div>
-            <p className="text-xl md:text-2xl font-black text-foreground">7 AM – 10 PM</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Open 7 days a week</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">7 AM – 10 PM</p>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">Open 7 days a week</p>
           </motion.div>
 
           <motion.div
             variants={statItemVariants}
             whileHover={{ y: -2 }}
             transition={{ duration: 0.2 }}
-            className="bg-card border border-border/70 p-4.5 md:p-5 rounded-xl shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
+            className="bg-card border border-border/70 p-3.5 sm:p-5 rounded-xl shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
           >
-            <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider mb-1.5">
-              <ShieldCheck className="size-3.5" />
+            <div className="flex items-center gap-1.5 sm:gap-2 text-primary text-[11px] sm:text-xs font-semibold uppercase tracking-wider mb-1 sm:mb-1.5">
+              <ShieldCheck className="size-3.5 shrink-0" />
               <span>Guarantee</span>
             </div>
-            <p className="text-xl md:text-2xl font-black text-foreground">Zero Conflicts</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Live real-time reservation locking</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">Zero Conflicts</p>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">Live reservation locking</p>
           </motion.div>
         </motion.div>
       </motion.div>
