@@ -16,7 +16,47 @@ export const to24h = (time12h: string): string => {
     return `${String(hours).padStart(2, "0")}:${minutes}`;
 };
 
-export type SlotStatus = "available" | "booked" | "pending" | "user_pending" | "maintenance" | "closed" | "passed";
+export type SlotStatus =
+    | "available"
+    | "booked"
+    | "pending"
+    | "user_pending"
+    | "maintenance"
+    | "closed"
+    | "passed";
+
+// Reuse the same timezone formatter.
+const manilaDateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+});
+
+// Convert a time range into comparable 24-hour times.
+const getSlotTimes = (timeRange: string) => {
+    const [start, end] = timeRange.split(" - ");
+
+    return {
+        start: to24h(start.trim()),
+        end: to24h(end.trim()),
+    };
+};
+
+// Find all bookings that overlap the selected time slot.
+const getOverlappingBookings = (
+    courtId: Court["id"],
+    timeRange: string,
+    bookings: BookingSlot[]
+): BookingSlot[] => {
+    const { start, end } = getSlotTimes(timeRange);
+
+    return bookings.filter((booking) => {
+        if (booking.court_id !== courtId) return false;
+
+        const bookingStart = booking.start_time.slice(0, 5);
+        const bookingEnd = booking.end_time.slice(0, 5);
+
+        return bookingStart < end && bookingEnd > start;
+    });
+};
 
 export const checkSlotAvailability = (
     courtName: string,
@@ -27,55 +67,48 @@ export const checkSlotAvailability = (
     currentUserId?: string | null
 ): SlotStatus => {
     const court = courts.find((court) => court.name === courtName);
-    if (!court) return "closed";
+
+    if (!court || court.status === "closed") return "closed";
     if (court.status === "maintenance") return "maintenance";
-    if (court.status === "closed") return "closed";
 
-    const [startStr, endStr] = timeRange.split(" - ");
-    const slotStart = to24h(startStr.trim());
-    const slotEnd = to24h(endStr.trim());
+    const now = new Date();
+    const today = manilaDateFormatter.format(now);
+    const slotDate = manilaDateFormatter.format(date);
 
-    /* 3. Logic to check if the time slot has already passed in facility timezone (Asia/Manila) */
-    const manilaToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-    const slotDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date);
+    if (slotDate < today) return "passed";
 
-    if (slotDateStr < manilaToday) {
-        return "passed";
-    }
-
-    if (slotDateStr === manilaToday) {
-        const currentManilaTime = new Date().toLocaleTimeString("en-GB", {
+    if (slotDate === today) {
+        const currentTime = now.toLocaleTimeString("en-GB", {
             timeZone: "Asia/Manila",
             hour: "2-digit",
             minute: "2-digit",
             hour12: false,
         });
-        if (slotStart <= currentManilaTime) {
-            return "passed";
-        }
+
+        const { start } = getSlotTimes(timeRange);
+
+        if (start <= currentTime) return "passed";
     }
 
-    const matchingBookings = bookings.filter((booking) => {
-        if (booking.court_id !== court.id) return false;
-        const bookingStart = booking.start_time.slice(0, 5);
-        const bookingEnd = booking.end_time.slice(0, 5);
-        return bookingStart < slotEnd && bookingEnd > slotStart;
-    });
+    const matchingBookings = getOverlappingBookings(
+        court.id,
+        timeRange,
+        bookings
+    );
 
-    if (matchingBookings.length > 0) {
-        const hasConfirmed = matchingBookings.some(
-            (booking) => (booking.status || "").toLowerCase() !== "pending"
-        );
-        if (hasConfirmed) {
-            return "booked";
-        }
-        if (currentUserId && matchingBookings.some((booking) => booking.user_id === currentUserId)) {
-            return "user_pending";
-        }
-        return "pending";
-    }
+    if (matchingBookings.length === 0) return "available";
 
-    return "available";
+    const hasConfirmed = matchingBookings.some(
+        (booking) => (booking.status || "").toLowerCase() !== "pending"
+    );
+
+    if (hasConfirmed) return "booked";
+
+    const belongsToUser = matchingBookings.some(
+        (booking) => booking.user_id === currentUserId
+    );
+
+    return belongsToUser ? "user_pending" : "pending";
 };
 
 export const getSlotBooking = (
@@ -85,17 +118,12 @@ export const getSlotBooking = (
     bookings: BookingSlot[]
 ): BookingSlot | undefined => {
     const court = courts.find((court) => court.name === courtName);
+
     if (!court) return undefined;
 
-    const [startStr, endStr] = timeRange.split(" - ");
-    const slotStart = to24h(startStr.trim());
-    const slotEnd = to24h(endStr.trim());
-
-    return bookings.find((booking) => {
-
-        if (booking.court_id !== court.id) return false;
-        const bookingStart = booking.start_time.slice(0, 5);
-        const bookingEnd = booking.end_time.slice(0, 5);
-        return bookingStart < slotEnd && bookingEnd > slotStart;
-    });
+    return getOverlappingBookings(
+        court.id,
+        timeRange,
+        bookings
+    )[0];
 };

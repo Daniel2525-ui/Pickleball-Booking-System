@@ -32,7 +32,7 @@ export function BookingScheduleSkeleton() {
                 {/* Calendar grid */}
                 <div className="grid grid-cols-7 gap-1">
                   {Array.from({ length: 35 }).map((_, i) => (
-                    <Skeleton key={i} className="aspect-square w-full rounded-xl" />
+                    <Skeleton key={i} className="aspect-square w-full rounded-full" />
                   ))}
                 </div>
               </div>

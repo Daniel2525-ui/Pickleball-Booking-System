@@ -156,7 +156,7 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
                     disabled={disabled}
                     onClick={() => onSelectDate(date)}
                     className={`
-                      relative aspect-square w-full min-h-[38px] sm:min-h-[44px] rounded-xl flex flex-col items-center justify-center
+                      relative aspect-square w-full rounded-full flex items-center justify-center
                       text-xs sm:text-sm font-semibold transition-all touch-manipulation
                       ${disabled
                         ? "text-muted-foreground/30 cursor-not-allowed"

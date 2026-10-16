@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabase";
 
 export interface BookingSlot {
@@ -11,13 +12,10 @@ export interface BookingSlot {
 
 export const fetchBookingsForDate = async (date: Date | string) => {
     try {
-        let dateStr = date;
-        if (date instanceof Date) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, "0");
-            const day = String(date.getDate()).padStart(2, "0");
-            dateStr = `${year}-${month}-${day}`;
-        }
+        const dateStr =
+            date instanceof Date
+                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+                : date;
 
         const { data, error } = await supabase
             .from("bookings")
@@ -26,6 +24,7 @@ export const fetchBookingsForDate = async (date: Date | string) => {
             .in("status", ["confirmed", "completed", "ongoing", "pending"]);
 
         if (error) throw error;
+
         return { data: (data || []) as BookingSlot[], error: null };
     } catch (error) {
         console.error("Failed to fetch bookings for date:", error);
