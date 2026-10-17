@@ -44,10 +44,10 @@ export const fetchCourtStatus = async () => {
         const courtsWithStatus = courts.map((court) => {
             const normalizedStatus = (court.status || "").toLowerCase();
             if (normalizedStatus === "maintenance") {
-                return { name: court.name, status: "Maintenance" as const };
+                return { name: court.name, status: "Maintenance" };
             }
             if (normalizedStatus === "closed") {
-                return { name: court.name, status: "Closed" as const };
+                return { name: court.name, status: "Closed" };
             }
             const isOccupied = bookings.some(
                 (booking) =>

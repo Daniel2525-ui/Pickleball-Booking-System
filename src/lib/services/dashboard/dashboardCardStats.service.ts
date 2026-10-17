@@ -163,13 +163,14 @@ export const availableCourts = async () => {
         );
 
         // Only courts that are active/available count towards available capacity
-        const playableCourts = (courts || []).filter((c) => {
-            const s = (c.status || "").toLowerCase();
-            return s === "active" || s === "available" || s === "";
+        const playableCourts = (courts || []).filter((court) => {
+            const status = (court.status || "").toLowerCase();
+            return status === "active" || status === "available" || status === "";
         });
 
         const totalPlayable = playableCourts.length;
         const occupied = occupiedCourts.size;
+        /* Used Math.max method to ensure that no negative number will be returned*/
         const available = Math.max(0, totalPlayable - occupied);
 
         return {

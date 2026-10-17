@@ -122,8 +122,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
               <SelectTrigger className="h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Choose a registered player">
                   {(value) => {
-                    const cust = customers.find((customer) => customer.id === value);
-                    return cust ? cust.full_name : value;
+                    const customer = customers.find((customer) => customer.id === value);
+                    return customer ? customer.full_name : value;
                   }}
                 </SelectValue>
               </SelectTrigger>
@@ -143,9 +143,9 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
             <Select value={courtId} onValueChange={(value) => setCourtId(value as string)}>
               <SelectTrigger className="h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Choose a court">
-                  {(val) => {
-                    const court = courts.find((court) => court.id === val);
-                    return court ? court.name : val;
+                  {(value) => {
+                    const court = courts.find((court) => court.id === value);
+                    return court ? court.name : value;
                   }}
                 </SelectValue>
               </SelectTrigger>
