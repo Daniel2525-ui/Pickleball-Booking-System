@@ -20,8 +20,6 @@ export default function BookingsContainer() {
     dateTime: "",
   });
 
-  const [refreshKey, setRefreshKey] = useState(0);
-
   return (
     <div className="flex flex-col gap-6">
       {/* Page Header */}
@@ -34,12 +32,12 @@ export default function BookingsContainer() {
             Monitor player reservations, manage slot confirmations, and record walk-in bookings.
           </p>
         </div>
-        <AddBookingModal onBookingAdded={() => setRefreshKey((prev) => prev + 1)} />
+        <AddBookingModal />
       </header>
 
       <div className="flex flex-col gap-4">
         <BookingFilters onFilterChange={setFilters} />
-        <BookingsTable filters={filters} refreshKey={refreshKey} />
+        <BookingsTable filters={filters} />
       </div>
     </div>
   );

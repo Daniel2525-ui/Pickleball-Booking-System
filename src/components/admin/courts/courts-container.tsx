@@ -202,19 +202,8 @@ export default function CourtsContainer() {
           </div>
           <div className="text-base font-semibold">No matching courts found</div>
           <p className="text-sm text-muted-foreground max-w-sm">
-            No courts match your search or status filter. Try adjusting or resetting your filters.
+            No courts match your search or status filter. Try adjusting your search or filters.
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSearch("");
-              setStatusFilter("all");
-            }}
-            className="mt-2"
-          >
-            Reset filters
-          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

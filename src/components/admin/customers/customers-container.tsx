@@ -104,7 +104,6 @@ export default function CustomersContainer() {
         customers={filtered}
         loading={loading}
         searchQuery={search}
-        onClearSearch={() => setSearch("")}
       />
     </div>
   );

@@ -17,7 +17,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchPayments } from "@/lib/services/payments/paymentsData.service";
@@ -29,7 +28,6 @@ interface PaymentsTableProps {
     search: string;
     status: string;
   };
-  onResetFilters?: () => void;
 }
 
 const formatDate = (date: string | null | undefined, withTime = false) => {
@@ -56,7 +54,7 @@ const formatCurrency = (amount: number | null | undefined) => {
   })}`;
 };
 
-export default function PaymentsTable({ filters, onResetFilters }: PaymentsTableProps) {
+export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -354,19 +352,9 @@ export default function PaymentsTable({ filters, onResetFilters }: PaymentsTable
                       <h3 className="font-semibold text-foreground text-sm">No payment records found</h3>
                       <p className="text-xs text-muted-foreground">
                         {filters?.search || filters?.status !== "All Statuses"
-                          ? "No transactions match your search or filter criteria. Try resetting filters."
+                          ? "No transactions match your search or filter criteria. Try adjusting your search or filters."
                           : "No payment transactions have been recorded yet."}
                       </p>
-                      {onResetFilters && (filters?.search || filters?.status !== "All Statuses") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={onResetFilters}
-                          className="mt-2 text-xs"
-                        >
-                          Clear Filters
-                        </Button>
-                      )}
                     </div>
                   </TableCell>
                 </TableRow>

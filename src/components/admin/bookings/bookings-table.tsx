@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, CheckCircle2, XCircle, CalendarX, Loader2, Clock } from "lucide-react";
+import { MoreHorizontal, CheckCircle2, XCircle, CalendarX, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { fetchBookings } from "@/lib/services/bookings/filterBookingsData.service";
@@ -51,10 +51,9 @@ interface BookingsTableProps {
     courtId: string;
     dateTime: string;
   };
-  refreshKey?: number;
 }
 
-export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTableProps = {}) {
+export default function BookingsTable({ filters }: BookingsTableProps = {}) {
   const [bookingsData, setBookingsData] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -67,7 +66,7 @@ export default function BookingsTable({ filters, refreshKey = 0 }: BookingsTable
       setLoading(false);
     };
     loadBookingsData();
-  }, [filters, refreshKey]);
+  }, [filters]);
 
   const handleConfirmBooking = async (id: string) => {
     if (actionLoadingId) return;

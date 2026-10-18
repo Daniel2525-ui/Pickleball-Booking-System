@@ -28,10 +28,10 @@ import { Court } from "@/lib/services/courts/courtsTypes";
 import { Customer } from "@/lib/services/customers/customersTypes";
 
 interface AddBookingModalProps {
-  onBookingAdded: () => void;
+  onBookingAdded?: () => void;
 }
 
-export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
+export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +85,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps) => {
       setStartTime("");
       setEndTime("");
       setAmount("");
-      onBookingAdded();
+      onBookingAdded?.();
     }
   };
 

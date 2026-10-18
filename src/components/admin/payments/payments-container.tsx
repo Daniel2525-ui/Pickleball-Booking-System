@@ -15,20 +15,13 @@ export default function PaymentsContainer() {
     status: "All Statuses",
   });
 
-  const handleResetFilters = () => {
-    setFilters({
-      search: "",
-      status: "All Statuses",
-    });
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <PaymentFilters
         filters={filters}
         onFilterChange={setFilters}
       />
-      <PaymentsTable filters={filters} onResetFilters={handleResetFilters} />
+      <PaymentsTable filters={filters} />
     </div>
   );
 }

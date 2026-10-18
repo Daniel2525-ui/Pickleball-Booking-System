@@ -9,13 +9,11 @@ import {
 } from "@/components/ui/table";
 import { Users, SearchX, Mail, Phone } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 
 interface CustomersTableProps {
   customers: Customer[];
   loading?: boolean;
   searchQuery?: string;
-  onClearSearch?: () => void;
 }
 
 const getInitials = (name?: string) => {
@@ -29,7 +27,6 @@ export const CustomersTable = ({
   customers,
   loading,
   searchQuery,
-  onClearSearch,
 }: CustomersTableProps) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
@@ -69,11 +66,6 @@ export const CustomersTable = ({
             <p className="text-sm font-semibold text-foreground">
               {searchQuery ? "No matching customers found" : "No registered customers yet"}
             </p>
-            {searchQuery && onClearSearch && (
-              <Button variant="outline" size="sm" onClick={onClearSearch} className="mt-2 text-xs">
-                Reset search
-              </Button>
-            )}
           </div>
         ) : (
           customers.map((customer) => (
@@ -158,19 +150,9 @@ export const CustomersTable = ({
                     </div>
                     <p className="text-sm text-muted-foreground text-center">
                       {searchQuery
-                        ? `We couldn't find any customers matching "${searchQuery}". Check the spelling or reset your search.`
+                        ? `We couldn't find any customers matching "${searchQuery}". Check the spelling or adjust your search.`
                         : "Customer records will appear here as soon as players create an account or book a court."}
                     </p>
-                    {searchQuery && onClearSearch && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onClearSearch}
-                        className="mt-2"
-                      >
-                        Reset search
-                      </Button>
-                    )}
                   </div>
                 </TableCell>
               </TableRow>
