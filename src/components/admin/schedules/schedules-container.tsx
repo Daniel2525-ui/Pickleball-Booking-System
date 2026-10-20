@@ -70,7 +70,7 @@ export const SchedulesContainer = () => {
 
     updateDay(dayIndex, {
       is_open: isOpen,
-      ...(needsDefaultTimes && { open_time: "08:00", close_time: "22:00" }),
+      ...(needsDefaultTimes && { open_time: "08:00", close_time: "10:00" }),
     })
   }
 

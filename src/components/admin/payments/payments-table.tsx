@@ -6,7 +6,6 @@ import {
   Clock,
   ReceiptText,
   DollarSign,
-  RotateCcw,
 } from "lucide-react";
 import {
   Table,
@@ -47,8 +46,8 @@ const formatDate = (date: string | null | undefined, withTime = false) => {
 };
 
 const formatCurrency = (amount: number | null | undefined) => {
-  const val = Number(amount) || 0;
-  return `₱${val.toLocaleString("en-PH", {
+  const value = Number(amount) || 0;
+  return `₱${value.toLocaleString("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -75,11 +74,11 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   });
 
   // Client-side search across customer name or court name
-  const filtered = validPayments.filter((p) => {
+  const filtered = validPayments.filter((payment) => {
     if (!filters?.search?.trim()) return true;
     const term = filters.search.trim().toLowerCase();
-    const name = p.bookings?.profiles?.full_name?.toLowerCase() || "";
-    const court = p.bookings?.courts?.name?.toLowerCase() || "";
+    const name = payment.bookings?.profiles?.full_name?.toLowerCase() || "";
+    const court = payment.bookings?.courts?.name?.toLowerCase() || "";
     return name.includes(term) || court.includes(term);
   });
 
@@ -96,15 +95,9 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase() || "";
+    const key = s === "paid" ? "succeeded" : s;
 
     const config = {
-      paid: {
-        label: "Succeeded",
-        icon: CheckCircle2,
-        className:
-          "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
-        iconClassName: "text-emerald-600 dark:text-emerald-400",
-      },
       succeeded: {
         label: "Succeeded",
         icon: CheckCircle2,
@@ -119,14 +112,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
           "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
         iconClassName: "text-amber-600 dark:text-amber-400",
       },
-      refunded: {
-        label: "Refunded",
-        icon: RotateCcw,
-        className:
-          "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
-        iconClassName: "text-purple-600 dark:text-purple-400",
-      },
-    }[s];
+    }[key];
 
     if (!config) {
       return (

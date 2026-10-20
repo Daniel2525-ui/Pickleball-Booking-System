@@ -58,12 +58,11 @@ export default function DashboardStats() {
   }, []);
 
   const bookingDiff = todayBookingsCount - yesterdayBookingsCount;
+
   const bookingDesc =
-    bookingDiff > 0
-      ? `+${bookingDiff} booking${bookingDiff === 1 ? "" : "s"} vs yesterday`
-      : bookingDiff < 0
-      ? `${bookingDiff} booking${bookingDiff === -1 ? "" : "s"} vs yesterday`
-      : `Same volume as yesterday`;
+    bookingDiff === 0
+      ? "Same volume as yesterday"
+      : `${bookingDiff > 0 ? "+" : ""}${bookingDiff} booking${Math.abs(bookingDiff) === 1 ? "" : "s"} vs yesterday`;
 
   const revDiff = revToday - revYesterday;
   const revDesc =
@@ -72,10 +71,10 @@ export default function DashboardStats() {
         ? "First revenue recorded today"
         : "No revenue recorded yesterday"
       : revDiff > 0
-      ? `+₱${revDiff.toLocaleString()} vs yesterday`
-      : revDiff < 0
-      ? `-₱${Math.abs(revDiff).toLocaleString()} vs yesterday`
-      : `Same revenue as yesterday`;
+        ? `+₱${revDiff.toLocaleString()} vs yesterday`
+        : revDiff < 0
+          ? `-₱${Math.abs(revDiff).toLocaleString()} vs yesterday`
+          : `Same revenue as yesterday`;
 
   const stats = [
     {

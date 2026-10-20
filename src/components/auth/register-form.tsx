@@ -24,11 +24,7 @@ export function RegisterForm() {
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value.replace(/\D/g, "");
-    const phone = value.startsWith("639") && value.length === 12
-      ? "0" + value.slice(2)
-      : value;
-
-    setPhone(phone.slice(0, 11));
+    setPhone(value.slice(0, 11));
   }
 
   async function handleRegister(e: React.FormEvent) {
@@ -45,8 +41,8 @@ export function RegisterForm() {
       return;
     }
 
-    const sanitizedPhone = phone.replace(/\D/g, "");
-    if (sanitizedPhone.length !== 11) {
+    const exactPhoneNum = phone.replace(/\D/g, "");
+    if (exactPhoneNum.length !== 11) {
       setError("Phone number must be exactly 11 digits.");
       return;
     }
@@ -58,7 +54,7 @@ export function RegisterForm() {
         email.trim(),
         password,
         fullName.trim(),
-        sanitizedPhone
+        exactPhoneNum
       );
 
       if (!result.success) {
@@ -181,7 +177,6 @@ export function RegisterForm() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors size-9 flex items-center justify-center rounded-lg"
-                tabIndex={-1}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -209,7 +204,6 @@ export function RegisterForm() {
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors size-9 flex items-center justify-center rounded-lg"
-                tabIndex={-1}
                 aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
                 {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -233,7 +227,7 @@ export function RegisterForm() {
           </Button>
 
           <div className="pt-2 text-center text-xs text-muted-foreground">
-            Already have an account?{" "}
+            Already have an account?
             <Link
               href="/login"
               className="font-bold text-primary hover:underline underline-offset-4"

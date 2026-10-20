@@ -1,10 +1,8 @@
-import {
-  DashboardStats,
-  TodaysSchedule,
-  CourtStatus,
-  BookingOverview,
-  RecentBookings,
-} from "@/components/admin/dashboard";
+import DashboardStats from "@/components/admin/dashboard/dashboard-stats";
+import TodaysSchedule from "@/components/admin/dashboard/todays-schedule";
+import CourtStatus from "@/components/admin/dashboard/court-status";
+import BookingOverview from "@/components/admin/dashboard/booking-overview";
+import RecentBookings from "@/components/admin/dashboard/recent-bookings";
 import { Clock } from "lucide-react";
 
 export const metadata = {
