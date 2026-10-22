@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-sans: var(--font-geist-sans);
+    --font-sans: var(--font-poppins);
     --font-mono: var(--font-geist-mono);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -129,7 +129,6 @@
     body {
         @apply bg-background text-foreground antialiased;
         min-height: 100vh;
-        font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
         letter-spacing: -0.02em;
         text-rendering: optimizeLegibility;
         -webkit-tap-highlight-color: transparent;

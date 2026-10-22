@@ -122,9 +122,9 @@ export const BookingHistoryContainer = () => {
     cancelInFlight.current = false;
   };
 
+  // Split bookings into upcoming and past
   const now = new Date();
 
-  // Split bookings into upcoming and past
   const upcomingBookings = bookings.filter((booking) => {
     const bookingDateTime = new Date(`${booking.booking_date}T${booking.start_time}`);
     return bookingDateTime >= now;
@@ -205,9 +205,8 @@ export const BookingHistoryContainer = () => {
               return (
                 <div
                   key={booking.id}
-                  className={`flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center p-5 sm:p-6 rounded-2xl border bg-card shadow-xs hover:shadow-md transition-all ${
-                    booking.status === "cancelled" ? "opacity-60 bg-muted/20" : ""
-                  }`}
+                  className={`flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center p-5 sm:p-6 rounded-2xl border bg-card shadow-xs hover:shadow-md transition-all ${booking.status === "cancelled" ? "opacity-60 bg-muted/20" : ""
+                    }`}
                 >
                   <div className="space-y-3.5">
                     <div className="flex flex-wrap items-center gap-2">

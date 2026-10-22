@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn, Calendar, Clock, X, CreditCard, XCircle } from "lucide-react";
+import { LoaderCircle, LogIn, Calendar, Clock, X, CreditCard, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -46,6 +46,8 @@ export const BookingContainer = () => {
   const [loading, setLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [isFetchingBookings, setIsFetchingBookings] = useState(false);
+  const [showMobileCalendar, setShowMobileCalendar] = useState(false);
   // Check auth state on mount
   useEffect(() => {
     const supabase = createClient();
@@ -91,8 +93,10 @@ export const BookingContainer = () => {
 
   // Load bookings when selected date changes
   const refreshBookings = useCallback(async () => {
+    setIsFetchingBookings(true);
     const { data } = await fetchBookingsForDate(selectedDate);
     setBookings(data);
+    setIsFetchingBookings(false);
   }, [selectedDate]);
 
   useEffect(() => {
@@ -194,7 +198,7 @@ export const BookingContainer = () => {
     setCheckoutError(null);
 
     try {
-      const court = courts.find(c => c.name === selectedSlot.court);
+      const court = courts.find(court => court.name === selectedSlot.court);
       if (!court) throw new Error("Court not found");
 
       const url = await createCheckoutSession({
@@ -222,7 +226,89 @@ export const BookingContainer = () => {
   ) : (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-4 xl:col-span-3">
+        {/* Mobile Quick-Date Strip */}
+        <div className="lg:hidden col-span-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() - 1);
+                const today = new Date(); today.setHours(0,0,0,0);
+                if (d >= today) setSelectedDate(d);
+              }}
+              className="size-9 shrink-0 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+              aria-label="Previous day"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <div className="flex-1 overflow-x-auto scrollbar-none">
+              <div className="flex gap-1.5 pb-1">
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const d = new Date();
+                  d.setHours(0, 0, 0, 0);
+                  d.setDate(d.getDate() + i);
+                  const isSelected = d.toDateString() === selectedDate.toDateString();
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedDate(d)}
+                      className={`shrink-0 flex flex-col items-center px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-md"
+                          : "bg-card border border-border hover:border-primary/40"
+                      }`}
+                    >
+                      <span className="text-[10px] uppercase tracking-wider opacity-80">
+                        {i === 0 ? "Today" : i === 1 ? "Tmrw" : d.toLocaleDateString("en-US", { weekday: "short" })}
+                      </span>
+                      <span className="text-sm font-bold mt-0.5">{d.getDate()}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() + 1);
+                setSelectedDate(d);
+              }}
+              className="size-9 shrink-0 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+              aria-label="Next day"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">
+              {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowMobileCalendar((prev) => !prev)}
+              className="text-primary hover:underline font-semibold flex items-center gap-1.5 py-1 px-2 rounded-md hover:bg-primary/10 transition-colors"
+            >
+              <Calendar className="size-3.5" />
+              <span>{showMobileCalendar ? "Hide Calendar" : "Pick Other Date"}</span>
+            </button>
+          </div>
+
+          {showMobileCalendar && (
+            <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+              <DateSelector
+                selectedDate={selectedDate}
+                onSelectDate={(d) => {
+                  setSelectedDate(d);
+                  setShowMobileCalendar(false);
+                }}
+                operatingHours={operatingHours}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="hidden lg:block lg:col-span-4 xl:col-span-3">
           <DateSelector
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
@@ -240,6 +326,7 @@ export const BookingContainer = () => {
                 onSlotClick={handleSlotClick}
                 getSlotStatus={getSlotStatus}
                 selectedSlot={selectedSlot}
+                isFetching={isFetchingBookings}
               />
 
               {/* Selected Slot Summary */}

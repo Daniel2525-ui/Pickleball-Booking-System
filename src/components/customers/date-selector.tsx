@@ -37,6 +37,7 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
   const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
   const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
 
+  /* sets to midnight */
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 

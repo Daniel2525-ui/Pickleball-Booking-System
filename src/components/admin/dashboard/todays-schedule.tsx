@@ -86,49 +86,7 @@ export default function TodaysSchedule({
       </CardHeader>
 
       <CardContent>
-        {/* Mobile View (< sm) */}
-        <div className="sm:hidden divide-y divide-border/60">
-          {loading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="py-3 space-y-2">
-                <div className="flex justify-between items-center">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-5 w-16 rounded-full" />
-                </div>
-                <Skeleton className="h-3.5 w-36" />
-              </div>
-            ))
-          ) : schedule.length > 0 ? (
-            schedule.map((booking) => (
-              <div key={booking.id} className="py-3 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-foreground">
-                    {formatTime12h(booking.start_time)} – {formatTime12h(booking.end_time)}
-                  </span>
-                  <Badge variant="outline" className={`text-[10px] capitalize font-semibold ${getStatusColor(booking.status)}`}>
-                    {booking.status}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground font-medium truncate max-w-[180px]">
-                    {booking.profiles?.full_name || "Guest Player"}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold text-[11px] shrink-0">
-                    {booking.courts?.name || `Court ${booking.court_id}`}
-                  </span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="py-8 text-center space-y-1">
-              <CalendarX className="size-6 text-muted-foreground/40 mx-auto mb-1.5" />
-              <p className="text-xs font-semibold text-foreground">No matches scheduled today</p>
-            </div>
-          )}
-        </div>
-
-        {/* Desktop View (>= sm) */}
-        <div className="hidden sm:block overflow-auto max-h-[320px] pr-1.5 overscroll-contain [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+        <div className="overflow-auto max-h-[320px] pr-1.5 overscroll-contain [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
           <table className="w-full text-sm min-w-[540px]">
             <thead className="sticky top-0 bg-card z-10 shadow-[0_1px_0_0_var(--color-border)]">
               <tr className="text-left text-xs text-muted-foreground">

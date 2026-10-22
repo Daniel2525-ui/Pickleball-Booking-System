@@ -75,7 +75,7 @@ export const SchedulesContainer = () => {
   }
 
   const handleTimeChange = (dayIndex: number, field: "open_time" | "close_time", value: string) => {
-    updateDay(dayIndex, { [field]: value })
+    updateDay(dayIndex, { [field]: value }) /* openTime , 09:00*/
   }
 
   const validateHours = (currentHours: OperatingHour[]) => {
@@ -116,7 +116,7 @@ export const SchedulesContainer = () => {
         <>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-card border shadow-xs">
             <div className="text-sm">
-              <span className="font-semibold text-foreground">Real-Time Sync:</span>{" "}
+              <span className="font-semibold text-foreground">Real-Time Sync:</span>
               <span className="text-muted-foreground">
                 Updated operating hours immediately reflect on the player booking calendar.
               </span>

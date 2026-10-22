@@ -26,7 +26,7 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
 
-    const result = await login(email.trim(), password);
+    const result = await login(email.trim(), password);  /* "Daniel" */
 
     if (!result.success) {
       setError(result.error);

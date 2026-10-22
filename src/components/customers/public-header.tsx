@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Crosshair, LogOut, LoaderCircle, Menu, X, CalendarDays, HelpCircle, Sparkles } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -123,6 +124,8 @@ export function PublicHeader() {
             </Button>
           </Link>
         )}
+
+        <ThemeToggle className="text-muted-foreground hover:text-foreground" />
 
         <Link
           href="/#booking"

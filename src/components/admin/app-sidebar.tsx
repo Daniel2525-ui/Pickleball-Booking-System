@@ -11,7 +11,6 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
     LayoutDashboard,
@@ -22,9 +21,12 @@ import {
     CreditCard,
     Crosshair,
     LogOut,
+    Moon,
+    Sun,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { logout } from "@/lib/services/auth.service";
 
 interface NavItem {
@@ -72,6 +74,7 @@ const managementNav: NavItem[] = [
 export default function AppSidebar() {
     const currentPath = usePathname();
     const router = useRouter();
+    const { setTheme, resolvedTheme } = useTheme();
 
     async function handleLogout() {
         await logout();
@@ -172,6 +175,18 @@ export default function AppSidebar() {
             {/* Sidebar Footer / Logout */}
             <SidebarFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                            className="cursor-pointer py-5 font-medium"
+                            tooltip="Toggle theme"
+                        >
+                            <Sun className="size-4 dark:hidden" />
+                            <Moon className="hidden size-4 dark:block" />
+                            <span className="dark:hidden">Light Mode</span>
+                            <span className="hidden dark:inline">Dark Mode</span>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             onClick={handleLogout}
