@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Loader2, Plus, AlertCircle } from "lucide-react";
+import { useState, useEffect, useTransition } from "react";
+import { Loader2, Plus, AlertCircle, Search, UserCheck, UserPlus, Banknote, Smartphone, Clock } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -21,11 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createAdminBooking } from "@/lib/services/bookings/createAdminBooking.service";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
-import { fetchCustomers } from "@/lib/services/customers/fetchCustomers.service";
+import { searchCustomers } from "@/lib/services/customers/searchCustomers.service";
+import { createWalkInCustomer } from "@/lib/services/customers/createWalkInCustomer.service";
+import { createWalkInBooking } from "@/lib/services/bookings/createWalkInBooking.service";
 import { Court } from "@/lib/services/courts/courtsTypes";
-import { Customer } from "@/lib/services/customers/customersTypes";
+import { UnifiedCustomerResult } from "@/lib/services/customers/customersTypes";
 
 interface AddBookingModalProps {
   onBookingAdded?: () => void;
@@ -37,54 +40,153 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   const [error, setError] = useState<string | null>(null);
 
   const [courts, setCourts] = useState<Court[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
 
-  const [userId, setUserId] = useState("");
+  // Player mode: "existing" or "new"
+  const [playerMode, setPlayerMode] = useState<"existing" | "new">("existing");
+
+  // Existing player search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<UnifiedCustomerResult[]>([]);
+  const [selectedPlayer, setSelectedPlayer] = useState<UnifiedCustomerResult | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  // New walk-in player fields
+  const [newFullName, setNewFullName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<UnifiedCustomerResult | null>(null);
+
+  // Reservation details
   const [courtId, setCourtId] = useState("");
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState("200");
 
+  // Payment details
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash" | "unpaid">("cash");
+  const [paymentReference, setPaymentReference] = useState("");
+
+  // Load courts when modal opens
   useEffect(() => {
     if (open) {
       fetchCourtsData().then((res) => setCourts(res.data || []));
-      fetchCustomers().then((res) => setCustomers(res.data || []));
+      // Reset form
+      setPlayerMode("existing");
+      setSearchQuery("");
+      setSearchResults([]);
+      setSelectedPlayer(null);
+      setNewFullName("");
+      setNewPhone("");
+      setNewEmail("");
+      setDuplicateWarning(null);
+      setError(null);
+      setPaymentMethod("cash");
+      setPaymentReference("");
     }
   }, [open]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Debounced search for existing players
+  useEffect(() => {
+    if (!open || playerMode !== "existing") return;
 
-    if (!userId || !courtId || !date || !startTime || !endTime || !amount) {
-      setError("All fields are required. Please complete all reservation details.");
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      const { data } = await searchCustomers(searchQuery);
+      setSearchResults(data || []);
+      setSearching(false);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, open, playerMode]);
+
+  // Live duplicate check when typing a new walk-in name
+  useEffect(() => {
+    if (!open || playerMode !== "new" || !newFullName.trim()) {
+      setDuplicateWarning(null);
       return;
     }
 
-    setLoading(true);
+    const timer = setTimeout(async () => {
+      const { data } = await searchCustomers(newFullName.trim());
+      const exactMatch = (data || []).find(
+        (c) => c.full_name.toLowerCase() === newFullName.trim().toLowerCase()
+      );
+      setDuplicateWarning(exactMatch || null);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [newFullName, open, playerMode]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
 
-    const { error: submitError } = await createAdminBooking(
+    // Validation
+    if (!courtId || !date || !startTime || !endTime || !amount) {
+      setError("Please complete all reservation schedule and fee details.");
+      return;
+    }
+
+    let customerId: string | null = null;
+    let userId: string | null = null;
+    let customerName = "";
+
+    if (playerMode === "existing") {
+      if (!selectedPlayer) {
+        setError("Please search and select a player, or create a new walk-in player.");
+        return;
+      }
+      customerName = selectedPlayer.full_name;
+      if (selectedPlayer.type === "registered") {
+        userId = selectedPlayer.id;
+      } else {
+        customerId = selectedPlayer.id;
+      }
+    } else {
+      if (!newFullName.trim()) {
+        setError("Walk-in player's full name is required.");
+        return;
+      }
+      customerName = newFullName.trim();
+
+      setLoading(true);
+      const { data: createdCust, error: custErr } = await createWalkInCustomer({
+        fullName: customerName,
+        phone: newPhone.trim() || undefined,
+        email: newEmail.trim() || undefined,
+      });
+
+      if (custErr || !createdCust) {
+        setLoading(false);
+        setError(custErr?.message || "Failed to create customer record.");
+        return;
+      }
+      customerId = createdCust.id;
+    }
+
+    setLoading(true);
+
+    const { bookingId, error: bookingErr } = await createWalkInBooking({
+      customerId,
       userId,
+      customerName,
       courtId,
-      date,
+      bookingDate: date,
       startTime,
       endTime,
-      Number(amount)
-    );
+      amount: Number(amount),
+      paymentMethod,
+      paymentReference: paymentMethod === "gcash" ? paymentReference : undefined,
+    });
 
     setLoading(false);
 
-    if (submitError) {
-      setError((submitError as any).message || "Failed to create booking.");
+    if (bookingErr || !bookingId) {
+      setError(bookingErr?.message || "Failed to create reservation.");
     } else {
+      toast.success("Reservation recorded successfully!");
       setOpen(false);
-      setUserId("");
-      setCourtId("");
-      setDate("");
-      setStartTime("");
-      setEndTime("");
-      setAmount("");
       onBookingAdded?.();
     }
   };
@@ -93,17 +195,17 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button className="w-full sm:w-auto gap-2 font-bold text-xs sm:text-sm shadow-sm hover:shadow">
+          <Button className="w-full sm:w-auto gap-2 font-bold text-xs sm:text-sm shadow-xs hover:shadow">
             <Plus className="h-4 w-4" />
             New Reservation
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-[440px]">
+      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Record Manual Reservation</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
-            Manually log a phone reservation or walk-in player into the court schedule.
+            Book a walk-in player or phone reservation and record counter payment.
           </DialogDescription>
         </DialogHeader>
 
@@ -115,26 +217,182 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
             </div>
           )}
 
-          {/* Select Player */}
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-semibold text-foreground">Select Player</Label>
-            <Select value={userId} onValueChange={(value) => setUserId(value as string)}>
-              <SelectTrigger className="h-9 text-xs sm:text-sm">
-                <SelectValue placeholder="Choose a registered player">
-                  {(value) => {
-                    const customer = customers.find((customer) => customer.id === value);
-                    return customer ? customer.full_name : value;
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id} className="text-xs sm:text-sm">
-                    {customer.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Player Mode Tabs */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs font-semibold text-foreground">Customer / Player</Label>
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-lg border border-border">
+              <button
+                type="button"
+                onClick={() => setPlayerMode("existing")}
+                className={`py-1.5 px-3 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  playerMode === "existing"
+                    ? "bg-card text-foreground shadow-2xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Search className="size-3.5" />
+                Existing Player
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayerMode("new")}
+                className={`py-1.5 px-3 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  playerMode === "new"
+                    ? "bg-card text-foreground shadow-2xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <UserPlus className="size-3.5" />
+                New Walk-In
+              </button>
+            </div>
+
+            {/* Existing Player Search Panel */}
+            {playerMode === "existing" ? (
+              <div className="flex flex-col gap-2 mt-1">
+                {selectedPlayer ? (
+                  <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                        <UserCheck className="size-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-sm text-foreground">
+                          {selectedPlayer.full_name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {selectedPlayer.phone || selectedPlayer.email || (selectedPlayer.type === "registered" ? "Online Member" : "Walk-in Guest")}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedPlayer(null)}
+                      className="text-xs font-semibold text-muted-foreground hover:text-foreground h-8"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        type="text"
+                        placeholder="Search player by name or phone..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 h-9 text-xs sm:text-sm"
+                      />
+                    </div>
+
+                    <div className="max-h-[140px] overflow-y-auto border border-border rounded-lg divide-y divide-border/60 bg-card">
+                      {searching ? (
+                        <div className="p-3 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                          <Loader2 className="size-3.5 animate-spin" />
+                          Searching players...
+                        </div>
+                      ) : searchResults.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-muted-foreground">
+                          {searchQuery ? "No matching players found. Switch to 'New Walk-In' to register." : "Type a name or phone to search..."}
+                        </div>
+                      ) : (
+                        searchResults.map((player) => (
+                          <button
+                            key={player.id}
+                            type="button"
+                            onClick={() => setSelectedPlayer(player)}
+                            className="w-full p-2.5 text-left text-xs hover:bg-muted/50 flex items-center justify-between transition-colors"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-foreground text-xs">
+                                {player.full_name}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {player.phone || player.email || "No contact info"}
+                              </span>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] capitalize">
+                              {player.type === "registered" ? "Member" : "Walk-in"}
+                            </Badge>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* New Walk-In Registration Panel */
+              <div className="flex flex-col gap-2.5 mt-1 p-3 bg-muted/30 border border-border rounded-lg">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs font-semibold text-foreground">
+                    Full Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Juan Dela Cruz"
+                    value={newFullName}
+                    onChange={(e) => setNewFullName(e.target.value)}
+                    className="h-8 text-xs sm:text-sm"
+                    required
+                  />
+                </div>
+
+                {/* Duplicate Warning Alert */}
+                {duplicateWarning && (
+                  <div className="p-2.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-1.5 text-amber-800 dark:text-amber-300">
+                      <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-[11px]">Possible duplicate player found!</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          &quot;{duplicateWarning.full_name}&quot; is already registered ({duplicateWarning.phone || "No phone"}).
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedPlayer(duplicateWarning);
+                        setPlayerMode("existing");
+                        setDuplicateWarning(null);
+                      }}
+                      className="text-[11px] h-7 px-2 border-amber-500/30 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20"
+                    >
+                      Use Existing
+                    </Button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-[11px] font-medium text-muted-foreground">Phone (Optional)</Label>
+                    <Input
+                      type="tel"
+                      placeholder="e.g. 09171234567"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-[11px] font-medium text-muted-foreground">Email (Optional)</Label>
+                    <Input
+                      type="email"
+                      placeholder="e.g. juan@example.com"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Assigned Court */}
@@ -203,6 +461,67 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
               placeholder="e.g. 200"
               className="h-9 text-xs sm:text-sm"
             />
+          </div>
+
+          {/* Payment Method Selector */}
+          <div className="flex flex-col gap-2 pt-1 border-t border-border">
+            <Label className="text-xs font-semibold text-foreground">Payment Collection</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("cash")}
+                className={`p-2.5 rounded-lg border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
+                  paymentMethod === "cash"
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-bold"
+                    : "border-border text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Banknote className="size-4" />
+                <span>Cash (Paid)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("gcash")}
+                className={`p-2.5 rounded-lg border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
+                  paymentMethod === "gcash"
+                    ? "border-blue-500 bg-blue-500/10 text-blue-800 dark:text-blue-300 font-bold"
+                    : "border-border text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Smartphone className="size-4" />
+                <span>GCash (Paid)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("unpaid")}
+                className={`p-2.5 rounded-lg border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
+                  paymentMethod === "unpaid"
+                    ? "border-amber-500 bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold"
+                    : "border-border text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Clock className="size-4" />
+                <span>Pay Later</span>
+              </button>
+            </div>
+
+            {/* Optional GCash Reference Field */}
+            {paymentMethod === "gcash" && (
+              <div className="flex flex-col gap-1 mt-1">
+                <Label className="text-[11px] font-medium text-muted-foreground">
+                  GCash Reference No. (Optional)
+                </Label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 1029384756"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-4 pt-2 border-t">
