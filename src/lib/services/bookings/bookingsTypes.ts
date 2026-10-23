@@ -23,7 +23,13 @@ export interface Booking {
     courts?: {
         name: string;
     } | null;
-    payments?: Array<{
+    payments?: {
+        id: string;
+        status: string;
+        payment_method?: string | null;
+        payment_reference?: string | null;
+        amount?: number;
+    } | Array<{
         id: string;
         status: string;
         payment_method?: string | null;

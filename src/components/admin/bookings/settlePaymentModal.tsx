@@ -37,7 +37,7 @@ export const SettlePaymentModal = ({
 
   if (!booking) return null;
 
-  const payment = booking.payments?.[0];
+  const payment = Array.isArray(booking.payments) ? booking.payments[0] : booking.payments;
   const amount = booking.total_amount || 0;
 
   const handleSubmit = async (e: React.FormEvent) => {

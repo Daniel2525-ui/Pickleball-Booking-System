@@ -130,7 +130,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
   };
 
   const renderPaymentBadge = (booking: Booking) => {
-    const payment = booking.payments?.[0];
+    const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments as any);
     if (!payment) return null;
 
     if (payment.status === "paid") {
@@ -225,7 +225,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                 </TableRow>
               ) : (
                 bookingsData.map((booking) => {
-                  const payment = booking.payments?.[0];
+                  const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments as any);
                   const isUnpaid = payment?.status === "pending";
 
                   return (
