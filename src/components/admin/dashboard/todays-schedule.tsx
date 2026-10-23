@@ -20,13 +20,25 @@ import { calculateDuration } from "@/lib/helpers/totalDuration";
 const statusStyles: Record<string, string> = {
   confirmed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
   pending: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-  ongoing: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-semibold",
-  cancelled: "bg-destructive/10 text-destructive border-destructive/20 line-through opacity-75",
+  checked_in: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-semibold",
+  in_progress: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20 font-semibold",
   completed: "bg-muted text-muted-foreground border-border",
+  no_show: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
+  cancelled: "bg-destructive/10 text-destructive border-destructive/20 line-through opacity-75",
 };
 
 const getStatusColor = (status: string) =>
   statusStyles[status.toLowerCase()] ?? "bg-muted text-muted-foreground border-border";
+
+const STATUS_LABELS: Record<string, string> = {
+  confirmed: "Confirmed",
+  checked_in: "Checked In",
+  in_progress: "In Progress",
+  completed: "Completed",
+  no_show: "No-Show",
+  cancelled: "Cancelled",
+  pending: "Pending",
+};
 
 interface ScheduleItem {
   id: string;
@@ -34,8 +46,10 @@ interface ScheduleItem {
   end_time: string;
   status: string;
   court_id: string;
+  customer_name?: string | null;
   courts?: { name: string } | null;
   profiles?: { full_name: string } | null;
+  customers?: { full_name: string } | null;
 }
 
 export default function TodaysSchedule({
@@ -136,7 +150,7 @@ export default function TodaysSchedule({
                     </td>
 
                     <td className="py-3 pr-4 font-medium text-foreground text-xs sm:text-sm">
-                      {booking.profiles?.full_name || "Guest Player"}
+                      {booking.customer_name || booking.customers?.full_name || booking.profiles?.full_name || "Guest Player"}
                     </td>
 
                     <td className="py-3 pr-4 text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
@@ -148,7 +162,7 @@ export default function TodaysSchedule({
                         variant="outline"
                         className={`text-xs capitalize font-semibold ${getStatusColor(booking.status)}`}
                       >
-                        {booking.status}
+                        {STATUS_LABELS[booking.status] ?? booking.status}
                       </Badge>
                     </td>
                   </tr>

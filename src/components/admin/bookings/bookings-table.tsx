@@ -29,6 +29,10 @@ import {
   Smartphone,
   Clock,
   CircleDollarSign,
+  UserCheck,
+  Play,
+  Trophy,
+  AlertTriangle,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
@@ -38,16 +42,30 @@ import { formatTime12h } from "@/lib/utils/formatTime";
 import { removeBooking } from "@/lib/services/bookings/removeBooking.service";
 import { confirmBooking } from "@/lib/services/bookings/confirmBooking.service";
 import { SettlePaymentModal } from "./settlePaymentModal";
+import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
 const statusStyles: Record<string, string> = {
   confirmed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-semibold",
   pending: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold",
   cancelled: "bg-destructive/10 text-destructive border-destructive/20 font-semibold",
+  checked_in: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-semibold",
+  in_progress: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20 font-semibold",
+  completed: "bg-muted text-muted-foreground border-border font-semibold",
+  no_show: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20 font-semibold",
 };
 
 const getStatusColor = (status: string) => statusStyles[status?.toLowerCase()] ?? "bg-muted text-muted-foreground";
 
-const capitalize = (status: string) => (status ? status[0].toUpperCase() + status.slice(1) : "");
+const STATUS_LABELS: Record<string, string> = {
+  confirmed: "Confirmed",
+  pending: "Pending",
+  cancelled: "Cancelled",
+  checked_in: "Checked In",
+  in_progress: "In Progress",
+  completed: "Completed",
+  no_show: "No-Show",
+};
+const capitalize = (status: string) => STATUS_LABELS[status?.toLowerCase()] ?? (status ? status[0].toUpperCase() + status.slice(1) : "");
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -113,6 +131,37 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
       toast.error("Failed to delete reservation.");
     } else {
       toast.success("Reservation deleted successfully.");
+    }
+    setActionLoadingId(null);
+  };
+
+  const handleStatusChange = async (booking: Booking, newStatus: GameDayStatus) => {
+    if (actionLoadingId) return;
+
+    if (newStatus === "no_show") {
+      const ok = window.confirm(
+        "Warning: Marking this booking as No-Show will release the court slot immediately.\n" +
+        "The original player may still arrive late. Payment status will NOT change.\n\n" +
+        "Proceed?"
+      );
+      if (!ok) return;
+    }
+
+    setActionLoadingId(booking.id);
+    const { error } = await updateBookingStatus(booking.id, newStatus);
+    if (error) {
+      toast.error(error);
+    } else {
+      const label: Record<GameDayStatus, string> = {
+        checked_in: "Player checked in.",
+        in_progress: "Match started.",
+        completed: "Match completed.",
+        no_show: "Booking marked as no-show. Court slot released.",
+      };
+      setBookingsData((prev) =>
+        prev.map((b) => (b.id === booking.id ? { ...b, status: newStatus } : b))
+      );
+      toast.success(label[newStatus]);
     }
     setActionLoadingId(null);
   };
@@ -323,6 +372,50 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                     <CheckCircle2 className="mr-2 h-4 w-4" />
                                   )}
                                   Confirm Reservation
+                                </DropdownMenuItem>
+                              )}
+
+                              {/* Game-Day Actions */}
+                              {booking.status?.toLowerCase() === "confirmed" && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => handleStatusChange(booking, "checked_in")}
+                                    disabled={actionLoadingId === booking.id}
+                                    className="cursor-pointer text-blue-600 focus:text-blue-600 text-xs font-semibold"
+                                  >
+                                    {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCheck className="mr-2 h-4 w-4" />}
+                                    Check In Player
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleStatusChange(booking, "no_show")}
+                                    disabled={actionLoadingId === booking.id}
+                                    className="cursor-pointer text-orange-600 focus:text-orange-600 text-xs font-semibold"
+                                  >
+                                    <AlertTriangle className="mr-2 h-4 w-4" />
+                                    Mark No-Show
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+
+                              {booking.status?.toLowerCase() === "checked_in" && (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusChange(booking, "in_progress")}
+                                  disabled={actionLoadingId === booking.id}
+                                  className="cursor-pointer text-violet-600 focus:text-violet-600 text-xs font-semibold"
+                                >
+                                  {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                                  Start Match
+                                </DropdownMenuItem>
+                              )}
+
+                              {booking.status?.toLowerCase() === "in_progress" && (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusChange(booking, "completed")}
+                                  disabled={actionLoadingId === booking.id}
+                                  className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
+                                >
+                                  {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trophy className="mr-2 h-4 w-4" />}
+                                  Complete Match
                                 </DropdownMenuItem>
                               )}
 

@@ -15,15 +15,19 @@ export const todaysSchedule = async () => {
                 end_time,
                 status,
                 court_id,
+                customer_name,
                 courts (
                     name
                 ),
                 profiles:user_id (
                     full_name
+                ),
+                customers (
+                    full_name
                 )
             `)
             .eq("booking_date", today)
-            .in("status", ["confirmed", "completed", "ongoing"])
+            .in("status", ["confirmed", "checked_in", "in_progress", "completed", "no_show"])
             .order("start_time", { ascending: true });
 
         if (error) throw error;
