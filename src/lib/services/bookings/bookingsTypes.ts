@@ -1,6 +1,8 @@
 export interface Booking {
     id: string;
-    user_id: string;
+    user_id?: string | null;
+    customer_id?: string | null;
+    customer_name: string;
     court_id: string;
     booking_date: string;
     start_time: string;
@@ -12,10 +14,22 @@ export interface Booking {
 
     profiles?: {
         full_name: string;
-    };
+    } | null;
+    customers?: {
+        full_name: string;
+        phone?: string | null;
+        email?: string | null;
+    } | null;
     courts?: {
         name: string;
-    };
+    } | null;
+    payments?: Array<{
+        id: string;
+        status: string;
+        payment_method?: string | null;
+        payment_reference?: string | null;
+        amount?: number;
+    }> | null;
 }
 
 export interface FetchBookingsFilters {

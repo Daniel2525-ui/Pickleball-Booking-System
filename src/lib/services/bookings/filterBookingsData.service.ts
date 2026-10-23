@@ -19,10 +19,6 @@ export const fetchBookings = async (filters?: FetchBookingsFilters) => {
         const isCourtUuid =
             /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(courtId);
 
-        const profilesJoin = search
-            ? "profiles!inner(full_name)"
-            : "profiles(full_name)";
-
         const courtsJoin =
             hasCourtFilter && !isCourtUuid
                 ? "courts!inner(name)"
@@ -30,7 +26,13 @@ export const fetchBookings = async (filters?: FetchBookingsFilters) => {
 
         let query = supabase
             .from("bookings")
-            .select(`*, ${profilesJoin}, ${courtsJoin}`)
+            .select(`
+                *,
+                ${courtsJoin},
+                profiles(full_name),
+                customers(full_name, phone, email),
+                payments(id, status, amount, payment_method, payment_reference, paid_at)
+            `)
             .order("booking_date", { ascending: false });
 
         if (hasStatusFilter) {
@@ -44,7 +46,7 @@ export const fetchBookings = async (filters?: FetchBookingsFilters) => {
         }
 
         if (search) {
-            query = query.ilike("profiles.full_name", `%${search}%`);
+            query = query.ilike("customer_name", `%${search}%`);
         }
 
         if (dateTime) {
