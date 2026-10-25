@@ -37,7 +37,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { fetchBookings } from "@/lib/services/bookings/filterBookingsData.service";
-import { Booking } from "@/lib/services/bookings/bookingsTypes";
+import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { removeBooking } from "@/lib/services/bookings/removeBooking.service";
 import { confirmBooking } from "@/lib/services/bookings/confirmBooking.service";
@@ -166,20 +166,20 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     setActionLoadingId(null);
   };
 
-  const handlePaymentSettled = (bookingId: string, updatedPayment: any) => {
+  const handlePaymentSettled = (bookingId: string, updatedPayment: unknown) => {
     setBookingsData((prev) =>
       prev.map((b) => {
         if (b.id !== bookingId) return b;
         return {
           ...b,
-          payments: [updatedPayment],
+          payments: [updatedPayment as BookingPayment],
         };
       })
     );
   };
 
   const renderPaymentBadge = (booking: Booking) => {
-    const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments as any);
+    const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments ?? null);
     if (!payment) return null;
 
     if (payment.status === "paid") {
@@ -274,7 +274,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                 </TableRow>
               ) : (
                 bookingsData.map((booking) => {
-                  const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments as any);
+                  const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments ?? null);
                   const isUnpaid = payment?.status === "pending";
 
                   return (

@@ -1,8 +1,12 @@
 import { NextRequest } from "next/server";
+import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
-import { calculateCourtPrice } from "@/lib/services/courts/calculateCourtPrice.service";
-import { getBookingStart } from "@/lib/services/bookings/cancelBooking.service";
+import {
+    validateBookingSlot,
+    getBookingWeekday,
+} from "@/lib/services/bookings/validateBookingSlot.service";
+import { formatTime12h } from "@/lib/utils/formatTime";
 
 export async function POST(request: NextRequest) {
     let createdBookingId: string | null = null;
@@ -62,88 +66,90 @@ export async function POST(request: NextRequest) {
         }
 
         const court_name = court.name;
-        
-        // Ensure times have seconds for accurate DB string comparison (e.g. '08:00:00' vs '08:00')
-        const startTimeDb = start_time.length === 5 ? `${start_time}:00` : start_time;
-        const endTimeDb = end_time.length === 5 ? `${end_time}:00` : end_time;
 
-        // Verify the requested match slot has not already started or passed
-        const startInstant = getBookingStart({ booking_date, start_time: startTimeDb });
-        if (Number.isNaN(startInstant.getTime()) || startInstant <= new Date()) {
+        // Query operating hours for target date in Asia/Manila
+        const dayOfWeek = getBookingWeekday(booking_date);
+        const { data: operatingHour, error: opError } = await supabase
+            .from("operating_hours")
+            .select("is_open, open_time, close_time")
+            .eq("day_of_week", dayOfWeek)
+            .maybeSingle();
+
+        if (opError) {
             return Response.json(
-                { error: "The requested time slot has already passed." },
+                { error: "Failed to verify venue operating hours." },
+                { status: 500 }
+            );
+        }
+
+        // Server-side validation of whole-hour boundaries, duration limits, operating hours, and past dates
+        const validation = validateBookingSlot({
+            bookingDate: booking_date,
+            startTime: start_time,
+            endTime: end_time,
+            operatingHour,
+        });
+
+        if (!validation.valid) {
+            return Response.json(
+                { error: validation.error },
                 { status: 400 }
             );
         }
 
-        // Calculate price dynamically using our central service
-        const amount = calculateCourtPrice();
+        const { durationHours, startTimeDb, endTimeDb, amount } = validation;
 
-        // 3. Check court availability (no overlapping confirmed bookings)
-        const { data: conflicts } = await supabase
-            .from("bookings")
-            .select("id")
-            .eq("court_id", court_id)
-            .eq("booking_date", booking_date)
-            .in("status", ["confirmed", "completed", "ongoing", "pending"])
-            .lt("start_time", endTimeDb)
-            .gt("end_time", startTimeDb);
+        // 3. Atomically hold the court slot using database row lock
+        let bookingId: string | null = null;
+        let paymentId: string | null = null;
 
-        if (conflicts && conflicts.length > 0) {
+        const { data: rpcResult, error: rpcError } = await supabase.rpc("hold_court_booking", {
+            p_court_id: court_id,
+            p_booking_date: booking_date,
+            p_start_time: startTimeDb,
+            p_end_time: endTimeDb,
+            p_user_id: user.id,
+            p_amount: amount,
+        });
+
+        if (rpcError) {
+            const isConflict = rpcError.message?.includes("SLOT_UNAVAILABLE") || rpcError.code === "P0001";
+            if (isConflict) {
+                return Response.json(
+                    { error: "This time slot is no longer available. Please choose another." },
+                    { status: 409 }
+                );
+            }
+
+            const isMissingRpc = rpcError.code === "42883" || rpcError.code === "PGRST202" || rpcError.message?.includes("hold_court_booking");
+            if (isMissingRpc) {
+                console.error("Required RPC hold_court_booking is not configured in database:", rpcError);
+                return Response.json(
+                    { error: "Database concurrency lock (hold_court_booking) is not configured. Please ensure the required database migration has been applied." },
+                    { status: 503 }
+                );
+            }
+
+            console.error("hold_court_booking RPC failed:", rpcError);
             return Response.json(
-                { error: "This time slot is no longer available. Please choose another." },
-                { status: 409 }
+                { error: rpcError.message || "Failed to create reservation hold." },
+                { status: 500 }
             );
+        } else if (rpcResult) {
+            const parsed = typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
+            bookingId = parsed.booking_id;
+            paymentId = parsed.payment_id;
         }
 
-        // 4. Create a pending booking in Supabase
-        const { data: booking, error: bookingError } = await supabase
-            .from("bookings")
-            .insert({
-                user_id: user.id,
-                court_id,
-                booking_date,
-                start_time: startTimeDb,
-                end_time: endTimeDb,
-                status: "pending",
-                total_amount: amount,
-            })
-            .select("id")
-            .single();
-
-        if (bookingError || !booking) {
-            console.error("Failed to create booking:", bookingError);
+        if (!bookingId || !paymentId) {
             return Response.json(
-                { error: "Failed to create booking. Please try again." },
+                { error: "Could not create reservation hold. Please try again." },
                 { status: 500 }
             );
         }
 
-        createdBookingId = booking.id;
-
-        // 5. Create a pending payment record in Supabase
-        const { data: payment, error: paymentError } = await supabase
-            .from("payments")
-            .insert({
-                booking_id: booking.id,
-                amount,
-                currency: "php",
-                status: "pending",
-            })
-            .select("id")
-            .single();
-
-        if (paymentError || !payment) {
-            console.error("Failed to create payment:", paymentError);
-            // Clean up the booking we just created
-            await supabase.from("bookings").delete().eq("id", booking.id);
-            return Response.json(
-                { error: "Failed to create payment record. Please try again." },
-                { status: 500 }
-            );
-        }
-
-        createdPaymentId = payment.id;
+        createdBookingId = bookingId;
+        createdPaymentId = paymentId;
 
         // 6. Create a Stripe Checkout Session
         const baseUrl = request.nextUrl.origin;
@@ -155,8 +161,8 @@ export async function POST(request: NextRequest) {
                     price_data: {
                         currency: "php",
                         product_data: {
-                            name: `${court_name} — Court Booking`,
-                            description: `${booking_date} • ${start_time} – ${end_time}`,
+                            name: `${court_name} — Court Booking (${durationHours} ${durationHours === 1 ? "Hour" : "Hours"})`,
+                            description: `${booking_date} • ${formatTime12h(startTimeDb)} – ${formatTime12h(endTimeDb)}`,
                         },
                         unit_amount: Math.round(amount * 100), // Stripe uses cents
                     },
@@ -167,8 +173,8 @@ export async function POST(request: NextRequest) {
             success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${baseUrl}/book`,
             metadata: {
-                booking_id: booking.id,
-                payment_id: payment.id,
+                booking_id: bookingId,
+                payment_id: paymentId,
             },
             customer_email: user.email,
             expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // Expires in exactly 30 minutes
@@ -178,23 +184,51 @@ export async function POST(request: NextRequest) {
         await supabase
             .from("payments")
             .update({ stripe_session_id: session.id })
-            .eq("id", payment.id);
+            .eq("id", paymentId);
 
         return Response.json({ url: session.url });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Checkout session error:", error);
 
-        // Clean up the pending records since we couldn't redirect to Stripe
-        const supabase = await createClient(); // Need a fresh client for catch block
-        if (createdPaymentId) {
-            await supabase.from("payments").delete().eq("id", createdPaymentId);
+        const isDefinitePreCreationError =
+            error instanceof Stripe.errors.StripeInvalidRequestError ||
+            error instanceof Stripe.errors.StripeAuthenticationError ||
+            error instanceof Stripe.errors.StripePermissionError ||
+            Boolean((error as Error)?.message?.includes("Stripe is not configured"));
+
+        // Only delete records on definite pre-creation failure where no session could exist at Stripe.
+        // For network timeouts or connection drops, preserve pending records so payment resumption,
+        // webhooks, or cron cleanup can safely resolve them without dropping paid bookings.
+        if (isDefinitePreCreationError) {
+            const supabase = await createClient();
+            if (createdPaymentId) {
+                await supabase.from("payments").delete().eq("id", createdPaymentId);
+            }
+            if (createdBookingId) {
+                await supabase.from("bookings").delete().eq("id", createdBookingId);
+            }
+            return Response.json(
+                { error: (error as Error).message || "Checkout session initialization failed. Please try again." },
+                { status: 400 }
+            );
         }
+
+        // Ambiguous failure (e.g. StripeConnectionError, socket timeout, or error after sessions.create)
         if (createdBookingId) {
-            await supabase.from("bookings").delete().eq("id", createdBookingId);
+            console.error(
+                `[Checkout Ambiguous Failure] Preserving pending hold for asynchronous recovery: booking_id=${createdBookingId}, payment_id=${createdPaymentId}, error=${(error as Error)?.name || "Unknown"}: ${(error as Error)?.message}`
+            );
+            return Response.json(
+                {
+                    error: "A network issue occurred while connecting to payment services. Your court hold is temporarily saved. Please visit 'My Bookings' to complete your reservation or try again.",
+                    bookingId: createdBookingId,
+                },
+                { status: 500 }
+            );
         }
 
         return Response.json(
-            { error: error.message || "An unexpected error occurred. Please try again." },
+            { error: (error as Error).message || "An unexpected error occurred. Please try again." },
             { status: 500 }
         );
     }

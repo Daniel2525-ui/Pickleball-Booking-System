@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase"
 
+const ACTIVE_STATUSES = ["confirmed", "completed", "checked_in", "in_progress"];
+const OCCUPYING_STATUSES = ["confirmed", "checked_in", "in_progress"];
+
 /* Today's Bookings */
 export const bookingsToday = async () => {
     const today = new Intl.DateTimeFormat("en-CA", {
@@ -11,7 +14,7 @@ export const bookingsToday = async () => {
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("booking_date", today)
-            .in("status", ["confirmed", "completed", "ongoing"]);
+            .in("status", ACTIVE_STATUSES);
 
         if (error) throw error;
         return count ?? 0
@@ -33,7 +36,7 @@ export const bookingsYesterday = async () => {
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("booking_date", yesterday)
-            .in("status", ["confirmed", "completed", "ongoing"]);
+            .in("status", ACTIVE_STATUSES);
 
         if (error) throw error;
         return count ?? 0;
@@ -62,7 +65,7 @@ export const upcomingBookings = async () => {
             .select("*", { count: "exact", head: true })
             .gte("booking_date", today)
             .lte("booking_date", endDate)
-            .in("status", ["confirmed", "completed", "ongoing"]);
+            .in("status", ACTIVE_STATUSES);
 
         if (error) throw error;
 
@@ -85,7 +88,7 @@ export const revenueToday = async () => {
             .from("bookings")
             .select("total_amount")
             .eq("booking_date", today)
-            .in("status", ["confirmed", "completed", "ongoing"]);
+            .in("status", ACTIVE_STATUSES);
 
         if (error) throw error;
 
@@ -112,7 +115,7 @@ export const revenueYesterday = async () => {
             .from("bookings")
             .select("total_amount")
             .eq("booking_date", yesterday)
-            .in("status", ["confirmed", "completed", "ongoing"]);
+            .in("status", ACTIVE_STATUSES);
 
         if (error) throw error;
 
@@ -152,7 +155,7 @@ export const availableCourts = async () => {
             .from("bookings")
             .select("court_id, start_time, end_time")
             .eq("booking_date", today)
-            .in("status", ["confirmed", "completed", "ongoing"])
+            .in("status", OCCUPYING_STATUSES)
             .lte("start_time", now)
             .gt("end_time", now);
 

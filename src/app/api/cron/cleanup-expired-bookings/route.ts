@@ -24,8 +24,9 @@ export async function GET(request: Request) {
       .select(`
         id,
         created_at,
-        payments!inner(
+        payments(
           id,
+          status,
           stripe_session_id
         )
       `)
@@ -44,34 +45,39 @@ export async function GET(request: Request) {
     let cancelledCount = 0;
 
     for (const booking of pendingBookings) {
-      // In Supabase, a one-to-many join (booking -> payments) will always return an array
       const payments = booking.payments || [];
 
-      
+      // If any associated payment was marked paid, do not cancel this booking
+      const hasPaidPayment = payments.some((p: { status?: string }) => p.status === "paid");
+      if (hasPaidPayment) {
+        continue;
+      }
+
       for (const payment of payments) {
         if (payment.stripe_session_id) {
           try {
-            // Expire the checkout session in Stripe so they can't pay it anymore
             await stripe.checkout.sessions.expire(payment.stripe_session_id);
-          } catch (stripeError: any) {
-            // If the session is already expired or completed, Stripe might throw an error. 
-            // We log it and continue since we still want to clean up our DB if it's pending.
-            console.error(`Failed to expire Stripe session ${payment.stripe_session_id}:`, stripeError.message);
+          } catch (stripeError: unknown) {
+            console.error(`Failed to expire Stripe session ${payment.stripe_session_id}:`, (stripeError as Error).message);
           }
         }
 
-        // Mark payment as cancelled
-        await supabase
-          .from("payments")
-          .update({ status: "cancelled" })
-          .eq("id", payment.id);
+        // Only mark pending payment as cancelled
+        if (payment.status === "pending") {
+          await supabase
+            .from("payments")
+            .update({ status: "cancelled" })
+            .eq("id", payment.id)
+            .eq("status", "pending");
+        }
       }
 
       // Mark booking as cancelled
       await supabase
         .from("bookings")
         .update({ status: "cancelled" })
-        .eq("id", booking.id);
+        .eq("id", booking.id)
+        .eq("status", "pending");
         
       cancelledCount++;
     }
@@ -81,7 +87,7 @@ export async function GET(request: Request) {
       message: `Successfully cancelled ${cancelledCount} expired booking(s).` 
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Cron job error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

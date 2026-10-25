@@ -22,6 +22,22 @@ export async function proxy(request: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Protect /api/admin API routes — must be logged in + admin role
+    if (request.nextUrl.pathname.startsWith('/api/admin')) {
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized." }, { status: 401 })
+        }
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (profile?.role !== 'admin') {
+            return NextResponse.json({ error: "Admin access required." }, { status: 403 })
+        }
+    }
+
     // Protect /admin routes — must be logged in + admin role
     if (request.nextUrl.pathname.startsWith('/admin')) {
         if (!user) {
@@ -51,5 +67,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/admin/:path*', '/login'],
+    matcher: ['/admin/:path*', '/api/admin/:path*', '/login'],
 }

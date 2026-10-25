@@ -3,4 +3,6 @@ export type Slot = {
   court: string;
   time: string;
   price: number;
+  duration?: number;
+  startSlot?: string;
 };

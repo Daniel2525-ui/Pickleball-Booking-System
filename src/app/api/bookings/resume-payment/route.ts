@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
-import { getBookingStart } from "@/lib/services/bookings/cancelBooking.service";
+import { getBookingStart } from "@/lib/utils/bookingTime.ts";
+import { formatTime12h } from "@/lib/utils/formatTime";
 
 /**
  * Customer-initiated payment resumption for an unfinished pending booking.
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
             .eq("court_id", booking.court_id)
             .eq("booking_date", booking.booking_date)
             .neq("id", booking.id)
-            .in("status", ["confirmed", "completed", "ongoing"])
+            .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
             .lt("start_time", endTimeDb)
             .gt("end_time", startTimeDb);
 
@@ -155,7 +156,7 @@ export async function POST(request: NextRequest) {
         // 8. Ensure payment record exists before creating Stripe session
         const baseUrl = request.nextUrl.origin;
         const amount = booking.total_amount || payment?.amount || 200;
-        const courtName = (booking.courts as any)?.name || "Crosshair Dinkers Court";
+        const courtName = (booking.courts as { name?: string } | null)?.name || "Crosshair Dinkers Court";
         let paymentRecordId = payment?.id;
 
         if (!paymentRecordId) {
@@ -180,6 +181,10 @@ export async function POST(request: NextRequest) {
         }
 
         // 9. Create a fresh Stripe Checkout Session with verified payment_id in metadata
+        const startHour = parseInt(startTimeDb.slice(0, 2), 10);
+        const endHour = parseInt(endTimeDb.slice(0, 2), 10);
+        const durationHours = Math.max(1, endHour - startHour);
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
             line_items: [
@@ -187,8 +192,8 @@ export async function POST(request: NextRequest) {
                     price_data: {
                         currency: "php",
                         product_data: {
-                            name: `${courtName} — Court Booking`,
-                            description: `${booking.booking_date} • ${booking.start_time.slice(0, 5)} – ${booking.end_time.slice(0, 5)}`,
+                            name: `${courtName} — Court Booking (${durationHours} ${durationHours === 1 ? "Hour" : "Hours"})`,
+                            description: `${booking.booking_date} • ${formatTime12h(startTimeDb)} – ${formatTime12h(endTimeDb)}`,
                         },
                         unit_amount: Math.round(amount * 100),
                     },
@@ -216,10 +221,10 @@ export async function POST(request: NextRequest) {
             .eq("id", paymentRecordId);
 
         return Response.json({ url: session.url });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Resume payment error:", error);
         return Response.json(
-            { error: error.message || "An unexpected error occurred while resuming payment." },
+            { error: (error as Error).message || "An unexpected error occurred while resuming payment." },
             { status: 500 }
         );
     }

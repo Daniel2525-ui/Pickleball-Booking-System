@@ -118,6 +118,48 @@ export const BookingContainer = () => {
     [courts, bookings, user?.id]
   );
 
+  // Calculate maximum consecutive available hours (1 to 3) starting at slotTime for courtName
+  const getMaxAvailableDuration = useCallback(
+    (courtName: string, slotTime: string): number => {
+      const startIndex = timeSlots.indexOf(slotTime);
+      if (startIndex === -1) return 1;
+
+      let maxHours = 1;
+      for (let h = 2; h <= 3; h++) {
+        const nextSlot = timeSlots[startIndex + h - 1];
+        if (!nextSlot) break;
+        const status = getSlotStatus(selectedDate, courtName, nextSlot);
+        if (status !== "available") break;
+        maxHours = h;
+      }
+      return maxHours;
+    },
+    [timeSlots, selectedDate, getSlotStatus]
+  );
+
+  const setSlotWithDuration = (courtName: string, startSlotTime: string, duration: number) => {
+    const startIndex = timeSlots.indexOf(startSlotTime);
+    if (startIndex === -1) return;
+
+    const startPart = startSlotTime.split(" - ")[0].trim();
+    const endSlot = timeSlots[startIndex + duration - 1];
+    if (!endSlot) return;
+    const endPart = endSlot.split(" - ")[1].trim();
+
+    const formattedRange = `${startPart} - ${endPart}`;
+    const price = duration * 200;
+
+    setSelectedSlot({
+      date: selectedDate,
+      court: courtName,
+      time: formattedRange,
+      price,
+      duration,
+      startSlot: startSlotTime,
+    });
+    setIsBookingSuccess(false);
+  };
+
   const handleSlotClick = (courtName: string, time: string) => {
     const status = getSlotStatus(selectedDate, courtName, time);
 
@@ -143,21 +185,37 @@ export const BookingContainer = () => {
       return;
     }
 
-    // Unselect if clicking the already selected slot
-    if (selectedSlot?.court === courtName && selectedSlot?.time === time) {
-      setSelectedSlot(null);
-      return;
+    // If clicking on an already selected court
+    if (selectedSlot && selectedSlot.court === courtName) {
+      const startSlot = selectedSlot.startSlot || selectedSlot.time;
+      const startIndex = timeSlots.indexOf(startSlot);
+      const clickedIndex = timeSlots.indexOf(time);
+
+      // If clicked the exact start slot and duration is 1, deselect
+      if (startSlot === time && (selectedSlot.duration || 1) === 1) {
+        setSelectedSlot(null);
+        return;
+      }
+
+      // If clicked consecutive hour right after currently selected duration, expand
+      const currentDur = selectedSlot.duration || 1;
+      if (clickedIndex === startIndex + currentDur && currentDur < 3) {
+        const maxDur = getMaxAvailableDuration(courtName, startSlot);
+        if (maxDur >= currentDur + 1) {
+          setSlotWithDuration(courtName, startSlot, currentDur + 1);
+          return;
+        }
+      }
+
+      // If clicked within the currently selected range, deselect
+      if (clickedIndex >= startIndex && clickedIndex < startIndex + currentDur) {
+        setSelectedSlot(null);
+        return;
+      }
     }
 
-    const court = courts.find((court) => court.name === courtName);
-
-    setSelectedSlot({
-      date: selectedDate,
-      court: courtName,
-      time,
-      price: court?.price || 200, // Read the dynamically attached price
-    });
-    setIsBookingSuccess(false);
+    // Default: select this slot as starting slot with duration 1
+    setSlotWithDuration(courtName, time, 1);
   };
 
   const handleResumeGridBooking = async () => {
@@ -208,10 +266,11 @@ export const BookingContainer = () => {
         timeRange: selectedSlot.time,
       });
 
-      window.location.href = url;
-    } catch (err: any) {
-      setCheckoutError(err.message || "An unexpected error occurred");
+      window.location.assign(url);
+    } catch (err: unknown) {
+      setCheckoutError((err as Error).message || "An unexpected error occurred");
       setIsCheckoutLoading(false);
+      await refreshBookings();
     }
   };
 
@@ -360,10 +419,43 @@ export const BookingContainer = () => {
                         </span>
                       </div>
                     </div>
+                    {/* Duration Selection Pills */}
+                    <div className="flex items-center gap-2 mt-2.5">
+                      <span className="text-xs font-semibold text-muted-foreground">Duration:</span>
+                      <div className="flex items-center gap-1.5">
+                        {[1, 2, 3].map((hours) => {
+                          const startSlot = selectedSlot.startSlot || selectedSlot.time;
+                          const maxAvailable = getMaxAvailableDuration(selectedSlot.court, startSlot);
+                          const isAvailable = hours <= maxAvailable;
+                          const isCurrent = (selectedSlot.duration || 1) === hours;
+
+                          return (
+                            <button
+                              key={hours}
+                              type="button"
+                              disabled={!isAvailable}
+                              onClick={() => setSlotWithDuration(selectedSlot.court, startSlot, hours)}
+                              title={isAvailable ? `${hours} hour${hours > 1 ? "s" : ""} (₱${hours * 200})` : "Consecutive slot unavailable"}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                                isCurrent
+                                  ? "bg-primary text-primary-foreground shadow-xs"
+                                  : isAvailable
+                                  ? "bg-muted hover:bg-muted/80 text-foreground border border-border"
+                                  : "opacity-35 cursor-not-allowed bg-muted/40 text-muted-foreground border border-border/40"
+                              }`}
+                            >
+                              {hours} {hours === 1 ? "hr" : "hrs"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                   <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start w-full sm:w-auto gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
                     <div className="text-left sm:text-right">
-                      <p className="text-[11px] text-muted-foreground">Total Price</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Total Price {(selectedSlot.duration || 1) > 1 ? `(${selectedSlot.duration} hrs × ₱200)` : "(₱200 / hr)"}
+                      </p>
                       <p className="text-xl sm:text-2xl font-black text-foreground">₱{selectedSlot.price.toLocaleString()}</p>
                     </div>
                     <Button

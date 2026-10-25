@@ -26,7 +26,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All Statuses");
   const [courtId, setCourtId] = useState("All Courts");
-  const [dateTime, setDateTime] = useState("");
+  const [dateTime] = useState("");
   const [courts, setCourts] = useState<CourtOption[]>([]);
 
   useEffect(() => {

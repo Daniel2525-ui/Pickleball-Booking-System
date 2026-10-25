@@ -77,7 +77,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const filtered = validPayments.filter((payment) => {
     if (!filters?.search?.trim()) return true;
     const term = filters.search.trim().toLowerCase();
-    const name = payment.bookings?.profiles?.full_name?.toLowerCase() || "";
+    const name = (payment.bookings?.profiles?.full_name || payment.bookings?.customer_name || "").toLowerCase();
     const court = payment.bookings?.courts?.name?.toLowerCase() || "";
     return name.includes(term) || court.includes(term);
   });
@@ -291,14 +291,19 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                   <TableRow key={payment.id} className="group transition-colors hover:bg-muted/40">
                     {/* Customer */}
                     <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                          {payment.bookings?.profiles?.full_name?.charAt(0)?.toUpperCase() || "U"}
-                        </div>
-                        <span className="font-medium text-sm text-foreground">
-                          {payment.bookings?.profiles?.full_name || "Unknown Customer"}
-                        </span>
-                      </div>
+                      {(() => {
+                        const displayName = payment.bookings?.profiles?.full_name || payment.bookings?.customer_name || "Unknown Customer";
+                        return (
+                          <div className="flex items-center gap-2.5">
+                            <div className="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                              {displayName.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-medium text-sm text-foreground">
+                              {displayName}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
 
                     {/* Court & Slot */}

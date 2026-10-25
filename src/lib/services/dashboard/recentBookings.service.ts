@@ -16,10 +16,11 @@ export const fetchRecentBookings = async () => {
                 total_amount,
                 status,
                 court_id,
+                customer_name,
                 courts ( name ),
                 profiles:user_id ( full_name )       
             `)
-            .in("status", ["confirmed", "completed", "cancelled", "ongoing", "pending"])
+            .in("status", ["confirmed", "completed", "cancelled", "checked_in", "in_progress", "pending"])
             .order("created_at", {
                 ascending: false,
             })
@@ -27,8 +28,21 @@ export const fetchRecentBookings = async () => {
 
         if (error) throw error;
 
-        const formattedBookings: RecentBooking[] = (data || []).map((booking: any) => {
-            const customerName = booking.profiles?.full_name || "Guest User";
+        interface RawRecentBooking {
+            id: string | number;
+            created_at?: string;
+            booking_date?: string;
+            start_time: string;
+            end_time: string;
+            total_amount?: number;
+            status?: string;
+            customer_name?: string;
+            courts?: { name?: string };
+            profiles?: { full_name?: string };
+        }
+
+        const formattedBookings: RecentBooking[] = ((data || []) as unknown as RawRecentBooking[]).map((booking) => {
+            const customerName = booking.profiles?.full_name || booking.customer_name || "Guest User";
             const courtName = booking.courts?.name || "Court";
 
             const datePart = booking.booking_date
@@ -40,7 +54,7 @@ export const fetchRecentBookings = async () => {
 
             const rawStatus = (booking.status || "").toLowerCase();
             const status: "Confirmed" | "Pending" | "Cancelled" =
-                rawStatus === "confirmed" || rawStatus === "completed" || rawStatus === "ongoing"
+                rawStatus === "confirmed" || rawStatus === "completed" || rawStatus === "checked_in" || rawStatus === "in_progress"
                     ? "Confirmed"
                     : rawStatus === "cancelled"
                         ? "Cancelled"

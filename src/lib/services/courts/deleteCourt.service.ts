@@ -2,6 +2,12 @@ import { supabase } from "@/lib/supabase";
 
 export const deleteCourt = async (id: string) => {
     try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { error: new Error("Unauthorized.") };
+
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        if (profile?.role !== "admin") return { error: new Error("Admin privileges required.") };
+
         // Prevent deleting a court that has associated reservations
         const { data: existingBookings, error: checkError } = await supabase
             .from("bookings")

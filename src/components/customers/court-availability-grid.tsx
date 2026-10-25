@@ -2,7 +2,7 @@
 
 import { Clock, Check, LoaderCircle } from "lucide-react";
 import { Slot } from "./types";
-import { SlotStatus } from "@/lib/services/bookings/checkSlotAvailability.service";
+import { SlotStatus, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 
 interface CourtAvailabilityGridProps {
   selectedDate: Date;
@@ -97,7 +97,15 @@ export const CourtAvailabilityGrid = ({
                 >
                   {courts.map((court, courtIdx) => {
                     const status = getSlotStatus(selectedDate, court, time);
-                    const isSelected = selectedSlot?.court === court && selectedSlot?.time === time;
+                    const isSelected = Boolean(
+                      selectedSlot &&
+                      selectedSlot.court === court &&
+                      (selectedSlot.time === time || (() => {
+                        const [cellStart, cellEnd] = time.split(" - ").map((t) => to24h(t.trim()));
+                        const [selStart, selEnd] = selectedSlot.time.split(" - ").map((t) => to24h(t.trim()));
+                        return Boolean(cellStart && cellEnd && selStart && selEnd && cellStart >= selStart && cellEnd <= selEnd);
+                      })())
+                    );
 
                     return (
                       <div key={courtIdx} className="p-2 border-l first:border-l-0 h-full">

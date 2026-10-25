@@ -12,20 +12,14 @@ export const customerCancellableStatuses = ["pending", "confirmed"] as const;
 /** Exact status value stored in the database for cancelled bookings. */
 export const CANCELLED_STATUS = "cancelled";
 
-/** Venue timezone offset (Asia/Manila, UTC+8, no DST). Booking dates/times are stored in venue local time. */
-const venueUtcOffset = "+08:00";
+import { getBookingStart } from "@/lib/utils/bookingTime.ts";
+export { getBookingStart };
 
 interface CancellableBookingFields {
     status: string;
     booking_date: string;
     start_time: string;
 }
-
-/** Returns the booking's start as an absolute instant, interpreting date/time in venue local time. */
-export const getBookingStart = (booking: Pick<CancellableBookingFields, "booking_date" | "start_time">) => {
-    const time = booking.start_time.length === 5 ? `${booking.start_time}:00` : booking.start_time.slice(0, 8);
-    return new Date(`${booking.booking_date}T${time}${venueUtcOffset}`);
-};
 
 /**
  * Returns null if the customer may cancel the booking, otherwise a human-readable reason.

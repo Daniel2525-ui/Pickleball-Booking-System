@@ -3,6 +3,12 @@ import { OperatingHour } from "@/components/admin/schedules/types";
 
 export const updateOperatingHours = async (hours: OperatingHour[]) => {
     try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { data: null, error: new Error("Unauthorized.") };
+
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        if (profile?.role !== "admin") return { data: null, error: new Error("Admin privileges required.") };
+
         // Insert or update rows based on the unique day_of_week constraint
         const payload = hours.map((hour) => ({
             day_of_week: hour.day_of_week,

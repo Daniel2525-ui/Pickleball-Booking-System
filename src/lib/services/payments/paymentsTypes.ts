@@ -13,6 +13,7 @@ export interface Payment {
         booking_date: string;
         start_time: string;
         end_time: string;
+        customer_name?: string;
         profiles?: {
             full_name: string;
         };

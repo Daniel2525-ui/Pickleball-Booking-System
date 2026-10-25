@@ -1,3 +1,11 @@
+export interface BookingPayment {
+    id: string;
+    status: string;
+    payment_method?: string | null;
+    payment_reference?: string | null;
+    amount?: number;
+}
+
 export interface Booking {
     id: string;
     user_id?: string | null;
@@ -23,19 +31,7 @@ export interface Booking {
     courts?: {
         name: string;
     } | null;
-    payments?: {
-        id: string;
-        status: string;
-        payment_method?: string | null;
-        payment_reference?: string | null;
-        amount?: number;
-    } | Array<{
-        id: string;
-        status: string;
-        payment_method?: string | null;
-        payment_reference?: string | null;
-        amount?: number;
-    }> | null;
+    payments?: BookingPayment | BookingPayment[] | null;
 }
 
 export interface FetchBookingsFilters {

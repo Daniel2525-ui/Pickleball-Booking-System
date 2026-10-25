@@ -20,6 +20,11 @@ function BookingSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const [isVerifying, setIsVerifying] = useState(true);
+  const [verifyResult, setVerifyResult] = useState<{
+    success: boolean;
+    conflict?: boolean;
+    error?: string;
+  }>({ success: true });
 
   useEffect(() => {
     async function verifySession() {
@@ -28,13 +33,22 @@ function BookingSuccessContent() {
         return;
       }
       try {
-        await fetch("/api/stripe/verify", {
+        const res = await fetch("/api/stripe/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId }),
         });
+        const data = await res.json().catch(() => null);
+        if (data) {
+          setVerifyResult({
+            success: Boolean(data.success),
+            conflict: Boolean(data.conflict),
+            error: data.error,
+          });
+        }
       } catch (err) {
         console.error("Verification failed", err);
+        setVerifyResult({ success: false, error: "Unable to verify payment." });
       } finally {
         setIsVerifying(false);
       }
@@ -56,6 +70,53 @@ function BookingSuccessContent() {
             </h2>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               Verifying your payment with Stripe and securing your court slot at Crosshair Dinkers...
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!verifyResult.success || verifyResult.conflict) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background text-foreground selection:bg-primary/20 selection:text-primary">
+        <PublicHeader />
+        <main className="flex-1 flex flex-col items-center justify-center p-4 py-12 sm:py-16">
+          <div className="max-w-lg w-full bg-card border border-destructive/20 rounded-2xl shadow-md p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col items-center text-center">
+              <div className="size-16 sm:size-20 rounded-full bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-center mb-4 shadow-xs">
+                <Info className="size-8 sm:size-10" />
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 border border-destructive/20 px-3 py-1 text-xs font-bold text-destructive mb-2">
+                <span>{verifyResult.conflict ? "Slot Unavailable • Refund Initiated" : "Verification Issue"}</span>
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                {verifyResult.conflict ? "Court Slot Conflict" : "Payment Verification Failed"}
+              </h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-2 leading-relaxed">
+                {verifyResult.error || "This time slot was claimed by another player. A full refund has been initiated to your original payment method."}
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2.5">
+              <Link href="/#booking" className="w-full">
+                <Button className="w-full h-11 font-bold text-sm shadow-sm gap-2">
+                  <CalendarDays className="size-4" />
+                  Select Another Time Slot
+                </Button>
+              </Link>
+              <Link href="/" className="w-full">
+                <Button variant="ghost" className="w-full h-11 text-xs font-semibold text-muted-foreground hover:text-foreground gap-1.5">
+                  <ArrowLeft className="size-3.5" />
+                  Back to Home
+                </Button>
+              </Link>
+            </div>
+
+            <p className="text-center text-[11px] text-muted-foreground pt-2 border-t">
+              Need assistance? Call venue reception at <span className="font-semibold text-foreground">+63 917 123 4567</span>.
             </p>
           </div>
         </main>

@@ -37,7 +37,7 @@ export const fetchCourtStatus = async () => {
                 status
                 `)
             .eq("booking_date", today)
-            .in("status", ["confirmed", "completed", "ongoing"])
+            .in("status", ["confirmed", "checked_in", "in_progress"]);
 
         if (bookingError) throw bookingError;
 

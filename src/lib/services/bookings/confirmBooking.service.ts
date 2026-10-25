@@ -27,7 +27,7 @@ export const confirmBooking = async (id: string) => {
             .select("id")
             .eq("court_id", booking.court_id)
             .eq("booking_date", booking.booking_date)
-            .in("status", ["confirmed", "completed", "ongoing"])
+            .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
             .neq("id", booking.id)
             .lt("start_time", booking.end_time)
             .gt("end_time", booking.start_time);

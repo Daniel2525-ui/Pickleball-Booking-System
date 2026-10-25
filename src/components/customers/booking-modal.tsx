@@ -53,14 +53,23 @@ export const BookingModal = ({
                       <Calendar className="size-3.5" />
                       {selectedSlot.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                     </div>
-                    <div className="flex items-center text-sm text-muted-foreground mt-1 gap-1">
-                      <Clock className="size-3.5" />
-                      {selectedSlot.time}
+                    <div className="flex items-center text-sm text-muted-foreground mt-1 gap-1.5 flex-wrap">
+                      <Clock className="size-3.5 text-primary" />
+                      <span>{selectedSlot.time}</span>
+                      {(selectedSlot.duration || 1) > 1 && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          {selectedSlot.duration} Hours
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold">₱{selectedSlot.price.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">Total due</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(selectedSlot.duration || 1) > 1
+                        ? `${selectedSlot.duration} hrs × ₱200/hr`
+                        : "₱200 / hr"}
+                    </p>
                   </div>
                 </div>
 

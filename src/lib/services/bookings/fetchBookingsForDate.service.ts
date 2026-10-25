@@ -14,14 +14,14 @@ export const fetchBookingsForDate = async (date: Date | string) => {
     try {
         const dateStr =
             date instanceof Date
-                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+                ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date)
                 : date;
 
         const { data, error } = await supabase
             .from("bookings")
             .select("id, user_id, court_id, start_time, end_time, status")
             .eq("booking_date", dateStr)
-            .in("status", ["confirmed", "completed", "ongoing", "pending"]);
+            .in("status", ["confirmed", "completed", "checked_in", "in_progress", "pending"]);
 
         if (error) throw error;
 

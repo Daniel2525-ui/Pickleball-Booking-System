@@ -5,7 +5,7 @@ export const searchCustomers = async (
     queryText: string = ""
 ): Promise<{ data: UnifiedCustomerResult[]; error: Error | null }> => {
     try {
-        const query = queryText.trim();
+        const sanitizedQuery = queryText.replace(/[(),%]/g, " ").trim();
 
         let profilesQuery = supabase
             .from("profiles")
@@ -17,9 +17,9 @@ export const searchCustomers = async (
             .select("id, full_name, email, phone")
             .order("full_name");
 
-        if (query) {
-            profilesQuery = profilesQuery.or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`);
-            customersQuery = customersQuery.or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`);
+        if (sanitizedQuery) {
+            profilesQuery = profilesQuery.or(`full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%`);
+            customersQuery = customersQuery.or(`full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%`);
         } else {
             profilesQuery = profilesQuery.limit(10);
             customersQuery = customersQuery.limit(10);

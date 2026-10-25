@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
                     .eq("court_id", booking.court_id)
                     .eq("booking_date", booking.booking_date)
                     .neq("id", booking.id)
-                    .in("status", ["confirmed", "completed", "ongoing"])
+                    .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
                     .lt("start_time", booking.end_time)
                     .gt("end_time", booking.start_time);
 
@@ -102,8 +102,8 @@ export async function POST(req: NextRequest) {
         }
 
         return Response.json({ success: true, status: session.payment_status });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Verification error:", err);
-        return Response.json({ error: "Verification failed" }, { status: 500 });
+        return Response.json({ error: (err as Error).message || "Verification failed" }, { status: 500 });
     }
 }

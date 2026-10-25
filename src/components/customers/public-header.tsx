@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Crosshair, LogOut, LoaderCircle, Menu, X, CalendarDays, HelpCircle, Sparkles } from "lucide-react";
+import { Crosshair, LogOut, LoaderCircle, Menu, X, CalendarDays } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -15,7 +15,6 @@ export function PublicHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    setLoading(true);
     const supabase = createClient();
 
     const checkUser = async () => {

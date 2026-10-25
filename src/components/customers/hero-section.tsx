@@ -3,7 +3,6 @@
 import { motion, type Variants } from "motion/react";
 import {
   CalendarDays,
-  Crosshair,
   Layers,
   Sparkles,
   Clock,

@@ -77,7 +77,7 @@ export const BookingHistoryContainer = () => {
       if (latest) setBookings(latest);
     } else {
       toast.success("Redirecting to secure Stripe checkout...", { id: "resume-payment-toast" });
-      window.location.href = url;
+      window.location.assign(url);
     }
   };
 

@@ -32,9 +32,10 @@ export async function POST(req: NextRequest) {
 
         try {
             event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-        } catch (err: any) {
-            console.error(`Webhook signature verification failed. ${err.message}`);
-            return Response.json({ error: err.message }, { status: 400 });
+        } catch (err: unknown) {
+            const message = (err as Error).message || "Verification failed";
+            console.error(`Webhook signature verification failed. ${message}`);
+            return Response.json({ error: message }, { status: 400 });
         }
 
         // Handle the event
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
                     .eq("court_id", booking.court_id)
                     .eq("booking_date", booking.booking_date)
                     .neq("id", booking.id)
-                    .in("status", ["confirmed", "completed", "ongoing"])
+                    .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
                     .lt("start_time", booking.end_time)
                     .gt("end_time", booking.start_time);
 

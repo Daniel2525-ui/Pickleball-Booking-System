@@ -11,6 +11,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters) => {
                     booking_date,
                     start_time,
                     end_time,
+                    customer_name,
                     profiles (
                         full_name
                     ),

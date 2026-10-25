@@ -21,7 +21,7 @@ interface SettlePaymentModalProps {
   booking: Booking | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSettled: (bookingId: string, updatedPayment: any) => void;
+  onSettled: (bookingId: string, updatedPayment: unknown) => void;
 }
 
 export const SettlePaymentModal = ({

@@ -12,7 +12,7 @@ export const settleCounterPayment = async ({
     bookingId,
     paymentMethod,
     paymentReference,
-}: SettleCounterPaymentParams): Promise<{ success: boolean; data: any; error: Error | null }> => {
+}: SettleCounterPaymentParams): Promise<{ success: boolean; data: Record<string, unknown> | null; error: Error | null }> => {
     try {
         if (!paymentId || !bookingId || !paymentMethod) {
             return {
@@ -46,8 +46,15 @@ export const settleCounterPayment = async ({
             };
         }
 
-        return { success: true, data, error: null };
-    } catch (error: any) {
+        // Confirm the booking row so it won't be cancelled by the cleanup cron
+        await supabase
+            .from("bookings")
+            .update({ status: "confirmed" })
+            .eq("id", bookingId)
+            .eq("status", "pending");
+
+        return { success: true, data: data as Record<string, unknown>, error: null };
+    } catch (error: unknown) {
         console.error("Failed to settle counter payment:", error);
         return { success: false, data: null, error: error as Error };
     }
