@@ -2,11 +2,6 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Supabase client with service role to bypass RLS
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceRole);
-
 export async function GET(request: Request) {
   try {
     // Security check to ensure this is called with valid Vercel Cron secret
@@ -14,6 +9,19 @@ export async function GET(request: Request) {
     if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceRole) {
+      console.error("Cron configuration error: SUPABASE_SERVICE_ROLE_KEY is required to bypass RLS.");
+      return NextResponse.json(
+        { error: "Server configuration error: SUPABASE_SERVICE_ROLE_KEY is missing." },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceRole);
 
     // Calculate cutoff time: 30 minutes ago (aligns with Stripe Checkout session expiry)
     const cutoffTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
@@ -42,7 +50,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "No expired pending bookings found." });
     }
 
-    let cancelledCount = 0;
+    const expiredPaymentIds: string[] = [];
+    const expiredBookingIds: string[] = [];
 
     for (const booking of pendingBookings) {
       const payments = booking.payments || [];
@@ -62,29 +71,43 @@ export async function GET(request: Request) {
           }
         }
 
-        // Only mark pending payment as cancelled
         if (payment.status === "pending") {
-          await supabase
-            .from("payments")
-            .update({ status: "cancelled" })
-            .eq("id", payment.id)
-            .eq("status", "pending");
+          expiredPaymentIds.push(payment.id);
         }
       }
 
-      // Mark booking as cancelled
-      await supabase
+      expiredBookingIds.push(booking.id);
+    }
+
+    // Batch update payments to failed (payments.status check constraint: pending, paid, failed, refunded)
+    if (expiredPaymentIds.length > 0) {
+      const { error: paymentError } = await supabase
+        .from("payments")
+        .update({ status: "failed" })
+        .in("id", expiredPaymentIds)
+        .eq("status", "pending");
+
+      if (paymentError) {
+        console.error("Failed to batch cancel payments:", paymentError);
+      }
+    }
+
+    // Batch update bookings to cancelled
+    if (expiredBookingIds.length > 0) {
+      const { error: bookingError } = await supabase
         .from("bookings")
         .update({ status: "cancelled" })
-        .eq("id", booking.id)
+        .in("id", expiredBookingIds)
         .eq("status", "pending");
-        
-      cancelledCount++;
+
+      if (bookingError) {
+        console.error("Failed to batch cancel bookings:", bookingError);
+      }
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: `Successfully cancelled ${cancelledCount} expired booking(s).` 
+      message: `Successfully cancelled ${expiredBookingIds.length} expired booking(s).` 
     });
 
   } catch (error: unknown) {

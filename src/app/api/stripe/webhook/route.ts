@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
                     .eq("court_id", booking.court_id)
                     .eq("booking_date", booking.booking_date)
                     .neq("id", booking.id)
-                    .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
+                    .in("status", ["confirmed", "completed", "checked_in", "in_progress", "pending"])
                     .lt("start_time", booking.end_time)
                     .gt("end_time", booking.start_time);
 

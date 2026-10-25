@@ -23,6 +23,7 @@ import { OperatingHour } from "@/components/admin/schedules/types";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { fetchBookingsForDate, BookingSlot } from "@/lib/services/bookings/fetchBookingsForDate.service";
+import { calculateCourtPrice } from "@/lib/services/courts/calculateCourtPrice.service";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
@@ -147,7 +148,7 @@ export const BookingContainer = () => {
     const endPart = endSlot.split(" - ")[1].trim();
 
     const formattedRange = `${startPart} - ${endPart}`;
-    const price = duration * 200;
+    const price = calculateCourtPrice(duration);
 
     setSelectedSlot({
       date: selectedDate,
@@ -435,7 +436,7 @@ export const BookingContainer = () => {
                               type="button"
                               disabled={!isAvailable}
                               onClick={() => setSlotWithDuration(selectedSlot.court, startSlot, hours)}
-                              title={isAvailable ? `${hours} hour${hours > 1 ? "s" : ""} (₱${hours * 200})` : "Consecutive slot unavailable"}
+                              title={isAvailable ? `${hours} hour${hours > 1 ? "s" : ""} (₱${calculateCourtPrice(hours)})` : "Consecutive slot unavailable"}
                               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                                 isCurrent
                                   ? "bg-primary text-primary-foreground shadow-xs"

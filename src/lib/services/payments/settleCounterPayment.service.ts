@@ -1,5 +1,3 @@
-import { supabase } from "@/lib/supabase";
-
 export interface SettleCounterPaymentParams {
     paymentId: string;
     bookingId: string;
@@ -22,40 +20,38 @@ export const settleCounterPayment = async ({
             };
         }
 
-        const { data, error } = await supabase
-            .from("payments")
-            .update({
-                status: "paid",
-                payment_method: paymentMethod,
-                payment_reference: paymentReference?.trim() || null,
-                paid_at: new Date().toISOString(),
-            })
-            .eq("id", paymentId)
-            .eq("booking_id", bookingId)
-            .eq("status", "pending")
-            .select()
-            .single();
+        const res = await fetch("/api/admin/payments/settle", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                paymentId,
+                bookingId,
+                paymentMethod,
+                paymentReference: paymentReference?.trim() || null,
+            }),
+        });
 
-        if (error) throw error;
+        const body = await res.json().catch(() => null);
 
-        if (!data) {
+        if (!res.ok) {
             return {
                 success: false,
                 data: null,
-                error: new Error("Payment is no longer pending or has already been settled."),
+                error: new Error(body?.error || "Failed to settle payment."),
             };
         }
 
-        // Confirm the booking row so it won't be cancelled by the cleanup cron
-        await supabase
-            .from("bookings")
-            .update({ status: "confirmed" })
-            .eq("id", bookingId)
-            .eq("status", "pending");
-
-        return { success: true, data: data as Record<string, unknown>, error: null };
+        return {
+            success: true,
+            data: (body?.data as Record<string, unknown>) || null,
+            error: null,
+        };
     } catch (error: unknown) {
         console.error("Failed to settle counter payment:", error);
-        return { success: false, data: null, error: error as Error };
+        return {
+            success: false,
+            data: null,
+            error: error instanceof Error ? error : new Error("Network error during payment settlement."),
+        };
     }
 };

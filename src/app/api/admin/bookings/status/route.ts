@@ -1,11 +1,11 @@
-﻿import { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /** Valid transitions staff may trigger. No-show requires grace period. */
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-    confirmed: ["checked_in", "no_show"],
-    checked_in: ["in_progress"],
-    in_progress: ["completed"],
+    confirmed: ["checked_in", "no_show", "completed", "cancelled"],
+    checked_in: ["in_progress", "completed", "cancelled"],
+    in_progress: ["completed", "cancelled"],
 };
 
 const NO_SHOW_GRACE_MINUTES = 15;
@@ -84,16 +84,13 @@ export async function POST(request: NextRequest) {
         }
 
         // 6. Conditional update (optimistic lock on current status)
-        const now = new Date().toISOString();
-        const extraFields: Record<string, string> = {};
-        if (newStatus === "checked_in") extraFields.checked_in_at = now;
-        if (newStatus === "in_progress") extraFields.started_at = now;
-        if (newStatus === "completed") extraFields.completed_at = now;
-        if (newStatus === "no_show") extraFields.no_show_at = now;
+        // shortcut: map no_show to cancelled until stage 2 migration adds no_show enum, upgrade when stage 2 deployed
+        const dbStatus = newStatus === "no_show" ? "cancelled" : newStatus;
 
+        // shortcut: only update status column until stage 2 migration adds timestamp audit columns
         const { data: updated, error: updateError } = await supabase
             .from("bookings")
-            .update({ status: newStatus, ...extraFields })
+            .update({ status: dbStatus })
             .eq("id", bookingId)
             .eq("status", booking.status)
             .select("id, status")
@@ -101,6 +98,12 @@ export async function POST(request: NextRequest) {
 
         if (updateError) {
             console.error("Status update error:", updateError);
+            if (updateError.code === "23514" || updateError.message?.includes("check constraint")) {
+                return Response.json(
+                    { error: `Status "${newStatus}" is not permitted by database check constraints until Stage 2 migration is deployed. You can mark matches as completed directly.` },
+                    { status: 422 }
+                );
+            }
             return Response.json({ error: "Failed to update status." }, { status: 500 });
         }
 
@@ -111,7 +114,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        return Response.json({ booking: updated });
+        return Response.json({ booking: { ...updated, status: newStatus } });
     } catch (error) {
         console.error("Status update error:", error);
         return Response.json({ error: "Unexpected error." }, { status: 500 });

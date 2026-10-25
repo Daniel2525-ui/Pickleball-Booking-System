@@ -387,6 +387,14 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                     Check In Player
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
+                                    onClick={() => handleStatusChange(booking, "completed")}
+                                    disabled={actionLoadingId === booking.id}
+                                    className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
+                                  >
+                                    <Trophy className="mr-2 h-4 w-4" />
+                                    Complete Match
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
                                     onClick={() => handleStatusChange(booking, "no_show")}
                                     disabled={actionLoadingId === booking.id}
                                     className="cursor-pointer text-orange-600 focus:text-orange-600 text-xs font-semibold"

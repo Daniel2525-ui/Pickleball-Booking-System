@@ -27,6 +27,7 @@ import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { searchCustomers } from "@/lib/services/customers/searchCustomers.service";
 import { createWalkInCustomer } from "@/lib/services/customers/createWalkInCustomer.service";
 import { createWalkInBooking } from "@/lib/services/bookings/createWalkInBooking.service";
+import { calculateCourtPrice } from "@/lib/services/courts/calculateCourtPrice.service";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { UnifiedCustomerResult } from "@/lib/services/customers/customersTypes";
 
@@ -117,6 +118,38 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
     return () => clearTimeout(timer);
   }, [newFullName, open, playerMode]);
+
+  const handleStartTimeChange = (newStartTime: string) => {
+    setStartTime(newStartTime);
+    if (endTime) {
+      const startHour = parseInt(newStartTime.split(":")[0], 10);
+      const endHour = parseInt(endTime.split(":")[0], 10);
+      const duration = endHour - startHour;
+      if (duration >= 1 && duration <= 3) {
+        try {
+          setAmount(String(calculateCourtPrice(duration)));
+        } catch {
+          // ignore
+        }
+      }
+    }
+  };
+
+  const handleEndTimeChange = (newEndTime: string) => {
+    setEndTime(newEndTime);
+    if (startTime) {
+      const startHour = parseInt(startTime.split(":")[0], 10);
+      const endHour = parseInt(newEndTime.split(":")[0], 10);
+      const duration = endHour - startHour;
+      if (duration >= 1 && duration <= 3) {
+        try {
+          setAmount(String(calculateCourtPrice(duration)));
+        } catch {
+          // ignore
+        }
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -435,7 +468,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
               <Input
                 type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
                 className="h-9 text-xs sm:text-sm"
               />
             </div>
@@ -445,7 +478,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
               <Input
                 type="time"
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                onChange={(e) => handleEndTimeChange(e.target.value)}
                 className="h-9 text-xs sm:text-sm"
               />
             </div>

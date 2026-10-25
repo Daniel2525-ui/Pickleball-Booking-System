@@ -125,18 +125,19 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 7. Mirror the existing cron cleanup: an unpaid (pending) payment is marked cancelled.
+        // 7. Mirror the existing cron cleanup: an unpaid (pending) payment is marked failed
+        //    (payments.status check constraint: pending, paid, failed, refunded).
         //    Paid payments are left untouched; refunds are handled manually by an admin.
         if (pendingPaymentId) {
             const { error: paymentUpdateError } = await supabase
                 .from("payments")
-                .update({ status: CANCELLED_STATUS })
+                .update({ status: "failed" })
                 .eq("id", pendingPaymentId)
                 .eq("status", "pending");
 
             if (paymentUpdateError) {
                 // The booking itself is cancelled; log so an admin can reconcile the payment row.
-                console.error("Cancel booking: failed to mark payment cancelled:", paymentUpdateError);
+                console.error("Cancel booking: failed to mark payment failed:", paymentUpdateError);
             }
         }
 
