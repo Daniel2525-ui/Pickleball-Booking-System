@@ -22,7 +22,7 @@ const statusStyles: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
   checked_in: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-semibold",
   in_progress: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20 font-semibold",
-  completed: "bg-muted text-muted-foreground border-border",
+  completed: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20 font-semibold",
   no_show: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
   cancelled: "bg-destructive/10 text-destructive border-destructive/20 line-through opacity-75",
 };
