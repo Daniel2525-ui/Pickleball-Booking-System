@@ -83,24 +83,30 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 6. Conditional update (optimistic lock on current status)
-        // shortcut: map no_show to cancelled until stage 2 migration adds no_show enum, upgrade when stage 2 deployed
-        const dbStatus = newStatus === "no_show" ? "cancelled" : newStatus;
+        // 6. Conditional update (optimistic lock on current status) with Stage 2 audit timestamps
+        const now = new Date().toISOString();
+        const updatePayload: Record<string, unknown> = {
+            status: newStatus,
+        };
 
-        // shortcut: only update status column until stage 2 migration adds timestamp audit columns
+        if (newStatus === "checked_in") updatePayload.checked_in_at = now;
+        if (newStatus === "in_progress") updatePayload.started_at = now;
+        if (newStatus === "completed") updatePayload.completed_at = now;
+        if (newStatus === "no_show") updatePayload.no_show_at = now;
+
         const { data: updated, error: updateError } = await supabase
             .from("bookings")
-            .update({ status: dbStatus })
+            .update(updatePayload)
             .eq("id", bookingId)
             .eq("status", booking.status)
-            .select("id, status")
+            .select("id, status, checked_in_at, started_at, completed_at, no_show_at")
             .maybeSingle();
 
         if (updateError) {
             console.error("Status update error:", updateError);
             if (updateError.code === "23514" || updateError.message?.includes("check constraint")) {
                 return Response.json(
-                    { error: `Status "${newStatus}" is not permitted by database check constraints until Stage 2 migration is deployed. You can mark matches as completed directly.` },
+                    { error: `Status "${newStatus}" is not permitted by database check constraints until Stage 2 migration is applied.` },
                     { status: 422 }
                 );
             }
@@ -114,7 +120,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        return Response.json({ booking: { ...updated, status: newStatus } });
+        return Response.json({ booking: updated });
     } catch (error) {
         console.error("Status update error:", error);
         return Response.json({ error: "Unexpected error." }, { status: 500 });

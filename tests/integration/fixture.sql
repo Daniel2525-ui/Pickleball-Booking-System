@@ -78,7 +78,9 @@ CREATE TABLE IF NOT EXISTS public.bookings (
   end_time time NOT NULL,
   status text NOT NULL,
   total_amount numeric NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed'))
 );
 
 CREATE TABLE IF NOT EXISTS public.payments (

@@ -35,10 +35,17 @@ function evaluateNoShowGracePeriod(bookingDate, startTime, now) {
     return { allowed: true };
 }
 
-function resolveDbStatus(targetStatus) {
-    // shortcut: map no_show to cancelled until stage 2 migration adds no_show enum, upgrade when stage 2 deployed
-    if (targetStatus === "no_show") return "cancelled";
-    return targetStatus;
+function buildStatusUpdatePayload(newStatus, now = new Date().toISOString()) {
+    const updatePayload = {
+        status: newStatus,
+    };
+
+    if (newStatus === "checked_in") updatePayload.checked_in_at = now;
+    if (newStatus === "in_progress") updatePayload.started_at = now;
+    if (newStatus === "completed") updatePayload.completed_at = now;
+    if (newStatus === "no_show") updatePayload.no_show_at = now;
+
+    return updatePayload;
 }
 
 test("admin status transitions: validates allowed and disallowed state machine paths", () => {
@@ -57,10 +64,17 @@ test("admin status transitions: validates allowed and disallowed state machine p
     assert.equal(validateStatusTransition("in_progress", "completed"), true);
     assert.equal(validateStatusTransition("in_progress", "cancelled"), true);
 
+    // Disallowed: pending cannot jump directly to game-day statuses
+    assert.equal(validateStatusTransition("pending", "checked_in"), false);
+    assert.equal(validateStatusTransition("pending", "in_progress"), false);
+    assert.equal(validateStatusTransition("pending", "completed"), false);
+
     // Disallowed: backward or terminal transitions
     assert.equal(validateStatusTransition("completed", "confirmed"), false);
     assert.equal(validateStatusTransition("completed", "in_progress"), false);
     assert.equal(validateStatusTransition("cancelled", "confirmed"), false);
+    assert.equal(validateStatusTransition("no_show", "confirmed"), false);
+    assert.equal(validateStatusTransition("no_show", "in_progress"), false);
     assert.equal(validateStatusTransition("checked_in", "confirmed"), false);
     assert.equal(validateStatusTransition("in_progress", "checked_in"), false);
 });
@@ -92,8 +106,28 @@ test("admin status transitions: enforces 15-minute grace period before no-show i
     assert.equal(checkThirty.allowed, true);
 });
 
-test("admin status transitions: maps no_show to cancelled in database to release court slot", () => {
-    assert.equal(resolveDbStatus("no_show"), "cancelled");
-    assert.equal(resolveDbStatus("completed"), "completed");
-    assert.equal(resolveDbStatus("cancelled"), "cancelled");
+test("admin status transitions: populates appropriate Stage 2 audit timestamps per status", () => {
+    const testNow = "2026-10-25T08:15:00.000Z";
+
+    // 1. checked_in generates checked_in_at
+    const p1 = buildStatusUpdatePayload("checked_in", testNow);
+    assert.equal(p1.status, "checked_in");
+    assert.equal(p1.checked_in_at, testNow);
+    assert.equal(p1.started_at, undefined);
+
+    // 2. in_progress generates started_at
+    const p2 = buildStatusUpdatePayload("in_progress", testNow);
+    assert.equal(p2.status, "in_progress");
+    assert.equal(p2.started_at, testNow);
+    assert.equal(p2.completed_at, undefined);
+
+    // 3. completed generates completed_at
+    const p3 = buildStatusUpdatePayload("completed", testNow);
+    assert.equal(p3.status, "completed");
+    assert.equal(p3.completed_at, testNow);
+
+    // 4. no_show preserves distinct no_show status and generates no_show_at
+    const p4 = buildStatusUpdatePayload("no_show", testNow);
+    assert.equal(p4.status, "no_show");
+    assert.equal(p4.no_show_at, testNow);
 });

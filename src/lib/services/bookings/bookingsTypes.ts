@@ -20,6 +20,12 @@ export interface Booking {
     created_at: string;
     updated_at: string;
 
+    // Stage 2 game-day audit timestamps
+    checked_in_at?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+    no_show_at?: string | null;
+
     profiles?: {
         full_name: string;
     } | null;

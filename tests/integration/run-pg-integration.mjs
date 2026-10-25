@@ -263,6 +263,12 @@ async function main() {
   runPsqlFile(migrationPath);
   console.log("✔ Migration applied successfully with 0 errors.");
 
+  // 8. Apply Stage 2 migration under test
+  const stage2MigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261025_stage2_game_day_status_tracking.sql");
+  console.log(`[Setup] Applying Stage 2 migration: 20261025_stage2_game_day_status_tracking.sql...`);
+  runPsqlFile(stage2MigrationPath);
+  console.log("✔ Stage 2 migration applied successfully with 0 errors.");
+
   // ---------------------------------------------------------------------------
   // Test Cases Execution
   // ---------------------------------------------------------------------------
@@ -834,6 +840,129 @@ async function main() {
       `SELECT count(*) FROM public.bookings WHERE court_id = '${activeCourtId}' AND booking_date = '${raceDate}';`
     );
     assert.equal(countCheck.stdout, "1", "Exactly one booking must exist from concurrent race");
+  });
+
+  // --- Group 8: Stage 2 Game-Day Status Tracking & Concurrency Tests ---
+
+  await runTest("Stage 2: Check constraint permits game-day statuses and audit timestamps", () => {
+    // 1. Verify audit columns exist
+    const colCheck = runPsqlCommand(
+      `SELECT column_name, data_type 
+       FROM information_schema.columns 
+       WHERE table_schema = 'public' 
+         AND table_name = 'bookings' 
+         AND column_name IN ('checked_in_at', 'started_at', 'completed_at', 'no_show_at')
+       ORDER BY column_name;`
+    );
+    assert.ok(colCheck.stdout.includes("checked_in_at|timestamp with time zone"));
+    assert.ok(colCheck.stdout.includes("started_at|timestamp with time zone"));
+    assert.ok(colCheck.stdout.includes("completed_at|timestamp with time zone"));
+    assert.ok(colCheck.stdout.includes("no_show_at|timestamp with time zone"));
+
+    // 2. Inserting invalid status fails check constraint
+    const invalidStatusRes = runPsqlCommand(
+      `INSERT INTO public.bookings (
+        user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount
+      ) VALUES (
+        '${aliceUid}', 'Alice Invalid', '${activeCourtId}', '2029-10-24', '08:00:00', '09:00:00', 'invalid_status', 200
+      );`
+    );
+    assert.notEqual(invalidStatusRes.status, 0, "Invalid status should fail check constraint");
+    assert.ok(invalidStatusRes.stderr.includes("bookings_status_check") || invalidStatusRes.stderr.includes("23514"));
+  });
+
+  await runTest("Stage 2: checked_in and in_progress statuses block conflicting online reservations", () => {
+    const stage2TestDate = "2029-10-25"; // Thursday
+    const slotStart = "08:00:00";
+    const slotEnd = "09:00:00";
+
+    // 1. Insert a booking with status = checked_in and checked_in_at timestamp
+    const insertCheckedIn = runPsqlCommand(
+      `INSERT INTO public.bookings (
+        id, user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount, checked_in_at
+      ) VALUES (
+        '10101010-1010-1010-1010-101010101010', '${aliceUid}', 'Alice CheckedIn', '${activeCourtId}', '${stage2TestDate}', '${slotStart}', '${slotEnd}', 'checked_in', 200, now()
+      ) RETURNING id;`
+    );
+    assert.equal(insertCheckedIn.status, 0, insertCheckedIn.stderr);
+
+    // 2. hold_court_booking must REJECT overlapping hold with SLOT_UNAVAILABLE (P0001)
+    const holdRes1 = runPsqlCommand(
+      `SELECT public.hold_court_booking(
+        p_court_id => '${activeCourtId}',
+        p_booking_date => '${stage2TestDate}',
+        p_start_time => '${slotStart}',
+        p_end_time => '${slotEnd}',
+        p_user_id => '${bobUid}',
+        p_amount => 200
+      );`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.notEqual(holdRes1.status, 0, "Online hold must be rejected when court is checked_in");
+    assert.ok(holdRes1.stderr.includes("SLOT_UNAVAILABLE") || holdRes1.stderr.includes("P0001"));
+
+    // 3. Transition booking to in_progress with started_at timestamp
+    const updateInProgress = runPsqlCommand(
+      `UPDATE public.bookings 
+       SET status = 'in_progress', started_at = now() 
+       WHERE id = '10101010-1010-1010-1010-101010101010';`
+    );
+    assert.equal(updateInProgress.status, 0, updateInProgress.stderr);
+
+    // 4. hold_court_booking must STILL REJECT overlapping hold
+    const holdRes2 = runPsqlCommand(
+      `SELECT public.hold_court_booking(
+        p_court_id => '${activeCourtId}',
+        p_booking_date => '${stage2TestDate}',
+        p_start_time => '${slotStart}',
+        p_end_time => '${slotEnd}',
+        p_user_id => '${bobUid}',
+        p_amount => 200
+      );`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.notEqual(holdRes2.status, 0, "Online hold must be rejected when court is in_progress");
+    assert.ok(holdRes2.stderr.includes("SLOT_UNAVAILABLE") || holdRes2.stderr.includes("P0001"));
+  });
+
+  await runTest("Stage 2: no_show status releases court slot immediately", () => {
+    const stage2TestDate = "2029-10-26"; // Friday
+    const slotStart = "10:00:00";
+    const slotEnd = "11:00:00";
+
+    // 1. Insert a booking with status = confirmed
+    const insertConfirmed = runPsqlCommand(
+      `INSERT INTO public.bookings (
+        id, user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount
+      ) VALUES (
+        '20202020-2020-2020-2020-202020202020', '${aliceUid}', 'Alice NoShow', '${activeCourtId}', '${stage2TestDate}', '${slotStart}', '${slotEnd}', 'confirmed', 200
+      ) RETURNING id;`
+    );
+    assert.equal(insertConfirmed.status, 0, insertConfirmed.stderr);
+
+    // 2. Admin marks no_show with no_show_at timestamp
+    const markNoShow = runPsqlCommand(
+      `UPDATE public.bookings 
+       SET status = 'no_show', no_show_at = now() 
+       WHERE id = '20202020-2020-2020-2020-202020202020';`
+    );
+    assert.equal(markNoShow.status, 0, markNoShow.stderr);
+
+    // 3. Slot is released: Bob can now hold this court slot successfully
+    const holdRes = runPsqlCommand(
+      `SELECT public.hold_court_booking(
+        p_court_id => '${activeCourtId}',
+        p_booking_date => '${stage2TestDate}',
+        p_start_time => '${slotStart}',
+        p_end_time => '${slotEnd}',
+        p_user_id => '${bobUid}',
+        p_amount => 200
+      );`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.equal(holdRes.status, 0, `Bob should be able to book released no-show slot: ${holdRes.stderr}`);
+    const holdBookingId = JSON.parse(holdRes.stdout).booking_id;
+    assert.ok(holdBookingId, "Expected valid booking_id returned after court released from no_show");
   });
 
   console.log("\n================================================================================");
