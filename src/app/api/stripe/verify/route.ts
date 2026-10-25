@@ -39,14 +39,14 @@ export async function POST(req: NextRequest) {
 
             // Only promote bookings that are still pending.
             if (booking && booking.status === "pending") {
-                // Check for double booking conflicts before confirming
+                // Check for double booking conflicts against active confirmed reservations before confirming
                 const { data: conflicts } = await supabase
                     .from("bookings")
                     .select("id")
                     .eq("court_id", booking.court_id)
                     .eq("booking_date", booking.booking_date)
                     .neq("id", booking.id)
-                    .in("status", ["confirmed", "completed", "checked_in", "in_progress", "pending"])
+                    .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
                     .lt("start_time", booking.end_time)
                     .gt("end_time", booking.start_time);
 

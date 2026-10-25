@@ -27,8 +27,8 @@ function processCheckoutSessionCompleted({
         return { status: 200, action: "skipped", reason: "already_processed" };
     }
 
-    // Conflict detection includes confirmed, completed, checked_in, in_progress, and pending
-    const ACTIVE_CONFLICT_STATUSES = ["confirmed", "completed", "checked_in", "in_progress", "pending"];
+    // Conflict detection includes active confirmed match statuses (not unpaid pending holds)
+    const ACTIVE_CONFLICT_STATUSES = ["confirmed", "completed", "checked_in", "in_progress"];
     const hasConflict = existingConflicts.some(
         (c) =>
             c.id !== existingBooking.id &&
@@ -122,7 +122,7 @@ test("Stripe webhook: idempotency skips re-processing if booking is already conf
     assert.equal(bookingUpdated, false);
 });
 
-test("Stripe webhook: detects conflict with pending or confirmed booking, triggers refund and cancels booking", () => {
+test("Stripe webhook: detects conflict with confirmed booking, triggers refund and cancels booking", () => {
     let refundedIntent = null;
     let paymentUpdate = null;
     let bookingUpdate = null;
@@ -140,7 +140,7 @@ test("Stripe webhook: detects conflict with pending or confirmed booking, trigge
             end_time: "11:00:00",
             status: "pending",
         },
-        // Another customer held the slot concurrently (pending hold)
+        // Confirmed booking exists in overlapping interval
         existingConflicts: [
             {
                 id: "book-1",
@@ -148,7 +148,7 @@ test("Stripe webhook: detects conflict with pending or confirmed booking, trigge
                 booking_date: "2026-10-25",
                 start_time: "08:00:00",
                 end_time: "10:00:00",
-                status: "pending",
+                status: "confirmed",
             },
         ],
         stripeRefundsMock: {
@@ -165,4 +165,43 @@ test("Stripe webhook: detects conflict with pending or confirmed booking, trigge
     assert.equal(refundedIntent, "pi_conflict_999");
     assert.equal(paymentUpdate.status, "refunded");
     assert.equal(bookingUpdate.status, "cancelled");
+});
+
+test("Stripe webhook: does not refund when overlapping hold is only unpaid pending", () => {
+    let paymentUpdate = null;
+    let bookingUpdate = null;
+
+    const res = processCheckoutSessionCompleted({
+        session: {
+            metadata: { booking_id: "book-2" },
+            payment_intent: "pi_paid_winner",
+        },
+        existingBooking: {
+            id: "book-2",
+            court_id: "court-a",
+            booking_date: "2026-10-25",
+            start_time: "09:00:00",
+            end_time: "11:00:00",
+            status: "pending",
+        },
+        // Stale un-paid pending hold should not block this paid booking
+        existingConflicts: [
+            {
+                id: "book-old-pending",
+                court_id: "court-a",
+                booking_date: "2026-10-25",
+                start_time: "08:00:00",
+                end_time: "10:00:00",
+                status: "pending",
+            },
+        ],
+        stripeRefundsMock: { create: () => {} },
+        paymentsTableMock: { update: (u) => { paymentUpdate = u; } },
+        bookingsTableMock: { update: (u) => { bookingUpdate = u; } },
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.action, "confirmed");
+    assert.equal(paymentUpdate.status, "paid");
+    assert.equal(bookingUpdate.status, "confirmed");
 });

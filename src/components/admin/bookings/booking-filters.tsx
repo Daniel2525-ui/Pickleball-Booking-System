@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { useState, useEffect } from "react";
-import { fetchCourts } from "@/lib/services/bookings/fetchCourtFilter.service";
+import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 
 interface BookingFiltersProps {
@@ -31,7 +31,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
 
   useEffect(() => {
     const loadCourts = async () => {
-      const { data } = await fetchCourts();
+      const { data } = await fetchCourtsData();
       setCourts(data);
     };
 

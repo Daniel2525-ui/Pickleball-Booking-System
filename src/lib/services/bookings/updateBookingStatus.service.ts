@@ -1,4 +1,4 @@
-﻿export type GameDayStatus = "checked_in" | "in_progress" | "completed" | "no_show";
+export type GameDayStatus = "checked_in" | "in_progress" | "completed" | "no_show" | "cancelled";
 
 export const updateBookingStatus = async (
     bookingId: string,

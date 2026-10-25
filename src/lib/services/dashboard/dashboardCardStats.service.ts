@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { fetchCourtsData } from "../courts/courtsData.service"
 
 const ACTIVE_STATUSES = ["confirmed", "completed", "checked_in", "in_progress"];
 const OCCUPYING_STATUSES = ["confirmed", "checked_in", "in_progress"];
@@ -132,57 +133,26 @@ export const revenueYesterday = async () => {
 
 /* Available Courts */
 export const availableCourts = async () => {
-    const today = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(new Date());
-
-    const now = new Date().toLocaleTimeString("en-GB", {
-        timeZone: "Asia/Manila",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false
-    });
-
     try {
-        const { data: courts, error: courtsError } = await supabase
-            .from("courts")
-            .select("id, status");
+        const { data: courts, error } = await fetchCourtsData();
+        if (error || !courts) throw (error || new Error("Failed to load court status"));
 
-        if (courtsError) throw courtsError;
-
-        const { data: bookings, error: bookingsError } = await supabase
-            .from("bookings")
-            .select("court_id, status, start_time, end_time")
-            .eq("booking_date", today)
-            .in("status", OCCUPYING_STATUSES);
-
-        if (bookingsError) throw bookingsError;
-
-        const occupiedCourts = new Set(
-            (bookings || [])
-                .filter(b => b.status === "in_progress" || (b.start_time <= now && b.end_time > now))
-                .map((booking) => booking.court_id)
-        );
-
-        // Only courts that are active/available count towards available capacity
-        const playableCourts = (courts || []).filter((court) => {
+        const occupied = courts.filter((c) => c.status === "occupied").length;
+        const playableCourts = courts.filter((court) => {
             const status = (court.status || "").toLowerCase();
-            return status === "active" || status === "available" || status === "";
+            return status === "active" || status === "available" || status === "occupied";
         });
 
         const totalPlayable = playableCourts.length;
-        const occupied = occupiedCourts.size;
-        /* Used Math.max method to ensure that no negative number will be returned*/
         const available = Math.max(0, totalPlayable - occupied);
 
         return {
-            total: courts?.length ?? 0,
+            total: courts.length,
             occupied,
             available,
         };
     } catch (error) {
-        console.error(error);
+        console.error("availableCourts error:", error);
         throw error;
     }
 };

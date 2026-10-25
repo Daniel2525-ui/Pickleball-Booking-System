@@ -1,4 +1,4 @@
-import { Clock, CheckCircle, MapPin, Calendar, LoaderCircle, AlertCircle, Lock } from "lucide-react";
+import { Clock, MapPin, Calendar, LoaderCircle, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,111 +14,86 @@ interface BookingModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   selectedSlot: Slot | null;
-  isBookingSuccess: boolean;
   isLoading?: boolean;
   error?: string | null;
   onConfirm: () => void;
-  onCloseAndReset: () => void;
 }
 
 export const BookingModal = ({
   isOpen,
   onOpenChange,
   selectedSlot,
-  isBookingSuccess,
   isLoading,
   error,
   onConfirm,
-  onCloseAndReset,
 }: BookingModalProps) => {
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        {!isBookingSuccess ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Confirm Reservation</DialogTitle>
-              <DialogDescription>
-                Review your booking details before proceeding to payment.
-              </DialogDescription>
-            </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Confirm Reservation</DialogTitle>
+          <DialogDescription>
+            Review your booking details before proceeding to payment.
+          </DialogDescription>
+        </DialogHeader>
 
-            {selectedSlot && (
-              <div className="bg-muted p-4 rounded-xl my-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold">{selectedSlot.court}</p>
-                    <div className="flex items-center text-sm text-muted-foreground mt-1 gap-1">
-                      <Calendar className="size-3.5" />
-                      {selectedSlot.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                    </div>
-                    <div className="flex items-center text-sm text-muted-foreground mt-1 gap-1.5 flex-wrap">
-                      <Clock className="size-3.5 text-primary" />
-                      <span>{selectedSlot.time}</span>
-                      {(selectedSlot.duration || 1) > 1 && (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                          {selectedSlot.duration} Hours
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold">₱{selectedSlot.price.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(selectedSlot.duration || 1) > 1
-                        ? `${selectedSlot.duration} hrs × ₱200/hr`
-                        : "₱200 / hr"}
-                    </p>
-                  </div>
+        {selectedSlot && (
+          <div className="bg-muted p-4 rounded-xl my-4 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-semibold">{selectedSlot.court}</p>
+                <div className="flex items-center text-sm text-muted-foreground mt-1 gap-1">
+                  <Calendar className="size-3.5" />
+                  {selectedSlot.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                 </div>
-
-                <div className="pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="size-4 shrink-0 text-primary" />
-                  <span>Crosshair Dinkers, J.C. Aquino Ave, Butuan City</span>
+                <div className="flex items-center text-sm text-muted-foreground mt-1 gap-1.5 flex-wrap">
+                  <Clock className="size-3.5 text-primary" />
+                  <span>{selectedSlot.time}</span>
+                  {(selectedSlot.duration || 1) > 1 && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                      {selectedSlot.duration} Hours
+                    </span>
+                  )}
                 </div>
               </div>
-            )}
-
-            {error && (
-              <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md flex items-start gap-2 mb-4">
-                <AlertCircle className="size-4 mt-0.5 shrink-0" />
-                <p>{error}</p>
+              <div className="text-right">
+                <p className="text-2xl font-bold">₱{selectedSlot.price.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(selectedSlot.duration || 1) > 1
+                    ? `${selectedSlot.duration} hrs × ₱200/hr`
+                    : "₱200 / hr"}
+                </p>
               </div>
-            )}
-
-            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-2 mt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-11 text-sm font-semibold" disabled={isLoading}>
-                Cancel
-              </Button>
-              <Button onClick={onConfirm} className="w-full sm:w-auto h-11 text-sm font-bold gap-2" disabled={isLoading}>
-                {isLoading ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Lock className="size-4" />
-                )}
-                {isLoading ? "Redirecting..." : "Continue to Checkout"}
-              </Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <div className="py-6 flex flex-col items-center justify-center text-center">
-            <div className="size-16 bg-emerald-500/10 text-emerald-600 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="size-8" />
             </div>
-            <DialogTitle className="text-xl mb-2 font-bold">Booking Confirmed!</DialogTitle>
-            <DialogDescription className="text-sm mb-6 leading-relaxed">
-              Your court has been successfully reserved. We&apos;ve sent the details to your email.
-            </DialogDescription>
-            <Button
-              className="w-full h-11 font-bold text-sm"
-              onClick={onCloseAndReset}
-            >
-              View My Bookings
-            </Button>
+
+            <div className="pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="size-4 shrink-0 text-primary" />
+              <span>Crosshair Dinkers, J.C. Aquino Ave, Butuan City</span>
+            </div>
           </div>
         )}
+
+        {error && (
+          <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md flex items-start gap-2 mb-4">
+            <AlertCircle className="size-4 mt-0.5 shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
+
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-2 mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-11 text-sm font-semibold" disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} className="w-full sm:w-auto h-11 text-sm font-bold gap-2" disabled={isLoading}>
+            {isLoading ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <Lock className="size-4" />
+            )}
+            {isLoading ? "Redirecting..." : "Continue to Checkout"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
+};

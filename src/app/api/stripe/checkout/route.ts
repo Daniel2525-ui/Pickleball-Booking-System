@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
                 payment_id: paymentId,
             },
             customer_email: user.email,
-            expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // Expires in exactly 30 minutes
+            expires_at: Math.floor(Date.now() / 1000) + (31 * 60), // 31 minutes to safely exceed Stripe 30-min minimum
         });
 
         // 7. Store the Stripe session ID on the payment record

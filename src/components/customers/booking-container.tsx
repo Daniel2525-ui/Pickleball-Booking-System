@@ -39,7 +39,6 @@ export const BookingContainer = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isBookingSuccess, setIsBookingSuccess] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [operatingHours, setOperatingHours] = useState<OperatingHour[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
@@ -158,7 +157,6 @@ export const BookingContainer = () => {
       duration,
       startSlot: startSlotTime,
     });
-    setIsBookingSuccess(false);
   };
 
   const handleSlotClick = (courtName: string, time: string) => {
@@ -275,9 +273,8 @@ export const BookingContainer = () => {
     }
   };
 
-  const handleCloseAndReset = () => {
+  const handleCloseDialog = () => {
     setIsDialogOpen(false);
-    setIsBookingSuccess(false);
     setCheckoutError(null);
   };
 
@@ -480,13 +477,14 @@ export const BookingContainer = () => {
 
       <BookingModal
         isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) setCheckoutError(null);
+        }}
         selectedSlot={selectedSlot}
-        isBookingSuccess={isBookingSuccess}
         isLoading={isCheckoutLoading}
         error={checkoutError}
         onConfirm={confirmBooking}
-        onCloseAndReset={handleCloseAndReset}
       />
 
       {/* Login Prompt Dialog */}

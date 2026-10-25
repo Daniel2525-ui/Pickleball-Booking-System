@@ -39,8 +39,6 @@ import { useEffect, useState } from "react";
 import { fetchBookings } from "@/lib/services/bookings/filterBookingsData.service";
 import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
-import { removeBooking } from "@/lib/services/bookings/removeBooking.service";
-import { confirmBooking } from "@/lib/services/bookings/confirmBooking.service";
 import { SettlePaymentModal } from "./settlePaymentModal";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
@@ -100,37 +98,22 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     loadBookingsData();
   }, [filters]);
 
-  const handleConfirmBooking = async (id: string) => {
+  const handleCancelBooking = async (booking: Booking) => {
     if (actionLoadingId) return;
-    setActionLoadingId(id);
+    const ok = window.confirm(
+      `Are you sure you want to cancel the reservation for ${booking.customer_name || "this player"}? The court slot will be released.`
+    );
+    if (!ok) return;
 
-    const { data, error } = await confirmBooking(id);
-    if (error || !data) {
-      toast.error((error as Error)?.message || "Failed to confirm reservation.");
+    setActionLoadingId(booking.id);
+    const { error } = await updateBookingStatus(booking.id, "cancelled");
+    if (error) {
+      toast.error(error);
     } else {
       setBookingsData((prev) =>
-        prev.map((booking) =>
-          booking.id === id ? { ...booking, status: "confirmed" } : booking
-        )
+        prev.map((b) => (b.id === booking.id ? { ...b, status: "cancelled" } : b))
       );
-      toast.success("Reservation confirmed successfully.");
-    }
-
-    setActionLoadingId(null);
-  };
-
-  const handleRemoveBooking = async (id: string) => {
-    if (actionLoadingId) return;
-    setActionLoadingId(id);
-    const prevData = bookingsData;
-    setBookingsData((prev) => prev.filter((booking) => booking.id !== id));
-
-    const { error } = await removeBooking(id);
-    if (error) {
-      setBookingsData(prevData);
-      toast.error("Failed to delete reservation.");
-    } else {
-      toast.success("Reservation deleted successfully.");
+      toast.success("Reservation cancelled successfully.");
     }
     setActionLoadingId(null);
   };
@@ -157,6 +140,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
         in_progress: "Match started.",
         completed: "Match completed.",
         no_show: "Booking marked as no-show. Court slot released.",
+        cancelled: "Booking cancelled. Court slot released.",
       };
       setBookingsData((prev) =>
         prev.map((b) => (b.id === booking.id ? { ...b, status: newStatus } : b))
@@ -359,22 +343,6 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                 </DropdownMenuItem>
                               )}
 
-                              {/* Confirm Reservation Action if Booking is Pending */}
-                              {booking.status?.toLowerCase() === "pending" && (
-                                <DropdownMenuItem
-                                  onClick={() => handleConfirmBooking(booking.id)}
-                                  disabled={actionLoadingId === booking.id}
-                                  className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
-                                >
-                                  {actionLoadingId === booking.id ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                                  )}
-                                  Confirm Reservation
-                                </DropdownMenuItem>
-                              )}
-
                               {/* Game-Day Actions */}
                               {booking.status?.toLowerCase() === "confirmed" && (
                                 <>
@@ -427,16 +395,19 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                 </DropdownMenuItem>
                               )}
 
-                              <DropdownMenuSeparator />
-
-                              <DropdownMenuItem
-                                onClick={() => handleRemoveBooking(booking.id)}
-                                disabled={actionLoadingId === booking.id}
-                                className="cursor-pointer text-destructive focus:text-destructive text-xs font-semibold"
-                              >
-                                <XCircle className="mr-2 h-4 w-4" />
-                                Delete Reservation
-                              </DropdownMenuItem>
+                              {booking.status?.toLowerCase() !== "cancelled" && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleCancelBooking(booking)}
+                                    disabled={actionLoadingId === booking.id}
+                                    className="cursor-pointer text-destructive focus:text-destructive text-xs font-semibold"
+                                  >
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Cancel Reservation
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuGroup>
                           </DropdownMenuContent>
                         </DropdownMenu>

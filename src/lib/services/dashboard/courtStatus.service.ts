@@ -1,45 +1,9 @@
-import { supabase } from "@/lib/supabase";
+import { fetchCourtsData } from "../courts/courtsData.service";
 
 export const fetchCourtStatus = async () => {
-    const today = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila"
-    }).format(new Date());
-
-    const now = new Date().toLocaleTimeString("en-GB",
-        {
-            timeZone: "Asia/Manila",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false
-        }
-    )
-
     try {
-        const { data: courts, error } = await supabase
-            .from("courts")
-            .select(`
-            id,
-            name,
-            status
-            `)
-            .order("name")
-
-        if (error) throw error;
-
-        const { data: bookings, error: bookingError } = await supabase
-            .from("bookings")
-            .select(`
-                court_id,
-                booking_date,
-                start_time,
-                end_time,
-                status
-                `)
-            .eq("booking_date", today)
-            .in("status", ["confirmed", "checked_in", "in_progress"]);
-
-        if (bookingError) throw bookingError;
+        const { data: courts, error } = await fetchCourtsData();
+        if (error || !courts) throw (error || new Error("Failed to fetch courts"));
 
         const courtsWithStatus = courts.map((court) => {
             const normalizedStatus = (court.status || "").toLowerCase();
@@ -49,29 +13,24 @@ export const fetchCourtStatus = async () => {
             if (normalizedStatus === "closed") {
                 return { name: court.name, status: "Closed" as const };
             }
-            const isOccupied = bookings.some(
-                (booking) =>
-                    booking.court_id === court.id &&
-                    (booking.status === "in_progress" ||
-                        (booking.start_time <= now && booking.end_time > now))
-            );
+            if (normalizedStatus === "occupied") {
+                return { name: court.name, status: "In Use" as const };
+            }
             return {
                 name: court.name,
-                status: (isOccupied ? "In Use" : "Available") as "In Use" | "Available",
+                status: "Available" as const,
             };
         });
 
         return {
             data: { courts: courtsWithStatus },
-            error: null
-        }
-
-
+            error: null,
+        };
     } catch (error) {
-        console.error("Failed to fetch court status", error)
+        console.error("Failed to fetch court status", error);
         return {
             data: null,
-            error
-        }
+            error: error as Error,
+        };
     }
-}
+};

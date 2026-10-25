@@ -5,7 +5,7 @@ export const searchCustomers = async (
     queryText: string = ""
 ): Promise<{ data: UnifiedCustomerResult[]; error: Error | null }> => {
     try {
-        const sanitizedQuery = queryText.replace(/[(),%]/g, " ").trim();
+        const sanitizedQuery = queryText.replace(/[(),%.,]/g, " ").trim();
 
         let profilesQuery = supabase
             .from("profiles")

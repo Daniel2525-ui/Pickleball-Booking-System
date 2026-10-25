@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
  * State machine and grace period logic from src/app/api/admin/bookings/status/route.ts.
  */
 const ALLOWED_TRANSITIONS = {
+    pending: ["cancelled"],
     confirmed: ["checked_in", "no_show", "completed", "cancelled"],
     checked_in: ["in_progress", "completed", "cancelled"],
     in_progress: ["completed", "cancelled"],
@@ -63,6 +64,9 @@ test("admin status transitions: validates allowed and disallowed state machine p
     // Allowed from in_progress
     assert.equal(validateStatusTransition("in_progress", "completed"), true);
     assert.equal(validateStatusTransition("in_progress", "cancelled"), true);
+
+    // Allowed from pending
+    assert.equal(validateStatusTransition("pending", "cancelled"), true);
 
     // Disallowed: pending cannot jump directly to game-day statuses
     assert.equal(validateStatusTransition("pending", "checked_in"), false);

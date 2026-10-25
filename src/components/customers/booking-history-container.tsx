@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { UserBooking, fetchUserBookings } from "@/lib/services/bookings/fetchUserBookings.service";
 import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/cancelBooking.service";
+import { getBookingStart } from "@/lib/utils/bookingTime";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import {
   Calendar,
@@ -126,13 +127,13 @@ export const BookingHistoryContainer = () => {
   const now = new Date();
 
   const upcomingBookings = bookings.filter((booking) => {
-    const bookingDateTime = new Date(`${booking.booking_date}T${booking.start_time}`);
-    return bookingDateTime >= now;
+    const isCancelledOrNoShow = booking.status === "cancelled" || booking.status === "no_show";
+    return !isCancelledOrNoShow && getBookingStart(booking) >= now;
   });
 
   const pastBookings = bookings.filter((booking) => {
-    const bookingDateTime = new Date(`${booking.booking_date}T${booking.start_time}`);
-    return bookingDateTime < now;
+    const isCancelledOrNoShow = booking.status === "cancelled" || booking.status === "no_show";
+    return isCancelledOrNoShow || getBookingStart(booking) < now;
   });
 
   const displayedBookings = activeTab === "upcoming" ? upcomingBookings : pastBookings;

@@ -1,6 +1,4 @@
-from pathlib import Path
-
-content = """# Pickleball Booking System — System Requirements
+# Pickleball Booking System — System Requirements
 
 ## 1. System Overview
 

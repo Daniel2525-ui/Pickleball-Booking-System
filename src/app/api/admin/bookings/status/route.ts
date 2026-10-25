@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 /** Valid transitions staff may trigger. No-show requires grace period. */
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+    pending: ["cancelled"],
     confirmed: ["checked_in", "no_show", "completed", "cancelled"],
     checked_in: ["in_progress", "completed", "cancelled"],
     in_progress: ["completed", "cancelled"],

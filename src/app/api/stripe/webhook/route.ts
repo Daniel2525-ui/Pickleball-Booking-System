@@ -69,14 +69,14 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
-                // Check for double booking
+                // Check for double booking against active confirmed reservations
                 const { data: conflicts } = await supabase
                     .from("bookings")
                     .select("id")
                     .eq("court_id", booking.court_id)
                     .eq("booking_date", booking.booking_date)
                     .neq("id", booking.id)
-                    .in("status", ["confirmed", "completed", "checked_in", "in_progress", "pending"])
+                    .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
                     .lt("start_time", booking.end_time)
                     .gt("end_time", booking.start_time);
 

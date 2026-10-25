@@ -3,18 +3,20 @@ import { DayData } from "./dashboardTypes";
 
 export const fetchBookingOverview = async () => {
     try {
-        const now = new Date();
-        const currentDay = now.getDay();
+        const todayStr = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Manila"
+        }).format(new Date());
+
+        const todayManila = new Date(`${todayStr}T12:00:00+08:00`);
+        const currentDay = todayManila.getDay();
 
         const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
 
-        const monday = new Date(now);
+        const monday = new Date(todayManila);
+        monday.setDate(todayManila.getDate() + distanceToMonday);
 
-        monday.setDate(now.getDate() + distanceToMonday);
-
-        const sunday = new Date(monday)
-
-        sunday.setDate(monday.getDate() + 6)
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
 
         const formatToYMD = (date: Date) => new Intl.DateTimeFormat("en-CA", {
             timeZone: "Asia/Manila"
@@ -28,7 +30,7 @@ export const fetchBookingOverview = async () => {
             .select("booking_date")
             .gte("booking_date", mondayStr)
             .lte("booking_date", sundayStr)
-            .neq("status", "cancelled")
+            .in("status", ["confirmed", "completed", "checked_in", "in_progress"]);
 
         if (error) throw error;
 
