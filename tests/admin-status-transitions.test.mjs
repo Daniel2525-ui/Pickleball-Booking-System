@@ -131,3 +131,30 @@ test("admin status transitions: populates appropriate Stage 2 audit timestamps p
     assert.equal(p4.status, "no_show");
     assert.equal(p4.no_show_at, testNow);
 });
+
+test("court occupancy logic: marks courts occupied for in_progress and active time windows", () => {
+    const isCourtOccupied = (booking, currentTime) => {
+        if (booking.status === "in_progress") return true;
+        if (booking.status === "confirmed" || booking.status === "checked_in") {
+            return booking.start_time <= currentTime && booking.end_time > currentTime;
+        }
+        return false;
+    };
+
+    const court1Booking = { status: "in_progress", start_time: "10:00:00", end_time: "11:00:00" };
+    // in_progress is occupied even if currentTime is slightly before scheduled start (early start)
+    assert.equal(isCourtOccupied(court1Booking, "09:55:00"), true);
+    // in_progress is occupied during scheduled time
+    assert.equal(isCourtOccupied(court1Booking, "10:30:00"), true);
+
+    // confirmed booking only occupies during scheduled time
+    const court2Booking = { status: "confirmed", start_time: "14:00:00", end_time: "15:00:00" };
+    assert.equal(isCourtOccupied(court2Booking, "13:30:00"), false);
+    assert.equal(isCourtOccupied(court2Booking, "14:15:00"), true);
+    assert.equal(isCourtOccupied(court2Booking, "15:00:00"), false);
+
+    // completed and no_show never occupy court
+    assert.equal(isCourtOccupied({ status: "completed", start_time: "10:00:00", end_time: "11:00:00" }, "10:30:00"), false);
+    assert.equal(isCourtOccupied({ status: "no_show", start_time: "10:00:00", end_time: "11:00:00" }, "10:30:00"), false);
+});
+

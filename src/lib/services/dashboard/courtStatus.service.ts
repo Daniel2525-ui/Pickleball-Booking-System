@@ -52,8 +52,8 @@ export const fetchCourtStatus = async () => {
             const isOccupied = bookings.some(
                 (booking) =>
                     booking.court_id === court.id &&
-                    booking.start_time <= now &&
-                    booking.end_time > now
+                    (booking.status === "in_progress" ||
+                        (booking.start_time <= now && booking.end_time > now))
             );
             return {
                 name: court.name,

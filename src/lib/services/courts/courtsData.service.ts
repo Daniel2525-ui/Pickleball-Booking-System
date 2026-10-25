@@ -26,15 +26,17 @@ export const fetchCourtsData = async () => {
 
         const { data: activeBookings, error: bookingsError } = await supabase
             .from("bookings")
-            .select("court_id")
+            .select("court_id, status, start_time, end_time")
             .eq("booking_date", currentDate)
-            .in("status", ["confirmed", "ongoing"])
-            .lte("start_time", currentTime)
-            .gt("end_time", currentTime);
+            .in("status", ["confirmed", "checked_in", "in_progress"]);
 
         if (bookingsError) throw bookingsError;
 
-        const occupiedCourtIds = new Set(activeBookings?.map(booking => booking.court_id) || []);
+        const occupiedCourtIds = new Set(
+            (activeBookings || [])
+                .filter(b => b.status === "in_progress" || (b.start_time <= currentTime && b.end_time > currentTime))
+                .map(b => b.court_id)
+        );
 
         const updatedCourts = (courts || []).map(court => {
             let finalStatus = court.status;

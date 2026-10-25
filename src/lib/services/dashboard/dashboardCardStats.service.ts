@@ -153,16 +153,16 @@ export const availableCourts = async () => {
 
         const { data: bookings, error: bookingsError } = await supabase
             .from("bookings")
-            .select("court_id, start_time, end_time")
+            .select("court_id, status, start_time, end_time")
             .eq("booking_date", today)
-            .in("status", OCCUPYING_STATUSES)
-            .lte("start_time", now)
-            .gt("end_time", now);
+            .in("status", OCCUPYING_STATUSES);
 
         if (bookingsError) throw bookingsError;
 
         const occupiedCourts = new Set(
-            bookings.map((booking) => booking.court_id)
+            (bookings || [])
+                .filter(b => b.status === "in_progress" || (b.start_time <= now && b.end_time > now))
+                .map((booking) => booking.court_id)
         );
 
         // Only courts that are active/available count towards available capacity
