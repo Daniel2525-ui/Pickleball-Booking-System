@@ -99,7 +99,11 @@ export async function POST(request: NextRequest) {
 
         const { durationHours, startTimeDb, endTimeDb, amount } = validation;
 
-        // 3. Atomically hold the court slot using database row lock
+        // 3. Atomically hold the court slot using database row lock.
+        // Grant an initial 35-minute safety buffer (2100s) to guarantee the court remains held
+        // while database operations and Stripe Checkout Session creation execute.
+        const initialHoldExpiresAtIso = new Date(Date.now() + 35 * 60 * 1000).toISOString();
+
         let bookingId: string | null = null;
         let paymentId: string | null = null;
 
@@ -110,14 +114,31 @@ export async function POST(request: NextRequest) {
             p_end_time: endTimeDb,
             p_user_id: user.id,
             p_amount: amount,
+            p_hold_expires_at: initialHoldExpiresAtIso,
         });
 
         if (rpcError) {
-            const isConflict = rpcError.message?.includes("SLOT_UNAVAILABLE") || rpcError.code === "P0001";
+            const isConflict = rpcError.message?.includes("SLOT_UNAVAILABLE");
             if (isConflict) {
                 return Response.json(
                     { error: "This time slot is no longer available. Please choose another." },
                     { status: 409 }
+                );
+            }
+
+            const isVenueClosed = rpcError.message?.includes("VENUE_CLOSED");
+            if (isVenueClosed) {
+                return Response.json(
+                    { error: "The venue is closed on this date." },
+                    { status: 400 }
+                );
+            }
+
+            const isCourtUnavailable = rpcError.message?.includes("COURT_UNAVAILABLE");
+            if (isCourtUnavailable) {
+                return Response.json(
+                    { error: "This court is currently not available for reservations." },
+                    { status: 400 }
                 );
             }
 
@@ -154,6 +175,11 @@ export async function POST(request: NextRequest) {
         // 6. Create a Stripe Checkout Session
         const baseUrl = request.nextUrl.origin;
 
+        // Stripe requires expires_at to be at least 30 minutes in the future from the moment of session creation.
+        // We set 33 minutes (1980s), providing a robust 3-minute (180s) safety margin over Stripe's 30-minute minimum
+        // to comfortably absorb network transit, clock skew, and DNS/TLS latency.
+        const stripeExpiresAtSec = Math.floor(Date.now() / 1000) + (33 * 60);
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
             line_items: [
@@ -177,14 +203,53 @@ export async function POST(request: NextRequest) {
                 payment_id: paymentId,
             },
             customer_email: user.email,
-            expires_at: Math.floor(Date.now() / 1000) + (31 * 60), // 31 minutes to safely exceed Stripe 30-min minimum
+            expires_at: stripeExpiresAtSec,
         });
 
-        // 7. Store the Stripe session ID on the payment record
-        await supabase
-            .from("payments")
-            .update({ stripe_session_id: session.id })
-            .eq("id", paymentId);
+        // 7. Atomically confirm hold and persist Stripe session ID.
+        // Uses confirm_checkout_hold RPC under court row lock to verify that the slot was not claimed
+        // if the initial hold expired while Stripe was processing (preventing expired-hold resurrection).
+        const authoritativeHoldExpiresAtIso = new Date((session.expires_at + 120) * 1000).toISOString();
+
+        const { error: confirmError } = await supabase.rpc("confirm_checkout_hold", {
+            p_booking_id: bookingId,
+            p_payment_id: paymentId,
+            p_stripe_session_id: session.id,
+            p_hold_expires_at: authoritativeHoldExpiresAtIso,
+        });
+
+        if (confirmError) {
+            console.error("confirm_checkout_hold RPC failed:", confirmError);
+
+            // Case A: The initial hold expired and another booking claimed the slot while Stripe was processing
+            const isConflict = confirmError.message?.includes("SLOT_UNAVAILABLE");
+            if (isConflict) {
+                try {
+                    await stripe.checkout.sessions.expire(session.id);
+                } catch (expireErr) {
+                    console.error("Failed to expire superseded Stripe session:", expireErr);
+                }
+
+                // Preserve booking record for audit (do not delete), but report conflict to player
+                return Response.json(
+                    { error: "Your reservation hold expired and the time slot was reserved by another player. Please choose another slot." },
+                    { status: 409 }
+                );
+            }
+
+            // Case B: Database error or network glitch after Stripe session creation
+            // Do NOT delete booking or payment (Stripe session exists). Attempt to expire session and report error.
+            try {
+                await stripe.checkout.sessions.expire(session.id);
+            } catch (expireErr) {
+                console.error("Failed to expire Stripe session on DB failure:", expireErr);
+            }
+
+            return Response.json(
+                { error: "Unable to confirm court reservation hold. If payment was initiated, your booking will be preserved under 'My Bookings'." },
+                { status: 500 }
+            );
+        }
 
         return Response.json({ url: session.url });
     } catch (error: unknown) {

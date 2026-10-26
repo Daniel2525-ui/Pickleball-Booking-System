@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS public.bookings (
   total_amount numeric NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  hold_expires_at timestamptz DEFAULT NULL,
   CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed'))
 );
 
@@ -89,6 +90,8 @@ CREATE TABLE IF NOT EXISTS public.payments (
   amount numeric NOT NULL,
   currency text NOT NULL DEFAULT 'php',
   status text NOT NULL,
+  stripe_session_id text,
+  stripe_payment_id text,
   payment_method text,
   payment_reference text,
   paid_at timestamptz,

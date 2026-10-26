@@ -1,21 +1,31 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { createClient } from "@supabase/supabase-js";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
 
-// We need a service role client to update the records, just like the webhook.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceRole);
+const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceRole);
 
 export async function POST(req: NextRequest) {
     try {
+        // 1. Authenticate caller
+        const authClient = await createServerClient();
+        const { data: { user } } = await authClient.auth.getUser();
+
+        if (!user) {
+            return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
         const { sessionId } = body;
 
-        if (!sessionId) {
-            return Response.json({ error: "Missing session ID" }, { status: 400 });
+        if (!sessionId || typeof sessionId !== "string") {
+            return Response.json({ error: "Missing or invalid session ID" }, { status: 400 });
         }
 
+        // 2. Retrieve session from Stripe
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
         if (!session) {
@@ -29,6 +39,31 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: "Missing metadata" }, { status: 400 });
         }
 
+        // 3. Verify user ownership of the booking
+        const { data: booking, error: bookingErr } = await supabaseAdmin
+            .from("bookings")
+            .select("id, user_id, status")
+            .eq("id", bookingId)
+            .single();
+
+        if (bookingErr || !booking) {
+            return Response.json({ error: "Booking not found" }, { status: 404 });
+        }
+
+        // Check if user owns booking or has admin role
+        if (booking.user_id !== user.id) {
+            const { data: profile } = await supabaseAdmin
+                .from("profiles")
+                .select("role")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (profile?.role !== "admin") {
+                return Response.json({ error: "Forbidden: You do not own this booking" }, { status: 403 });
+            }
+        }
+
+        // 4. Validate payment status in Stripe
         if (session.payment_status !== "paid" && session.status !== "complete") {
             return Response.json(
                 {
@@ -40,74 +75,40 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Check booking details and status
-        const { data: booking } = await supabase
-            .from("bookings")
-            .select("id, status, court_id, booking_date, start_time, end_time")
-            .eq("id", bookingId)
-            .single();
+        const amount = (session.amount_total || 0) / 100;
+        const currency = (session.currency || "php").toLowerCase();
+        const paymentIntent = typeof session.payment_intent === "string"
+            ? session.payment_intent
+            : session.payment_intent?.id || "";
 
-        // Only promote bookings that are still pending.
-        if (booking && booking.status === "pending") {
-            // Check for double booking conflicts against active confirmed reservations before confirming
-            const { data: conflicts } = await supabase
-                .from("bookings")
-                .select("id")
-                .eq("court_id", booking.court_id)
-                .eq("booking_date", booking.booking_date)
-                .neq("id", booking.id)
-                .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
-                .lt("start_time", booking.end_time)
-                .gt("end_time", booking.start_time);
+        if (!paymentIntent) {
+            return Response.json({ error: "Missing payment_intent in Stripe session" }, { status: 400 });
+        }
 
-            if (conflicts && conflicts.length > 0) {
-                console.log(`Double booking conflict in verify for ${bookingId}. Refunding payment_intent: ${session.payment_intent}`);
+        // 5. Reconcile transactionally
+        const outcome = await processStripePaymentReconciliation({
+            bookingId,
+            paymentId,
+            amount,
+            currency,
+            stripeSessionId: session.id,
+            stripePaymentIntent: paymentIntent,
+            supabase: supabaseAdmin,
+        });
 
-                if (session.payment_intent) {
-                    try {
-                        await stripe.refunds.create({
-                            payment_intent: session.payment_intent as string,
-                        });
-                    } catch (refundError) {
-                        console.error("Refund failed in verify:", refundError);
-                    }
-                }
+        if (!outcome.success) {
+            return Response.json(
+                { error: outcome.error || "Payment reconciliation failed" },
+                { status: 500 }
+            );
+        }
 
-                await supabase
-                    .from("payments")
-                    .update({
-                        status: "refunded",
-                        stripe_payment_id: (session.payment_intent as string) || null,
-                    })
-                    .eq("id", paymentId);
-
-                await supabase
-                    .from("bookings")
-                    .update({ status: "cancelled" })
-                    .eq("id", bookingId);
-
-                return Response.json({
-                    success: false,
-                    conflict: true,
-                    error: "This slot was booked by another player. A full refund has been initiated."
-                });
-            }
-
-            // Confirm the payment
-            await supabase
-                .from("payments")
-                .update({
-                    status: "paid",
-                    stripe_payment_id: session.payment_intent as string || null,
-                    paid_at: new Date().toISOString()
-                })
-                .eq("id", paymentId);
-
-            // Confirm the booking
-            await supabase
-                .from("bookings")
-                .update({ status: "confirmed" })
-                .eq("id", bookingId);
+        if (outcome.action === "REFUND_SCHEDULED") {
+            return Response.json({
+                success: false,
+                conflict: true,
+                error: "This slot is no longer available. A full refund has been initiated.",
+            });
         }
 
         return Response.json({ success: true, status: session.payment_status });
