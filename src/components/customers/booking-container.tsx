@@ -32,6 +32,7 @@ import { checkSlotAvailability, getSlotBooking } from "@/lib/services/bookings/c
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
+import { BookingCountdown } from "@/components/customers/booking-countdown";
 
 export const BookingContainer = () => {
   const router = useRouter();
@@ -87,6 +88,7 @@ export const BookingContainer = () => {
     courtName: string;
     time: string;
     date: Date;
+    holdExpiresAt?: string | null;
   } | null>(null);
   const [isResumingGridBooking, setIsResumingGridBooking] = useState(false);
   const [isCancellingGridBooking, setIsCancellingGridBooking] = useState(false);
@@ -171,6 +173,7 @@ export const BookingContainer = () => {
           courtName,
           time,
           date: selectedDate,
+          holdExpiresAt: slotBooking.hold_expires_at,
         });
         return;
       }
@@ -546,6 +549,16 @@ export const BookingContainer = () => {
                 <Clock className="size-4 text-primary shrink-0" />
                 <span>{pendingBookingToResume.time}</span>
               </div>
+              <BookingCountdown
+                variant="dialog"
+                bookingId={pendingBookingToResume.bookingId}
+                holdExpiresAt={pendingBookingToResume.holdExpiresAt}
+                status="pending"
+                onStatusChange={async () => {
+                  await refreshBookings();
+                  setPendingBookingToResume(null);
+                }}
+              />
             </div>
           )}
 

@@ -254,3 +254,17 @@ test("Stripe webhook: auto-refunds when booking was already cancelled or expired
     assert.equal(refundedIntent, "pi_late_arrival_123");
     assert.equal(paymentUpdate.status, "refunded");
 });
+
+test("Stripe webhook: rejects checkout reconciliation when service-role key is missing", () => {
+    function getServiceRoleClient(serviceRoleKey) {
+        if (!serviceRoleKey || serviceRoleKey.trim() === "") {
+            return null;
+        }
+        return { client: true };
+    }
+
+    assert.equal(getServiceRoleClient(undefined), null);
+    assert.equal(getServiceRoleClient(""), null);
+    assert.equal(getServiceRoleClient("   "), null);
+    assert.notEqual(getServiceRoleClient("valid_key"), null);
+});

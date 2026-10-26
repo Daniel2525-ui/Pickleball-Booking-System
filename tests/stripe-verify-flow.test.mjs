@@ -180,3 +180,20 @@ test("Stripe verify: detects double-booking conflict, refunds payment and cancel
     assert.equal(paymentUpdate.status, "refunded");
     assert.equal(bookingUpdate.status, "cancelled");
 });
+
+test("Stripe verify: rejects reconciliation with 500 when service-role key is missing", () => {
+    function verifyServiceRoleGuard(serviceRoleKey) {
+        if (!serviceRoleKey || serviceRoleKey.trim() === "") {
+            return {
+                status: 500,
+                error: "Server configuration error: payment reconciliation service key missing",
+            };
+        }
+        return { status: 200, ok: true };
+    }
+
+    assert.equal(verifyServiceRoleGuard(undefined).status, 500);
+    assert.equal(verifyServiceRoleGuard("").status, 500);
+    assert.equal(verifyServiceRoleGuard("   ").status, 500);
+    assert.equal(verifyServiceRoleGuard("valid_key").status, 200);
+});

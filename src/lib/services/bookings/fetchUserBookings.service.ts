@@ -9,6 +9,7 @@ export interface UserBooking {
     status: string,
     total_amount?: number,
     created_at: string,
+    hold_expires_at?: string | null,
     courts?: { name: string }
 }
 
@@ -26,6 +27,7 @@ export const fetchUserBookings = async (userId: string) => {
                 status,
                 total_amount,
                 created_at,
+                hold_expires_at,
                     courts (
                         name
                     )

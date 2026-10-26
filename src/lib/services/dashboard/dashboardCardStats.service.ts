@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { fetchCourtsData } from "../courts/courtsData.service";
+import { fetchCourtsData, ActiveBookingSnippet } from "../courts/courtsData.service";
 
 const ACTIVE_STATUSES = ["confirmed", "completed", "checked_in", "in_progress"];
 
@@ -33,19 +33,27 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
     nextWeekDate.setDate(nextWeekDate.getDate() + 7);
     const endDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(nextWeekDate);
 
-    const [bookingsRes, courtStats] = await Promise.all([
-        supabase
-            .from("bookings")
-            .select("booking_date, total_amount")
-            .gte("booking_date", yesterdayStr)
-            .lte("booking_date", endDateStr)
-            .in("status", ACTIVE_STATUSES),
-        availableCourts(),
-    ]);
+    const { data: bookings, error } = await supabase
+        .from("bookings")
+        .select("court_id, start_time, end_time, status, booking_date, total_amount")
+        .gte("booking_date", yesterdayStr)
+        .lte("booking_date", endDateStr)
+        .in("status", ACTIVE_STATUSES);
 
-    if (bookingsRes.error) throw bookingsRes.error;
+    if (error) throw error;
 
-    const bookings = bookingsRes.data || [];
+    const allBookings = bookings || [];
+    const todayActive = allBookings
+        .filter((b) => b.booking_date === todayStr && (b.status === "confirmed" || b.status === "checked_in" || b.status === "in_progress"))
+        .map((b) => ({
+            court_id: b.court_id,
+            status: b.status,
+            start_time: b.start_time,
+            end_time: b.end_time,
+        }));
+
+    const courtStats = await availableCourts(todayActive);
+
 
     let todayBookingsCount = 0;
     let yesterdayBookingsCount = 0;
@@ -79,9 +87,9 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
 };
 
 /* Available Courts */
-export const availableCourts = async () => {
+export const availableCourts = async (activeBookingsOverride?: ActiveBookingSnippet[]) => {
     try {
-        const { data: courts, error } = await fetchCourtsData();
+        const { data: courts, error } = await fetchCourtsData(activeBookingsOverride);
         if (error || !courts) throw (error || new Error("Failed to load court status"));
 
         const occupied = courts.filter((c) => c.status === "occupied").length;

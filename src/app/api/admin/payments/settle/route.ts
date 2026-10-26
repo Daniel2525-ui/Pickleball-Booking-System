@@ -11,18 +11,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
         }
 
-        // 2. Authorize admin role
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .maybeSingle();
-
-        if (profile?.role !== "admin") {
-            return NextResponse.json({ error: "Admin access required." }, { status: 403 });
-        }
-
-        // 3. Validate request payload
+        // 2. Validate request payload
         const body = await request.json().catch(() => null);
         const paymentId = typeof body?.paymentId === "string" ? body.paymentId.trim() : "";
         const bookingId = typeof body?.bookingId === "string" ? body.bookingId.trim() : "";
@@ -36,45 +25,37 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 4. Update payment row to paid
-        const { data: updatedPayment, error: paymentError } = await supabase
-            .from("payments")
-            .update({
-                status: "paid",
-                payment_method: paymentMethod,
-                payment_reference: paymentReference || null,
-                paid_at: new Date().toISOString(),
-            })
-            .eq("id", paymentId)
-            .eq("booking_id", bookingId)
-            .eq("status", "pending")
-            .select()
-            .maybeSingle();
-
-        if (paymentError) {
-            console.error("Counter settlement: payment update failed:", paymentError);
-            return NextResponse.json({ error: "Failed to update payment record." }, { status: 500 });
-        }
-
-        if (!updatedPayment) {
+        if (paymentMethod === "gcash" && !paymentReference) {
             return NextResponse.json(
-                { error: "Payment is no longer pending or has already been settled." },
-                { status: 409 }
+                { error: "paymentReference is required for GCash payments." },
+                { status: 400 }
             );
         }
 
-        // 5. Confirm booking so it is protected from cleanup cron
-        const { error: bookingError } = await supabase
-            .from("bookings")
-            .update({ status: "confirmed" })
-            .eq("id", bookingId)
-            .eq("status", "pending");
+        // 3. Execute atomic counter settlement via database RPC
+        const { data: settleRes, error: settleErr } = await supabase.rpc("settle_counter_payment", {
+            p_booking_id: bookingId,
+            p_payment_id: paymentId,
+            p_payment_method: paymentMethod,
+            p_payment_reference: paymentReference,
+        });
 
-        if (bookingError) {
-            console.error("Counter settlement: booking confirmation failed:", bookingError);
+        if (settleErr) {
+            console.error("Counter settlement RPC error:", settleErr);
+            if (settleErr.message?.includes("FORBIDDEN")) {
+                return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+            }
+            if (
+                settleErr.message?.includes("INVALID_STATUS") ||
+                settleErr.message?.includes("SLOT_UNAVAILABLE") ||
+                settleErr.message?.includes("MATCH_START_PASSED")
+            ) {
+                return NextResponse.json({ error: settleErr.message }, { status: 409 });
+            }
+            return NextResponse.json({ error: settleErr.message || "Settlement failed." }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, data: updatedPayment });
+        return NextResponse.json({ success: true, data: settleRes });
     } catch (error) {
         console.error("Counter settlement error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

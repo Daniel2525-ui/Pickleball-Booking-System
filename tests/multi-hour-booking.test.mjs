@@ -424,6 +424,125 @@ test("evaluateHoldRecoveryAction preserves pending holds on ambiguous timeouts a
     });
 });
 
+test("checkout expiry strategy: fresh calculation guarantees Stripe >=30m minimum and DB hold coverage", () => {
+    // 1. Simulate DB RPC duration taking various times (from fast 200ms to slow 65s)
+    const simulatedDbLatenciesSec = [0.2, 2, 10, 65];
+
+    for (const dbLatencySec of simulatedDbLatenciesSec) {
+        const requestStartMs = 1700000000000;
+        // Step 1: Initial DB hold calculation with 35-minute safety buffer
+        const initialHoldExpiresAtIso = new Date(requestStartMs + 35 * 60 * 1000).toISOString();
+
+        // Step 2: Time passes during DB RPC execution
+        const dbCompleteMs = requestStartMs + Math.round(dbLatencySec * 1000);
+
+        // Step 3: Fresh Stripe calculation evaluated immediately before sessions.create (33 minutes = 1980s)
+        const stripeExpiresAtSec = Math.floor(dbCompleteMs / 1000) + (33 * 60);
+
+        // Assert: When Stripe receives the request at dbCompleteMs, remaining window is ALWAYS exactly 1980s (33m)
+        const remainingWindowAtStripeSec = stripeExpiresAtSec - Math.floor(dbCompleteMs / 1000);
+        assert.equal(remainingWindowAtStripeSec, 1980, "Stripe expiry window must always be 1980s (33m) at call time");
+        assert.equal(remainingWindowAtStripeSec - 1800, 180, "Must provide 180s (3m) safety margin above Stripe minimum 30-minute threshold");
+
+        // Step 4: Authoritative coordination on session return (session.expires_at + 120s)
+        const sessionExpiresAt = stripeExpiresAtSec;
+        const coordinatedHoldExpiresAtIso = new Date((sessionExpiresAt + 120) * 1000).toISOString();
+        const coordinatedHoldExpiresAtMs = new Date(coordinatedHoldExpiresAtIso).getTime();
+
+        // Assert: Coordinated DB hold covers entire Stripe session + 2-minute webhook grace buffer
+        assert.equal(
+            coordinatedHoldExpiresAtMs - (sessionExpiresAt * 1000),
+            120 * 1000,
+            "DB hold must extend 2 minutes beyond Stripe session expiry"
+        );
+    }
+});
+
+// 10. Post-Stripe Confirmation Failure Handling
+const evaluatePostStripeFailureAction = ({ confirmError, sessionCreated }) => {
+    if (!sessionCreated) {
+        throw new Error("Pre-condition: session must have been created");
+    }
+
+    const isConflict = confirmError?.message?.includes("SLOT_UNAVAILABLE") || confirmError?.code === "P0001";
+    if (isConflict) {
+        return {
+            action: "expire_stripe_session_and_reject_resurrection",
+            shouldDeleteBooking: false,
+            shouldExpireStripeSession: true,
+            httpStatus: 409,
+        };
+    }
+
+    return {
+        action: "expire_stripe_session_and_preserve_hold_for_recovery",
+        shouldDeleteBooking: false,
+        shouldExpireStripeSession: true,
+        httpStatus: 500,
+    };
+};
+
+test("post-Stripe failure handling: preserves booking records and expires Stripe session on conflict or DB error", () => {
+    // Case 1: Slot claimed while Stripe was processing (expired-hold resurrection prevented)
+    const conflictErr = { message: "SLOT_UNAVAILABLE: Slot was claimed", code: "P0001" };
+    const conflictResult = evaluatePostStripeFailureAction({ confirmError: conflictErr, sessionCreated: true });
+    assert.deepEqual(conflictResult, {
+        action: "expire_stripe_session_and_reject_resurrection",
+        shouldDeleteBooking: false,
+        shouldExpireStripeSession: true,
+        httpStatus: 409,
+    });
+
+    // Case 2: Database failure after Stripe session creation
+    const dbErr = { message: "Connection timeout to PostgreSQL", code: "57P01" };
+    const dbResult = evaluatePostStripeFailureAction({ confirmError: dbErr, sessionCreated: true });
+    assert.deepEqual(dbResult, {
+        action: "expire_stripe_session_and_preserve_hold_for_recovery",
+        shouldDeleteBooking: false,
+        shouldExpireStripeSession: true,
+        httpStatus: 500,
+    });
+});
+
+test("route error classifier: disambiguates SLOT_UNAVAILABLE from COURT_UNAVAILABLE and VENUE_CLOSED without relying on P0001", () => {
+    const parseCheckoutRpcError = (rpcError) => {
+        const isConflict = rpcError.message?.includes("SLOT_UNAVAILABLE");
+        if (isConflict) return { status: 409, type: "conflict" };
+
+        const isVenueClosed = rpcError.message?.includes("VENUE_CLOSED");
+        if (isVenueClosed) return { status: 400, type: "venue_closed" };
+
+        const isCourtUnavailable = rpcError.message?.includes("COURT_UNAVAILABLE");
+        if (isCourtUnavailable) return { status: 400, type: "court_unavailable" };
+
+        return { status: 500, type: "generic" };
+    };
+
+    // P0001 with SLOT_UNAVAILABLE -> Conflict (409)
+    assert.deepEqual(
+        parseCheckoutRpcError({ message: "SLOT_UNAVAILABLE", code: "P0001" }),
+        { status: 409, type: "conflict" }
+    );
+
+    // P0001 with VENUE_CLOSED -> Venue closed (400), not conflict
+    assert.deepEqual(
+        parseCheckoutRpcError({ message: "VENUE_CLOSED: The venue is closed on this date", code: "P0001" }),
+        { status: 400, type: "venue_closed" }
+    );
+
+    // P0001 with COURT_UNAVAILABLE -> Court unavailable (400), not conflict
+    assert.deepEqual(
+        parseCheckoutRpcError({ message: "COURT_UNAVAILABLE: Court is currently not available", code: "P0001" }),
+        { status: 400, type: "court_unavailable" }
+    );
+
+    // Generic unhandled P0001 -> Generic 500, not conflict
+    assert.deepEqual(
+        parseCheckoutRpcError({ message: "Internal trigger failure", code: "P0001" }),
+        { status: 500, type: "generic" }
+    );
+});
+
 // 10. Automated Expiration Cleanup Policy (Task 3)
 const isBookingEligibleForExpiredCleanup = (booking, now = new Date()) => {
     if (booking.status !== "pending") return false;

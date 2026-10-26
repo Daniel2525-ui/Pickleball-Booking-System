@@ -84,3 +84,28 @@ test("slot collision calculation detects interval overlaps correctly", () => {
     // Completely contained: 08:00-10:00 vs 08:30-09:30
     assert.equal(overlaps("08:00", "10:00", "08:30", "09:30"), true);
 });
+
+test("slot availability ignores expired pending holds and keeps unexpired holds pending", () => {
+    const filterActiveBookings = (bookings, now = new Date()) => {
+        return bookings.filter((b) => {
+            const status = (b.status || "").toLowerCase();
+            if (status !== "pending") return true;
+            return !b.hold_expires_at || new Date(b.hold_expires_at) > now;
+        });
+    };
+
+    const pastExpiry = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const futureExpiry = new Date(Date.now() + 25 * 60 * 1000).toISOString();
+
+    const testBookings = [
+        { id: "expired-hold", status: "pending", hold_expires_at: pastExpiry },
+        { id: "active-hold", status: "pending", hold_expires_at: futureExpiry },
+        { id: "confirmed-booking", status: "confirmed", hold_expires_at: null },
+    ];
+
+    const active = filterActiveBookings(testBookings);
+    assert.equal(active.length, 2);
+    assert.equal(active.some((b) => b.id === "expired-hold"), false);
+    assert.equal(active.some((b) => b.id === "active-hold"), true);
+    assert.equal(active.some((b) => b.id === "confirmed-booking"), true);
+});

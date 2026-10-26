@@ -2,17 +2,18 @@ import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
+import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
 
-// Webhooks don't have cookies, so we need a service role client or regular client
-// Since we are updating records, we need a server context.
-// NextJS Route Handlers can use the regular Supabase JS client with service role key if needed.
-// Or we can just rely on the existing one if RLS allows it. Let's use service role if available,
-// else regular env vars.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceRole);
-
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
+function getServiceRoleClient() {
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey || serviceRoleKey.trim() === "" || !supabaseUrl) {
+        return null;
+    }
+    return createClient(supabaseUrl, serviceRoleKey);
+}
 
 export async function POST(req: NextRequest) {
     if (!webhookSecret) {
@@ -38,7 +39,6 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: message }, { status: 400 });
         }
 
-        // Handle the event
         switch (event.type) {
             case "checkout.session.completed": {
                 const session = event.data.object as Stripe.Checkout.Session;
@@ -51,134 +51,65 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
-                // Fetch the pending booking details
-                const { data: booking } = await supabase
-                    .from("bookings")
-                    .select("*")
-                    .eq("id", bookingId)
-                    .single();
+                const amount = (session.amount_total || 0) / 100;
+                const currency = (session.currency || "php").toLowerCase();
+                const paymentIntent = typeof session.payment_intent === "string"
+                    ? session.payment_intent
+                    : session.payment_intent?.id || "";
 
-                if (!booking) {
-                    console.error("Booking not found:", bookingId);
+                if (!paymentIntent) {
+                    console.error("Missing payment_intent in session:", session.id);
                     break;
                 }
 
-                // If already confirmed, do not re-process (idempotency for webhook retries)
-                if (booking.status === "confirmed" || booking.status === "completed") {
-                    console.log(`Booking ${bookingId} already has status '${booking.status}', skipping webhook processing.`);
-                    break;
+                const supabase = getServiceRoleClient();
+                if (!supabase) {
+                    console.error("Webhook configuration error: SUPABASE_SERVICE_ROLE_KEY is required for payment reconciliation");
+                    return Response.json({ error: "Server configuration error: missing service role key" }, { status: 500 });
                 }
 
-                // If the booking was cancelled (e.g. by expiration cleanup cron or customer), refund the payment
-                if (booking.status === "cancelled") {
-                    console.log(`Paid booking ${bookingId} was already cancelled/expired. Initiating refund for payment_intent: ${session.payment_intent}`);
-                    if (session.payment_intent) {
-                        try {
-                            await stripe.refunds.create({
-                                payment_intent: session.payment_intent as string,
-                            });
-                        } catch (refundError) {
-                            console.error("Refund failed for cancelled booking:", refundError);
-                        }
-                    }
-                    await supabase
-                        .from("payments")
-                        .update({
-                            status: "refunded",
-                            stripe_payment_id: (session.payment_intent as string) || null,
-                        })
-                        .eq("id", paymentId);
-                    break;
+                const outcome = await processStripePaymentReconciliation({
+                    bookingId,
+                    paymentId,
+                    amount,
+                    currency,
+                    stripeSessionId: session.id,
+                    stripePaymentIntent: paymentIntent,
+                    supabase,
+                });
+
+                if (!outcome.success) {
+                    console.error("Webhook payment reconciliation failed:", outcome.error);
+                    return Response.json({ error: outcome.error }, { status: 500 });
                 }
 
-                if (booking.status !== "pending") {
-                    console.log(`Booking ${bookingId} has status '${booking.status}', skipping webhook processing.`);
-                    break;
-                }
-
-                // Check for double booking against active confirmed reservations
-                const { data: conflicts } = await supabase
-                    .from("bookings")
-                    .select("id")
-                    .eq("court_id", booking.court_id)
-                    .eq("booking_date", booking.booking_date)
-                    .neq("id", booking.id)
-                    .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
-                    .lt("start_time", booking.end_time)
-                    .gt("end_time", booking.start_time);
-
-                if (conflicts && conflicts.length > 0) {
-                    console.log(`Double booking detected for ${bookingId}. Refunding payment_intent: ${session.payment_intent}`);
-
-                    if (session.payment_intent) {
-                        try {
-                            await stripe.refunds.create({
-                                payment_intent: session.payment_intent as string,
-                            });
-                        } catch (refundError) {
-                            console.error("Refund failed:", refundError);
-                        }
-                    }
-
-                    // Update payment to refunded
-                    await supabase
-                        .from("payments")
-                        .update({
-                            status: "refunded",
-                            stripe_payment_id: session.payment_intent as string || null,
-                        })
-                        .eq("id", paymentId);
-
-                    // Update booking to cancelled
-                    await supabase
-                        .from("bookings")
-                        .update({ status: "cancelled" })
-                        .eq("id", bookingId);
-
-                    break;
-                }
-
-                // If no conflicts, proceed with confirming the payment and booking
-                // Update payment to paid
-                await supabase
-                    .from("payments")
-                    .update({
-                        status: "paid",
-                        stripe_payment_id: session.payment_intent as string || null,
-                        paid_at: new Date().toISOString()
-                    })
-                    .eq("id", paymentId);
-
-                // Update booking to confirmed
-                await supabase
-                    .from("bookings")
-                    .update({ status: "confirmed" })
-                    .eq("id", bookingId);
-
+                console.log(`Reconciled checkout session ${session.id}: action=${outcome.action}`);
                 break;
             }
+
             case "checkout.session.expired": {
                 const session = event.data.object as Stripe.Checkout.Session;
 
                 const bookingId = session.metadata?.booking_id;
                 const paymentId = session.metadata?.payment_id;
 
-                if (!bookingId || !paymentId) break;
+                if (bookingId && paymentId) {
+                    const supabase = getServiceRoleClient();
+                    if (!supabase) {
+                        console.error("Webhook configuration error: SUPABASE_SERVICE_ROLE_KEY is required for expired booking cleanup");
+                        return Response.json({ error: "Server configuration error: missing service role key" }, { status: 500 });
+                    }
 
-                // Update payment to failed
-                await supabase
-                    .from("payments")
-                    .update({ status: "failed" })
-                    .eq("id", paymentId);
-
-                // Update booking to cancelled/failed
-                await supabase
-                    .from("bookings")
-                    .update({ status: "cancelled" })
-                    .eq("id", bookingId);
+                    const cancelRes = await supabase.rpc("cancel_expired_booking", {
+                        p_booking_id: bookingId,
+                        p_payment_id: paymentId,
+                    });
+                    console.log(`Checkout session expired cleanup for booking ${bookingId}:`, cancelRes.data);
+                }
 
                 break;
             }
+
             default:
                 console.log(`Unhandled event type ${event.type}`);
         }

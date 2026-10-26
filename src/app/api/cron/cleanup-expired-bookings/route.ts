@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
+import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
+import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 
+/**
+ * Cleanup cron job for expired reservation holds.
+ *
+ * Concurrency Safety:
+ * 1. Checks external Stripe session state before performing cancellation.
+ * 2. If Stripe session is paid or complete, reconciles via processStripePaymentReconciliation
+ *    instead of cancelling.
+ * 3. If Stripe session is open, expires the Stripe session to prevent late checkout.
+ * 4. Calls cancel_expired_booking RPC, which uses database-level FOR UPDATE locks and
+ *    conditional checks (hold_expires_at <= now() and status == 'pending') to prevent
+ *    races with concurrent webhook deliveries.
+ */
 export async function GET(request: Request) {
   try {
-    // Security check to ensure this is called with valid Vercel Cron secret
     const authHeader = request.headers.get("authorization");
     if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -22,94 +35,120 @@ export async function GET(request: Request) {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceRole);
+    const nowIso = new Date().toISOString();
+    const fallbackCutoff = new Date(Date.now() - 35 * 60 * 1000).toISOString();
 
-    // Calculate cutoff time: 30 minutes ago (aligns with Stripe Checkout session expiry)
-    const cutoffTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-
-    // Find all pending bookings created before the cutoff time
-    const { data: pendingBookings, error: fetchError } = await supabase
+    // Query pending bookings where hold has expired
+    const { data: expiredBookings, error: fetchError } = await supabase
       .from("bookings")
       .select(`
         id,
+        status,
         created_at,
+        hold_expires_at,
         payments(
           id,
           status,
-          stripe_session_id
+          stripe_session_id,
+          stripe_payment_id,
+          amount,
+          currency
         )
       `)
       .eq("status", "pending")
-      .lt("created_at", cutoffTime);
+      .or(`hold_expires_at.lte.${nowIso},and(hold_expires_at.is.null,created_at.lt.${fallbackCutoff})`)
+      .limit(25);
 
     if (fetchError) {
-      console.error("Error fetching pending bookings:", fetchError);
+      console.error("Error fetching expired bookings:", fetchError);
       return NextResponse.json({ error: "Failed to fetch bookings" }, { status: 500 });
     }
 
-    if (!pendingBookings || pendingBookings.length === 0) {
-      return NextResponse.json({ message: "No expired pending bookings found." });
-    }
+    let reconciledCount = 0;
+    let cancelledCount = 0;
 
-    const expiredPaymentIds: string[] = [];
-    const expiredBookingIds: string[] = [];
+    if (expiredBookings && expiredBookings.length > 0) {
+      for (const booking of expiredBookings) {
+        const payments = booking.payments || [];
 
-    for (const booking of pendingBookings) {
-      const payments = booking.payments || [];
+        for (const payment of payments) {
+          if (payment.status !== "pending") {
+            continue;
+          }
 
-      // If any associated payment was marked paid, do not cancel this booking
-      const hasPaidPayment = payments.some((p: { status?: string }) => p.status === "paid");
-      if (hasPaidPayment) {
-        continue;
-      }
+          // Check Stripe Checkout session state if available
+          if (payment.stripe_session_id) {
+            try {
+              const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
 
-      for (const payment of payments) {
-        if (payment.stripe_session_id) {
-          try {
-            await stripe.checkout.sessions.expire(payment.stripe_session_id);
-          } catch (stripeError: unknown) {
-            console.error(`Failed to expire Stripe session ${payment.stripe_session_id}:`, (stripeError as Error).message);
+              // Reconcile paid sessions instead of cancelling
+              if (session.payment_status === "paid" || session.status === "complete") {
+                const paymentIntent = typeof session.payment_intent === "string"
+                  ? session.payment_intent
+                  : session.payment_intent?.id || "";
+
+                if (paymentIntent) {
+                  const outcome = await processStripePaymentReconciliation({
+                    bookingId: booking.id,
+                    paymentId: payment.id,
+                    amount: (session.amount_total || 0) / 100,
+                    currency: (session.currency || "php").toLowerCase(),
+                    stripeSessionId: session.id,
+                    stripePaymentIntent: paymentIntent,
+                    supabase,
+                  });
+
+                  if (outcome.success) {
+                    reconciledCount++;
+                    continue;
+                  }
+                }
+              } else if (session.status === "open") {
+                // Expire session to prevent user from paying after hold expiration
+                try {
+                  await stripe.checkout.sessions.expire(session.id);
+                } catch (expireErr: unknown) {
+                  console.error(`Failed to expire Stripe session ${session.id}:`, (expireErr as Error).message);
+                }
+              }
+            } catch (stripeErr: unknown) {
+              console.error(`Error checking Stripe session for payment ${payment.id}:`, (stripeErr as Error).message);
+            }
+          }
+
+          // Database-side conditional cancellation under FOR UPDATE lock
+          const { data: cancelResult, error: cancelErr } = await supabase.rpc("cancel_expired_booking", {
+            p_booking_id: booking.id,
+            p_payment_id: payment.id,
+          });
+
+          if (cancelErr) {
+            console.error(`cancel_expired_booking RPC failed for ${booking.id}:`, cancelErr);
+          } else if (cancelResult?.cancelled) {
+            cancelledCount++;
           }
         }
-
-        if (payment.status === "pending") {
-          expiredPaymentIds.push(payment.id);
-        }
-      }
-
-      expiredBookingIds.push(booking.id);
-    }
-
-    // Batch update payments to failed (payments.status check constraint: pending, paid, failed, refunded)
-    if (expiredPaymentIds.length > 0) {
-      const { error: paymentError } = await supabase
-        .from("payments")
-        .update({ status: "failed" })
-        .in("id", expiredPaymentIds)
-        .eq("status", "pending");
-
-      if (paymentError) {
-        console.error("Failed to batch cancel payments:", paymentError);
       }
     }
 
-    // Batch update bookings to cancelled
-    if (expiredBookingIds.length > 0) {
-      const { error: bookingError } = await supabase
-        .from("bookings")
-        .update({ status: "cancelled" })
-        .in("id", expiredBookingIds)
-        .eq("status", "pending");
-
-      if (bookingError) {
-        console.error("Failed to batch cancel bookings:", bookingError);
-      }
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      message: `Successfully cancelled ${expiredBookingIds.length} expired booking(s).` 
+    // Process queued pending refunds from ledger
+    const refundResult = await processPendingRefundJobs({
+      workerId: "cron-cleanup-worker",
+      leaseSeconds: 60,
+      maxJobs: 10,
+      supabase,
+    }).catch((err: unknown) => {
+      console.error("Refund worker execution in cron failed:", err);
+      return { processed: 0, succeeded: 0, failed: 0 };
     });
 
+    return NextResponse.json({
+      success: true,
+      message: `Cleanup completed. Cancelled: ${cancelledCount}, Reconciled: ${reconciledCount}, Refunds processed: ${refundResult.processed}.`,
+      cancelledCount,
+      reconciledCount,
+      refunds: refundResult,
+    });
   } catch (error: unknown) {
     console.error("Cron job error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

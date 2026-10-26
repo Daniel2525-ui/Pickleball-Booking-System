@@ -20,6 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
+import { BookingCountdown } from "@/components/customers/booking-countdown";
 import {
   Dialog,
   DialogContent,
@@ -247,13 +248,18 @@ export const BookingHistoryContainer = () => {
                           CONFIRMED PASS
                         </Badge>
                       ) : booking.status === "pending" ? (
-                        <Badge
-                          variant="outline"
-                          className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold text-xs gap-1"
-                        >
-                          <Clock className="size-3" />
-                          PENDING PAYMENT
-                        </Badge>
+                        <BookingCountdown
+                          bookingId={booking.id}
+                          holdExpiresAt={booking.hold_expires_at}
+                          status={booking.status}
+                          onStatusChange={(newStatus) => {
+                            setBookings((prev) =>
+                              prev.map((b) =>
+                                b.id === booking.id ? { ...b, status: newStatus } : b
+                              )
+                            );
+                          }}
+                        />
                       ) : (
                         <Badge
                           variant="outline"
