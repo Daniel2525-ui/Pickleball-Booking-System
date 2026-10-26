@@ -65,8 +65,15 @@ const STATUS_LABELS: Record<string, string> = {
 };
 const capitalize = (status: string) => STATUS_LABELS[status?.toLowerCase()] ?? (status ? status[0].toUpperCase() + status.slice(1) : "");
 
-const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const formatDate = (date: string) => {
+  const d = date.includes("T") ? new Date(date) : new Date(`${date}T12:00:00+08:00`);
+  return d.toLocaleDateString("en-US", {
+    timeZone: "Asia/Manila",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
 const columnCount = 6;
 

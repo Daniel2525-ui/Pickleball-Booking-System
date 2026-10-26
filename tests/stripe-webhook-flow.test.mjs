@@ -22,9 +22,25 @@ function processCheckoutSessionCompleted({
         return { status: 404, error: "Booking not found" };
     }
 
-    // Idempotency: skip if already processed / not pending
-    if (existingBooking.status !== "pending") {
+    // Idempotency: skip if already confirmed
+    if (existingBooking.status === "confirmed" || existingBooking.status === "completed") {
         return { status: 200, action: "skipped", reason: "already_processed" };
+    }
+
+    // Auto-refund if booking was cancelled before payment completed
+    if (existingBooking.status === "cancelled") {
+        if (session.payment_intent && stripeRefundsMock) {
+            stripeRefundsMock.create({ payment_intent: session.payment_intent });
+        }
+        paymentsTableMock.update({
+            status: "refunded",
+            payment_reference: session.payment_intent || null,
+        });
+        return { status: 200, action: "refunded_due_to_cancelled" };
+    }
+
+    if (existingBooking.status !== "pending") {
+        return { status: 200, action: "skipped", reason: "unexpected_status" };
     }
 
     // Conflict detection includes active confirmed match statuses (not unpaid pending holds)
@@ -204,4 +220,37 @@ test("Stripe webhook: does not refund when overlapping hold is only unpaid pendi
     assert.equal(res.action, "confirmed");
     assert.equal(paymentUpdate.status, "paid");
     assert.equal(bookingUpdate.status, "confirmed");
+});
+
+test("Stripe webhook: auto-refunds when booking was already cancelled or expired before payment completed", () => {
+    let refundedIntent = null;
+    let paymentUpdate = null;
+
+    const res = processCheckoutSessionCompleted({
+        session: {
+            metadata: { booking_id: "book-expired" },
+            payment_intent: "pi_late_arrival_123",
+        },
+        existingBooking: {
+            id: "book-expired",
+            court_id: "court-a",
+            booking_date: "2026-10-25",
+            start_time: "09:00:00",
+            end_time: "10:00:00",
+            status: "cancelled", // Expired by cron or cancelled by user
+        },
+        existingConflicts: [],
+        stripeRefundsMock: {
+            create: ({ payment_intent }) => {
+                refundedIntent = payment_intent;
+            },
+        },
+        paymentsTableMock: { update: (u) => { paymentUpdate = u; } },
+        bookingsTableMock: { update: () => {} },
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.action, "refunded_due_to_cancelled");
+    assert.equal(refundedIntent, "pi_late_arrival_123");
+    assert.equal(paymentUpdate.status, "refunded");
 });

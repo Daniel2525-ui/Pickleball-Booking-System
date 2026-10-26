@@ -32,6 +32,8 @@ export const fetchUserBookings = async (userId: string) => {
                 `)
             .eq("user_id", userId)
             .order("booking_date", { ascending: false })
+            .order("start_time", { ascending: false })
+            .limit(100);
 
         if (error) throw error;
 

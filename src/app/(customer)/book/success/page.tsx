@@ -29,6 +29,7 @@ function BookingSuccessContent() {
   useEffect(() => {
     async function verifySession() {
       if (!sessionId) {
+        setVerifyResult({ success: false, error: "No checkout session ID provided." });
         setIsVerifying(false);
         return;
       }

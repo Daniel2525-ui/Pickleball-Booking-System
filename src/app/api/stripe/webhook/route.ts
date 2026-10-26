@@ -63,9 +63,36 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
-                // If already confirmed or not pending, do not re-process (idempotency for webhook retries)
-                if (booking.status !== "pending") {
+                // If already confirmed, do not re-process (idempotency for webhook retries)
+                if (booking.status === "confirmed" || booking.status === "completed") {
                     console.log(`Booking ${bookingId} already has status '${booking.status}', skipping webhook processing.`);
+                    break;
+                }
+
+                // If the booking was cancelled (e.g. by expiration cleanup cron or customer), refund the payment
+                if (booking.status === "cancelled") {
+                    console.log(`Paid booking ${bookingId} was already cancelled/expired. Initiating refund for payment_intent: ${session.payment_intent}`);
+                    if (session.payment_intent) {
+                        try {
+                            await stripe.refunds.create({
+                                payment_intent: session.payment_intent as string,
+                            });
+                        } catch (refundError) {
+                            console.error("Refund failed for cancelled booking:", refundError);
+                        }
+                    }
+                    await supabase
+                        .from("payments")
+                        .update({
+                            status: "refunded",
+                            stripe_payment_id: (session.payment_intent as string) || null,
+                        })
+                        .eq("id", paymentId);
+                    break;
+                }
+
+                if (booking.status !== "pending") {
+                    console.log(`Booking ${bookingId} has status '${booking.status}', skipping webhook processing.`);
                     break;
                 }
 

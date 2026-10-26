@@ -33,7 +33,9 @@ export const fetchBookings = async (filters?: FetchBookingsFilters) => {
                 customers(full_name, phone, email),
                 payments(id, status, amount, payment_method, payment_reference, paid_at)
             `)
-            .order("booking_date", { ascending: false });
+            .order("booking_date", { ascending: false })
+            .order("start_time", { ascending: false })
+            .limit(100);
 
         if (hasStatusFilter) {
             query = query.eq("status", status.toLowerCase());

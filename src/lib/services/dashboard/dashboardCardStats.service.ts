@@ -1,134 +1,81 @@
-import { supabase } from "@/lib/supabase"
-import { fetchCourtsData } from "../courts/courtsData.service"
+import { supabase } from "@/lib/supabase";
+import { fetchCourtsData } from "../courts/courtsData.service";
 
 const ACTIVE_STATUSES = ["confirmed", "completed", "checked_in", "in_progress"];
-const OCCUPYING_STATUSES = ["confirmed", "checked_in", "in_progress"];
 
-/* Today's Bookings */
-export const bookingsToday = async () => {
-    const today = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(new Date())
-
-    try {
-        const { count, error } = await supabase
-            .from("bookings")
-            .select("*", { count: "exact", head: true })
-            .eq("booking_date", today)
-            .in("status", ACTIVE_STATUSES);
-
-        if (error) throw error;
-        return count ?? 0
-    } catch (error) {
-        console.error(error)
-        throw error;
-    }
+export interface DashboardCardStatsData {
+    todayBookingsCount: number;
+    yesterdayBookingsCount: number;
+    upcomingBookingsCount: number;
+    revToday: number;
+    revYesterday: number;
+    courtStats: {
+        total: number;
+        occupied: number;
+        available: number;
+    };
 }
 
-export const bookingsYesterday = async () => {
-    const yesterdayDate = new Date();
+/**
+ * Consolidates all dashboard KPI metrics into a single range query
+ * plus parallel court availability fetch.
+ */
+export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData> => {
+    const now = new Date();
+    const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(now);
+
+    const todayNoon = new Date(`${todayStr}T12:00:00+08:00`);
+    const yesterdayDate = new Date(todayNoon);
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterday = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(yesterdayDate);
+    const yesterdayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(yesterdayDate);
 
-    try {
-        const { count, error } = await supabase
+    const nextWeekDate = new Date(todayNoon);
+    nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+    const endDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(nextWeekDate);
+
+    const [bookingsRes, courtStats] = await Promise.all([
+        supabase
             .from("bookings")
-            .select("*", { count: "exact", head: true })
-            .eq("booking_date", yesterday)
-            .in("status", ACTIVE_STATUSES);
+            .select("booking_date, total_amount")
+            .gte("booking_date", yesterdayStr)
+            .lte("booking_date", endDateStr)
+            .in("status", ACTIVE_STATUSES),
+        availableCourts(),
+    ]);
 
-        if (error) throw error;
-        return count ?? 0;
-    } catch (error) {
-        console.error(error);
-        throw error;
+    if (bookingsRes.error) throw bookingsRes.error;
+
+    const bookings = bookingsRes.data || [];
+
+    let todayBookingsCount = 0;
+    let yesterdayBookingsCount = 0;
+    let upcomingBookingsCount = 0;
+    let revToday = 0;
+    let revYesterday = 0;
+
+    for (const b of bookings) {
+        const amt = Number(b.total_amount) || 0;
+        if (b.booking_date === todayStr) {
+            todayBookingsCount++;
+            revToday += amt;
+        }
+        if (b.booking_date === yesterdayStr) {
+            yesterdayBookingsCount++;
+            revYesterday += amt;
+        }
+        if (b.booking_date >= todayStr && b.booking_date <= endDateStr) {
+            upcomingBookingsCount++;
+        }
     }
-};
 
-/* Upcoming Bookings */
-export const upcomingBookings = async () => {
-    const today = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(new Date());
-
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-
-    const endDate = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(nextWeek);
-
-    try {
-        const { count, error } = await supabase
-            .from("bookings")
-            .select("*", { count: "exact", head: true })
-            .gte("booking_date", today)
-            .lte("booking_date", endDate)
-            .in("status", ACTIVE_STATUSES);
-
-        if (error) throw error;
-
-        return count ?? 0;
-    } catch (error) {
-        console.error(error);
-        throw error;
-    }
-};
-
-
-/* Today's Revenue */
-export const revenueToday = async () => {
-    const today = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(new Date());
-
-    try {
-        const { data, error } = await supabase
-            .from("bookings")
-            .select("total_amount")
-            .eq("booking_date", today)
-            .in("status", ACTIVE_STATUSES);
-
-        if (error) throw error;
-
-        const revenue = data.reduce(
-            (total, booking) => total + booking.total_amount, 0
-        )
-
-        return revenue;
-    } catch (error) {
-        console.error(error)
-        throw error
-    }
-}
-
-export const revenueYesterday = async () => {
-    const yesterdayDate = new Date();
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterday = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(yesterdayDate);
-
-    try {
-        const { data, error } = await supabase
-            .from("bookings")
-            .select("total_amount")
-            .eq("booking_date", yesterday)
-            .in("status", ACTIVE_STATUSES);
-
-        if (error) throw error;
-
-        const revenue = data.reduce(
-            (total, booking) => total + booking.total_amount, 0
-        );
-
-        return revenue;
-    } catch (error) {
-        console.error(error);
-        throw error;
-    }
+    return {
+        todayBookingsCount,
+        yesterdayBookingsCount,
+        upcomingBookingsCount,
+        revToday,
+        revYesterday,
+        courtStats,
+    };
 };
 
 /* Available Courts */
@@ -157,3 +104,9 @@ export const availableCourts = async () => {
     }
 };
 
+/* Individual helpers preserved for backwards compatibility */
+export const bookingsToday = async () => (await fetchDashboardCardStats()).todayBookingsCount;
+export const bookingsYesterday = async () => (await fetchDashboardCardStats()).yesterdayBookingsCount;
+export const upcomingBookings = async () => (await fetchDashboardCardStats()).upcomingBookingsCount;
+export const revenueToday = async () => (await fetchDashboardCardStats()).revToday;
+export const revenueYesterday = async () => (await fetchDashboardCardStats()).revYesterday;

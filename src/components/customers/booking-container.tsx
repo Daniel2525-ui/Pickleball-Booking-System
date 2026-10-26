@@ -273,11 +273,6 @@ export const BookingContainer = () => {
     }
   };
 
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setCheckoutError(null);
-  };
-
   return loading ? (
     <BookingScheduleSkeleton />
   ) : (

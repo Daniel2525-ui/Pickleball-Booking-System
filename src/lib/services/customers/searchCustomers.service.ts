@@ -18,8 +18,8 @@ export const searchCustomers = async (
             .order("full_name");
 
         if (sanitizedQuery) {
-            profilesQuery = profilesQuery.or(`full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%`);
-            customersQuery = customersQuery.or(`full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%`);
+            profilesQuery = profilesQuery.or(`full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%`).limit(15);
+            customersQuery = customersQuery.or(`full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%`).limit(15);
         } else {
             profilesQuery = profilesQuery.limit(10);
             customersQuery = customersQuery.limit(10);

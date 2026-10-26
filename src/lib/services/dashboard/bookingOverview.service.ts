@@ -48,15 +48,16 @@ export const fetchBookingOverview = async () => {
             if (!booking.booking_date)
                 return;
 
-            const dateObj = new Date(booking.booking_date + "T00:00:00");
-            const dayOfWeek = dateObj.getDay();
+            const dayName = new Intl.DateTimeFormat("en-US", {
+                weekday: "long",
+                timeZone: "Asia/Manila",
+            }).format(new Date(`${booking.booking_date}T12:00:00+08:00`));
 
-            const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-            if (weekData[dayIndex])
-
-                weekData[dayIndex].bookings += 1;
-        })
+            const targetDay = weekData.find((d) => d.day === dayName);
+            if (targetDay) {
+                targetDay.bookings += 1;
+            }
+        });
 
         return { data: weekData, error: null }
 

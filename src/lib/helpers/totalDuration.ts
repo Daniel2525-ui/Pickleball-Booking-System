@@ -1,22 +1,8 @@
-export const calculateDuration = (start: string, end: string) => {
+/**
+ * Formats duration between booking start and end time (whole hours).
+ */
+export const calculateDuration = (start?: string, end?: string): string => {
     if (!start || !end) return "";
-
-    const [startH, startM] = start.split(":").map(Number);
-    const [endH, endM] = end.split(":").map(Number);
-
-    const diffMinutes =
-        endH * 60 + endM - (startH * 60 + startM);
-
-    const hours = Math.floor(diffMinutes / 60);
-    const mins = diffMinutes % 60;
-
-    if (hours > 0 && mins > 0) {
-        return `${hours} hr ${mins} min`;
-    }
-
-    if (hours > 0) {
-        return `${hours} hour${hours > 1 ? "s" : ""}`;
-    }
-
-    return `${mins} min`;
+    const hours = Math.max(1, parseInt(end.slice(0, 2), 10) - parseInt(start.slice(0, 2), 10));
+    return `${hours} ${hours === 1 ? "hour" : "hours"}`;
 };

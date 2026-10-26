@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabase";
 import { Customer, CreateWalkInCustomerInput } from "./customersTypes";
 
 export const createWalkInCustomer = async (
@@ -13,19 +12,18 @@ export const createWalkInCustomer = async (
         const phone = input.phone?.trim() || null;
         const email = input.email?.trim() || null;
 
-        const { data, error } = await supabase
-            .from("customers")
-            .insert({
-                full_name: fullName,
-                phone,
-                email,
-            })
-            .select()
-            .single();
+        const res = await fetch("/api/admin/customers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fullName, phone, email }),
+        });
 
-        if (error) throw error;
+        const body = await res.json().catch(() => null);
+        if (!res.ok) {
+            return { data: null, error: new Error(body?.error || "Failed to create customer record.") };
+        }
 
-        return { data: data as Customer, error: null };
+        return { data: body.data as Customer, error: null };
     } catch (error) {
         console.error("Failed to create walk-in customer:", error);
         return { data: null, error: error as Error };

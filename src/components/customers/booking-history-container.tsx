@@ -32,27 +32,31 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { BookingCardSkeleton } from "@/components/skeletons/booking-card-skeleton";
 
-const formatBookingDate = (date: string) =>
-  new Date(date).toLocaleDateString("en-US", {
+const formatBookingDate = (date: string) => {
+  const d = date.includes("T") ? new Date(date) : new Date(`${date}T12:00:00+08:00`);
+  return d.toLocaleDateString("en-US", {
+    timeZone: "Asia/Manila",
     weekday: "short",
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+};
 
-/** Loads the current user's bookings. Returns null if unauthenticated or the fetch failed. */
-const fetchCurrentUserBookings = async (): Promise<UserBooking[] | null> => {
+/** Loads the current user's bookings and authentication state. */
+const fetchCurrentUserBookings = async (): Promise<{ bookings: UserBooking[]; isAuthenticated: boolean }> => {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return { bookings: [], isAuthenticated: false };
   const { data, error } = await fetchUserBookings(user.id);
-  return error ? null : data;
+  return { bookings: error ? [] : (data || []), isAuthenticated: true };
 };
 
 export const BookingHistoryContainer = () => {
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [bookings, setBookings] = useState<UserBooking[]>([]);
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [bookingToCancel, setBookingToCancel] = useState<UserBooking | null>(null);
@@ -75,7 +79,7 @@ export const BookingHistoryContainer = () => {
       setResumingId(null);
       // Re-sync with the database to reflect any status changes
       const latest = await fetchCurrentUserBookings();
-      if (latest) setBookings(latest);
+      if (latest) setBookings(latest.bookings);
     } else {
       toast.success("Redirecting to secure Stripe checkout...", { id: "resume-payment-toast" });
       window.location.assign(url);
@@ -84,9 +88,10 @@ export const BookingHistoryContainer = () => {
 
   useEffect(() => {
     let active = true;
-    fetchCurrentUserBookings().then((data) => {
+    fetchCurrentUserBookings().then((res) => {
       if (!active) return;
-      if (data) setBookings(data);
+      setIsAuthenticated(res.isAuthenticated);
+      setBookings(res.bookings);
       setLoading(false);
     });
     return () => {
@@ -175,6 +180,21 @@ export const BookingHistoryContainer = () => {
             {Array.from({ length: 3 }).map((_, i) => (
               <BookingCardSkeleton key={i} />
             ))}
+          </div>
+        ) : !isAuthenticated ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center border rounded-2xl bg-muted/20 border-dashed p-6">
+            <div className="size-14 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
+              <Calendar className="size-6" />
+            </div>
+            <h3 className="text-lg font-bold text-foreground">Sign In Required</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm leading-relaxed">
+              Please sign in to your account to view your court reservations and match passes.
+            </p>
+            <Link href="/login" className="mt-6">
+              <Button className="rounded-xl shadow-md hover:shadow-lg font-bold gap-2">
+                Sign In to View Reservations
+              </Button>
+            </Link>
           </div>
         ) : displayedBookings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center border rounded-2xl bg-muted/20 border-dashed p-6">

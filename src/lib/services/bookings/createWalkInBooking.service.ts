@@ -46,22 +46,6 @@ export const createWalkInBooking = async (
         const startTimeDb = startTime.length === 5 ? `${startTime}:00` : startTime;
         const endTimeDb = endTime.length === 5 ? `${endTime}:00` : endTime;
 
-        // Check for conflicts against all active holding statuses
-        const { data: conflicts, error: conflictErr } = await supabase
-            .from("bookings")
-            .select("id")
-            .eq("court_id", courtId)
-            .eq("booking_date", bookingDate)
-            .in("status", ["confirmed", "checked_in", "in_progress", "completed", "pending"])
-            .lt("start_time", endTimeDb)
-            .gt("end_time", startTimeDb);
-
-        if (conflictErr) throw conflictErr;
-
-        if (conflicts && conflicts.length > 0) {
-            return { bookingId: null, error: new Error("This court slot is no longer available. Please choose another time or court.") };
-        }
-
         const methodParam = paymentMethod === "unpaid" ? null : paymentMethod;
 
         // 1. Try calling the unified court-locking RPC first (serializes on courts row for both guest & member)

@@ -20,7 +20,8 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters) => {
                     )
                 )
             `)
-            .order("created_at", { ascending: false });
+            .order("created_at", { ascending: false })
+            .limit(100);
 
         if (filters?.status && filters.status !== "All Statuses" && filters.status.toLowerCase() !== "all" && filters.status.trim() !== "") {
             const status = filters.status.toLowerCase();

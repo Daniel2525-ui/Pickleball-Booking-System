@@ -1,7 +1,6 @@
 import { OperatingHour } from "./operatingHoursInterface";
 import { formatTime12h } from "@/lib/utils/formatTime";
 
-const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /*
  * Generates an array of time slot strings (e.g. "08:00 AM - 09:00 AM")
@@ -10,7 +9,10 @@ const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 export const generateTimeSlots = (selectedDate: Date, operatingHours: OperatingHour[]): string[] => {
     if (!operatingHours || !operatingHours.length) return [];
 
-    const dayName = weekDays[selectedDate.getDay()];
+    const dayName = new Intl.DateTimeFormat("en-US", {
+        weekday: "long",
+        timeZone: "Asia/Manila",
+    }).format(selectedDate);
     const todaySchedule = operatingHours.find((hour) => hour.day_of_week === dayName);
 
     if (!todaySchedule || !todaySchedule.is_open || !todaySchedule.open_time || !todaySchedule.close_time) {

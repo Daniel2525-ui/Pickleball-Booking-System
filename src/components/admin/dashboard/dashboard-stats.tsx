@@ -4,12 +4,7 @@ import { useEffect, useState } from "react";
 import StatCard from "@/components/admin/dashboard/stat-card";
 import { CalendarCheck, CalendarDays, PhilippinePeso, CircleCheck } from "lucide-react";
 import {
-  bookingsToday,
-  bookingsYesterday,
-  upcomingBookings,
-  revenueToday,
-  revenueYesterday,
-  availableCourts,
+  fetchDashboardCardStats,
 } from "@/lib/services/dashboard/dashboardCardStats.service";
 
 export default function DashboardStats() {
@@ -27,28 +22,13 @@ export default function DashboardStats() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [
-          today,
-          yesterdayBookings,
-          upcoming,
-          revenueTodayAmount,
-          revenueYesterdayAmount,
-          getCourtToday,
-        ] = await Promise.all([
-          bookingsToday(),
-          bookingsYesterday(),
-          upcomingBookings(),
-          revenueToday(),
-          revenueYesterday(),
-          availableCourts(),
-        ]);
-
-        setTodayBookingsCount(today);
-        setYesterdayBookingsCount(yesterdayBookings);
-        setUpcomingBookingsCount(upcoming);
-        setRevToday(revenueTodayAmount);
-        setRevYesterday(revenueYesterdayAmount);
-        setCourtStats(getCourtToday);
+        const stats = await fetchDashboardCardStats();
+        setTodayBookingsCount(stats.todayBookingsCount);
+        setYesterdayBookingsCount(stats.yesterdayBookingsCount);
+        setUpcomingBookingsCount(stats.upcomingBookingsCount);
+        setRevToday(stats.revToday);
+        setRevYesterday(stats.revYesterday);
+        setCourtStats(stats.courtStats);
       } catch (err) {
         console.error("Failed to load dashboard statistics:", err);
       }
