@@ -1,12 +1,20 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { stripe } from "@/lib/stripe";
-import { withDbRetry } from "./withDbRetry";
+import { stripe } from "../../stripe.ts";
+import { withDbRetry } from "./withDbRetry.ts";
 
 export interface ProcessRefundJobsOptions {
     workerId: string;
     leaseSeconds?: number;
     maxJobs?: number;
     supabase: SupabaseClient;
+    stripeClient?: {
+        refunds: {
+            create: (
+                params: { payment_intent: string },
+                options?: { idempotencyKey?: string }
+            ) => Promise<{ id: string; status?: string }>;
+        };
+    };
 }
 
 export interface ProcessRefundJobResult {
@@ -23,6 +31,7 @@ export async function processPendingRefundJobs({
     leaseSeconds = 60,
     maxJobs = 10,
     supabase,
+    stripeClient,
 }: ProcessRefundJobsOptions): Promise<ProcessRefundJobResult> {
     let processed = 0;
     let succeeded = 0;
@@ -42,7 +51,8 @@ export async function processPendingRefundJobs({
         }
 
         const claimData = claimRes.data as {
-            found: boolean;
+            claimed?: boolean;
+            found?: boolean;
             refund_request?: {
                 id: string;
                 payment_id: string;
@@ -53,7 +63,8 @@ export async function processPendingRefundJobs({
             };
         };
 
-        if (!claimData?.found || !claimData.refund_request) {
+        const isClaimed = Boolean(claimData?.claimed ?? claimData?.found);
+        if (!isClaimed || !claimData?.refund_request) {
             break; // No more jobs to claim
         }
 
@@ -64,7 +75,8 @@ export async function processPendingRefundJobs({
         let stripeRefundStatus = "pending";
 
         try {
-            const refund = await stripe.refunds.create(
+            const stripeInstance = stripeClient || stripe;
+            const refund = await stripeInstance.refunds.create(
                 {
                     payment_intent: job.stripe_payment_intent,
                 },

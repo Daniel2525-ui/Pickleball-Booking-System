@@ -5,12 +5,10 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceRole);
 
 export async function POST(req: NextRequest) {
     try {
-        // 1. Authenticate caller
+        // 1. Authenticate caller using session client
         const authClient = await createServerClient();
         const { data: { user } } = await authClient.auth.getUser();
 
@@ -40,7 +38,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 3. Verify user ownership of the booking
-        const { data: booking, error: bookingErr } = await supabaseAdmin
+        const { data: booking, error: bookingErr } = await authClient
             .from("bookings")
             .select("id, user_id, status")
             .eq("id", bookingId)
@@ -52,7 +50,7 @@ export async function POST(req: NextRequest) {
 
         // Check if user owns booking or has admin role
         if (booking.user_id !== user.id) {
-            const { data: profile } = await supabaseAdmin
+            const { data: profile } = await authClient
                 .from("profiles")
                 .select("role")
                 .eq("id", user.id)
@@ -85,7 +83,18 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: "Missing payment_intent in Stripe session" }, { status: 400 });
         }
 
-        // 5. Reconcile transactionally
+        // 5. Reconcile transactionally using privileged service-role client
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!serviceRoleKey || serviceRoleKey.trim() === "") {
+            console.error("Payment verification configuration error: SUPABASE_SERVICE_ROLE_KEY is required for reconciliation");
+            return Response.json(
+                { error: "Server configuration error: payment reconciliation service key missing" },
+                { status: 500 }
+            );
+        }
+
+        const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey);
+
         const outcome = await processStripePaymentReconciliation({
             bookingId,
             paymentId,

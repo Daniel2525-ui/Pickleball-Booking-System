@@ -5,10 +5,15 @@ import Stripe from "stripe";
 import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceRole);
-
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
+function getServiceRoleClient() {
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey || serviceRoleKey.trim() === "" || !supabaseUrl) {
+        return null;
+    }
+    return createClient(supabaseUrl, serviceRoleKey);
+}
 
 export async function POST(req: NextRequest) {
     if (!webhookSecret) {
@@ -57,6 +62,12 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
+                const supabase = getServiceRoleClient();
+                if (!supabase) {
+                    console.error("Webhook configuration error: SUPABASE_SERVICE_ROLE_KEY is required for payment reconciliation");
+                    return Response.json({ error: "Server configuration error: missing service role key" }, { status: 500 });
+                }
+
                 const outcome = await processStripePaymentReconciliation({
                     bookingId,
                     paymentId,
@@ -83,6 +94,12 @@ export async function POST(req: NextRequest) {
                 const paymentId = session.metadata?.payment_id;
 
                 if (bookingId && paymentId) {
+                    const supabase = getServiceRoleClient();
+                    if (!supabase) {
+                        console.error("Webhook configuration error: SUPABASE_SERVICE_ROLE_KEY is required for expired booking cleanup");
+                        return Response.json({ error: "Server configuration error: missing service role key" }, { status: 500 });
+                    }
+
                     const cancelRes = await supabase.rpc("cancel_expired_booking", {
                         p_booking_id: bookingId,
                         p_payment_id: paymentId,

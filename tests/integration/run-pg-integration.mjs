@@ -289,6 +289,12 @@ async function main() {
   runPsqlFile(paymentReconciliationPath);
   console.log("✔ Phase 2 migration applied successfully with 0 errors.");
 
+  // 11. Apply Phase 2 Corrective: reconcile_booking_payment refund fix
+  const paymentRefundFixPath = path.join(PROJECT_ROOT, "supabase/migrations/20261028_reconcile_booking_payment_refund_fix.sql");
+  console.log(`[Setup] Applying Phase 2 corrective migration: 20261028_reconcile_booking_payment_refund_fix.sql...`);
+  runPsqlFile(paymentRefundFixPath);
+  console.log("✔ Phase 2 corrective migration applied successfully with 0 errors.");
+
   // ---------------------------------------------------------------------------
   // Test Cases Execution
   // ---------------------------------------------------------------------------
@@ -1940,6 +1946,55 @@ async function main() {
     assert.equal(checkCashA.stdout.trim(), "cash|");
     const checkCashB = runPsqlCommand(`SELECT payment_method, stripe_payment_id FROM public.payments WHERE id = '${pIdB}';`);
     assert.equal(checkCashB.stdout.trim(), "cash|");
+  });
+
+  await runTest("Phase 2 corrective: reconcile_booking_payment reserves refund for late payment on cancelled/expired booking", () => {
+    // 1. Create a hold
+    const holdRes = runPsqlCommand(
+      `SELECT public.hold_court_booking(
+        '${activeCourtId}', '${phase2Date}', '17:00:00', '18:00:00', '${aliceUid}', 200, now() + interval '35 minutes'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    const { booking_id: bId, payment_id: pId } = JSON.parse(holdRes.stdout);
+
+    // 2. Booking is cancelled before payment reconciliation (e.g. cleanup worker ran after expiry)
+    runPsqlCommand(`UPDATE public.bookings SET status = 'cancelled' WHERE id = '${bId}';`);
+
+    // 3. Late payment arrives via Stripe webhook / verify
+    const reconcileRes = runPsqlCommand(
+      `SELECT public.reconcile_booking_payment('${bId}', '${pId}', 'cs_late_cleanup', 'pi_late_cleanup', 200, 'php');`,
+      { role: "service_role" }
+    );
+    assert.equal(reconcileRes.status, 0, reconcileRes.stderr);
+    const reconcileObj = JSON.parse(reconcileRes.stdout);
+    assert.equal(reconcileObj.action, "REFUND_SCHEDULED");
+    assert.equal(reconcileObj.reason, "CANCELLED_BOOKING");
+    assert.equal(reconcileObj.payment_id, pId);
+
+    // 4. Payment must be recorded as captured ('paid', 'stripe') with stripe_payment_id
+    const pCheck = runPsqlCommand(`SELECT status, payment_method, stripe_payment_id FROM public.payments WHERE id = '${pId}';`);
+    assert.equal(pCheck.stdout.trim(), "paid|stripe|pi_late_cleanup");
+
+    // 5. Booking must remain cancelled
+    const bCheck = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bId}';`);
+    assert.equal(bCheck.stdout.trim(), "cancelled");
+
+    // 6. A pending refund request must exist with correct details
+    const refReqQuery = runPsqlCommand(`
+      SELECT status, amount, currency, stripe_payment_intent
+      FROM public.refund_requests
+      WHERE payment_id = '${pId}';
+    `);
+    assert.equal(refReqQuery.stdout.trim(), "pending|200|php|pi_late_cleanup");
+
+    // 7. Exact redelivery is a safe NO_OP
+    const redelivRes = runPsqlCommand(
+      `SELECT public.reconcile_booking_payment('${bId}', '${pId}', 'cs_late_cleanup', 'pi_late_cleanup', 200, 'php');`,
+      { role: "service_role" }
+    );
+    assert.equal(redelivRes.status, 0);
+    assert.equal(JSON.parse(redelivRes.stdout).action, "NO_OP");
   });
 
   console.log("\n================================================================================");
