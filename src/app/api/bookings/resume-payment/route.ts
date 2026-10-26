@@ -211,14 +211,37 @@ export async function POST(request: NextRequest) {
             expires_at: Math.floor(Date.now() / 1000) + (31 * 60), // 31 minutes to safely exceed Stripe 30-min minimum
         });
 
-        // 10. Update the payment record with the new stripe_session_id
-        await supabase
-            .from("payments")
-            .update({
-                stripe_session_id: session.id,
-                status: "pending",
-            })
-            .eq("id", paymentRecordId);
+        // 10. Atomically confirm hold extension under court lock and persist new Stripe session ID
+        const authoritativeHoldExpiresAtIso = new Date((session.expires_at + 120) * 1000).toISOString();
+
+        const { error: confirmError } = await supabase.rpc("confirm_checkout_hold", {
+            p_booking_id: booking.id,
+            p_payment_id: paymentRecordId,
+            p_stripe_session_id: session.id,
+            p_hold_expires_at: authoritativeHoldExpiresAtIso,
+        });
+
+        if (confirmError) {
+            console.error("confirm_checkout_hold RPC failed on resume:", confirmError);
+            try {
+                await stripe.checkout.sessions.expire(session.id);
+            } catch (expireErr) {
+                console.error("Failed to expire superseded Stripe session on resume:", expireErr);
+            }
+
+            const isConflict = confirmError.message?.includes("SLOT_UNAVAILABLE");
+            if (isConflict) {
+                return Response.json(
+                    { error: "Your reservation hold expired and the time slot was reserved by another player. Please choose another slot." },
+                    { status: 409 }
+                );
+            }
+
+            return Response.json(
+                { error: confirmError.message || "Failed to extend reservation hold for checkout." },
+                { status: 500 }
+            );
+        }
 
         return Response.json({ url: session.url });
     } catch (error: unknown) {

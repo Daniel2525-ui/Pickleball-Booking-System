@@ -33,8 +33,7 @@ $$;
 CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
   SELECT coalesce(
     nullif(current_setting('request.jwt.claim.role', true), ''),
-    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'),
-    'anon'
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
   );
 $$;
 
@@ -140,3 +139,8 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.courts (id, name, status) VALUES
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Court 2 - Maintenance', 'maintenance')
 ON CONFLICT (id) DO NOTHING;
+
+-- 7. Grant standard schema and table access to Supabase roles
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;

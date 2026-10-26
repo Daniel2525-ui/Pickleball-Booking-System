@@ -96,15 +96,21 @@ export const checkSlotAvailability = (
         bookings
     );
 
-    if (matchingBookings.length === 0) return "available";
+    const activeBookings = matchingBookings.filter((b) => {
+        const status = (b.status || "").toLowerCase();
+        if (status !== "pending") return true;
+        return !b.hold_expires_at || new Date(b.hold_expires_at) > now;
+    });
 
-    const hasConfirmed = matchingBookings.some(
+    if (activeBookings.length === 0) return "available";
+
+    const hasConfirmed = activeBookings.some(
         (booking) => (booking.status || "").toLowerCase() !== "pending"
     );
 
     if (hasConfirmed) return "booked";
 
-    const belongsToUser = matchingBookings.some(
+    const belongsToUser = activeBookings.some(
         (booking) => booking.user_id === currentUserId
     );
 
@@ -121,9 +127,11 @@ export const getSlotBooking = (
 
     if (!court) return undefined;
 
-    return getOverlappingBookings(
-        court.id,
-        timeRange,
-        bookings
-    )[0];
+    const matching = getOverlappingBookings(court.id, timeRange, bookings);
+    const now = new Date();
+    return matching.find((b) => {
+        const status = (b.status || "").toLowerCase();
+        if (status !== "pending") return true;
+        return !b.hold_expires_at || new Date(b.hold_expires_at) > now;
+    });
 };

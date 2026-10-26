@@ -105,8 +105,11 @@ process.on("exit", () => {
   cleanup();
 });
 
-function runPsqlCommand(sql, { db = TEST_DB, role = null, uid = null } = {}) {
+function runPsqlCommand(sql, { db = TEST_DB, role = null, uid = null, asRole = false } = {}) {
   let sessionPreamble = "";
+  if (asRole && role) {
+    sessionPreamble += `SET LOCAL ROLE ${role};\n`;
+  }
   if (role) {
     sessionPreamble += `SET LOCAL request.jwt.claim.role = '${role}';\n`;
   }
@@ -294,6 +297,12 @@ async function main() {
   console.log(`[Setup] Applying Phase 2 corrective migration: 20261028_reconcile_booking_payment_refund_fix.sql...`);
   runPsqlFile(paymentRefundFixPath);
   console.log("✔ Phase 2 corrective migration applied successfully with 0 errors.");
+
+  // 12. Apply RLS migration: 20261029_enable_rls_on_core_tables.sql
+  const rlsMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261029_enable_rls_on_core_tables.sql");
+  console.log(`[Setup] Applying RLS migration: 20261029_enable_rls_on_core_tables.sql...`);
+  runPsqlFile(rlsMigrationPath);
+  console.log("✔ RLS migration applied successfully with 0 errors.");
 
   // ---------------------------------------------------------------------------
   // Test Cases Execution
@@ -1995,6 +2004,58 @@ async function main() {
     );
     assert.equal(redelivRes.status, 0);
     assert.equal(JSON.parse(redelivRes.stdout).action, "NO_OP");
+  });
+
+  // --- Group: Row Level Security (RLS) Policies ---
+
+  await runTest("RLS: anonymous caller can view public bookings schedule but is blocked from direct payment access", () => {
+    // 1. Anon can query public bookings schedule
+    const anonBookings = runPsqlCommand(`SELECT count(*) FROM public.bookings;`, { role: "anon", asRole: true });
+    assert.equal(anonBookings.status, 0);
+    assert(parseInt(anonBookings.stdout.trim(), 10) > 0, "Anon must be able to read bookings schedule");
+
+    // 2. Anon can query courts
+    const anonCourts = runPsqlCommand(`SELECT count(*) FROM public.courts;`, { role: "anon", asRole: true });
+    assert.equal(anonCourts.status, 0);
+    assert(parseInt(anonCourts.stdout.trim(), 10) > 0, "Anon must be able to read courts");
+
+    // 3. Anon cannot query payments (RLS filters out all rows)
+    const anonPayments = runPsqlCommand(`SELECT count(*) FROM public.payments;`, { role: "anon", asRole: true });
+    assert.equal(anonPayments.status, 0);
+    assert.equal(anonPayments.stdout.trim(), "0", "Anon must not see any payment rows");
+
+    // 4. Anon cannot insert directly into bookings (RLS CHECK blocks it)
+    const anonInsert = runPsqlCommand(
+      `INSERT INTO public.bookings (court_id, booking_date, start_time, end_time, status, total_amount)
+       VALUES ('${activeCourtId}', '2029-10-23', '20:00:00', '21:00:00', 'confirmed', 200);`,
+      { role: "anon", asRole: true }
+    );
+    assert.notEqual(anonInsert.status, 0, "Anon direct insert into bookings must be blocked by RLS");
+    assert(anonInsert.stderr.includes("row-level security policy"), "Error must mention row-level security policy");
+
+    // 5. Anon cannot view refund requests
+    const anonRefunds = runPsqlCommand(`SELECT count(*) FROM public.refund_requests;`, { role: "anon", asRole: true });
+    assert.equal(anonRefunds.status, 0);
+    assert.equal(anonRefunds.stdout.trim(), "0", "Anon must not see any refund requests");
+  });
+
+  await runTest("RLS: authenticated user can only view their own payments while service_role views all", () => {
+    // 1. Alice queries payments - sees only Alice's payments
+    const alicePayments = runPsqlCommand(`SELECT count(*) FROM public.payments;`, { role: "authenticated", uid: aliceUid, asRole: true });
+    assert.equal(alicePayments.status, 0);
+    const aliceCount = parseInt(alicePayments.stdout.trim(), 10);
+    assert(aliceCount > 0, "Alice must see her own payments");
+
+    // 2. Bob queries payments - sees only Bob's payments
+    const bobPayments = runPsqlCommand(`SELECT count(*) FROM public.payments;`, { role: "authenticated", uid: bobUid, asRole: true });
+    assert.equal(bobPayments.status, 0);
+    const bobCount = parseInt(bobPayments.stdout.trim(), 10);
+
+    // 3. Service role queries payments - sees all payments (Alice + Bob + Walk-ins)
+    const allPayments = runPsqlCommand(`SELECT count(*) FROM public.payments;`, { role: "service_role", asRole: true });
+    assert.equal(allPayments.status, 0);
+    const totalCount = parseInt(allPayments.stdout.trim(), 10);
+    assert(totalCount > aliceCount, "Total payments must exceed Alice's count alone");
   });
 
   console.log("\n================================================================================");

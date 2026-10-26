@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   Info,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/customers/public-header";
@@ -102,8 +103,16 @@ function BookingSuccessContent() {
             </div>
 
             <div className="pt-2 flex flex-col gap-2.5">
+              {!verifyResult.conflict && (
+                <Link href="/my-bookings" className="w-full">
+                  <Button className="w-full h-11 font-bold text-sm shadow-sm gap-2">
+                    <CreditCard className="size-4" />
+                    View My Reservations to Complete Payment
+                  </Button>
+                </Link>
+              )}
               <Link href="/#booking" className="w-full">
-                <Button className="w-full h-11 font-bold text-sm shadow-sm gap-2">
+                <Button variant={!verifyResult.conflict ? "outline" : "default"} className="w-full h-11 font-bold text-sm shadow-sm gap-2">
                   <CalendarDays className="size-4" />
                   Select Another Time Slot
                 </Button>

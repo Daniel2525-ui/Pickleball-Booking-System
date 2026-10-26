@@ -2,7 +2,14 @@ import { supabase } from "@/lib/supabase";
 import { Court } from "./courtsTypes";
 import { calculateCourtPrice } from "./calculateCourtPrice.service";
 
-export const fetchCourtsData = async () => {
+export interface ActiveBookingSnippet {
+    court_id: string;
+    status: string;
+    start_time: string;
+    end_time: string;
+}
+
+export const fetchCourtsData = async (activeBookingsOverride?: ActiveBookingSnippet[]) => {
     try {
         const { data: courts, error: courtsError } = await supabase
             .from("courts")
@@ -11,10 +18,23 @@ export const fetchCourtsData = async () => {
 
         if (courtsError) throw courtsError;
 
-        // Find if any court is currently occupied (in Asia/Manila timezone)
-        const currentDate = new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Asia/Manila",
-        }).format(new Date());
+        let activeBookings = activeBookingsOverride;
+
+        if (!activeBookings) {
+            // Find if any court is currently occupied (in Asia/Manila timezone)
+            const currentDate = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Manila",
+            }).format(new Date());
+
+            const { data, error: bookingsError } = await supabase
+                .from("bookings")
+                .select("court_id, status, start_time, end_time")
+                .eq("booking_date", currentDate)
+                .in("status", ["confirmed", "checked_in", "in_progress"]);
+
+            if (bookingsError) throw bookingsError;
+            activeBookings = data || [];
+        }
 
         const currentTime = new Date().toLocaleTimeString("en-GB", {
             timeZone: "Asia/Manila",
@@ -24,19 +44,13 @@ export const fetchCourtsData = async () => {
             hour12: false,
         });
 
-        const { data: activeBookings, error: bookingsError } = await supabase
-            .from("bookings")
-            .select("court_id, status, start_time, end_time")
-            .eq("booking_date", currentDate)
-            .in("status", ["confirmed", "checked_in", "in_progress"]);
-
-        if (bookingsError) throw bookingsError;
-
         const occupiedCourtIds = new Set(
             (activeBookings || [])
                 .filter(b => b.status === "in_progress" || (b.start_time <= currentTime && b.end_time > currentTime))
                 .map(b => b.court_id)
         );
+
+        const defaultPrice = calculateCourtPrice();
 
         const updatedCourts = (courts || []).map(court => {
             let finalStatus = court.status;
@@ -46,7 +60,7 @@ export const fetchCourtsData = async () => {
             return {
                 ...court,
                 status: finalStatus,
-                price: calculateCourtPrice()
+                price: defaultPrice
             };
         });
 
