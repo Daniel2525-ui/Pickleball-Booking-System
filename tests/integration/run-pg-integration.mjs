@@ -1485,6 +1485,120 @@ async function main() {
     assert.notEqual(notFoundRes.status, 0);
     assert.ok(notFoundRes.stderr.includes("NOT_FOUND"), "Must raise NOT_FOUND");
     assert.ok(!notFoundRes.stderr.includes("SLOT_UNAVAILABLE"), "NOT_FOUND must not be confused with SLOT_UNAVAILABLE");
+
+    // 4. NOT_FOUND: Nonexistent or mismatched payment id
+    const newHold = runPsqlCommand(
+      `SELECT public.hold_court_booking(
+        '${activeCourtId}', '${conflictAuditDate}', '18:00:00', '19:00:00', '${aliceUid}', 200, now() + interval '35 minutes'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.equal(newHold.status, 0, newHold.stderr);
+    const { booking_id: bId4, payment_id: pId4 } = JSON.parse(newHold.stdout);
+
+    const mismatchedPaymentRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold(
+        '${bId4}', '00000000-0000-0000-0000-000000000000', 'cs_mismatch', now() + interval '33 minutes'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(mismatchedPaymentRes.status, 0);
+    assert.ok(mismatchedPaymentRes.stderr.includes("NOT_FOUND"), "Must raise NOT_FOUND for mismatched payment");
+    assert.ok(mismatchedPaymentRes.stderr.includes("Payment"), "Must identify payment in error message");
+
+    // 5. INVALID_STATUS: Payment that is not pending cannot be confirmed
+    runPsqlCommand(`UPDATE public.payments SET status = 'paid' WHERE id = '${pId4}';`);
+    const invalidPaymentStatusRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold(
+        '${bId4}', '${pId4}', 'cs_paid', now() + interval '33 minutes'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(invalidPaymentStatusRes.status, 0);
+    assert.ok(invalidPaymentStatusRes.stderr.includes("INVALID_STATUS"), "Must raise INVALID_STATUS for non-pending payment");
+    assert.ok(invalidPaymentStatusRes.stderr.includes("Payment is not pending"), "Must identify payment status in error message");
+  });
+
+  await runTest("Stage 1: confirm_checkout_hold defensive input validation rejects NULL/blank session IDs and NULL/past expiry timestamps", () => {
+    // 1. Create a valid pending hold
+    const holdRes = runPsqlCommand(
+      `SELECT public.hold_court_booking(
+        '${activeCourtId}', '${conflictAuditDate}', '19:00:00', '20:00:00', '${aliceUid}', 200, now() + interval '35 minutes'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.equal(holdRes.status, 0, holdRes.stderr);
+    const { booking_id, payment_id } = JSON.parse(holdRes.stdout);
+
+    // 2. Reject NULL session ID
+    const nullSessionRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold(
+        '${booking_id}', '${payment_id}', NULL, now() + interval '33 minutes'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(nullSessionRes.status, 0);
+    assert.ok(nullSessionRes.stderr.includes("INVALID_ARGUMENT"), "Must raise INVALID_ARGUMENT for NULL session ID");
+    assert.ok(nullSessionRes.stderr.includes("p_stripe_session_id cannot be empty"), "Must explain session ID cannot be empty");
+
+    // 3. Reject empty string session ID
+    const emptySessionRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold(
+        '${booking_id}', '${payment_id}', '', now() + interval '33 minutes'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(emptySessionRes.status, 0);
+    assert.ok(emptySessionRes.stderr.includes("INVALID_ARGUMENT"), "Must raise INVALID_ARGUMENT for empty session ID");
+
+    // 4. Reject whitespace-only session ID
+    const blankSessionRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold(
+        '${booking_id}', '${payment_id}', '   ', now() + interval '33 minutes'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(blankSessionRes.status, 0);
+    assert.ok(blankSessionRes.stderr.includes("INVALID_ARGUMENT"), "Must raise INVALID_ARGUMENT for blank session ID");
+
+    // 5. Reject NULL expiry timestamp
+    const nullExpiryRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold(
+        '${booking_id}', '${payment_id}', 'cs_valid_session_id', NULL
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(nullExpiryRes.status, 0);
+    assert.ok(nullExpiryRes.stderr.includes("INVALID_ARGUMENT"), "Must raise INVALID_ARGUMENT for NULL expiry timestamp");
+    assert.ok(nullExpiryRes.stderr.includes("p_hold_expires_at must be in the future"), "Must explain expiry must be in the future");
+
+    // 6. Reject past expiry timestamp
+    const pastExpiryRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold(
+        '${booking_id}', '${payment_id}', 'cs_valid_session_id', now() - interval '1 minute'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(pastExpiryRes.status, 0);
+    assert.ok(pastExpiryRes.stderr.includes("INVALID_ARGUMENT"), "Must raise INVALID_ARGUMENT for past expiry timestamp");
+    assert.ok(pastExpiryRes.stderr.includes("p_hold_expires_at must be in the future"), "Must explain expiry must be in the future");
+
+    // 7. Reject clock_timestamp() past timestamp
+    const clockPastExpiryRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold(
+        '${booking_id}', '${payment_id}', 'cs_valid_session_id', clock_timestamp() - interval '5 seconds'
+      );`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(clockPastExpiryRes.status, 0);
+    assert.ok(clockPastExpiryRes.stderr.includes("INVALID_ARGUMENT"), "Must raise INVALID_ARGUMENT for clock_timestamp() past timestamp");
+
+    // 8. Verify no database mutation occurred: payment stripe_session_id remains NULL
+    const paymentCheck = runPsqlCommand(
+      `SELECT stripe_session_id FROM public.payments WHERE id = '${payment_id}';`
+    );
+    assert.equal(paymentCheck.status, 0);
+    assert.equal(paymentCheck.stdout, "", "Payment stripe_session_id must remain untouched after failed validation");
   });
 
   // --- Group 5: Phase 2 Payment Reconciliation & Refund Ledger Tests ---

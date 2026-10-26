@@ -262,14 +262,24 @@ DECLARE
   v_status text;
   v_court_status text;
   v_conflict_id uuid;
+  v_payment_status text;
 BEGIN
-  -- 1. Authorization: allow signed service_role JWTs or console psql
+  -- 1. Input validation (trust boundary)
+  IF p_stripe_session_id IS NULL OR trim(p_stripe_session_id) = '' THEN
+    RAISE EXCEPTION 'INVALID_ARGUMENT: p_stripe_session_id cannot be empty' USING ERRCODE = '22000';
+  END IF;
+
+  IF p_hold_expires_at IS NULL OR p_hold_expires_at <= clock_timestamp() THEN
+    RAISE EXCEPTION 'INVALID_ARGUMENT: p_hold_expires_at must be in the future' USING ERRCODE = '22000';
+  END IF;
+
+  -- 2. Authorization: allow signed service_role JWTs or console psql
   v_is_service_role := (
     coalesce(auth.role(), '') = 'service_role'
     OR (session_user = 'postgres' AND auth.role() IS NULL)
   );
 
-  -- 2. Lock target booking row and verify caller ownership
+  -- 3. Lock target booking row and verify caller ownership (Hierarchy Level 1)
   SELECT court_id, booking_date, start_time, end_time, user_id, status
   INTO v_court_id, v_booking_date, v_start_time, v_end_time, v_user_id, v_status
   FROM public.bookings
@@ -293,7 +303,7 @@ BEGIN
     RAISE EXCEPTION 'INVALID_STATUS: Booking is not pending (status: %)', v_status USING ERRCODE = '22000';
   END IF;
 
-  -- 3. Lock court row to serialize against all concurrent reservations on this court
+  -- 4. Lock court row to serialize against all concurrent reservations on this court (Hierarchy Level 2)
   SELECT status INTO v_court_status
   FROM public.courts
   WHERE id = v_court_id
@@ -303,7 +313,7 @@ BEGIN
     RAISE EXCEPTION 'COURT_UNAVAILABLE: Court is currently not available' USING ERRCODE = 'P0001';
   END IF;
 
-  -- 4. Check for overlapping reservations (prevents resurrecting hold if slot was claimed after initial hold expired)
+  -- 5. Check for overlapping reservations (prevents resurrecting hold if slot was claimed after initial hold expired)
   SELECT id INTO v_conflict_id
   FROM public.bookings
   WHERE court_id = v_court_id
@@ -324,7 +334,21 @@ BEGIN
     RAISE EXCEPTION 'SLOT_UNAVAILABLE' USING ERRCODE = 'P0001';
   END IF;
 
-  -- 5. Atomically update hold expiry and stripe_session_id in the same database transaction
+  -- 6. Lock and validate target payment row (Hierarchy Level 3)
+  SELECT status INTO v_payment_status
+  FROM public.payments
+  WHERE id = p_payment_id AND booking_id = p_booking_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'NOT_FOUND: Payment % does not exist for booking %', p_payment_id, p_booking_id USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_payment_status != 'pending' THEN
+    RAISE EXCEPTION 'INVALID_STATUS: Payment is not pending (status: %)', v_payment_status USING ERRCODE = '22000';
+  END IF;
+
+  -- 7. Atomically update hold expiry and stripe_session_id in the same database transaction
   UPDATE public.bookings
   SET hold_expires_at = p_hold_expires_at,
       updated_at = clock_timestamp()
@@ -332,7 +356,7 @@ BEGIN
 
   UPDATE public.payments
   SET stripe_session_id = p_stripe_session_id
-  WHERE id = p_payment_id AND booking_id = p_booking_id;
+  WHERE id = p_payment_id;
 
   RETURN jsonb_build_object(
     'success', true,
