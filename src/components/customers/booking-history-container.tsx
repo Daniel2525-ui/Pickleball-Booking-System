@@ -112,7 +112,7 @@ export const BookingHistoryContainer = () => {
       toast.error(error?.message || "Failed to cancel reservation. Please try again.");
       // Re-sync with the database so the UI reflects the booking's real status.
       const latest = await fetchCurrentUserBookings();
-      if (latest) setBookings(latest);
+      if (latest) setBookings(latest.bookings);
     } else {
       // Apply the status confirmed by the backend.
       setBookings((prev) =>
