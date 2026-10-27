@@ -1,5 +1,6 @@
 
 import { supabase } from "@/lib/supabase";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 export interface BookingSlot {
     id: string;
@@ -14,10 +15,7 @@ export interface BookingSlot {
 
 export const fetchBookingsForDate = async (date: Date | string) => {
     try {
-        const dateStr =
-            date instanceof Date
-                ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date)
-                : date;
+        const dateStr = formatManilaDate(date);
 
         const { data, error } = await supabase
             .from("bookings")

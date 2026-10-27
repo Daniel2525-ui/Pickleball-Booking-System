@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { stripe } from "@/lib/stripe";
 
 /** Valid transitions staff may trigger. No-show requires grace period. */
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
@@ -119,6 +120,33 @@ export async function POST(request: NextRequest) {
                 { error: "Booking was updated concurrently. Please refresh and try again." },
                 { status: 409 }
             );
+        }
+
+        if (newStatus === "cancelled") {
+            const { data: payment } = await supabase
+                .from("payments")
+                .select("id, status, stripe_session_id")
+                .eq("booking_id", bookingId)
+                .maybeSingle();
+
+            if (payment?.stripe_session_id) {
+                try {
+                    const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
+                    if (session.status === "open") {
+                        await stripe.checkout.sessions.expire(payment.stripe_session_id);
+                    }
+                } catch (stripeErr) {
+                    console.error("Admin cancel: failed to expire Stripe session:", stripeErr);
+                }
+            }
+
+            if (payment?.status === "pending") {
+                await supabase
+                    .from("payments")
+                    .update({ status: "failed" })
+                    .eq("id", payment.id)
+                    .eq("status", "pending");
+            }
         }
 
         return Response.json({ booking: updated });

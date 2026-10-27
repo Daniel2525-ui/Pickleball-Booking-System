@@ -23,3 +23,13 @@ export const getBookingStart = (
             : booking.start_time.slice(0, 8);
     return new Date(`${booking.booking_date}T${time}${VENUE_UTC_OFFSET}`);
 };
+
+const manilaDateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: VENUE_TIMEZONE,
+});
+
+/** Formats a Date or date string to YYYY-MM-DD in Asia/Manila. */
+export const formatManilaDate = (date: Date | string = new Date()): string => {
+    const d = typeof date === "string" ? new Date(date) : date;
+    return manilaDateFormatter.format(d);
+};

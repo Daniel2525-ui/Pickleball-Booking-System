@@ -68,22 +68,34 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash" | "unpaid">("cash");
   const [paymentReference, setPaymentReference] = useState("");
 
+  const resetForm = () => {
+    setPlayerMode("existing");
+    setSearchQuery("");
+    setSearchResults([]);
+    setSelectedPlayer(null);
+    setNewFullName("");
+    setNewPhone("");
+    setNewEmail("");
+    setDuplicateWarning(null);
+    setError(null);
+    setPaymentMethod("cash");
+    setPaymentReference("");
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      resetForm();
+    }
+  };
+
+  const activeDuplicateWarning =
+    open && playerMode === "new" && newFullName.trim() ? duplicateWarning : null;
+
   // Load courts when modal opens
   useEffect(() => {
     if (open) {
       fetchCourtsData().then((res) => setCourts(res.data || []));
-      // Reset form
-      setPlayerMode("existing");
-      setSearchQuery("");
-      setSearchResults([]);
-      setSelectedPlayer(null);
-      setNewFullName("");
-      setNewPhone("");
-      setNewEmail("");
-      setDuplicateWarning(null);
-      setError(null);
-      setPaymentMethod("cash");
-      setPaymentReference("");
     }
   }, [open]);
 
@@ -104,7 +116,6 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   // Live duplicate check when typing a new walk-in name
   useEffect(() => {
     if (!open || playerMode !== "new" || !newFullName.trim()) {
-      setDuplicateWarning(null);
       return;
     }
 
@@ -225,7 +236,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button className="w-full sm:w-auto gap-2 font-bold text-xs sm:text-sm shadow-xs hover:shadow">
@@ -375,14 +386,14 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
                 </div>
 
                 {/* Duplicate Warning Alert */}
-                {duplicateWarning && (
+                {activeDuplicateWarning && (
                   <div className="p-2.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs flex items-start justify-between gap-2">
                     <div className="flex items-start gap-1.5 text-amber-800 dark:text-amber-300">
                       <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
                       <div>
                         <p className="font-semibold text-[11px]">Possible duplicate player found!</p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
-                          &quot;{duplicateWarning.full_name}&quot; is already registered ({duplicateWarning.phone || "No phone"}).
+                          &quot;{activeDuplicateWarning.full_name}&quot; is already registered ({activeDuplicateWarning.phone || "No phone"}).
                         </p>
                       </div>
                     </div>
@@ -391,7 +402,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        setSelectedPlayer(duplicateWarning);
+                        setSelectedPlayer(activeDuplicateWarning);
                         setPlayerMode("existing");
                         setDuplicateWarning(null);
                       }}

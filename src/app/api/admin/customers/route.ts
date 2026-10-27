@@ -12,18 +12,28 @@ export async function GET(request: NextRequest) {
 
         const searchParams = request.nextUrl.searchParams;
         const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") || "100", 10)), 500);
+        const search = searchParams.get("search")?.replace(/[(),%]/g, " ").trim() || "";
+
+        let profilesQuery = supabase
+            .from("profiles")
+            .select("id, full_name, email, phone, created_at")
+            .order("created_at", { ascending: false })
+            .limit(limit);
+
+        let customersQuery = supabase
+            .from("customers")
+            .select("id, full_name, email, phone, created_at")
+            .order("created_at", { ascending: false })
+            .limit(limit);
+
+        if (search) {
+            profilesQuery = profilesQuery.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
+            customersQuery = customersQuery.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
+        }
 
         const [profilesRes, customersRes] = await Promise.all([
-            supabase
-                .from("profiles")
-                .select("id, full_name, email, phone, created_at")
-                .order("created_at", { ascending: false })
-                .limit(limit),
-            supabase
-                .from("customers")
-                .select("id, full_name, email, phone, created_at")
-                .order("created_at", { ascending: false })
-                .limit(limit),
+            profilesQuery,
+            customersQuery,
         ]);
 
         if (profilesRes.error) {
@@ -35,7 +45,10 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: customersRes.error.message }, { status: 500 });
         }
 
-        const combined = [...(profilesRes.data || []), ...(customersRes.data || [])].sort((a, b) => {
+        const combined = [
+            ...(profilesRes.data || []).map((p) => ({ ...p, type: "registered" as const })),
+            ...(customersRes.data || []).map((c) => ({ ...c, type: "walk_in" as const })),
+        ].sort((a, b) => {
             const dateA = new Date(a.created_at || 0).getTime();
             const dateB = new Date(b.created_at || 0).getTime();
             return dateB - dateA;

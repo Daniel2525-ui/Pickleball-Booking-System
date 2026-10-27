@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabase";
 import { UnifiedCustomerResult } from "./customersTypes";
 
 export const searchCustomers = async (
@@ -6,50 +5,25 @@ export const searchCustomers = async (
 ): Promise<{ data: UnifiedCustomerResult[]; error: Error | null }> => {
     try {
         const sanitizedQuery = queryText.replace(/[(),%.,]/g, " ").trim();
+        const limit = sanitizedQuery ? 15 : 10;
+        const res = await fetch(`/api/admin/customers?search=${encodeURIComponent(sanitizedQuery)}&limit=${limit}`);
+        const body = await res.json().catch(() => null);
 
-        let profilesQuery = supabase
-            .from("profiles")
-            .select("id, full_name, email, phone")
-            .order("full_name");
-
-        let customersQuery = supabase
-            .from("customers")
-            .select("id, full_name, email, phone")
-            .order("full_name");
-
-        if (sanitizedQuery) {
-            profilesQuery = profilesQuery.or(`full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%`).limit(15);
-            customersQuery = customersQuery.or(`full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%`).limit(15);
-        } else {
-            profilesQuery = profilesQuery.limit(10);
-            customersQuery = customersQuery.limit(10);
+        if (!res.ok) {
+            return { data: [], error: new Error(body?.error || "Failed to search customers.") };
         }
 
-        const [profilesRes, customersRes] = await Promise.all([
-            profilesQuery,
-            customersQuery,
-        ]);
+        const data: UnifiedCustomerResult[] = (body?.data || []).map(
+            (c: { id: string; full_name: string; email?: string | null; phone?: string | null; type?: "registered" | "walk_in" }) => ({
+                id: c.id,
+                full_name: c.full_name,
+                email: c.email || null,
+                phone: c.phone || null,
+                type: c.type || "walk_in",
+            })
+        );
 
-        if (profilesRes.error) throw profilesRes.error;
-        if (customersRes.error) throw customersRes.error;
-
-        const registered: UnifiedCustomerResult[] = (profilesRes.data || []).map((p) => ({
-            id: p.id,
-            full_name: p.full_name,
-            email: p.email,
-            phone: p.phone,
-            type: "registered" as const,
-        }));
-
-        const walkIns: UnifiedCustomerResult[] = (customersRes.data || []).map((c) => ({
-            id: c.id,
-            full_name: c.full_name,
-            email: c.email,
-            phone: c.phone,
-            type: "walk_in" as const,
-        }));
-
-        return { data: [...registered, ...walkIns], error: null };
+        return { data, error: null };
     } catch (error) {
         console.error("Failed to search customers:", error);
         return { data: [], error: error as Error };

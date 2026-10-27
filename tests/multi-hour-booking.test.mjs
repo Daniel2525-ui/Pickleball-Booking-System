@@ -1222,6 +1222,7 @@ const simulateCreateWalkInBookingRpc = ({
     customerId = null,
     userId = null,
     paymentMethod = null,
+    paymentReference = null,
     operatingHoursTable = {},
     courtsTable = {},
     bookingsTable = [],
@@ -1304,10 +1305,16 @@ const simulateCreateWalkInBookingRpc = ({
         throw new Error("COURT_UNAVAILABLE: Court is currently not available for reservations (P0001)");
     }
 
-    // 6. Overlap conflict
+    // 6. Overlap conflict (ignoring expired pending holds)
     const hasConflict = bookingsTable.some((b) => {
         if (b.court_id !== courtId || b.booking_date !== bookingDate) return false;
         if (!["confirmed", "checked_in", "in_progress", "completed", "pending"].includes(b.status)) return false;
+        if (b.status === "pending") {
+            const expiry = b.hold_expires_at
+                ? new Date(b.hold_expires_at)
+                : (b.created_at ? new Date(new Date(b.created_at).getTime() + 35 * 60 * 1000) : null);
+            if (expiry && expiry <= nowManila) return false;
+        }
         return b.start_time < endTimeFormatted && b.end_time > startTimeFormatted;
     });
 
@@ -1325,6 +1332,7 @@ const simulateCreateWalkInBookingRpc = ({
         total_amount: expectedAmount,
         payment_status: paymentStatus,
         payment_method: paymentMethod,
+        payment_reference: paymentReference,
     };
 };
 
@@ -1656,6 +1664,58 @@ test("simulated create_walk_in_booking enforces authorization, duration, pricing
             }),
         /INVALID_ARGUMENT: payment_method must be cash, gcash, or null/
     );
+
+    // 15. Valid walk-in booking retains paymentReference (GCash reference)
+    const walkinGcash = simulateCreateWalkInBookingRpc({
+        authRole: "authenticated",
+        authUid: adminUid,
+        profileRole: "admin",
+        courtId: validCourtId,
+        customerName: "Guest Player GCash",
+        bookingDate: "2026-10-25",
+        startTime: "16:00:00",
+        endTime: "17:00:00",
+        amount: 200,
+        customerId: guestCustId,
+        paymentMethod: "gcash",
+        paymentReference: "GCASH-REF-9988",
+        operatingHoursTable,
+        courtsTable,
+        bookingsTable,
+        nowManila: nowInManila,
+    });
+    assert.equal(walkinGcash.payment_method, "gcash");
+    assert.equal(walkinGcash.payment_reference, "GCASH-REF-9988");
+
+    // 16. Walk-in booking succeeds when overlapping slot is an expired pending hold
+    const expiredPendingHoldBooking = {
+        court_id: validCourtId,
+        booking_date: "2026-10-25",
+        start_time: "18:00:00",
+        end_time: "20:00:00",
+        status: "pending",
+        hold_expires_at: "2026-10-24T11:00:00+08:00", // expired 1 hour prior to nowInManila (12:00)
+    };
+    const bookingsWithExpiredHold = [...bookingsTable, expiredPendingHoldBooking];
+    const walkinOverExpiredHold = simulateCreateWalkInBookingRpc({
+        authRole: "authenticated",
+        authUid: adminUid,
+        profileRole: "admin",
+        courtId: validCourtId,
+        customerName: "Walkin Over Expired Hold",
+        bookingDate: "2026-10-25",
+        startTime: "18:00:00",
+        endTime: "20:00:00",
+        amount: 400,
+        customerId: guestCustId,
+        paymentMethod: "cash",
+        operatingHoursTable,
+        courtsTable,
+        bookingsTable: bookingsWithExpiredHold,
+        nowManila: nowInManila,
+    });
+    assert.equal(walkinOverExpiredHold.duration_hours, 2);
+    assert.equal(walkinOverExpiredHold.total_amount, 400);
 });
 
 test("simulated concurrent booking race between online customer and walk-in admin serializes cleanly", () => {

@@ -1,11 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { DayData } from "./dashboardTypes";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 export const fetchBookingOverview = async () => {
     try {
-        const todayStr = new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Asia/Manila"
-        }).format(new Date());
+        const todayStr = formatManilaDate(new Date());
 
         const todayManila = new Date(`${todayStr}T12:00:00+08:00`);
         const currentDay = todayManila.getDay();
@@ -18,12 +17,8 @@ export const fetchBookingOverview = async () => {
         const sunday = new Date(monday);
         sunday.setDate(monday.getDate() + 6);
 
-        const formatToYMD = (date: Date) => new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Asia/Manila"
-        }).format(date);
-
-        const mondayStr = formatToYMD(monday);
-        const sundayStr = formatToYMD(sunday);
+        const mondayStr = formatManilaDate(monday);
+        const sundayStr = formatManilaDate(sunday);
 
         const { data: bookings, error } = await supabase
             .from("bookings")

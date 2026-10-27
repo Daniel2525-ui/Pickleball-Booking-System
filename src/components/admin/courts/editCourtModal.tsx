@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,18 +32,18 @@ interface EditCourtModalProps {
 }
 
 export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: EditCourtModalProps) => {
-    const [name, setName] = useState("");
-    const [status, setStatus] = useState("active");
+    const [name, setName] = useState(court?.name || "");
+    const [status, setStatus] = useState(court ? ((court.status === "occupied" || court.status === "available") ? "active" : court.status) : "active");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [prevCourt, setPrevCourt] = useState<Court | null>(court);
 
-    useEffect(() => {
-        if (court) {
-            setName(court.name);
-            setStatus((court.status === "occupied" || court.status === "available") ? "active" : court.status);
-            setError(null);
-        }
-    }, [court]);
+    if (court !== prevCourt) {
+        setPrevCourt(court);
+        setName(court?.name || "");
+        setStatus(court ? ((court.status === "occupied" || court.status === "available") ? "active" : court.status) : "active");
+        setError(null);
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

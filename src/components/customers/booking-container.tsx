@@ -102,8 +102,17 @@ export const BookingContainer = () => {
   }, [selectedDate]);
 
   useEffect(() => {
-    refreshBookings();
-  }, [refreshBookings]);
+    let ignore = false;
+    fetchBookingsForDate(selectedDate).then(({ data }) => {
+      if (!ignore) {
+        setBookings(data);
+        setIsFetchingBookings(false);
+      }
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [selectedDate]);
 
   const courtNames = useMemo(() => courts.map((c) => c.name), [courts]);
 

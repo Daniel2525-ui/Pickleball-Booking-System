@@ -55,7 +55,18 @@ export default function CourtsContainer() {
   };
 
   useEffect(() => {
-    loadCourts();
+    let ignore = false;
+    fetchCourtsData().then(({ data }) => {
+      if (!ignore && data) {
+        setCourts(data);
+      }
+      if (!ignore) {
+        setLoading(false);
+      }
+    });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const normalizedSearch = search.trim().toLowerCase();

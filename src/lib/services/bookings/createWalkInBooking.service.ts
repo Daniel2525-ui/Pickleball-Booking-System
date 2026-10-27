@@ -59,16 +59,11 @@ export const createWalkInBooking = async (
             p_customer_id: customerId || null,
             p_user_id: userId || null,
             p_payment_method: methodParam,
+            p_payment_reference: paymentReference?.trim() || null,
         });
 
         if (!rpcError && rpcResult) {
             const bookingId = (rpcResult as { booking_id?: string } | null)?.booking_id ?? null;
-            if (bookingId && paymentReference?.trim()) {
-                await supabase
-                    .from("payments")
-                    .update({ payment_reference: paymentReference.trim() })
-                    .eq("booking_id", bookingId);
-            }
             return { bookingId, error: null };
         }
 

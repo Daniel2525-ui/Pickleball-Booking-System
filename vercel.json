@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/cleanup-expired-bookings",
-      "schedule": "0 16 * * *"
+      "schedule": "*/15 * * * *"
     }
   ]
 }

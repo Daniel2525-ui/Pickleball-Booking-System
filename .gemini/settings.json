@@ -25,5 +25,11 @@
         ]
       }
     ]
+  },
+  "mcpServers": {
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=fpqipekjhcmrjozqmgwb&read_only=true&features=database%2Cdocs",
+      "type": "http"
+    }
   }
 }
