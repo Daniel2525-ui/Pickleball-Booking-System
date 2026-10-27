@@ -40,8 +40,14 @@ export async function POST(req: NextRequest) {
         }
 
         switch (event.type) {
-            case "checkout.session.completed": {
+            case "checkout.session.completed":
+            case "checkout.session.async_payment_succeeded": {
                 const session = event.data.object as Stripe.Checkout.Session;
+
+                if (session.payment_status !== "paid") {
+                    console.log(`Checkout session ${session.id} payment_status is '${session.payment_status}'. Awaiting payment settlement.`);
+                    break;
+                }
 
                 const bookingId = session.metadata?.booking_id;
                 const paymentId = session.metadata?.payment_id;
@@ -84,6 +90,12 @@ export async function POST(req: NextRequest) {
                 }
 
                 console.log(`Reconciled checkout session ${session.id}: action=${outcome.action}`);
+                break;
+            }
+
+            case "checkout.session.async_payment_failed": {
+                const session = event.data.object as Stripe.Checkout.Session;
+                console.warn(`Checkout session ${session.id} async payment failed.`);
                 break;
             }
 

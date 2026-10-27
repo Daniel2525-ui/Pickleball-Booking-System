@@ -1,5 +1,5 @@
-import { Court } from "../courts/courtsTypes";
-import { BookingSlot } from "./fetchBookingsForDate.service";
+import type { Court } from "../courts/courtsTypes";
+import type { BookingSlot } from "./fetchBookingsForDate.service";
 
 export const to24h = (time12h: string): string => {
     const match = time12h.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -58,6 +58,42 @@ const getOverlappingBookings = (
     });
 };
 
+/**
+ * Determines whether a booking slot actively claims/blocks court availability.
+ * - Non-pending active statuses ('confirmed', 'completed', 'checked_in', 'in_progress') are always active.
+ * - Inactive terminal statuses ('cancelled', 'no_show') never block availability.
+ * - Pending holds check hold_expires_at, falling back to created_at + 35 minutes if hold_expires_at is missing.
+ * - If both timestamps are missing/invalid, fails conservatively to active (never silently frees a slot without established expiry).
+ */
+export const isBookingActive = (b: BookingSlot, now: Date = new Date()): boolean => {
+    const status = (b.status || "").toLowerCase();
+
+    // Cancelled or no-show bookings never block availability
+    if (status === "cancelled" || status === "no_show") {
+        return false;
+    }
+
+    // Confirmed / checked-in / in_progress / completed bookings block availability
+    if (status !== "pending") {
+        return true;
+    }
+
+    // Pending hold expiry evaluation
+    const holdExpiryMs = b.hold_expires_at ? new Date(b.hold_expires_at).getTime() : NaN;
+    const createdMs = b.created_at ? new Date(b.created_at).getTime() : NaN;
+
+    if (!isNaN(holdExpiryMs)) {
+        return holdExpiryMs > now.getTime();
+    }
+
+    if (!isNaN(createdMs)) {
+        return (createdMs + 35 * 60 * 1000) > now.getTime();
+    }
+
+    // Conservative fallback: do not silently free slot if hold expiry cannot be established safely
+    return true;
+};
+
 export const checkSlotAvailability = (
     courtName: string,
     timeRange: string,
@@ -96,11 +132,7 @@ export const checkSlotAvailability = (
         bookings
     );
 
-    const activeBookings = matchingBookings.filter((b) => {
-        const status = (b.status || "").toLowerCase();
-        if (status !== "pending") return true;
-        return !b.hold_expires_at || new Date(b.hold_expires_at) > now;
-    });
+    const activeBookings = matchingBookings.filter((b) => isBookingActive(b, now));
 
     if (activeBookings.length === 0) return "available";
 
@@ -111,7 +143,7 @@ export const checkSlotAvailability = (
     if (hasConfirmed) return "booked";
 
     const belongsToUser = activeBookings.some(
-        (booking) => booking.user_id === currentUserId
+        (booking) => Boolean(currentUserId) && Boolean(booking.user_id) && booking.user_id === currentUserId
     );
 
     return belongsToUser ? "user_pending" : "pending";
@@ -129,9 +161,5 @@ export const getSlotBooking = (
 
     const matching = getOverlappingBookings(court.id, timeRange, bookings);
     const now = new Date();
-    return matching.find((b) => {
-        const status = (b.status || "").toLowerCase();
-        if (status !== "pending") return true;
-        return !b.hold_expires_at || new Date(b.hold_expires_at) > now;
-    });
+    return matching.find((b) => isBookingActive(b, now));
 };

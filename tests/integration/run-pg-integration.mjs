@@ -304,6 +304,12 @@ async function main() {
   runPsqlFile(rlsMigrationPath);
   console.log("✔ RLS migration applied successfully with 0 errors.");
 
+  // 13. Apply cancel_expired_booking resilience migration: 20261030_cancel_expired_booking_resilience.sql
+  const resilienceMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261030_cancel_expired_booking_resilience.sql");
+  console.log(`[Setup] Applying resilience migration: 20261030_cancel_expired_booking_resilience.sql...`);
+  runPsqlFile(resilienceMigrationPath);
+  console.log("✔ Resilience migration applied successfully with 0 errors.");
+
   // ---------------------------------------------------------------------------
   // Test Cases Execution
   // ---------------------------------------------------------------------------
@@ -2056,6 +2062,486 @@ async function main() {
     assert.equal(allPayments.status, 0);
     const totalCount = parseInt(allPayments.stdout.trim(), 10);
     assert(totalCount > aliceCount, "Total payments must exceed Alice's count alone");
+  });
+
+  // --- Group 6: 20261030 cancel_expired_booking Resilience Tests ---
+  const cleanupAuditDate = "2029-11-13"; // Tuesday (open 07:00 - 22:00)
+
+  await runTest("20261030 Resilience: Expired pending booking with no payment can be cancelled (default NULL payment_id)", () => {
+    // 1. Create expired pending booking with no payments row
+    const insertRes = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '07:00:00', '08:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    assert.equal(insertRes.status, 0, insertRes.stderr);
+    const bookingId = insertRes.stdout.trim();
+
+    // Verify 0 payments exist
+    const pCount = runPsqlCommand(`SELECT count(*) FROM public.payments WHERE booking_id = '${bookingId}';`);
+    assert.equal(pCount.stdout.trim(), "0");
+
+    // Call cancel_expired_booking with 1 argument (omitting p_payment_id)
+    const cancelRes = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bookingId}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelRes.status, 0, cancelRes.stderr);
+    const cancelObj = JSON.parse(cancelRes.stdout);
+    assert.equal(cancelObj.cancelled, true, "Must cancel expired hold with 0 payments");
+    assert.equal(cancelObj.booking_id, bookingId);
+    assert.equal(cancelObj.payment_id, null);
+
+    // Verify booking status in database is 'cancelled'
+    const bCheck = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bookingId}';`);
+    assert.equal(bCheck.stdout.trim(), "cancelled");
+  });
+
+  await runTest("20261030 Resilience: Expired pending booking with a failed payment can be cancelled", () => {
+    // 1. Create expired pending booking
+    const insertRes = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '08:00:00', '09:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    assert.equal(insertRes.status, 0, insertRes.stderr);
+    const bookingId = insertRes.stdout.trim();
+
+    // 2. Insert a failed payment
+    const pInsertRes = runPsqlCommand(`
+      INSERT INTO public.payments (id, booking_id, amount, status)
+      VALUES (gen_random_uuid(), '${bookingId}', 200, 'failed')
+      RETURNING id;
+    `);
+    assert.equal(pInsertRes.status, 0, pInsertRes.stderr);
+    const paymentId = pInsertRes.stdout.trim();
+
+    // 3. Cancel with explicit payment_id (which is failed)
+    const cancelRes = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bookingId}', '${paymentId}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelRes.status, 0, cancelRes.stderr);
+    const cancelObj = JSON.parse(cancelRes.stdout);
+    assert.equal(cancelObj.cancelled, true, "Must cancel booking even if payment was already failed");
+
+    // Verify DB: booking is cancelled, payment remains failed
+    const bCheck = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bookingId}';`);
+    assert.equal(bCheck.stdout.trim(), "cancelled");
+    const pCheck = runPsqlCommand(`SELECT status FROM public.payments WHERE id = '${paymentId}';`);
+    assert.equal(pCheck.stdout.trim(), "failed");
+  });
+
+  await runTest("20261030 Resilience: Settled payment (paid, succeeded, refunded, or paid_at IS NOT NULL) prevents cancellation", () => {
+    const statuses = [
+      { status: "paid", paid_at: "now()" },
+      { status: "succeeded", paid_at: "NULL" },
+      { status: "refunded", paid_at: "now()" },
+      { status: "pending", paid_at: "now()" }, // paid_at IS NOT NULL prevents cancellation even if status says pending
+    ];
+
+    for (let i = 0; i < statuses.length; i++) {
+      const { status, paid_at } = statuses[i];
+      const startHour = 9 + i;
+      const endHour = startHour + 1;
+      const startTime = `${startHour.toString().padStart(2, "0")}:00:00`;
+      const endTime = `${endHour.toString().padStart(2, "0")}:00:00`;
+
+      const insertRes = runPsqlCommand(`
+        INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+        VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '${startTime}', '${endTime}', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+        RETURNING id;
+      `);
+      assert.equal(insertRes.status, 0, insertRes.stderr);
+      const bookingId = insertRes.stdout.trim();
+
+      const pInsertRes = runPsqlCommand(`
+        INSERT INTO public.payments (id, booking_id, amount, status, paid_at)
+        VALUES (gen_random_uuid(), '${bookingId}', 200, '${status}', ${paid_at})
+        RETURNING id;
+      `);
+      assert.equal(pInsertRes.status, 0, pInsertRes.stderr);
+      const paymentId = pInsertRes.stdout.trim();
+
+      // Call cancel_expired_booking
+      const cancelRes = runPsqlCommand(
+        `SELECT public.cancel_expired_booking('${bookingId}', '${paymentId}');`,
+        { role: "service_role" }
+      );
+      assert.equal(cancelRes.status, 0, cancelRes.stderr);
+      const cancelObj = JSON.parse(cancelRes.stdout);
+      assert.equal(cancelObj.cancelled, false, `Must reject cancellation for settled payment (status=${status}, paid_at=${paid_at})`);
+      assert.equal(cancelObj.reason, "PAYMENT_ALREADY_SETTLED");
+
+      // Verify booking is still pending
+      const bCheck = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bookingId}';`);
+      assert.equal(bCheck.stdout.trim(), "pending", "Booking must remain pending when payment is settled");
+    }
+  });
+
+  await runTest("20261030 Resilience: Active refund requests prevent cancellation, whereas inactive/terminal refund requests do not", () => {
+    // 4a. Active refund status: 'pending' prevents cancellation
+    const insertRes1 = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '13:00:00', '14:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    const bId1 = insertRes1.stdout.trim();
+
+    const pInsertRes1 = runPsqlCommand(`
+      INSERT INTO public.payments (id, booking_id, amount, status)
+      VALUES (gen_random_uuid(), '${bId1}', 200, 'pending')
+      RETURNING id;
+    `);
+    const pId1 = pInsertRes1.stdout.trim();
+
+    const refRes1 = runPsqlCommand(`
+      INSERT INTO public.refund_requests (id, payment_id, booking_id, amount, currency, payment_method, reason, status, idempotency_key)
+      VALUES (gen_random_uuid(), '${pId1}', '${bId1}', 200, 'php', 'stripe', 'EXPIRED_HOLD_RECONCILIATION', 'pending', 'idem_refund_pending_test')
+      RETURNING id;
+    `, { role: "service_role" });
+    assert.equal(refRes1.status, 0, `Insert refund request 1 failed: ${refRes1.stderr}`);
+
+    const cancelRes1 = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bId1}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelRes1.status, 0, cancelRes1.stderr);
+    const cancelObj1 = JSON.parse(cancelRes1.stdout);
+    assert.equal(cancelObj1.cancelled, false, "Must not cancel booking with active refund request");
+    assert.equal(cancelObj1.reason, "REFUND_IN_PROGRESS");
+
+    const bCheck1 = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bId1}';`);
+    assert.equal(bCheck1.stdout.trim(), "pending");
+
+    // 4b. Terminal refund status: 'failed' allows cancellation
+    const insertRes2 = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '14:00:00', '15:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    const bId2 = insertRes2.stdout.trim();
+
+    const pInsertRes2 = runPsqlCommand(`
+      INSERT INTO public.payments (id, booking_id, amount, status)
+      VALUES (gen_random_uuid(), '${bId2}', 200, 'failed')
+      RETURNING id;
+    `);
+    const pId2 = pInsertRes2.stdout.trim();
+
+    const refRes2 = runPsqlCommand(`
+      INSERT INTO public.refund_requests (id, payment_id, booking_id, amount, currency, payment_method, reason, status, idempotency_key)
+      VALUES (gen_random_uuid(), '${pId2}', '${bId2}', 200, 'php', 'stripe', 'EXPIRED_HOLD_RECONCILIATION', 'failed', 'idem_refund_failed_test')
+      RETURNING id;
+    `, { role: "service_role" });
+    assert.equal(refRes2.status, 0, `Insert refund request 2 failed: ${refRes2.stderr}`);
+
+    const cancelRes2 = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bId2}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelRes2.status, 0, cancelRes2.stderr);
+    const cancelObj2 = JSON.parse(cancelRes2.stdout);
+    assert.equal(cancelObj2.cancelled, true, "Terminal failed refund request must allow cancellation");
+
+    const bCheck2 = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bId2}';`);
+    assert.equal(bCheck2.stdout.trim(), "cancelled");
+  });
+
+  await runTest("20261030 Resilience: Unexpired bookings cannot be cancelled (explicit timestamp and 35-minute fallback)", () => {
+    // 5a. Explicit future hold_expires_at
+    const insertRes1 = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '15:00:00', '16:00:00', 'pending', 200, now() + interval '15 minutes', now())
+      RETURNING id;
+    `);
+    const bId1 = insertRes1.stdout.trim();
+
+    const cancelRes1 = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bId1}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelRes1.status, 0, cancelRes1.stderr);
+    const cancelObj1 = JSON.parse(cancelRes1.stdout);
+    assert.equal(cancelObj1.cancelled, false, "Must not cancel unexpired hold");
+    assert.equal(cancelObj1.reason, "HOLD_NOT_EXPIRED");
+
+    // 5b. Null hold_expires_at with created_at < 35 minutes ago -> unexpired via fallback
+    const insertRes2 = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '16:00:00', '17:00:00', 'pending', 200, NULL, now() - interval '10 minutes')
+      RETURNING id;
+    `);
+    const bId2 = insertRes2.stdout.trim();
+
+    const cancelRes2 = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bId2}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelRes2.status, 0, cancelRes2.stderr);
+    const cancelObj2 = JSON.parse(cancelRes2.stdout);
+    assert.equal(cancelObj2.cancelled, false, "Must not cancel booking within 35m fallback window");
+    assert.equal(cancelObj2.reason, "HOLD_NOT_EXPIRED");
+
+    // 5c. Null hold_expires_at with created_at > 35 minutes ago -> expired via fallback, can cancel
+    const insertRes3 = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '17:00:00', '18:00:00', 'pending', 200, NULL, now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    const bId3 = insertRes3.stdout.trim();
+
+    const cancelRes3 = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bId3}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelRes3.status, 0, cancelRes3.stderr);
+    const cancelObj3 = JSON.parse(cancelRes3.stdout);
+    assert.equal(cancelObj3.cancelled, true, "Must cancel booking when 35m fallback has passed");
+
+    const bCheck3 = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bId3}';`);
+    assert.equal(bCheck3.stdout.trim(), "cancelled");
+  });
+
+  await runTest("20261030 Resilience: Already-cancelled or otherwise ineligible bookings are handled safely", () => {
+    // 6a. Nonexistent booking UUID
+    const cancelNonexistent = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('ffffffff-ffff-ffff-ffff-ffffffffffff');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelNonexistent.status, 0, cancelNonexistent.stderr);
+    const nonExistObj = JSON.parse(cancelNonexistent.stdout);
+    assert.equal(nonExistObj.cancelled, false);
+    assert.equal(nonExistObj.reason, "BOOKING_NOT_FOUND");
+
+    // 6b. Already-cancelled booking
+    const insertCancelled = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '18:00:00', '19:00:00', 'cancelled', 200, now() - interval '10 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    const bIdCancelled = insertCancelled.stdout.trim();
+
+    const cancelAlreadyCancelled = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bIdCancelled}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelAlreadyCancelled.status, 0, cancelAlreadyCancelled.stderr);
+    const alreadyCancelledObj = JSON.parse(cancelAlreadyCancelled.stdout);
+    assert.equal(alreadyCancelledObj.cancelled, false);
+    assert.equal(alreadyCancelledObj.reason, "BOOKING_NOT_PENDING");
+    assert.equal(alreadyCancelledObj.status, "cancelled");
+
+    // 6c. Confirmed booking
+    const insertConfirmed = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '19:00:00', '20:00:00', 'confirmed', 200, now() - interval '10 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    const bIdConfirmed = insertConfirmed.stdout.trim();
+
+    const cancelConfirmed = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bIdConfirmed}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelConfirmed.status, 0, cancelConfirmed.stderr);
+    const confirmedObj = JSON.parse(cancelConfirmed.stdout);
+    assert.equal(confirmedObj.cancelled, false);
+    assert.equal(confirmedObj.reason, "BOOKING_NOT_PENDING");
+    assert.equal(confirmedObj.status, "confirmed");
+  });
+
+  await runTest("20261030 Resilience: Unauthorized roles cannot execute cancel_expired_booking", () => {
+    const dummyId = "00000000-0000-0000-0000-000000000001";
+
+    // 7a. Anonymous role
+    const anonRes = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${dummyId}');`,
+      { role: "anon", asRole: true }
+    );
+    assert.notEqual(anonRes.status, 0, "Anon must be rejected");
+    assert.ok(anonRes.stderr.includes("permission denied"), `Expected permission denied, got: ${anonRes.stderr}`);
+
+    // 7b. Authenticated customer role
+    const authRes = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${dummyId}');`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+    assert.notEqual(authRes.status, 0, "Authenticated customer must be rejected");
+    assert.ok(authRes.stderr.includes("permission denied"), `Expected permission denied, got: ${authRes.stderr}`);
+
+    // 7c. Authenticated claim when connected as postgres superuser (tested by internal guard)
+    const authClaimRes = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${dummyId}');`,
+      { role: "authenticated", uid: aliceUid, asRole: false }
+    );
+    assert.notEqual(authClaimRes.status, 0, "Authenticated claim must be rejected by internal guard");
+    assert.ok(authClaimRes.stderr.includes("UNAUTHORIZED") || authClaimRes.stderr.includes("42501"));
+  });
+
+  await runTest("20261030 Resilience: Passing a payment ID belonging to a different booking cannot incorrectly update that payment", () => {
+    // 1. Booking A: expired pending booking
+    const insertA = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '20:00:00', '21:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    const bIdA = insertA.stdout.trim();
+
+    // 2. Booking B: active pending booking with pending Payment B
+    const insertB = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '21:00:00', '22:00:00', 'pending', 200, now() + interval '30 minutes', now())
+      RETURNING id;
+    `);
+    const bIdB = insertB.stdout.trim();
+
+    const insertPaymentB = runPsqlCommand(`
+      INSERT INTO public.payments (id, booking_id, amount, status)
+      VALUES (gen_random_uuid(), '${bIdB}', 200, 'pending')
+      RETURNING id;
+    `);
+    const pIdB = insertPaymentB.stdout.trim();
+
+    // 3. Attempt to cancel Booking A while passing Payment B's id
+    const mismatchRes = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bIdA}', '${pIdB}');`,
+      { role: "service_role" }
+    );
+    assert.equal(mismatchRes.status, 0, mismatchRes.stderr);
+    const mismatchObj = JSON.parse(mismatchRes.stdout);
+    assert.equal(mismatchObj.cancelled, false, "Must refuse cancellation when payment does not belong to booking");
+    assert.equal(mismatchObj.reason, "PAYMENT_NOT_FOUND");
+
+    // 4. Verify neither Booking A nor Payment B was modified
+    const bCheckA = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bIdA}';`);
+    assert.equal(bCheckA.stdout.trim(), "pending", "Booking A must remain pending");
+
+    const pCheckB = runPsqlCommand(`SELECT status FROM public.payments WHERE id = '${pIdB}';`);
+    assert.equal(pCheckB.stdout.trim(), "pending", "Payment B must remain pending and not marked failed");
+  });
+
+  // --- Group 7: 20261030 Rollback Verification Tests ---
+  const rollbackAuditDate = "2029-11-20"; // Tuesday (open 07:00 - 22:00)
+
+  await runTest("20261030 Rollback: Execute rollback and verify parameter defaults, signature, original behavior, and permissions", () => {
+    // 1. Verify before rollback: pg_proc has 1 default argument (DEFAULT NULL)
+    const beforeProc = runPsqlCommand(`
+      SELECT pronargs, pronargdefaults, proargdefaults IS NOT NULL
+      FROM pg_proc
+      JOIN pg_namespace n ON n.oid = pg_proc.pronamespace
+      WHERE n.nspname = 'public' AND proname = 'cancel_expired_booking';
+    `);
+    assert.equal(beforeProc.status, 0, beforeProc.stderr);
+    assert.equal(beforeProc.stdout.trim(), "2|1|t", "Before rollback, function must have pronargs=2 and pronargdefaults=1");
+
+    // 2. Execute corrected rollback migration in disposable test database
+    const rollbackPath = path.join(PROJECT_ROOT, "supabase/rollback_20261030_cancel_expired_booking_resilience.sql");
+    runPsqlFile(rollbackPath);
+
+    // 3. Verify after rollback: pg_proc has 0 default arguments (proargdefaults IS NULL)
+    const afterProc = runPsqlCommand(`
+      SELECT pronargs, pronargdefaults, proargdefaults IS NULL
+      FROM pg_proc
+      JOIN pg_namespace n ON n.oid = pg_proc.pronamespace
+      WHERE n.nspname = 'public' AND proname = 'cancel_expired_booking';
+    `);
+    assert.equal(afterProc.status, 0, afterProc.stderr);
+    assert.equal(afterProc.stdout.trim(), "2|0|t", "After rollback, function must have pronargs=2 and pronargdefaults=0 with no defaults");
+
+    // 4. Verify single-argument call is REJECTED with 42883 (does not exist)
+    const singleArgRes = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('00000000-0000-0000-0000-000000000001');`,
+      { role: "service_role" }
+    );
+    assert.notEqual(singleArgRes.status, 0, "Single-argument call must be rejected after rollback");
+    assert.ok(
+      singleArgRes.stderr.includes("42883") || singleArgRes.stderr.includes("does not exist"),
+      `Expected function does not exist error (42883), got: ${singleArgRes.stderr}`
+    );
+
+    // 5. Verify two-argument call executes original function behavior
+    // 5a. Unexpired hold -> HOLD_NOT_EXPIRED
+    const unexpHold = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${rollbackAuditDate}', '07:00:00', '08:00:00', 'pending', 200, now() + interval '20 minutes', now())
+      RETURNING id;
+    `);
+    const bUnexp = unexpHold.stdout.trim();
+    const pUnexp = runPsqlCommand(`
+      INSERT INTO public.payments (id, booking_id, amount, status)
+      VALUES (gen_random_uuid(), '${bUnexp}', 200, 'pending')
+      RETURNING id;
+    `).stdout.trim();
+
+    const cancelUnexp = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bUnexp}', '${pUnexp}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelUnexp.status, 0, cancelUnexp.stderr);
+    assert.equal(JSON.parse(cancelUnexp.stdout).cancelled, false);
+    assert.equal(JSON.parse(cancelUnexp.stdout).reason, "HOLD_NOT_EXPIRED");
+
+    // 5b. Expired hold with pending payment -> cancels booking and marks payment failed
+    const expHold = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${rollbackAuditDate}', '08:00:00', '09:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    const bExp = expHold.stdout.trim();
+    const pExp = runPsqlCommand(`
+      INSERT INTO public.payments (id, booking_id, amount, status)
+      VALUES (gen_random_uuid(), '${bExp}', 200, 'pending')
+      RETURNING id;
+    `).stdout.trim();
+
+    const cancelExp = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bExp}', '${pExp}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelExp.status, 0, cancelExp.stderr);
+    assert.equal(JSON.parse(cancelExp.stdout).cancelled, true);
+
+    const bExpCheck = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${bExp}';`);
+    assert.equal(bExpCheck.stdout.trim(), "cancelled");
+    const pExpCheck = runPsqlCommand(`SELECT status FROM public.payments WHERE id = '${pExp}';`);
+    assert.equal(pExpCheck.stdout.trim(), "failed");
+
+    // 5c. Expired hold with non-pending payment -> returns PAYMENT_NOT_PENDING (original behavior)
+    const nonPendingHold = runPsqlCommand(`
+      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${activeCourtId}', '${rollbackAuditDate}', '09:00:00', '10:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      RETURNING id;
+    `);
+    const bNonPending = nonPendingHold.stdout.trim();
+    const pFailed = runPsqlCommand(`
+      INSERT INTO public.payments (id, booking_id, amount, status)
+      VALUES (gen_random_uuid(), '${bNonPending}', 200, 'failed')
+      RETURNING id;
+    `).stdout.trim();
+
+    const cancelNonPending = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bNonPending}', '${pFailed}');`,
+      { role: "service_role" }
+    );
+    assert.equal(cancelNonPending.status, 0, cancelNonPending.stderr);
+    assert.equal(JSON.parse(cancelNonPending.stdout).cancelled, false);
+    assert.equal(JSON.parse(cancelNonPending.stdout).reason, "PAYMENT_NOT_PENDING");
+
+    // 6. Verify permissions after rollback: anon and authenticated rejected, service_role allowed
+    const anonCheck = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bExp}', '${pExp}');`,
+      { role: "anon", asRole: true }
+    );
+    assert.notEqual(anonCheck.status, 0, "Anon must be rejected after rollback");
+    assert.ok(anonCheck.stderr.includes("permission denied"), `Expected permission denied, got: ${anonCheck.stderr}`);
+
+    const authCheck = runPsqlCommand(
+      `SELECT public.cancel_expired_booking('${bExp}', '${pExp}');`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+    assert.notEqual(authCheck.status, 0, "Authenticated must be rejected after rollback");
+    assert.ok(authCheck.stderr.includes("permission denied"), `Expected permission denied, got: ${authCheck.stderr}`);
   });
 
   console.log("\n================================================================================");

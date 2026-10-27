@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { stripe } from "@/lib/stripe";
-import { withDbRetry } from "./withDbRetry";
+import { stripe } from "../../stripe.ts";
+import { withDbRetry } from "./withDbRetry.ts";
 
 export interface ReconcileParams {
     bookingId: string;
@@ -10,6 +10,14 @@ export interface ReconcileParams {
     stripeSessionId: string;
     stripePaymentIntent: string;
     supabase: SupabaseClient;
+    stripeClient?: {
+        refunds: {
+            create: (
+                params: { payment_intent: string },
+                options?: { idempotencyKey?: string }
+            ) => Promise<{ id: string; status?: string }>;
+        };
+    };
 }
 
 export interface ReconcileOutcome {
@@ -38,6 +46,7 @@ export async function processStripePaymentReconciliation(
         stripeSessionId,
         stripePaymentIntent,
         supabase,
+        stripeClient,
     } = params;
 
     const rpcResult = await withDbRetry(() =>
@@ -99,7 +108,8 @@ export async function processStripePaymentReconciliation(
 
         if (stripePaymentIntent && data.idempotency_key) {
             try {
-                const refund = await stripe.refunds.create(
+                const stripeInstance = stripeClient || stripe;
+                const refund = await stripeInstance.refunds.create(
                     {
                         payment_intent: stripePaymentIntent,
                     },
@@ -132,7 +142,7 @@ export async function processStripePaymentReconciliation(
         }
 
         if (data.refund_request_id) {
-            await withDbRetry(() =>
+            const settleRes = await withDbRetry(() =>
                 supabase.rpc("settle_stripe_refund", {
                     p_refund_request_id: data.refund_request_id,
                     p_stripe_refund_id: stripeRefundId,
@@ -142,6 +152,17 @@ export async function processStripePaymentReconciliation(
                     p_currency: currency.toLowerCase(),
                 })
             );
+
+            if (settleRes.error) {
+                console.error("settle_stripe_refund RPC error:", settleRes.error);
+                return {
+                    success: false,
+                    action: "REFUND_SCHEDULED",
+                    error: settleRes.error.message || "Failed to settle refund in database",
+                    refundRequestId: data.refund_request_id,
+                    refundStatus: stripeRefundStatus,
+                };
+            }
         }
 
         return {
