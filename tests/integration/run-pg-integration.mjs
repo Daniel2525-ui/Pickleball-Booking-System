@@ -3216,10 +3216,28 @@ async function main() {
     const job = runPsqlCommand(`SELECT count(*) || '|' || max(schedule) FROM cron.job WHERE jobname = 'cleanup-expired-bookings';`, { db: cronDb });
     assert.equal(job.stdout, "1|*/15 * * * *", "Re-applying must keep exactly one 15-minute job");
 
-    const run = runPsqlCommand(`DO $$ BEGIN EXECUTE (SELECT command FROM cron.job WHERE jobname = 'cleanup-expired-bookings'); END $$;`, { db: cronDb });
+    // pg_cron executes the stored command text as a top-level statement; do the same
+    const command = runPsqlCommand(`SELECT command FROM cron.job WHERE jobname = 'cleanup-expired-bookings';`, { db: cronDb }).stdout;
+    const run = runPsqlCommand(command, { db: cronDb });
     assert.equal(run.status, 0, run.stderr);
     const call = runPsqlCommand(`SELECT url || '|' || (headers->>'Authorization') || '|' || timeout_milliseconds FROM net.calls;`, { db: cronDb });
     assert.equal(call.stdout, "https://crosshair.example/api/cron/cleanup-expired-bookings|Bearer test-cron-secret|15000");
+
+    // Failure cases: a missing or blank secret fails the run visibly (cron.job_run_details) and sends nothing
+    for (const [label, setup] of [
+      ["missing secret", `DELETE FROM vault.decrypted_secrets WHERE name = 'crosshair_cron_secret';`],
+      ["missing url", `DELETE FROM vault.decrypted_secrets WHERE name = 'crosshair_app_url';`],
+      ["blank secret", `UPDATE vault.decrypted_secrets SET decrypted_secret = '' WHERE name = 'crosshair_cron_secret';`],
+    ]) {
+      runPsqlCommand(`TRUNCATE net.calls; TRUNCATE vault.decrypted_secrets;
+        INSERT INTO vault.decrypted_secrets VALUES ('crosshair_app_url', 'https://crosshair.example'), ('crosshair_cron_secret', 'test-cron-secret');
+        ${setup}`, { db: cronDb });
+      const failed = runPsqlCommand(command, { db: cronDb });
+      assert.notEqual(failed.status, 0, `${label}: run must fail`);
+      assert.ok(failed.stderr.includes("Vault secret crosshair_app_url or crosshair_cron_secret is missing"), `${label}: ${failed.stderr}`);
+      assert.ok(!failed.stderr.includes("test-cron-secret"), `${label}: error must not leak the secret`);
+      assert.equal(runPsqlCommand(`SELECT count(*) FROM net.calls;`, { db: cronDb }).stdout, "0", `${label}: no request may be sent`);
+    }
 
     runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_20261103_supabase_cron_cleanup.sql"), { db: cronDb });
     runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_20261103_supabase_cron_cleanup.sql"), { db: cronDb });
