@@ -7,7 +7,7 @@ import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
 
 /**
  * Cleanup cron job for expired reservation holds.
- * Triggered every 15 minutes by Supabase Cron (supabase/migrations/20261103_supabase_cron_cleanup.sql).
+ * Triggered every 15 minutes by Supabase Cron (supabase/migrations/20261028153353_20261103_supabase_cron_cleanup.sql).
  *
  * Concurrency & Safety Guarantees:
  * 1. Authenticates request via Authorization: Bearer <CRON_SECRET>.

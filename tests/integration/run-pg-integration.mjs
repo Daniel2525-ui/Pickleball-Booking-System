@@ -301,7 +301,7 @@ async function main() {
   console.log("✔ Phase 2 corrective migration applied successfully with 0 errors.");
 
   // 12. Apply RLS migration: 20261029_enable_rls_on_core_tables.sql
-  const rlsMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261029_enable_rls_on_core_tables.sql");
+  const rlsMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261028141752_20261029_enable_rls_on_core_tables.sql");
   console.log(`[Setup] Applying RLS migration: 20261029_enable_rls_on_core_tables.sql...`);
   runPsqlFile(rlsMigrationPath);
   console.log("✔ RLS migration applied successfully with 0 errors.");
@@ -313,22 +313,31 @@ async function main() {
   console.log("✔ Resilience migration applied successfully with 0 errors.");
 
   // 14. Apply tightened RLS & walk-in RPC migration: 20261031_tighten_core_rls_and_walk_in_rpc.sql
-  const tightenRlsMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261031_tighten_core_rls_and_walk_in_rpc.sql");
+  const tightenRlsMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261028141848_20261031_tighten_core_rls_and_walk_in_rpc.sql");
   console.log(`[Setup] Applying tightened RLS migration: 20261031_tighten_core_rls_and_walk_in_rpc.sql...`);
   runPsqlFile(tightenRlsMigrationPath);
   console.log("✔ Tightened RLS migration applied successfully with 0 errors.");
 
   // 15. Apply 20261101 secure profiles & public slot availability migration
-  const secureProfilesMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261101_secure_profiles_and_public_slot_availability.sql");
+  const secureProfilesMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261028154959_20261101_secure_profiles_and_public_slot_availability.sql");
   console.log(`[Setup] Applying secure profiles migration: 20261101_secure_profiles_and_public_slot_availability.sql...`);
   runPsqlFile(secureProfilesMigrationPath);
   console.log("✔ Secure profiles migration applied successfully with 0 errors.");
 
   // 16. Apply 20261102 launch hardening migration
-  const launchHardeningMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261102_launch_hardening.sql");
+  const launchHardeningMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261028142111_20261102_launch_hardening.sql");
   console.log(`[Setup] Applying launch hardening migration: 20261102_launch_hardening.sql...`);
   runPsqlFile(launchHardeningMigrationPath);
   console.log("✔ Launch hardening migration applied successfully with 0 errors.");
+
+  // 17. Apply hold release grace period migration (file renamed to its hosted version once applied)
+  const graceMigrationPath = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations"))
+    .filter((f) => f.endsWith("hold_release_grace_period.sql") || f === "hold_release_grace_period.pending.sql")
+    .map((f) => path.join(PROJECT_ROOT, "supabase/migrations", f))[0];
+  assert.ok(graceMigrationPath, "hold_release_grace_period migration file not found");
+  console.log(`[Setup] Applying grace period migration: ${path.basename(graceMigrationPath)}...`);
+  runPsqlFile(graceMigrationPath);
+  console.log("✔ Grace period migration applied successfully with 0 errors.");
 
   // ---------------------------------------------------------------------------
   // Test Cases Execution
@@ -356,7 +365,7 @@ async function main() {
     // Tests build their own Alice/Bob holds; expire leftovers so the 3-active-holds cap
     // (20261102) only sees holds created by the current test.
     const expireLeftovers = runPsqlCommand(
-      `UPDATE public.bookings SET hold_expires_at = now() - interval '1 second'
+      `UPDATE public.bookings SET hold_expires_at = now() - interval '1 hour'
        WHERE status = 'pending' AND user_id IN ('${aliceUid}', '${bobUid}')
          AND coalesce(hold_expires_at, created_at + interval '35 minutes') > now();`
     );
@@ -1186,13 +1195,13 @@ async function main() {
     assert.ok(holdResBob.stderr.includes("SLOT_UNAVAILABLE") || holdResBob.stderr.includes("P0001"));
   });
 
-  await runTest("Stage 1: Expired pending hold does NOT block new reservations", () => {
-    // 1. Insert a pending hold for 15:00 - 16:00 whose hold_expires_at is strictly in the past
+  await runTest("Stage 1: Expired pending hold does NOT block new reservations once its grace period has passed", () => {
+    // 1. Insert a pending hold for 15:00 - 16:00 that expired longer ago than the 20-minute grace period
     const expiredInsert = runPsqlCommand(
       `INSERT INTO public.bookings (
         user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at
       ) VALUES (
-        '${aliceUid}', 'Alice Expired', '${activeCourtId}', '${stage1TestDate}', '15:00:00', '16:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '35 minutes'
+        '${aliceUid}', 'Alice Expired', '${activeCourtId}', '${stage1TestDate}', '15:00:00', '16:00:00', 'pending', 200, now() - interval '25 minutes', now() - interval '60 minutes'
       ) RETURNING id;`
     );
     assert.equal(expiredInsert.status, 0, expiredInsert.stderr);
@@ -1300,7 +1309,16 @@ async function main() {
     );
     assert.equal(expireRes.status, 0, expireRes.stderr);
 
-    // 5. Bob attempts to hold the same slot -> succeeds immediately, proving expired hold does not permanently block
+    // 4b. Just expired: still inside the 20-minute grace period, so a late Stripe webhook can still confirm it
+    const graceRes = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '${stage1TestDate}', '18:00:00', '19:00:00', '${bobUid}', 200);`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.notEqual(graceRes.status, 0, "A hold inside its grace period must still block the slot");
+    assert.ok(graceRes.stderr.includes("SLOT_UNAVAILABLE"), graceRes.stderr);
+    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '21 minutes' WHERE id = '${booking_id}';`);
+
+    // 5. Bob attempts to hold the same slot -> succeeds once the grace period has passed, proving expired hold does not permanently block
     const unblockRes = runPsqlCommand(
       `SELECT public.hold_court_booking(
         p_court_id => '${activeCourtId}',
@@ -1376,7 +1394,7 @@ async function main() {
 
     // 2. Alice's hold expires before Stripe session creation finishes
     const expireAlice = runPsqlCommand(
-      `UPDATE public.bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = '${aliceBookingId}';`
+      `UPDATE public.bookings SET hold_expires_at = now() - interval '21 minutes' WHERE id = '${aliceBookingId}';`
     );
     assert.equal(expireAlice.status, 0, expireAlice.stderr);
 
@@ -1483,7 +1501,7 @@ async function main() {
       // 1. Insert Alice's pending booking
       const aliceHold = runPsqlCommand(
         `SELECT public.hold_court_booking(
-          '${activeCourtId}', '${conflictAuditDate}', '${timeStart}', '${timeEnd}', '${aliceUid}', 200, now() - interval '1 minute'
+          '${activeCourtId}', '${conflictAuditDate}', '${timeStart}', '${timeEnd}', '${aliceUid}', 200, now() - interval '21 minutes'
         );`,
         { role: "authenticated", uid: aliceUid }
       );
@@ -2864,10 +2882,10 @@ async function main() {
       VALUES (gen_random_uuid(), '${bobUid}', '${activeCourtId}', '${slotDate}', '10:00:00', '11:00:00', 'pending', 200, now() + interval '25 minutes');
     `);
 
-    // 3d. Bob expired pending hold (11:00 - 12:00) - must be filtered out
+    // 3d. Bob expired pending hold (11:00 - 12:00), past its 20-minute grace period - must be filtered out
     runPsqlCommand(`
       INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at)
-      VALUES (gen_random_uuid(), '${bobUid}', '${activeCourtId}', '${slotDate}', '11:00:00', '12:00:00', 'pending', 200, now() - interval '5 minutes');
+      VALUES (gen_random_uuid(), '${bobUid}', '${activeCourtId}', '${slotDate}', '11:00:00', '12:00:00', 'pending', 200, now() - interval '25 minutes');
     `);
 
     // 4. Anon queries availability:
@@ -2972,8 +2990,10 @@ async function main() {
     assert.equal(anonProfilesRollback.status, 0, anonProfilesRollback.stderr);
     assert.ok(parseInt(anonProfilesRollback.stdout.trim(), 10) > 0, "Anon can read profiles directly after rollback");
 
-    // 4. Re-apply Phase 1 migration cleanly
+    // 4. Re-apply Phase 1 migration cleanly, then the later migration that also redefines
+    //    get_public_slot_availability, so the remaining tests see the full migration chain
     runPsqlFile(secureProfilesMigrationPath);
+    runPsqlFile(graceMigrationPath);
 
     // 5. Verify functions are restored
     const procRestored = runPsqlCommand(`
@@ -3038,7 +3058,7 @@ async function main() {
     );
     assert.equal(hold.status, 0, hold.stderr);
     const { booking_id: expiredId } = JSON.parse(hold.stdout);
-    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE id = '${expiredId}';`);
+    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '21 minutes' WHERE id = '${expiredId}';`);
 
     const walkIn = runPsqlCommand(
       `SELECT public.create_walk_in_booking(
@@ -3064,7 +3084,7 @@ async function main() {
     assert.equal(hold.status, 0, hold.stderr);
     const { booking_id: paidId, payment_id: paidPaymentId } = JSON.parse(hold.stdout);
     runPsqlCommand(`UPDATE public.payments SET status = 'paid', paid_at = now() WHERE id = '${paidPaymentId}';`);
-    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE id = '${paidId}';`);
+    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '21 minutes' WHERE id = '${paidId}';`);
 
     const bobAttempt = runPsqlCommand(
       `SELECT public.hold_court_booking('${activeCourtId}', '${hardeningDate}', '11:00:00', '12:00:00', '${bobUid}', 200);`,
@@ -3176,6 +3196,126 @@ async function main() {
     assert.equal(reapplied.stdout, "0|true|false");
   });
 
+  // --- hold_release_grace_period: late Stripe webhooks ---
+  const graceDate = "2029-12-18"; // Tuesday (open 07:00 - 22:00), not used by other tests
+
+  await runTest("Grace period: a late webhook inside the grace period confirms the booking; nobody can take the slot meanwhile", () => {
+    const hold = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '${graceDate}', '09:00:00', '10:00:00', '${aliceUid}', 200);`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.equal(hold.status, 0, hold.stderr);
+    const { booking_id: bookingId, payment_id: paymentId } = JSON.parse(hold.stdout);
+    const confirm = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold('${bookingId}', '${paymentId}', 'cs_late_webhook', now() + interval '33 minutes');`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.equal(confirm.status, 0, confirm.stderr);
+
+    // Customer paid at the last moment; the hold has now expired but the webhook has not arrived yet
+    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '5 minutes' WHERE id = '${bookingId}';`);
+
+    const bobAttempt = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '${graceDate}', '09:00:00', '10:00:00', '${bobUid}', 200);`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.notEqual(bobAttempt.status, 0, "Slot must stay blocked during the grace period");
+    assert.ok(bobAttempt.stderr.includes("SLOT_UNAVAILABLE"), bobAttempt.stderr);
+
+    const walkIn = runPsqlCommand(
+      `SELECT public.create_walk_in_booking(
+        p_court_id => '${activeCourtId}', p_customer_name => 'Charlie Guest', p_booking_date => '${graceDate}',
+        p_start_time => '09:00:00', p_end_time => '10:00:00', p_amount => 200,
+        p_customer_id => '${guestCustId}', p_payment_method => 'cash'
+      );`,
+      { role: "authenticated", uid: adminUid }
+    );
+    assert.notEqual(walkIn.status, 0, "Walk-ins must also respect the grace period");
+    assert.ok(walkIn.stderr.includes("SLOT_UNAVAILABLE"), walkIn.stderr);
+
+    const untouched = runPsqlCommand(
+      `SELECT b.status || '|' || p.status FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${bookingId}';`
+    );
+    assert.equal(untouched.stdout, "pending|pending", "Grace-period hold must not be released or marked failed");
+
+    const late = runPsqlCommand(
+      `SELECT public.reconcile_booking_payment('${bookingId}', '${paymentId}', 'cs_late_webhook', 'pi_late_webhook', 200, 'php');`,
+      { role: "service_role" }
+    );
+    assert.equal(late.status, 0, late.stderr);
+    assert.equal(JSON.parse(late.stdout).action, "CONFIRMED", "Late payment must confirm the booking, not refund it");
+    const final = runPsqlCommand(
+      `SELECT b.status || '|' || p.status || '|' || (SELECT count(*) FROM public.refund_requests WHERE booking_id = b.id)
+       FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${bookingId}';`
+    );
+    assert.equal(final.stdout, "confirmed|paid|0");
+  });
+
+  await runTest("Grace period: grid shows grace-period holds as taken (masked); Stripe-verified cron cancel is not delayed", () => {
+    const hold = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '${graceDate}', '11:00:00', '12:00:00', '${bobUid}', 200);`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.equal(hold.status, 0, hold.stderr);
+    const { booking_id: bookingId, payment_id: paymentId } = JSON.parse(hold.stdout);
+    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '5 minutes' WHERE id = '${bookingId}';`);
+
+    const grid = runPsqlCommand(
+      `SELECT count(*) || '|' || count(id) FROM public.get_public_slot_availability('${graceDate}') WHERE start_time = '11:00:00';`,
+      { role: "anon", asRole: true }
+    );
+    assert.equal(grid.stdout, "1|0", "Grace-period hold must show as taken with its identity masked");
+
+    // Cron calls this only after Stripe confirms the session is unpaid; it must not wait for the grace period
+    const cancel = runPsqlCommand(`SELECT public.cancel_expired_booking('${bookingId}', '${paymentId}');`, { role: "service_role" });
+    assert.equal(cancel.status, 0, cancel.stderr);
+    assert.equal(JSON.parse(cancel.stdout).cancelled, true, cancel.stdout);
+    const gridAfter = runPsqlCommand(
+      `SELECT count(*) FROM public.get_public_slot_availability('${graceDate}') WHERE start_time = '11:00:00';`,
+      { role: "anon", asRole: true }
+    );
+    assert.equal(gridAfter.stdout, "0", "Slot frees as soon as the Stripe-verified cleanup cancels the hold");
+
+    for (const role of ["anon", "authenticated"]) {
+      const call = runPsqlCommand(`SELECT public.hold_release_after(now(), now());`, { role, uid: aliceUid, asRole: true });
+      assert.notEqual(call.status, 0, `${role} must not execute hold_release_after`);
+      assert.ok(call.stderr.includes("permission denied"), call.stderr);
+    }
+  });
+
+  await runTest("Grace period rollback: restores immediate release on a fresh database and re-applies cleanly", () => {
+    const graceDb = "crosshair_grace_db";
+    const created = runPsqlCommand(`CREATE DATABASE ${graceDb};`, { db: "postgres" });
+    assert.equal(created.status, 0, created.stderr);
+    for (const file of [
+      fixturePath, migrationPath, stage2MigrationPath, stage1HoldExpiryPath, paymentReconciliationPath,
+      paymentRefundFixPath, rlsMigrationPath, resilienceMigrationPath, tightenRlsMigrationPath,
+      secureProfilesMigrationPath, launchHardeningMigrationPath, graceMigrationPath,
+    ]) {
+      runPsqlFile(file, { db: graceDb });
+    }
+
+    const releaseIn = (db, start, end) => runPsqlCommand(`
+      INSERT INTO public.bookings (user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at)
+      VALUES ('${aliceUid}', 'Alice', '${activeCourtId}', '${graceDate}', '${start}', '${end}', 'pending', 200, now() - interval '1 minute');
+      SELECT public.release_expired_court_holds('${activeCourtId}', '${graceDate}', '${start}', '${end}');
+    `, { db }).stdout.split("\n").pop();
+
+    assert.equal(releaseIn(graceDb, "13:00:00", "14:00:00"), "0", "With the grace period, a 1-minute-old expired hold is not released");
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_hold_release_grace_period.sql"), { db: graceDb });
+    assert.equal(
+      runPsqlCommand(`SELECT (to_regprocedure('public.hold_release_after(timestamptz,timestamptz)') IS NULL)::text;`, { db: graceDb }).stdout,
+      "true"
+    );
+    assert.equal(releaseIn(graceDb, "15:00:00", "16:00:00"), "1", "After rollback, expired holds release immediately again");
+
+    runPsqlFile(graceMigrationPath, { db: graceDb });
+    assert.equal(
+      runPsqlCommand(`SELECT (to_regprocedure('public.hold_release_after(timestamptz,timestamptz)') IS NOT NULL)::text;`, { db: graceDb }).stdout,
+      "true"
+    );
+  });
+
   await runTest("20261103 Supabase Cron: job calls the cleanup route with Vault secrets, is idempotent, and rolls back", () => {
     // postgres:15-alpine has no pg_cron / pg_net / Vault, so stub exactly what the job uses
     // (pg_net's http_get parameter names) and apply the real migration minus CREATE EXTENSION.
@@ -3205,7 +3345,7 @@ async function main() {
     `, { db: cronDb });
     assert.equal(stubs.status, 0, stubs.stderr);
 
-    const migrationSql = fs.readFileSync(path.join(PROJECT_ROOT, "supabase/migrations/20261103_supabase_cron_cleanup.sql"), "utf8");
+    const migrationSql = fs.readFileSync(path.join(PROJECT_ROOT, "supabase/migrations/20261028153353_20261103_supabase_cron_cleanup.sql"), "utf8");
     const withoutExtensions = migrationSql.replace(/^CREATE EXTENSION IF NOT EXISTS pg_(cron|net) .*$/gm, "");
     assert.equal(migrationSql.split("CREATE EXTENSION").length - 1, 2, "migration must enable pg_cron and pg_net");
 

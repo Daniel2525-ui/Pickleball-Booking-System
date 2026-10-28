@@ -62,9 +62,12 @@ const getOverlappingBookings = (
  * Determines whether a booking slot actively claims/blocks court availability.
  * - Non-pending active statuses ('confirmed', 'completed', 'checked_in', 'in_progress') are always active.
  * - Inactive terminal statuses ('cancelled', 'no_show') never block availability.
- * - Pending holds check hold_expires_at, falling back to created_at + 35 minutes if hold_expires_at is missing.
+ * - Pending holds check hold_expires_at (falling back to created_at + 35 minutes) plus the grace period below.
  * - If both timestamps are missing/invalid, fails conservatively to active (never silently frees a slot without established expiry).
  */
+// Must match public.hold_release_after(): an expired hold keeps its slot this long so a late Stripe payment can still confirm it
+export const HOLD_RELEASE_GRACE_MS = 20 * 60 * 1000;
+
 export const isBookingActive = (b: BookingSlot, now: Date = new Date()): boolean => {
     const status = (b.status || "").toLowerCase();
 
@@ -83,11 +86,11 @@ export const isBookingActive = (b: BookingSlot, now: Date = new Date()): boolean
     const createdMs = b.created_at ? new Date(b.created_at).getTime() : NaN;
 
     if (!isNaN(holdExpiryMs)) {
-        return holdExpiryMs > now.getTime();
+        return holdExpiryMs + HOLD_RELEASE_GRACE_MS > now.getTime();
     }
 
     if (!isNaN(createdMs)) {
-        return (createdMs + 35 * 60 * 1000) > now.getTime();
+        return (createdMs + 35 * 60 * 1000 + HOLD_RELEASE_GRACE_MS) > now.getTime();
     }
 
     // Conservative fallback: do not silently free slot if hold expiry cannot be established safely

@@ -19,14 +19,23 @@ test("checkSlotAvailability: handles null hold_expires_at with 35m created_at fa
   };
   assert.equal(isBookingActive(recentHold, now), true, "Hold within 35m fallback window must be active");
 
-  // 2. Pending booking created 40 minutes ago (exceeded 35m) -> expired hold -> excluded
+  // 2. Pending booking created 60 minutes ago (exceeded 35m hold + 20m grace) -> expired hold -> excluded
   const expiredFallbackHold = {
     id: "b-2",
     status: "pending",
     hold_expires_at: null,
-    created_at: new Date(now.getTime() - 40 * 60 * 1000).toISOString(),
+    created_at: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
   };
-  assert.equal(isBookingActive(expiredFallbackHold, now), false, "Hold created >35m ago must be treated as expired");
+  assert.equal(isBookingActive(expiredFallbackHold, now), false, "Hold created >55m ago must be treated as released");
+
+  // 2b. Created 40 minutes ago: hold expired but still inside the 20-minute grace period -> still blocks
+  const graceFallbackHold = { ...expiredFallbackHold, created_at: new Date(now.getTime() - 40 * 60 * 1000).toISOString() };
+  assert.equal(isBookingActive(graceFallbackHold, now), true, "Expired hold inside the grace period must still block");
+
+  // 2c. Explicit hold_expires_at: 5 minutes ago blocks (grace), 25 minutes ago does not
+  const explicit = (minutesAgo) => ({ id: "b-2c", status: "pending", hold_expires_at: new Date(now.getTime() - minutesAgo * 60 * 1000).toISOString() });
+  assert.equal(isBookingActive(explicit(5), now), true, "Hold expired 5m ago is inside the grace period");
+  assert.equal(isBookingActive(explicit(25), now), false, "Hold expired 25m ago is past the grace period");
 
   // 3. Conservative fallback: Missing or invalid timestamps fail safe to active (never silently free slot)
   const invalidDateString = {
@@ -76,18 +85,23 @@ test("checkSlotAvailability: slot status calculation correctly differentiates ac
   const courts = [{ id: "c-1", name: "Court 1", status: "active" }];
   const bookingDate = new Date("2029-10-27T10:00:00Z"); // Future date
 
-  // Slot with only expired hold -> available
+  // Slot with only a hold that expired past the grace period -> available
   const expiredHold = [{
     id: "b-exp",
     court_id: "c-1",
     start_time: "10:00:00",
     end_time: "11:00:00",
     status: "pending",
-    hold_expires_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    created_at: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
+    hold_expires_at: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
   }];
   const statusExpired = checkSlotAvailability("Court 1", "10:00 AM - 11:00 AM", courts, expiredHold, bookingDate);
   assert.equal(statusExpired, "available");
+
+  // Hold expired 5 minutes ago (inside the grace period) -> still taken; the owner sees it as their pending hold
+  const graceHold = [{ ...expiredHold[0], user_id: "u-owner", hold_expires_at: new Date(Date.now() - 5 * 60 * 1000).toISOString() }];
+  assert.equal(checkSlotAvailability("Court 1", "10:00 AM - 11:00 AM", courts, graceHold, bookingDate), "pending");
+  assert.equal(checkSlotAvailability("Court 1", "10:00 AM - 11:00 AM", courts, graceHold, bookingDate, "u-owner"), "user_pending");
 
   // Slot with cancelled booking -> available
   const cancelledSlot = [{

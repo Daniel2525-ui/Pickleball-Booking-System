@@ -1,4 +1,4 @@
--- ==============================================================================
+  -- ==============================================================================
 -- Migration: 20261101_secure_profiles_and_public_slot_availability.sql
 -- Description:
 --   1. Deploys non-recursive public.is_admin() SECURITY DEFINER helper owned by postgres.
