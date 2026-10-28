@@ -3,9 +3,11 @@ import { stripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
 import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
+import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
 
 /**
  * Cleanup cron job for expired reservation holds.
+ * Triggered every 15 minutes by Supabase Cron (supabase/migrations/20261103_supabase_cron_cleanup.sql).
  *
  * Concurrency & Safety Guarantees:
  * 1. Authenticates request via Authorization: Bearer <CRON_SECRET>.
@@ -24,8 +26,7 @@ import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.t
  */
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!isAuthorizedCronRequest(request.headers.get("authorization"), process.env.CRON_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

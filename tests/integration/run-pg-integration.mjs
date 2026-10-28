@@ -3176,6 +3176,57 @@ async function main() {
     assert.equal(reapplied.stdout, "0|true|false");
   });
 
+  await runTest("20261103 Supabase Cron: job calls the cleanup route with Vault secrets, is idempotent, and rolls back", () => {
+    // postgres:15-alpine has no pg_cron / pg_net / Vault, so stub exactly what the job uses
+    // (pg_net's http_get parameter names) and apply the real migration minus CREATE EXTENSION.
+    const cronDb = "crosshair_cron_db";
+    const created = runPsqlCommand(`CREATE DATABASE ${cronDb};`, { db: "postgres" });
+    assert.equal(created.status, 0, created.stderr);
+
+    const stubs = runPsqlCommand(`
+      CREATE SCHEMA cron; CREATE SCHEMA net; CREATE SCHEMA vault;
+      CREATE TABLE cron.job (jobname text PRIMARY KEY, schedule text, command text);
+      CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS $$
+        INSERT INTO cron.job VALUES (job_name, schedule, command)
+        ON CONFLICT (jobname) DO UPDATE SET schedule = EXCLUDED.schedule, command = EXCLUDED.command;
+        SELECT 1::bigint;
+      $$;
+      CREATE FUNCTION cron.unschedule(job_name text) RETURNS boolean LANGUAGE sql AS $$
+        DELETE FROM cron.job WHERE jobname = job_name RETURNING true;
+      $$;
+      CREATE TABLE net.calls (url text, headers jsonb, timeout_milliseconds int);
+      CREATE FUNCTION net.http_get(url text, params jsonb DEFAULT '{}', headers jsonb DEFAULT '{}', timeout_milliseconds int DEFAULT 5000)
+      RETURNS bigint LANGUAGE sql AS $$
+        INSERT INTO net.calls VALUES (url, headers, timeout_milliseconds);
+        SELECT 1::bigint;
+      $$;
+      CREATE TABLE vault.decrypted_secrets (name text, decrypted_secret text);
+      INSERT INTO vault.decrypted_secrets VALUES ('crosshair_app_url', 'https://crosshair.example/'), ('crosshair_cron_secret', 'test-cron-secret');
+    `, { db: cronDb });
+    assert.equal(stubs.status, 0, stubs.stderr);
+
+    const migrationSql = fs.readFileSync(path.join(PROJECT_ROOT, "supabase/migrations/20261103_supabase_cron_cleanup.sql"), "utf8");
+    const withoutExtensions = migrationSql.replace(/^CREATE EXTENSION IF NOT EXISTS pg_(cron|net) .*$/gm, "");
+    assert.equal(migrationSql.split("CREATE EXTENSION").length - 1, 2, "migration must enable pg_cron and pg_net");
+
+    for (let i = 0; i < 2; i++) {
+      const applied = runPsqlCommand(withoutExtensions, { db: cronDb });
+      assert.equal(applied.status, 0, applied.stderr);
+    }
+    const job = runPsqlCommand(`SELECT count(*) || '|' || max(schedule) FROM cron.job WHERE jobname = 'cleanup-expired-bookings';`, { db: cronDb });
+    assert.equal(job.stdout, "1|*/15 * * * *", "Re-applying must keep exactly one 15-minute job");
+
+    const run = runPsqlCommand(`DO $$ BEGIN EXECUTE (SELECT command FROM cron.job WHERE jobname = 'cleanup-expired-bookings'); END $$;`, { db: cronDb });
+    assert.equal(run.status, 0, run.stderr);
+    const call = runPsqlCommand(`SELECT url || '|' || (headers->>'Authorization') || '|' || timeout_milliseconds FROM net.calls;`, { db: cronDb });
+    assert.equal(call.stdout, "https://crosshair.example/api/cron/cleanup-expired-bookings|Bearer test-cron-secret|15000");
+
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_20261103_supabase_cron_cleanup.sql"), { db: cronDb });
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_20261103_supabase_cron_cleanup.sql"), { db: cronDb });
+    const afterRollback = runPsqlCommand(`SELECT count(*) FROM cron.job;`, { db: cronDb });
+    assert.equal(afterRollback.stdout, "0", "Rollback must remove the job and be safe to re-run");
+  });
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");
