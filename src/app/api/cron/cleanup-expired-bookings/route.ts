@@ -101,7 +101,8 @@ export async function GET(request: Request) {
         totalProcessed++;
 
         try {
-          const payments = booking.payments || [];
+          // PostgREST embeds a single object while payments.booking_id is UNIQUE (pre-20261102), an array after
+          const payments = ([] as typeof booking.payments).concat(booking.payments ?? []);
 
           // 1. Check if any DB payment record is already settled/paid
           const hasSettledPayment = payments.some(

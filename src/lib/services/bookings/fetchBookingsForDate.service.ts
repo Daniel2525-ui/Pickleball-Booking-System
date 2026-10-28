@@ -3,8 +3,9 @@ import { supabase } from "@/lib/supabase";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 export interface BookingSlot {
-    id: string;
-    user_id?: string;
+    /** Null for other players' bookings (masked by get_public_slot_availability). */
+    id: string | null;
+    user_id?: string | null;
     court_id: string;
     start_time: string;
     end_time: string;
@@ -17,11 +18,11 @@ export const fetchBookingsForDate = async (date: Date | string) => {
     try {
         const dateStr = formatManilaDate(date);
 
-        const { data, error } = await supabase
-            .from("bookings")
-            .select("id, user_id, court_id, start_time, end_time, status, hold_expires_at, created_at")
-            .eq("booking_date", dateStr)
-            .in("status", ["confirmed", "completed", "checked_in", "in_progress", "pending"]);
+        // Direct bookings reads are owner/admin-only under RLS (20261101); this RPC returns every
+        // blocking slot for the grid while masking other players' identities. Expired holds are excluded.
+        const { data, error } = await supabase.rpc("get_public_slot_availability", {
+            p_booking_date: dateStr,
+        });
 
         if (error) throw error;
 

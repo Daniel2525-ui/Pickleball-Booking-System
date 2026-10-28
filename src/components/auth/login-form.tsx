@@ -98,6 +98,12 @@ export function LoginForm() {
               <Label htmlFor="password" className="text-xs font-semibold text-foreground">
                 Password
               </Label>
+              <Link
+                href="/forgot-password"
+                className="text-xs font-semibold text-primary hover:underline underline-offset-4"
+              >
+                Forgot password?
+              </Link>
             </div>
             <div className="relative">
               <Input

@@ -137,14 +137,16 @@ export const SettlePaymentModal = ({
             </div>
           </div>
 
-          {/* Optional GCash Reference Field */}
+          {/* GCash Reference Field (required by /api/admin/payments/settle) */}
           {paymentMethod === "gcash" && (
             <div className="flex flex-col gap-1">
-              <Label className="text-[11px] font-medium text-muted-foreground">
-                GCash Reference Code (Optional)
+              <Label htmlFor="gcash-reference" className="text-[11px] font-medium text-muted-foreground">
+                GCash Reference Code
               </Label>
               <Input
+                id="gcash-reference"
                 type="text"
+                required
                 placeholder="e.g. 1029384756"
                 value={paymentReference}
                 onChange={(e) => setPaymentReference(e.target.value)}

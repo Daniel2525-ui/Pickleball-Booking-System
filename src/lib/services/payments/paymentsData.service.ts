@@ -8,6 +8,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters) => {
             .select(`
                 *,
                 bookings (
+                    status,
                     booking_date,
                     start_time,
                     end_time,

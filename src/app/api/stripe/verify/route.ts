@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
         }
 
         // 4. Validate payment status in Stripe
-        if (session.payment_status !== "paid" && session.status !== "complete") {
+        // A "complete" session can still be unpaid (async methods); only a paid session confirms a booking
+        if (session.payment_status !== "paid") {
             return Response.json(
                 {
                     success: false,
@@ -106,8 +107,9 @@ export async function POST(req: NextRequest) {
         });
 
         if (!outcome.success) {
+            console.error("Payment verification reconciliation failed:", outcome.error);
             return Response.json(
-                { error: outcome.error || "Payment reconciliation failed" },
+                { error: "Payment reconciliation failed. Your payment is safe; please check 'My Bookings' shortly." },
                 { status: 500 }
             );
         }
@@ -123,6 +125,6 @@ export async function POST(req: NextRequest) {
         return Response.json({ success: true, status: session.payment_status });
     } catch (err: unknown) {
         console.error("Verification error:", err);
-        return Response.json({ error: (err as Error).message || "Verification failed" }, { status: 500 });
+        return Response.json({ error: "Verification failed" }, { status: 500 });
     }
 }

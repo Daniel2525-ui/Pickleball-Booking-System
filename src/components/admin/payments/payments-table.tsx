@@ -18,9 +18,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { fetchPayments } from "@/lib/services/payments/paymentsData.service";
 import { Payment } from "@/lib/services/payments/paymentsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { RefundPaymentModal } from "./refundPaymentModal";
 
 interface PaymentsTableProps {
   filters?: {
@@ -56,6 +58,10 @@ const formatCurrency = (amount: number | null | undefined) => {
 export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refundTarget, setRefundTarget] = useState<Payment | null>(null);
+
+  // Paid payments on cancelled bookings are owed back to the customer
+  const needsRefund = (payment: Payment) => payment.status === "paid" && payment.bookings?.status === "cancelled";
 
   useEffect(() => {
     const loadPayments = async () => {
@@ -252,6 +258,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead>Processed At</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -268,11 +275,12 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                     <TableCell className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
                     <TableCell className="text-center"><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                    <TableCell />
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-44 text-center">
+                  <TableCell colSpan={6} className="h-44 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-center py-6">
                       <div className="p-3 rounded-full bg-muted text-muted-foreground">
                         <ReceiptText className="h-6 w-6" />
@@ -339,6 +347,15 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                         <span>{formatDate(payment.paid_at || payment.created_at, true)}</span>
                       </div>
                     </TableCell>
+
+                    {/* Action */}
+                    <TableCell className="text-right">
+                      {needsRefund(payment) && (
+                        <Button size="sm" variant="outline" className="text-xs" onClick={() => setRefundTarget(payment)}>
+                          Refund
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -346,6 +363,15 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
           </Table>
         </div>
       </div>
+
+      <RefundPaymentModal
+        payment={refundTarget}
+        open={refundTarget !== null}
+        onOpenChange={(open) => !open && setRefundTarget(null)}
+        onRefunded={(paymentId, status) =>
+          setPayments((prev) => prev.map((p) => (p.id === paymentId ? { ...p, status } : p)))
+        }
+      />
     </div>
   );
 }

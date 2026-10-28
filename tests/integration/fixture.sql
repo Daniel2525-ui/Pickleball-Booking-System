@@ -41,6 +41,8 @@ $$;
 CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid PRIMARY KEY,
   full_name text,
+  email text,
+  phone text,
   role text DEFAULT 'customer'
 );
 
@@ -97,6 +99,23 @@ CREATE TABLE IF NOT EXISTS public.payments (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- 4b. Constraints present on the hosted project (verified via pg_constraint 2026-10-28)
+-- but created outside the migrations; mirrored so tests start from the real baseline.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin', 'customer'));
+ALTER TABLE public.courts ADD CONSTRAINT courts_status_check CHECK (status IN ('active', 'maintenance'));
+ALTER TABLE public.bookings ADD CONSTRAINT valid_booking_time CHECK (end_time > start_time);
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_customer_identity_check CHECK (
+  (user_id IS NOT NULL AND customer_id IS NULL) OR (user_id IS NULL AND customer_id IS NOT NULL)
+);
+ALTER TABLE public.bookings ADD CONSTRAINT no_overlapping_active_court_bookings
+  EXCLUDE USING gist (court_id WITH =, tsrange(booking_date + start_time, booking_date + end_time) WITH &&)
+  WHERE (status IN ('confirmed', 'checked_in', 'in_progress', 'completed', 'pending'));
+ALTER TABLE public.payments ADD CONSTRAINT payments_booking_id_key UNIQUE (booking_id);
+ALTER TABLE public.payments ADD CONSTRAINT payments_stripe_session_id_key UNIQUE (stripe_session_id);
+ALTER TABLE public.payments ADD CONSTRAINT payments_stripe_payment_id_key UNIQUE (stripe_payment_id);
+
 -- 5. Baseline Operating Schedule (Sunday-Saturday; Monday closed)
 INSERT INTO public.operating_hours (day_of_week, is_open, open_time, close_time) VALUES
   ('Sunday', true, '07:00:00', '22:00:00'),
@@ -123,6 +142,11 @@ ON CONFLICT (id) DO NOTHING;
 -- Customer Profile 2 (Bob)
 INSERT INTO public.profiles (id, full_name, role) VALUES
   ('33333333-3333-3333-3333-333333333333', 'Bob Player', 'customer')
+ON CONFLICT (id) DO NOTHING;
+
+-- Customer Profile 3 (Dana)
+INSERT INTO public.profiles (id, full_name, role) VALUES
+  ('55555555-5555-5555-5555-555555555555', 'Dana Player', 'customer')
 ON CONFLICT (id) DO NOTHING;
 
 -- Guest Walk-in Customer

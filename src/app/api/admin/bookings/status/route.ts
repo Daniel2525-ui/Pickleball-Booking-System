@@ -85,7 +85,47 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 6. Conditional update (optimistic lock on current status) with Stage 2 audit timestamps
+        // 6. A pending booking may have an open Stripe Checkout. Close it before cancelling, and stop if
+        //    that fails, so the customer cannot pay for a cancelled booking (same rule as /api/bookings/cancel).
+        let pendingPaymentId: string | null = null;
+        if (newStatus === "cancelled" && currentStatus === "pending") {
+            const { data: payment, error: paymentError } = await supabase
+                .from("payments")
+                .select("id, status, stripe_session_id")
+                .eq("booking_id", bookingId)
+                .eq("status", "pending")
+                .maybeSingle();
+
+            if (paymentError) {
+                console.error("Admin cancel: failed to load payment:", paymentError);
+                return Response.json({ error: "Could not verify the payment for this booking." }, { status: 500 });
+            }
+
+            pendingPaymentId = payment?.id ?? null;
+
+            if (payment?.stripe_session_id) {
+                try {
+                    const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
+                    if (session.status === "complete") {
+                        return Response.json(
+                            { error: "The customer has already paid for this booking. Refresh to see its confirmed status." },
+                            { status: 409 }
+                        );
+                    }
+                    if (session.status === "open") {
+                        await stripe.checkout.sessions.expire(payment.stripe_session_id);
+                    }
+                } catch (stripeErr) {
+                    console.error("Admin cancel: failed to expire Stripe session:", stripeErr);
+                    return Response.json(
+                        { error: "Could not close the customer's payment session. Please try again." },
+                        { status: 502 }
+                    );
+                }
+            }
+        }
+
+        // 7. Conditional update (optimistic lock on current status) with Stage 2 audit timestamps
         const now = new Date().toISOString();
         const updatePayload: Record<string, unknown> = {
             status: newStatus,
@@ -122,30 +162,16 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (newStatus === "cancelled") {
-            const { data: payment } = await supabase
+        if (pendingPaymentId) {
+            const { error: paymentUpdateError } = await supabase
                 .from("payments")
-                .select("id, status, stripe_session_id")
-                .eq("booking_id", bookingId)
-                .maybeSingle();
+                .update({ status: "failed" })
+                .eq("id", pendingPaymentId)
+                .eq("status", "pending");
 
-            if (payment?.stripe_session_id) {
-                try {
-                    const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
-                    if (session.status === "open") {
-                        await stripe.checkout.sessions.expire(payment.stripe_session_id);
-                    }
-                } catch (stripeErr) {
-                    console.error("Admin cancel: failed to expire Stripe session:", stripeErr);
-                }
-            }
-
-            if (payment?.status === "pending") {
-                await supabase
-                    .from("payments")
-                    .update({ status: "failed" })
-                    .eq("id", payment.id)
-                    .eq("status", "pending");
+            if (paymentUpdateError) {
+                // The booking itself is cancelled; log so the payment row can be reconciled.
+                console.error("Admin cancel: failed to mark payment failed:", paymentUpdateError);
             }
         }
 

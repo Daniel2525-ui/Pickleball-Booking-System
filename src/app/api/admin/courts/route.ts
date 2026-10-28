@@ -104,7 +104,7 @@ export async function DELETE(request: NextRequest) {
         if (existingBookings && existingBookings.length > 0) {
             return NextResponse.json(
                 {
-                    error: "This court cannot be deleted because it has associated booking records. Please set its status to 'Maintenance' or 'Closed' instead.",
+                    error: "This court cannot be deleted because it has associated booking records. Please set its status to 'Maintenance' instead.",
                 },
                 { status: 409 }
             );

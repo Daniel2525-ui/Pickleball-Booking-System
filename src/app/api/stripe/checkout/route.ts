@@ -134,6 +134,13 @@ export async function POST(request: NextRequest) {
                 );
             }
 
+            if (rpcError.message?.includes("TOO_MANY_HOLDS")) {
+                return Response.json(
+                    { error: "You already have 3 reservations awaiting payment. Complete or cancel one under 'My Bookings' first." },
+                    { status: 409 }
+                );
+            }
+
             const isCourtUnavailable = rpcError.message?.includes("COURT_UNAVAILABLE");
             if (isCourtUnavailable) {
                 return Response.json(
@@ -153,7 +160,7 @@ export async function POST(request: NextRequest) {
 
             console.error("hold_court_booking RPC failed:", rpcError);
             return Response.json(
-                { error: rpcError.message || "Failed to create reservation hold." },
+                { error: "Failed to create reservation hold. Please try again." },
                 { status: 500 }
             );
         } else if (rpcResult) {
@@ -261,19 +268,20 @@ export async function POST(request: NextRequest) {
             error instanceof Stripe.errors.StripePermissionError ||
             Boolean((error as Error)?.message?.includes("Stripe is not configured"));
 
-        // Only delete records on definite pre-creation failure where no session could exist at Stripe.
+        // Only release records on definite pre-creation failure where no session could exist at Stripe.
         // For network timeouts or connection drops, preserve pending records so payment resumption,
         // webhooks, or cron cleanup can safely resolve them without dropping paid bookings.
+        // Customers may cancel (not delete) their own pending rows under RLS (20261031).
         if (isDefinitePreCreationError) {
             const supabase = await createClient();
             if (createdPaymentId) {
-                await supabase.from("payments").delete().eq("id", createdPaymentId);
+                await supabase.from("payments").update({ status: "failed" }).eq("id", createdPaymentId).eq("status", "pending");
             }
             if (createdBookingId) {
-                await supabase.from("bookings").delete().eq("id", createdBookingId);
+                await supabase.from("bookings").update({ status: "cancelled" }).eq("id", createdBookingId).eq("status", "pending");
             }
             return Response.json(
-                { error: (error as Error).message || "Checkout session initialization failed. Please try again." },
+                { error: "Checkout session initialization failed. Please try again." },
                 { status: 400 }
             );
         }
@@ -293,7 +301,7 @@ export async function POST(request: NextRequest) {
         }
 
         return Response.json(
-            { error: (error as Error).message || "An unexpected error occurred. Please try again." },
+            { error: "An unexpected error occurred. Please try again." },
             { status: 500 }
         );
     }

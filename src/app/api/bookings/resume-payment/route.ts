@@ -229,7 +229,9 @@ export async function POST(request: NextRequest) {
                 console.error("Failed to expire superseded Stripe session on resume:", expireErr);
             }
 
-            const isConflict = confirmError.message?.includes("SLOT_UNAVAILABLE");
+            // INVALID_STATUS: the expired hold was released when another player claimed the slot (20261102)
+            const isConflict =
+                confirmError.message?.includes("SLOT_UNAVAILABLE") || confirmError.message?.includes("INVALID_STATUS");
             if (isConflict) {
                 return Response.json(
                     { error: "Your reservation hold expired and the time slot was reserved by another player. Please choose another slot." },
@@ -238,7 +240,7 @@ export async function POST(request: NextRequest) {
             }
 
             return Response.json(
-                { error: confirmError.message || "Failed to extend reservation hold for checkout." },
+                { error: "Failed to extend reservation hold for checkout. Please try again." },
                 { status: 500 }
             );
         }
@@ -247,7 +249,7 @@ export async function POST(request: NextRequest) {
     } catch (error: unknown) {
         console.error("Resume payment error:", error);
         return Response.json(
-            { error: (error as Error).message || "An unexpected error occurred while resuming payment." },
+            { error: "An unexpected error occurred while resuming payment." },
             { status: 500 }
         );
     }

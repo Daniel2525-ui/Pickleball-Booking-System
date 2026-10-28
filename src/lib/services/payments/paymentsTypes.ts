@@ -6,10 +6,12 @@ export interface Payment {
     amount: number;
     currency: string;
     status: string;
+    payment_method?: string | null;
     paid_at: string | null;
     created_at: string;
     // Joined fields
     bookings?: {
+        status?: string;
         booking_date: string;
         start_time: string;
         end_time: string;

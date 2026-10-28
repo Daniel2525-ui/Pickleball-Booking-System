@@ -219,6 +219,8 @@ async function main() {
       "exec",
       CONTAINER_NAME,
       "psql",
+      "-h",
+      "127.0.0.1", // TCP: the image's temporary init server only listens on the unix socket
       "-U",
       POSTGRES_USER,
       "-c",
@@ -310,6 +312,24 @@ async function main() {
   runPsqlFile(resilienceMigrationPath);
   console.log("✔ Resilience migration applied successfully with 0 errors.");
 
+  // 14. Apply tightened RLS & walk-in RPC migration: 20261031_tighten_core_rls_and_walk_in_rpc.sql
+  const tightenRlsMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261031_tighten_core_rls_and_walk_in_rpc.sql");
+  console.log(`[Setup] Applying tightened RLS migration: 20261031_tighten_core_rls_and_walk_in_rpc.sql...`);
+  runPsqlFile(tightenRlsMigrationPath);
+  console.log("✔ Tightened RLS migration applied successfully with 0 errors.");
+
+  // 15. Apply 20261101 secure profiles & public slot availability migration
+  const secureProfilesMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261101_secure_profiles_and_public_slot_availability.sql");
+  console.log(`[Setup] Applying secure profiles migration: 20261101_secure_profiles_and_public_slot_availability.sql...`);
+  runPsqlFile(secureProfilesMigrationPath);
+  console.log("✔ Secure profiles migration applied successfully with 0 errors.");
+
+  // 16. Apply 20261102 launch hardening migration
+  const launchHardeningMigrationPath = path.join(PROJECT_ROOT, "supabase/migrations/20261102_launch_hardening.sql");
+  console.log(`[Setup] Applying launch hardening migration: 20261102_launch_hardening.sql...`);
+  runPsqlFile(launchHardeningMigrationPath);
+  console.log("✔ Launch hardening migration applied successfully with 0 errors.");
+
   // ---------------------------------------------------------------------------
   // Test Cases Execution
   // ---------------------------------------------------------------------------
@@ -318,6 +338,8 @@ async function main() {
   const adminUid = "11111111-1111-1111-1111-111111111111";
   const aliceUid = "22222222-2222-2222-2222-222222222222";
   const bobUid = "33333333-3333-3333-3333-333333333333";
+  // Owns the long-lived holds Groups 2 and 4 build on, so they do not count toward Alice/Bob hold caps
+  const danaUid = "55555555-5555-5555-5555-555555555555";
   const guestCustId = "44444444-4444-4444-4444-444444444444";
   const activeCourtId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   const maintCourtId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -331,6 +353,14 @@ async function main() {
   let passedTests = 0;
 
   async function runTest(name, fn) {
+    // Tests build their own Alice/Bob holds; expire leftovers so the 3-active-holds cap
+    // (20261102) only sees holds created by the current test.
+    const expireLeftovers = runPsqlCommand(
+      `UPDATE public.bookings SET hold_expires_at = now() - interval '1 second'
+       WHERE status = 'pending' AND user_id IN ('${aliceUid}', '${bobUid}')
+         AND coalesce(hold_expires_at, created_at + interval '35 minutes') > now();`
+    );
+    assert.equal(expireLeftovers.status, 0, expireLeftovers.stderr);
     try {
       await fn();
       console.log(`  ✔ PASS: ${name}`);
@@ -481,22 +511,22 @@ async function main() {
   await runTest("Online hold accepts 1, 2, and 3-hour durations at flat PHP 200/hr", () => {
     // 1 hour
     const r1 = runPsqlCommand(
-      `SELECT public.hold_court_booking('${activeCourtId}', '${openDate}', '13:00:00', '14:00:00', '${aliceUid}', 200);`,
-      { role: "authenticated", uid: aliceUid }
+      `SELECT public.hold_court_booking('${activeCourtId}', '${openDate}', '13:00:00', '14:00:00', '${danaUid}', 200);`,
+      { role: "authenticated", uid: danaUid }
     );
     assert.equal(r1.status, 0, r1.stderr);
 
     // 2 hours
     const r2 = runPsqlCommand(
-      `SELECT public.hold_court_booking('${activeCourtId}', '${openDate}', '14:00:00', '16:00:00', '${aliceUid}', 400);`,
-      { role: "authenticated", uid: aliceUid }
+      `SELECT public.hold_court_booking('${activeCourtId}', '${openDate}', '14:00:00', '16:00:00', '${danaUid}', 400);`,
+      { role: "authenticated", uid: danaUid }
     );
     assert.equal(r2.status, 0, r2.stderr);
 
     // 3 hours
     const r3 = runPsqlCommand(
-      `SELECT public.hold_court_booking('${activeCourtId}', '${openDate}', '16:00:00', '19:00:00', '${aliceUid}', 600);`,
-      { role: "authenticated", uid: aliceUid }
+      `SELECT public.hold_court_booking('${activeCourtId}', '${openDate}', '16:00:00', '19:00:00', '${danaUid}', 600);`,
+      { role: "authenticated", uid: danaUid }
     );
     assert.equal(r3.status, 0, r3.stderr);
   });
@@ -1035,8 +1065,8 @@ async function main() {
     assert.equal(dbCheck.stdout, "true", "Legacy 6-arg call must set safe 35m expiry buffer");
   });
 
-  await runTest("Stage 1: New 7-argument hold_court_booking sets exact p_hold_expires_at timestamp", () => {
-    const explicitExpiry = "2029-10-27 10:31:00+00";
+  await runTest("Stage 1: New 7-argument hold_court_booking sets exact p_hold_expires_at within the 40-minute customer window", () => {
+    const explicitExpiry = runPsqlCommand(`SELECT date_trunc('second', now() + interval '33 minutes');`).stdout;
     const holdRes = runPsqlCommand(
       `SELECT public.hold_court_booking(
         p_court_id => '${activeCourtId}',
@@ -1058,6 +1088,70 @@ async function main() {
        FROM public.bookings WHERE id = '${parsed.booking_id}';`
     );
     assert.equal(dbCheck.stdout, "true", "7-arg call must preserve exact passed hold_expires_at");
+  });
+
+  await runTest("20261102: customer cannot hold or extend a slot beyond 40 minutes (indefinite-hold attack)", () => {
+    const holdRes = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '2029-11-03', '15:00:00', '16:00:00',
+        '${aliceUid}', 200, '2099-01-01 00:00:00+00'::timestamptz);`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.equal(holdRes.status, 0, holdRes.stderr);
+    const { booking_id: bookingId, payment_id: paymentId } = JSON.parse(holdRes.stdout);
+
+    const clamped = runPsqlCommand(
+      `SELECT (hold_expires_at <= now() + interval '40 minutes')::text FROM public.bookings WHERE id = '${bookingId}';`
+    );
+    assert.equal(clamped.stdout, "true", "hold_court_booking must clamp customer-supplied expiry");
+
+    const extendRes = runPsqlCommand(
+      `SELECT public.confirm_checkout_hold('${bookingId}', '${paymentId}', 'cs_clamp_1', '2099-01-01 00:00:00+00'::timestamptz);`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.equal(extendRes.status, 0, extendRes.stderr);
+    const extended = runPsqlCommand(
+      `SELECT (hold_expires_at <= now() + interval '40 minutes')::text FROM public.bookings WHERE id = '${bookingId}';`
+    );
+    assert.equal(extended.stdout, "true", "confirm_checkout_hold must clamp customer-supplied expiry");
+
+    // Service role (webhooks/cron) keeps full control
+    const svcRes = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '2029-11-03', '17:00:00', '18:00:00',
+        '${bobUid}', 200, now() + interval '2 hours');`,
+      { role: "service_role" }
+    );
+    assert.equal(svcRes.status, 0, svcRes.stderr);
+    const svcCheck = runPsqlCommand(
+      `SELECT (hold_expires_at > now() + interval '90 minutes')::text FROM public.bookings WHERE id = '${JSON.parse(svcRes.stdout).booking_id}';`
+    );
+    assert.equal(svcCheck.stdout, "true", "service_role expiry must not be clamped");
+  });
+
+  await runTest("20261102: customer cannot hold more than 3 active slots", () => {
+    for (const [start, end] of [["07:00:00", "08:00:00"], ["08:00:00", "09:00:00"], ["09:00:00", "10:00:00"]]) {
+      const r = runPsqlCommand(
+        `SELECT public.hold_court_booking('${activeCourtId}', '2029-10-30', '${start}', '${end}', '${bobUid}', 200);`,
+        { role: "authenticated", uid: bobUid }
+      );
+      assert.equal(r.status, 0, r.stderr);
+    }
+    const fourth = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '2029-10-30', '11:00:00', '12:00:00', '${bobUid}', 200);`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.notEqual(fourth.status, 0, "4th active hold must be rejected");
+    assert.ok(fourth.stderr.includes("TOO_MANY_HOLDS"), fourth.stderr);
+
+    // Once a hold expires, the customer can hold again
+    runPsqlCommand(
+      `UPDATE public.bookings SET hold_expires_at = now() - interval '1 second'
+       WHERE user_id = '${bobUid}' AND booking_date = '2029-10-30' AND start_time = '07:00:00';`
+    );
+    const afterExpiry = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '2029-10-30', '11:00:00', '12:00:00', '${bobUid}', 200);`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.equal(afterExpiry.status, 0, afterExpiry.stderr);
   });
 
   await runTest("Stage 1: Active unexpired pending hold blocks overlapping reservations", () => {
@@ -1240,7 +1334,8 @@ async function main() {
     const { booking_id, payment_id } = JSON.parse(holdRes.stdout);
 
     // 2. Confirm hold with Stripe session ID
-    const newExpiry = "2029-10-27 20:33:00+00";
+    // Within the 40-minute customer window (20261102), so the exact value is kept
+    const newExpiry = runPsqlCommand(`SELECT date_trunc('second', now() + interval '35 minutes');`).stdout;
     const confirmRes = runPsqlCommand(
       `SELECT public.confirm_checkout_hold(
         p_booking_id => '${booking_id}',
@@ -1313,10 +1408,13 @@ async function main() {
       { role: "authenticated", uid: aliceUid }
     );
     assert.notEqual(aliceResurrectAttempt.status, 0, "Resurrecting an expired hold after slot is claimed MUST fail");
+    // Since 20261102 Bob's hold releases (cancels) Alice's expired hold, so the attempt fails INVALID_STATUS
     assert.ok(
-      aliceResurrectAttempt.stderr.includes("SLOT_UNAVAILABLE") || aliceResurrectAttempt.stderr.includes("P0001"),
-      `Expected SLOT_UNAVAILABLE / P0001 error, got: ${aliceResurrectAttempt.stderr}`
+      aliceResurrectAttempt.stderr.includes("SLOT_UNAVAILABLE") || aliceResurrectAttempt.stderr.includes("INVALID_STATUS"),
+      `Expected SLOT_UNAVAILABLE or INVALID_STATUS error, got: ${aliceResurrectAttempt.stderr}`
     );
+    const aliceStatus = runPsqlCommand(`SELECT b.status || '|' || p.status FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${aliceBookingId}';`);
+    assert.equal(aliceStatus.stdout, "cancelled|failed", "Expired overlapping hold is released when Bob claims the slot");
 
     // 5. Verify Bob's booking is completely unharmed and Alice's hold was NOT updated
     const verifyBob = runPsqlCommand(
@@ -1392,7 +1490,8 @@ async function main() {
       assert.equal(aliceHold.status, 0, aliceHold.stderr);
       const { booking_id: aBookingId, payment_id: aPaymentId } = JSON.parse(aliceHold.stdout);
 
-      // 2. Insert Bob's conflicting booking with the target status
+      // 2. A conflicting booking with the target status cannot coexist with Alice's pending row:
+      //    the hosted no_overlapping_active_court_bookings constraint rejects it outright.
       const bobBooking = runPsqlCommand(
         `INSERT INTO public.bookings (
           user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount, created_at
@@ -1400,9 +1499,17 @@ async function main() {
           '${bobUid}', 'Bob Status Test', '${activeCourtId}', '${conflictAuditDate}', '${timeStart}', '${timeEnd}', '${statusToTest}', 200, now()
         ) RETURNING id;`
       );
-      assert.equal(bobBooking.status, 0, bobBooking.stderr);
+      assert.notEqual(bobBooking.status, 0, `Overlapping '${statusToTest}' row must be rejected while a pending hold exists`);
+      assert.ok(bobBooking.stderr.includes("no_overlapping_active_court_bookings"), bobBooking.stderr);
 
-      // 3. Alice attempts confirm_checkout_hold -> MUST FAIL with SLOT_UNAVAILABLE
+      // 3. Bob claims the slot the supported way; Alice's expired hold is released, so she cannot resurrect it
+      const bobHold = runPsqlCommand(
+        `SELECT public.hold_court_booking('${activeCourtId}', '${conflictAuditDate}', '${timeStart}', '${timeEnd}', '${bobUid}', 200);`,
+        { role: "authenticated", uid: bobUid }
+      );
+      assert.equal(bobHold.status, 0, bobHold.stderr);
+      runPsqlCommand(`UPDATE public.bookings SET status = '${statusToTest}' WHERE id = '${JSON.parse(bobHold.stdout).booking_id}';`);
+
       const confirmAttempt = runPsqlCommand(
         `SELECT public.confirm_checkout_hold(
           '${aBookingId}', '${aPaymentId}', 'cs_test_status_${statusToTest}', now() + interval '33 minutes'
@@ -1411,8 +1518,8 @@ async function main() {
       );
       assert.notEqual(confirmAttempt.status, 0, `confirm_checkout_hold must reject conflict with status '${statusToTest}'`);
       assert.ok(
-        confirmAttempt.stderr.includes("SLOT_UNAVAILABLE"),
-        `Expected error to include 'SLOT_UNAVAILABLE', got: ${confirmAttempt.stderr}`
+        confirmAttempt.stderr.includes("SLOT_UNAVAILABLE") || confirmAttempt.stderr.includes("INVALID_STATUS"),
+        `Expected SLOT_UNAVAILABLE or INVALID_STATUS, got: ${confirmAttempt.stderr}`
       );
     }
   });
@@ -2014,32 +2121,41 @@ async function main() {
 
   // --- Group: Row Level Security (RLS) Policies ---
 
-  await runTest("RLS: anonymous caller can view public bookings schedule but is blocked from direct payment access", () => {
-    // 1. Anon can query public bookings schedule
+  await runTest("RLS: anonymous caller is blocked from direct bookings, profiles, and payments access", () => {
+    // 1. Anon direct SELECT on bookings returns 0 rows (RLS blocks direct table read)
     const anonBookings = runPsqlCommand(`SELECT count(*) FROM public.bookings;`, { role: "anon", asRole: true });
     assert.equal(anonBookings.status, 0);
-    assert(parseInt(anonBookings.stdout.trim(), 10) > 0, "Anon must be able to read bookings schedule");
+    assert.equal(anonBookings.stdout.trim(), "0", "Anon must not see any rows via direct SELECT on bookings");
 
-    // 2. Anon can query courts
+    // 2. Anon direct SELECT on profiles returns 0 rows (RLS blocks direct table read)
+    const anonProfiles = runPsqlCommand(`SELECT count(*) FROM public.profiles;`, { role: "anon", asRole: true });
+    assert.equal(anonProfiles.status, 0);
+    assert.equal(anonProfiles.stdout.trim(), "0", "Anon must not see any rows via direct SELECT on profiles");
+
+    // 3. Anon can query courts
     const anonCourts = runPsqlCommand(`SELECT count(*) FROM public.courts;`, { role: "anon", asRole: true });
     assert.equal(anonCourts.status, 0);
     assert(parseInt(anonCourts.stdout.trim(), 10) > 0, "Anon must be able to read courts");
 
-    // 3. Anon cannot query payments (RLS filters out all rows)
+    // 4. Anon cannot query payments (RLS filters out all rows)
     const anonPayments = runPsqlCommand(`SELECT count(*) FROM public.payments;`, { role: "anon", asRole: true });
     assert.equal(anonPayments.status, 0);
     assert.equal(anonPayments.stdout.trim(), "0", "Anon must not see any payment rows");
 
-    // 4. Anon cannot insert directly into bookings (RLS CHECK blocks it)
+    // 5. Anon cannot insert directly into bookings (RLS CHECK blocks it)
     const anonInsert = runPsqlCommand(
       `INSERT INTO public.bookings (court_id, booking_date, start_time, end_time, status, total_amount)
        VALUES ('${activeCourtId}', '2029-10-23', '20:00:00', '21:00:00', 'confirmed', 200);`,
       { role: "anon", asRole: true }
     );
     assert.notEqual(anonInsert.status, 0, "Anon direct insert into bookings must be blocked by RLS");
-    assert(anonInsert.stderr.includes("row-level security policy"), "Error must mention row-level security policy");
+    // Since 20261102 anon has no INSERT privilege at all, so Postgres refuses before RLS is evaluated
+    assert(
+      anonInsert.stderr.includes("permission denied") || anonInsert.stderr.includes("row-level security policy"),
+      `Error must be a privilege or RLS denial, got: ${anonInsert.stderr}`
+    );
 
-    // 5. Anon cannot view refund requests
+    // 6. Anon cannot view refund requests
     const anonRefunds = runPsqlCommand(`SELECT count(*) FROM public.refund_requests;`, { role: "anon", asRole: true });
     assert.equal(anonRefunds.status, 0);
     assert.equal(anonRefunds.stdout.trim(), "0", "Anon must not see any refund requests");
@@ -2070,8 +2186,8 @@ async function main() {
   await runTest("20261030 Resilience: Expired pending booking with no payment can be cancelled (default NULL payment_id)", () => {
     // 1. Create expired pending booking with no payments row
     const insertRes = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '07:00:00', '08:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '07:00:00', '08:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     assert.equal(insertRes.status, 0, insertRes.stderr);
@@ -2100,8 +2216,8 @@ async function main() {
   await runTest("20261030 Resilience: Expired pending booking with a failed payment can be cancelled", () => {
     // 1. Create expired pending booking
     const insertRes = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '08:00:00', '09:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '08:00:00', '09:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     assert.equal(insertRes.status, 0, insertRes.stderr);
@@ -2148,8 +2264,8 @@ async function main() {
       const endTime = `${endHour.toString().padStart(2, "0")}:00:00`;
 
       const insertRes = runPsqlCommand(`
-        INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-        VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '${startTime}', '${endTime}', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+        INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+        VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '${startTime}', '${endTime}', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
         RETURNING id;
       `);
       assert.equal(insertRes.status, 0, insertRes.stderr);
@@ -2182,8 +2298,8 @@ async function main() {
   await runTest("20261030 Resilience: Active refund requests prevent cancellation, whereas inactive/terminal refund requests do not", () => {
     // 4a. Active refund status: 'pending' prevents cancellation
     const insertRes1 = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '13:00:00', '14:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '13:00:00', '14:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     const bId1 = insertRes1.stdout.trim();
@@ -2216,8 +2332,8 @@ async function main() {
 
     // 4b. Terminal refund status: 'failed' allows cancellation
     const insertRes2 = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '14:00:00', '15:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '14:00:00', '15:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     const bId2 = insertRes2.stdout.trim();
@@ -2251,8 +2367,8 @@ async function main() {
   await runTest("20261030 Resilience: Unexpired bookings cannot be cancelled (explicit timestamp and 35-minute fallback)", () => {
     // 5a. Explicit future hold_expires_at
     const insertRes1 = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '15:00:00', '16:00:00', 'pending', 200, now() + interval '15 minutes', now())
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '15:00:00', '16:00:00', 'pending', 200, now() + interval '15 minutes', now())
       RETURNING id;
     `);
     const bId1 = insertRes1.stdout.trim();
@@ -2268,8 +2384,8 @@ async function main() {
 
     // 5b. Null hold_expires_at with created_at < 35 minutes ago -> unexpired via fallback
     const insertRes2 = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '16:00:00', '17:00:00', 'pending', 200, NULL, now() - interval '10 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '16:00:00', '17:00:00', 'pending', 200, NULL, now() - interval '10 minutes')
       RETURNING id;
     `);
     const bId2 = insertRes2.stdout.trim();
@@ -2285,8 +2401,8 @@ async function main() {
 
     // 5c. Null hold_expires_at with created_at > 35 minutes ago -> expired via fallback, can cancel
     const insertRes3 = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '17:00:00', '18:00:00', 'pending', 200, NULL, now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '17:00:00', '18:00:00', 'pending', 200, NULL, now() - interval '40 minutes')
       RETURNING id;
     `);
     const bId3 = insertRes3.stdout.trim();
@@ -2316,8 +2432,8 @@ async function main() {
 
     // 6b. Already-cancelled booking
     const insertCancelled = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '18:00:00', '19:00:00', 'cancelled', 200, now() - interval '10 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '18:00:00', '19:00:00', 'cancelled', 200, now() - interval '10 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     const bIdCancelled = insertCancelled.stdout.trim();
@@ -2334,8 +2450,8 @@ async function main() {
 
     // 6c. Confirmed booking
     const insertConfirmed = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '19:00:00', '20:00:00', 'confirmed', 200, now() - interval '10 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '19:00:00', '20:00:00', 'confirmed', 200, now() - interval '10 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     const bIdConfirmed = insertConfirmed.stdout.trim();
@@ -2382,16 +2498,16 @@ async function main() {
   await runTest("20261030 Resilience: Passing a payment ID belonging to a different booking cannot incorrectly update that payment", () => {
     // 1. Booking A: expired pending booking
     const insertA = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '20:00:00', '21:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '20:00:00', '21:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     const bIdA = insertA.stdout.trim();
 
     // 2. Booking B: active pending booking with pending Payment B
     const insertB = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${cleanupAuditDate}', '21:00:00', '22:00:00', 'pending', 200, now() + interval '30 minutes', now())
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${cleanupAuditDate}', '21:00:00', '22:00:00', 'pending', 200, now() + interval '30 minutes', now())
       RETURNING id;
     `);
     const bIdB = insertB.stdout.trim();
@@ -2463,8 +2579,8 @@ async function main() {
     // 5. Verify two-argument call executes original function behavior
     // 5a. Unexpired hold -> HOLD_NOT_EXPIRED
     const unexpHold = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${rollbackAuditDate}', '07:00:00', '08:00:00', 'pending', 200, now() + interval '20 minutes', now())
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${rollbackAuditDate}', '07:00:00', '08:00:00', 'pending', 200, now() + interval '20 minutes', now())
       RETURNING id;
     `);
     const bUnexp = unexpHold.stdout.trim();
@@ -2484,8 +2600,8 @@ async function main() {
 
     // 5b. Expired hold with pending payment -> cancels booking and marks payment failed
     const expHold = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${rollbackAuditDate}', '08:00:00', '09:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${rollbackAuditDate}', '08:00:00', '09:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     const bExp = expHold.stdout.trim();
@@ -2509,8 +2625,8 @@ async function main() {
 
     // 5c. Expired hold with non-pending payment -> returns PAYMENT_NOT_PENDING (original behavior)
     const nonPendingHold = runPsqlCommand(`
-      INSERT INTO public.bookings (id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
-      VALUES (gen_random_uuid(), '${activeCourtId}', '${rollbackAuditDate}', '09:00:00', '10:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${rollbackAuditDate}', '09:00:00', '10:00:00', 'pending', 200, now() - interval '5 minutes', now() - interval '40 minutes')
       RETURNING id;
     `);
     const bNonPending = nonPendingHold.stdout.trim();
@@ -2542,6 +2658,522 @@ async function main() {
     );
     assert.notEqual(authCheck.status, 0, "Authenticated must be rejected after rollback");
     assert.ok(authCheck.stderr.includes("permission denied"), `Expected permission denied, got: ${authCheck.stderr}`);
+  });
+
+  // --- Group 8: Phase 1 (20261101) Integration Tests: RLS Security, Profiles Isolation, Slot Masking, and Rollback ---
+
+  await runTest("Phase 1: public.is_admin() metadata, SECURITY DEFINER execution, search_path, and execution privileges", () => {
+    // 1. Verify function security metadata: prosecdef=true, owner=postgres, search_path=''
+    const procMeta = runPsqlCommand(`
+      SELECT 
+        p.prosecdef,
+        r.rolname,
+        array_to_string(p.proconfig, ',')
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      JOIN pg_roles r ON r.oid = p.proowner
+      WHERE n.nspname = 'public' AND p.proname = 'is_admin';
+    `);
+    assert.equal(procMeta.status, 0, procMeta.stderr);
+    const [prosecdef, owner, proconfig] = procMeta.stdout.trim().split("|");
+    assert.equal(prosecdef, "t", "is_admin() must be SECURITY DEFINER");
+    assert.equal(owner, "postgres", "is_admin() must be owned by postgres");
+    assert.ok(proconfig.includes("search_path="), `is_admin() must set search_path, got: ${proconfig}`);
+
+    // 2. Direct execution by anon is rejected with 42501 (permission denied)
+    const anonExec = runPsqlCommand(`SELECT public.is_admin();`, { role: "anon", asRole: true });
+    assert.notEqual(anonExec.status, 0, "Anon execution of is_admin() must be rejected");
+    assert.ok(anonExec.stderr.includes("permission denied"), `Expected permission denied, got: ${anonExec.stderr}`);
+
+    // 3. Admin user returns true
+    const adminExec = runPsqlCommand(`SELECT public.is_admin();`, { role: "authenticated", uid: adminUid, asRole: true });
+    assert.equal(adminExec.status, 0, adminExec.stderr);
+    assert.equal(adminExec.stdout.trim(), "t", "Admin must evaluate to true");
+
+    // 4. Customer Alice returns false
+    const aliceExec = runPsqlCommand(`SELECT public.is_admin();`, { role: "authenticated", uid: aliceUid, asRole: true });
+    assert.equal(aliceExec.status, 0, aliceExec.stderr);
+    assert.equal(aliceExec.stdout.trim(), "f", "Alice must evaluate to false");
+
+    // 5. Customer Bob returns false
+    const bobExec = runPsqlCommand(`SELECT public.is_admin();`, { role: "authenticated", uid: bobUid, asRole: true });
+    assert.equal(bobExec.status, 0, bobExec.stderr);
+    assert.equal(bobExec.stdout.trim(), "f", "Bob must evaluate to false");
+
+    // 6. Service role execution succeeds
+    const serviceExec = runPsqlCommand(`SELECT public.is_admin();`, { role: "service_role", asRole: true });
+    assert.equal(serviceExec.status, 0, serviceExec.stderr);
+  });
+
+  await runTest("Phase 1: public.profiles RLS customer isolation, role escalation prevention, and admin view-all without recursion", () => {
+    // 1. Customer Alice querying public.profiles sees only her own profile (1 row)
+    const aliceProfiles = runPsqlCommand(`SELECT count(*), min(id::text) FROM public.profiles;`, {
+      role: "authenticated",
+      uid: aliceUid,
+      asRole: true,
+    });
+    assert.equal(aliceProfiles.status, 0, aliceProfiles.stderr);
+    assert.equal(aliceProfiles.stdout.trim(), `1|${aliceUid}`, "Alice must see only her own profile row");
+
+    // 2. Customer Bob querying public.profiles sees only his own profile (1 row)
+    const bobProfiles = runPsqlCommand(`SELECT count(*), min(id::text) FROM public.profiles;`, {
+      role: "authenticated",
+      uid: bobUid,
+      asRole: true,
+    });
+    assert.equal(bobProfiles.status, 0, bobProfiles.stderr);
+    assert.equal(bobProfiles.stdout.trim(), `1|${bobUid}`, "Bob must see only his own profile row");
+
+    // 3. Customer Alice attempting to update Bob's profile modifies 0 rows
+    const aliceHackBob = runPsqlCommand(`UPDATE public.profiles SET full_name = 'Hacked' WHERE id = '${bobUid}' RETURNING id;`, {
+      role: "authenticated",
+      uid: aliceUid,
+      asRole: true,
+    });
+    assert.equal(aliceHackBob.status, 0, aliceHackBob.stderr);
+    assert.equal(aliceHackBob.stdout.trim(), "", "Alice must not be able to update Bob's profile (0 rows returned)");
+
+    const checkBobRow = runPsqlCommand(`SELECT full_name FROM public.profiles WHERE id = '${bobUid}';`);
+    assert.notEqual(checkBobRow.stdout.trim(), "Hacked", "Bob profile must remain unhacked");
+
+    // 4. Customer Alice updating own full_name and phone succeeds
+    const aliceUpdateSelf = runPsqlCommand(
+      `UPDATE public.profiles SET full_name = 'Alice Smith', phone = '09123456780' WHERE id = '${aliceUid}' RETURNING full_name, phone;`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+    assert.equal(aliceUpdateSelf.status, 0, aliceUpdateSelf.stderr);
+    assert.equal(aliceUpdateSelf.stdout.trim(), "Alice Smith|09123456780", "Alice must be able to update her own full_name and phone");
+
+    const checkAliceRow = runPsqlCommand(`SELECT full_name, phone, role FROM public.profiles WHERE id = '${aliceUid}';`);
+    assert.equal(checkAliceRow.stdout.trim(), "Alice Smith|09123456780|customer");
+
+    // 5. Customer Alice attempting privilege escalation to admin is blocked by RLS WITH CHECK
+    const aliceEscalate = runPsqlCommand(
+      `UPDATE public.profiles SET role = 'admin' WHERE id = '${aliceUid}';`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+    assert.notEqual(aliceEscalate.status, 0, "Alice role escalation to admin must be blocked by RLS");
+    assert.ok(
+      aliceEscalate.stderr.includes("row-level security policy") || aliceEscalate.stderr.includes("42501"),
+      `Expected RLS policy error, got: ${aliceEscalate.stderr}`
+    );
+
+    // Verify Alice role is still customer
+    const checkRoleStillCustomer = runPsqlCommand(`SELECT role FROM public.profiles WHERE id = '${aliceUid}';`);
+    assert.equal(checkRoleStillCustomer.stdout.trim(), "customer");
+
+    // 6. Admin can view all profiles without infinite recursion (Postgres 42P17 prevention)
+    const adminProfiles = runPsqlCommand(`SELECT count(*) FROM public.profiles;`, {
+      role: "authenticated",
+      uid: adminUid,
+      asRole: true,
+    });
+    assert.equal(adminProfiles.status, 0, adminProfiles.stderr);
+    const adminSeenCount = parseInt(adminProfiles.stdout.trim(), 10);
+    assert.ok(adminSeenCount >= 3, `Admin must see all profiles without recursion, saw: ${adminSeenCount}`);
+
+    // 7. Service role can view all profiles without restriction
+    const serviceProfiles = runPsqlCommand(`SELECT count(*) FROM public.profiles;`, {
+      role: "service_role",
+      asRole: true,
+    });
+    assert.equal(serviceProfiles.status, 0, serviceProfiles.stderr);
+    assert.equal(parseInt(serviceProfiles.stdout.trim(), 10), adminSeenCount);
+  });
+
+  await runTest("Phase 1: public.bookings direct table RLS: customer isolation, admin access, and join recursion protection", () => {
+    // 1. Alice direct SELECT sees only Alice's bookings; cannot see Bob's bookings
+    const aliceBobBookings = runPsqlCommand(
+      `SELECT count(*) FROM public.bookings WHERE user_id = '${bobUid}';`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+    assert.equal(aliceBobBookings.status, 0, aliceBobBookings.stderr);
+    assert.equal(aliceBobBookings.stdout.trim(), "0", "Alice must not see Bob's bookings via direct SELECT");
+
+    // 2. Admin direct SELECT sees all bookings
+    const adminBookings = runPsqlCommand(`SELECT count(*) FROM public.bookings;`, {
+      role: "authenticated",
+      uid: adminUid,
+      asRole: true,
+    });
+    assert.equal(adminBookings.status, 0, adminBookings.stderr);
+    assert.ok(parseInt(adminBookings.stdout.trim(), 10) > 0, "Admin must see all bookings");
+
+    // 3. Admin JOIN between bookings and profiles succeeds without recursion
+    const adminJoin = runPsqlCommand(
+      `SELECT count(*) FROM public.bookings b JOIN public.profiles p ON p.id = b.user_id;`,
+      { role: "authenticated", uid: adminUid, asRole: true }
+    );
+    assert.equal(adminJoin.status, 0, adminJoin.stderr);
+    assert.ok(parseInt(adminJoin.stdout.trim(), 10) > 0, "Admin must be able to join bookings and profiles without recursion");
+
+    // 4. Service role direct SELECT sees all bookings
+    const serviceBookings = runPsqlCommand(`SELECT count(*) FROM public.bookings;`, {
+      role: "service_role",
+      asRole: true,
+    });
+    assert.equal(serviceBookings.status, 0, serviceBookings.stderr);
+    assert.equal(serviceBookings.stdout.trim(), adminBookings.stdout.trim());
+  });
+
+  await runTest("Phase 1: public.get_public_slot_availability RPC: slot masking, expired hold exclusion, and countdown timer support", () => {
+    const slotDate = "2029-12-18"; // Tuesday
+
+    // 1. Verify RPC security metadata
+    const rpcMeta = runPsqlCommand(`
+      SELECT 
+        p.prosecdef,
+        r.rolname,
+        array_to_string(p.proconfig, ',')
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      JOIN pg_roles r ON r.oid = p.proowner
+      WHERE n.nspname = 'public' AND p.proname = 'get_public_slot_availability';
+    `);
+    assert.equal(rpcMeta.status, 0, rpcMeta.stderr);
+    const [prosecdef, owner, proconfig] = rpcMeta.stdout.trim().split("|");
+    assert.equal(prosecdef, "t", "get_public_slot_availability must be SECURITY DEFINER");
+    assert.equal(owner, "postgres", "get_public_slot_availability must be owned by postgres");
+    assert.ok(proconfig.includes("search_path="), `get_public_slot_availability must set search_path, got: ${proconfig}`);
+
+    // 2. Verify created_at is NOT in the return signature
+    const columnCheck = runPsqlCommand(`SELECT created_at FROM public.get_public_slot_availability('${slotDate}');`);
+    assert.notEqual(columnCheck.status, 0, "created_at must NOT be exposed in RPC return columns");
+    assert.ok(columnCheck.stderr.includes("does not exist") || columnCheck.stderr.includes("42703"));
+
+    // 3. Setup test bookings on slotDate
+    runPsqlCommand(`DELETE FROM public.bookings WHERE booking_date = '${slotDate}';`);
+
+    // 3a. Bob confirmed booking (08:00 - 09:00)
+    runPsqlCommand(`
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount)
+      VALUES (gen_random_uuid(), '${bobUid}', '${activeCourtId}', '${slotDate}', '08:00:00', '09:00:00', 'confirmed', 200);
+    `);
+
+    // 3b. Alice active pending hold (09:00 - 10:00)
+    const aliceHoldInsert = runPsqlCommand(`
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at)
+      VALUES (gen_random_uuid(), '${aliceUid}', '${activeCourtId}', '${slotDate}', '09:00:00', '10:00:00', 'pending', 200, now() + interval '25 minutes')
+      RETURNING id;
+    `);
+    const aliceHoldId = aliceHoldInsert.stdout.trim();
+
+    // 3c. Bob active pending hold (10:00 - 11:00)
+    runPsqlCommand(`
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at)
+      VALUES (gen_random_uuid(), '${bobUid}', '${activeCourtId}', '${slotDate}', '10:00:00', '11:00:00', 'pending', 200, now() + interval '25 minutes');
+    `);
+
+    // 3d. Bob expired pending hold (11:00 - 12:00) - must be filtered out
+    runPsqlCommand(`
+      INSERT INTO public.bookings (id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at)
+      VALUES (gen_random_uuid(), '${bobUid}', '${activeCourtId}', '${slotDate}', '11:00:00', '12:00:00', 'pending', 200, now() - interval '5 minutes');
+    `);
+
+    // 4. Anon queries availability:
+    // - Must return exactly 3 active rows (08:00, 09:00, 10:00). Expired 11:00 is omitted.
+    // - For all 3 rows: id, user_id, and hold_expires_at are masked as NULL.
+    const anonSlots = runPsqlCommand(
+      `SELECT 
+        coalesce(id::text, 'NULL'),
+        coalesce(user_id::text, 'NULL'),
+        court_id,
+        start_time,
+        end_time,
+        status,
+        coalesce(hold_expires_at::text, 'NULL')
+       FROM public.get_public_slot_availability('${slotDate}')
+       ORDER BY start_time;`,
+      { role: "anon", asRole: true }
+    );
+    assert.equal(anonSlots.status, 0, anonSlots.stderr);
+    const anonLines = anonSlots.stdout.trim().split("\n");
+    assert.equal(anonLines.length, 3, `Anon must see exactly 3 active slots, saw: ${anonLines.length}`);
+    for (const line of anonLines) {
+      const [id, userId, cId, start, end, status, holdExp] = line.split("|");
+      assert.equal(id, "NULL", "id must be masked as NULL for anon");
+      assert.equal(userId, "NULL", "user_id must be masked as NULL for anon");
+      assert.equal(holdExp, "NULL", "hold_expires_at must be masked as NULL for anon");
+      assert.equal(cId, activeCourtId);
+      assert.ok(["confirmed", "pending"].includes(status));
+    }
+
+    // 5. Customer Alice queries availability:
+    // - Alice's own pending hold (09:00) has unmasked id, user_id, and hold_expires_at (supports timer & resume modal)
+    // - Other players' bookings (08:00 Bob confirmed, 10:00 Bob pending) have id, user_id, hold_expires_at masked as NULL
+    const aliceSlots = runPsqlCommand(
+      `SELECT 
+        coalesce(id::text, 'NULL'),
+        coalesce(user_id::text, 'NULL'),
+        start_time,
+        status,
+        coalesce(hold_expires_at::text, 'NULL') != 'NULL'
+       FROM public.get_public_slot_availability('${slotDate}')
+       ORDER BY start_time;`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+    assert.equal(aliceSlots.status, 0, aliceSlots.stderr);
+    const aliceLines = aliceSlots.stdout.trim().split("\n");
+    assert.equal(aliceLines.length, 3);
+
+    // Row 1: Bob confirmed
+    const [b1Id, b1User, b1Start, b1Status, b1HasHold] = aliceLines[0].split("|");
+    assert.equal(b1Start, "08:00:00");
+    assert.equal(b1Status, "confirmed");
+    assert.equal(b1Id, "NULL", "Bob confirmed id masked for Alice");
+    assert.equal(b1User, "NULL", "Bob user_id masked for Alice");
+    assert.equal(b1HasHold, "f");
+
+    // Row 2: Alice pending hold
+    const [a2Id, a2User, a2Start, a2Status, a2HasHold] = aliceLines[1].split("|");
+    assert.equal(a2Start, "09:00:00");
+    assert.equal(a2Status, "pending");
+    assert.equal(a2Id, aliceHoldId, "Alice must see her own booking id for pending resume");
+    assert.equal(a2User, aliceUid, "Alice must see her own user_id");
+    assert.equal(a2HasHold, "t", "Alice must see hold_expires_at for countdown timer");
+
+    // Row 3: Bob pending hold
+    const [b3Id, b3User, b3Start, b3Status, b3HasHold] = aliceLines[2].split("|");
+    assert.equal(b3Start, "10:00:00");
+    assert.equal(b3Status, "pending");
+    assert.equal(b3Id, "NULL", "Bob pending hold id masked for Alice");
+    assert.equal(b3User, "NULL", "Bob user_id masked for Alice");
+    assert.equal(b3HasHold, "f", "Bob hold_expires_at masked for Alice");
+
+    // 6. Service role execution succeeds
+    const serviceSlots = runPsqlCommand(
+      `SELECT count(*) FROM public.get_public_slot_availability('${slotDate}');`,
+      { role: "service_role", asRole: true }
+    );
+    assert.equal(serviceSlots.status, 0, serviceSlots.stderr);
+    assert.equal(serviceSlots.stdout.trim(), "3");
+  });
+
+  await runTest("Phase 1: Rollback verification: execute rollback script, verify drop & policy restoration, and re-apply cleanly", () => {
+    // 1. Execute Phase 1 rollback
+    const rollbackPath = path.join(PROJECT_ROOT, "supabase/rollback_20261101_secure_profiles_and_public_slot_availability.sql");
+    runPsqlFile(rollbackPath);
+
+    // 2. Verify get_public_slot_availability and is_admin are dropped
+    const procCheck = runPsqlCommand(`
+      SELECT count(*) FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname IN ('is_admin', 'get_public_slot_availability');
+    `);
+    assert.equal(procCheck.status, 0, procCheck.stderr);
+    assert.equal(procCheck.stdout.trim(), "0", "Functions must be dropped after rollback");
+
+    // 3. Verify open read policies restored: anon can direct SELECT from bookings and profiles
+    const anonBookingsRollback = runPsqlCommand(`SELECT count(*) FROM public.bookings;`, { role: "anon", asRole: true });
+    assert.equal(anonBookingsRollback.status, 0, anonBookingsRollback.stderr);
+    assert.ok(parseInt(anonBookingsRollback.stdout.trim(), 10) > 0, "Anon can read bookings directly after rollback");
+
+    const anonProfilesRollback = runPsqlCommand(`SELECT count(*) FROM public.profiles;`, { role: "anon", asRole: true });
+    assert.equal(anonProfilesRollback.status, 0, anonProfilesRollback.stderr);
+    assert.ok(parseInt(anonProfilesRollback.stdout.trim(), 10) > 0, "Anon can read profiles directly after rollback");
+
+    // 4. Re-apply Phase 1 migration cleanly
+    runPsqlFile(secureProfilesMigrationPath);
+
+    // 5. Verify functions are restored
+    const procRestored = runPsqlCommand(`
+      SELECT count(*) FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname IN ('is_admin', 'get_public_slot_availability');
+    `);
+    assert.equal(procRestored.status, 0, procRestored.stderr);
+    assert.equal(procRestored.stdout.trim(), "2", "Both functions restored after re-applying migration");
+
+    // 6. Verify anon direct SELECT on bookings is blocked again
+    const anonBlockedAgain = runPsqlCommand(`SELECT count(*) FROM public.bookings;`, { role: "anon", asRole: true });
+    assert.equal(anonBlockedAgain.status, 0, anonBlockedAgain.stderr);
+    assert.equal(anonBlockedAgain.stdout.trim(), "0", "Anon direct SELECT on bookings blocked again");
+  });
+
+  // --- 20261102 launch hardening ---
+  const hardeningDate = "2029-12-04"; // Tuesday (open 07:00 - 22:00), not used by other tests
+
+  await runTest("20261102: customer cannot promote themselves to admin but can edit name and phone", () => {
+    const escalate = runPsqlCommand(
+      `UPDATE public.profiles SET role = 'admin' WHERE id = '${aliceUid}';`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+    assert.notEqual(escalate.status, 0, "Role escalation must be refused");
+    assert.ok(escalate.stderr.includes("permission denied"), escalate.stderr);
+
+    const edit = runPsqlCommand(
+      `UPDATE public.profiles SET full_name = 'Alice Renamed', phone = '09170000000' WHERE id = '${aliceUid}' RETURNING full_name`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+    assert.equal(edit.status, 0, edit.stderr);
+    assert.equal(edit.stdout, "Alice Renamed");
+
+    const role = runPsqlCommand(`SELECT role FROM public.profiles WHERE id = '${aliceUid}';`);
+    assert.equal(role.stdout, "customer");
+    runPsqlCommand(`UPDATE public.profiles SET full_name = 'Alice Player', phone = NULL WHERE id = '${aliceUid}';`);
+  });
+
+  await runTest("20261102: anon has no table write privileges and nobody can TRUNCATE", () => {
+    const res = runPsqlCommand(`
+      SELECT string_agg(t || ':' || r || ':' || p, ',')
+      FROM unnest(ARRAY['profiles','customers','courts','operating_hours','bookings','payments','refund_requests']) t,
+           unnest(ARRAY['anon','authenticated']) r,
+           unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE']) p
+      WHERE has_table_privilege(r, 'public.' || t, p)
+        AND (r = 'anon' OR p = 'TRUNCATE');
+    `);
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(res.stdout, "", `Unexpected write privileges: ${res.stdout}`);
+
+    const roleColumn = runPsqlCommand(
+      `SELECT has_column_privilege('authenticated', 'public.profiles', 'role', 'UPDATE')::text;`
+    );
+    assert.equal(roleColumn.stdout, "false");
+  });
+
+  await runTest("20261102: walk-in can take a slot whose online hold expired (no cron needed)", () => {
+    const hold = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '${hardeningDate}', '09:00:00', '10:00:00', '${aliceUid}', 200);`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.equal(hold.status, 0, hold.stderr);
+    const { booking_id: expiredId } = JSON.parse(hold.stdout);
+    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE id = '${expiredId}';`);
+
+    const walkIn = runPsqlCommand(
+      `SELECT public.create_walk_in_booking(
+        p_court_id => '${activeCourtId}', p_customer_name => 'Charlie Guest', p_booking_date => '${hardeningDate}',
+        p_start_time => '09:00:00', p_end_time => '10:00:00', p_amount => 200,
+        p_customer_id => '${guestCustId}', p_payment_method => 'cash'
+      );`,
+      { role: "authenticated", uid: adminUid }
+    );
+    assert.equal(walkIn.status, 0, walkIn.stderr);
+
+    const released = runPsqlCommand(
+      `SELECT b.status || '|' || p.status FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${expiredId}';`
+    );
+    assert.equal(released.stdout, "cancelled|failed");
+  });
+
+  await runTest("20261102: an expired hold with a recorded payment is never released and reports SLOT_UNAVAILABLE", () => {
+    const hold = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '${hardeningDate}', '11:00:00', '12:00:00', '${aliceUid}', 200);`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.equal(hold.status, 0, hold.stderr);
+    const { booking_id: paidId, payment_id: paidPaymentId } = JSON.parse(hold.stdout);
+    runPsqlCommand(`UPDATE public.payments SET status = 'paid', paid_at = now() WHERE id = '${paidPaymentId}';`);
+    runPsqlCommand(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE id = '${paidId}';`);
+
+    const bobAttempt = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '${hardeningDate}', '11:00:00', '12:00:00', '${bobUid}', 200);`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.notEqual(bobAttempt.status, 0);
+    assert.ok(bobAttempt.stderr.includes("SLOT_UNAVAILABLE"), `Exclusion error must map to SLOT_UNAVAILABLE: ${bobAttempt.stderr}`);
+
+    const untouched = runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${paidId}';`);
+    assert.equal(untouched.stdout, "pending", "Paid hold must not be cancelled by release_expired_court_holds");
+  });
+
+  await runTest("20261102: one pending payment per booking; release helper is not callable by clients", () => {
+    const hold = runPsqlCommand(
+      `SELECT public.hold_court_booking('${activeCourtId}', '${hardeningDate}', '15:00:00', '16:00:00', '${bobUid}', 200);`,
+      { role: "authenticated", uid: bobUid }
+    );
+    assert.equal(hold.status, 0, hold.stderr);
+    const { booking_id: bookingId } = JSON.parse(hold.stdout);
+    const secondPending = runPsqlCommand(
+      `INSERT INTO public.payments (booking_id, amount, currency, status) VALUES ('${bookingId}', 200, 'php', 'pending');`
+    );
+    assert.notEqual(secondPending.status, 0);
+    assert.ok(secondPending.stderr.includes("uq_payments_one_pending_per_booking"), secondPending.stderr);
+
+    for (const role of ["anon", "authenticated"]) {
+      const call = runPsqlCommand(
+        `SELECT public.release_expired_court_holds('${activeCourtId}', '${hardeningDate}', '07:00', '22:00');`,
+        { role, uid: aliceUid, asRole: true }
+      );
+      assert.notEqual(call.status, 0, `${role} must not execute release_expired_court_holds`);
+      assert.ok(call.stderr.includes("permission denied"), call.stderr);
+    }
+  });
+
+  await runTest("20261102: GCash refunds are manual handovers and never reach the Stripe worker", () => {
+    const walkIn = runPsqlCommand(
+      `SELECT public.create_walk_in_booking(
+        p_court_id => '${activeCourtId}', p_customer_name => 'Charlie Guest', p_booking_date => '${hardeningDate}',
+        p_start_time => '17:00:00', p_end_time => '18:00:00', p_amount => 200,
+        p_customer_id => '${guestCustId}', p_payment_method => 'gcash', p_payment_reference => 'GC-PAY-1'
+      );`,
+      { role: "authenticated", uid: adminUid }
+    );
+    assert.equal(walkIn.status, 0, walkIn.stderr);
+    const bookingId = JSON.parse(walkIn.stdout).booking_id;
+    const paymentId = runPsqlCommand(`SELECT id FROM public.payments WHERE booking_id = '${bookingId}';`).stdout;
+    runPsqlCommand(`UPDATE public.bookings SET status = 'cancelled' WHERE id = '${bookingId}';`);
+
+    const customerAttempt = runPsqlCommand(
+      `SELECT public.request_manual_cash_refund('${paymentId}', '${bookingId}', 200, 'php', 'Cancelled', 'ref_gcash_cust');`,
+      { role: "authenticated", uid: aliceUid }
+    );
+    assert.notEqual(customerAttempt.status, 0);
+    assert.ok(customerAttempt.stderr.includes("FORBIDDEN"), customerAttempt.stderr);
+
+    const request = runPsqlCommand(
+      `SELECT public.request_manual_cash_refund('${paymentId}', '${bookingId}', 200, 'php', 'Cancelled', 'ref_gcash_1');`,
+      { role: "authenticated", uid: adminUid }
+    );
+    assert.equal(request.status, 0, request.stderr);
+    const requestObj = JSON.parse(request.stdout);
+    assert.equal(requestObj.status, "pending_cash_handover");
+
+    runPsqlCommand(`SELECT public.claim_pending_refund_request('worker-test', 60);`, { role: "service_role" });
+    const afterClaim = runPsqlCommand(`SELECT status FROM public.refund_requests WHERE id = '${requestObj.refund_request_id}';`);
+    assert.equal(afterClaim.stdout, "pending_cash_handover", "Stripe worker must not claim GCash refunds");
+
+    const confirm = runPsqlCommand(
+      `SELECT public.confirm_manual_cash_refund('${requestObj.refund_request_id}', 'GC-REFUND-9', 'Sent back via GCash');`,
+      { role: "authenticated", uid: adminUid }
+    );
+    assert.equal(confirm.status, 0, confirm.stderr);
+    const final = runPsqlCommand(
+      `SELECT r.status || '|' || p.status FROM public.refund_requests r JOIN public.payments p ON p.id = r.payment_id WHERE r.id = '${requestObj.refund_request_id}';`
+    );
+    assert.equal(final.stdout, "cash_refunded|refunded");
+  });
+
+  await runTest("20261102 Rollback: on a fresh database, rollback restores previous objects and the migration re-applies cleanly", () => {
+    const rbDb = "crosshair_rollback_db";
+    const created = runPsqlCommand(`CREATE DATABASE ${rbDb};`, { db: "postgres" });
+    assert.equal(created.status, 0, created.stderr);
+
+    for (const file of [
+      fixturePath, migrationPath, stage2MigrationPath, stage1HoldExpiryPath, paymentReconciliationPath,
+      paymentRefundFixPath, rlsMigrationPath, resilienceMigrationPath, tightenRlsMigrationPath,
+      secureProfilesMigrationPath, launchHardeningMigrationPath,
+    ]) {
+      runPsqlFile(file, { db: rbDb });
+    }
+
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_20261102_launch_hardening.sql"), { db: rbDb });
+    const afterRollback = runPsqlCommand(`
+      SELECT (SELECT count(*) FROM pg_constraint WHERE conname = 'payments_booking_id_key')
+        || '|' || (to_regprocedure('public.release_expired_court_holds(uuid,date,time,time)') IS NULL)
+        || '|' || has_table_privilege('anon', 'public.bookings', 'INSERT')
+        || '|' || (SELECT prosrc NOT LIKE '%TOO_MANY_HOLDS%' FROM pg_proc WHERE proname = 'hold_court_booking');
+    `, { db: rbDb });
+    assert.equal(afterRollback.status, 0, afterRollback.stderr);
+    assert.equal(afterRollback.stdout, "1|true|true|true");
+
+    runPsqlFile(launchHardeningMigrationPath, { db: rbDb });
+    const reapplied = runPsqlCommand(`
+      SELECT (SELECT count(*) FROM pg_constraint WHERE conname = 'payments_booking_id_key')
+        || '|' || (to_regprocedure('public.release_expired_court_holds(uuid,date,time,time)') IS NOT NULL)
+        || '|' || has_table_privilege('anon', 'public.bookings', 'INSERT');
+    `, { db: rbDb });
+    assert.equal(reapplied.stdout, "0|true|false");
   });
 
   console.log("\n================================================================================");
