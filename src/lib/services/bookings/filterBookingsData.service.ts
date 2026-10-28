@@ -35,6 +35,8 @@ export const fetchBookings = async (filters?: FetchBookingsFilters) => {
             `)
             .order("booking_date", { ascending: false })
             .order("start_time", { ascending: false })
+            // A booking can have a later duplicate-charge payment row (20261102); keep the original first for payments[0]
+            .order("created_at", { referencedTable: "payments", ascending: true })
             .limit(100);
 
         if (hasStatusFilter) {
