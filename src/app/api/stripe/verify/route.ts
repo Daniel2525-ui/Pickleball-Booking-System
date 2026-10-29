@@ -103,7 +103,14 @@ export async function POST(req: NextRequest) {
         }
 
         // Read lost courts from the final rows: the webhook may have refunded them first (this call is then a NO_OP)
-        const finalBookings = (await loadBookings()) ?? bookings;
+        const finalBookings = await loadBookings();
+        if (!finalBookings) {
+            console.error(`Payment verification: re-reading bookings after reconciling ${session.id} failed`);
+            return Response.json(
+                { error: "Payment reconciliation failed. Your payment is safe; please check 'My Bookings' shortly." },
+                { status: 500 }
+            );
+        }
         const lostCourts = finalBookings
             .filter((b) => b.status === "cancelled")
             .map((b) => b.courts?.name ?? "Court");
