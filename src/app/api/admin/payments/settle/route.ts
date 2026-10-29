@@ -84,6 +84,12 @@ export async function POST(request: NextRequest) {
             if (settleErr.message?.includes("FORBIDDEN")) {
                 return NextResponse.json({ error: "Admin access required." }, { status: 403 });
             }
+            if (settleErr.message?.includes("HOLD_EXPIRED")) {
+                return NextResponse.json(
+                    { error: "This online hold has expired. Record a new walk-in reservation to take payment at the counter." },
+                    { status: 409 }
+                );
+            }
             if (
                 settleErr.message?.includes("INVALID_STATUS") ||
                 settleErr.message?.includes("SLOT_UNAVAILABLE") ||

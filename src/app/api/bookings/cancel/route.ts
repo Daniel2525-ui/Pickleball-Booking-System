@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         }
         const { data: updated, error: updateError } = await admin
             .from("bookings")
-            .update({ status: CANCELLED_STATUS })
+            .update({ status: CANCELLED_STATUS, cancel_reason: "customer" })
             .eq("id", booking.id)
             .eq("user_id", user.id)
             .eq("status", booking.status)

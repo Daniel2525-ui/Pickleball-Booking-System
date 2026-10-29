@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
+import { getServiceClient } from "@/lib/supabase/service";
 import {
     validateBookingSlot,
     getBookingWeekday,
@@ -271,14 +272,18 @@ export async function POST(request: NextRequest) {
         // Only release records on definite pre-creation failure where no session could exist at Stripe.
         // For network timeouts or connection drops, preserve pending records so payment resumption,
         // webhooks, or cron cleanup can safely resolve them without dropping paid bookings.
-        // Customers may cancel (not delete) their own pending rows under RLS (20261031).
+        // Service role: these ids came from our own hold_court_booking call, and RLS only accepts
+        // customer-labelled direct cancellations. Without the key the hold is left for cron cleanup.
+        const admin = isDefinitePreCreationError ? getServiceClient() : null;
         if (isDefinitePreCreationError) {
-            const supabase = await createClient();
-            if (createdPaymentId) {
-                await supabase.from("payments").update({ status: "failed" }).eq("id", createdPaymentId).eq("status", "pending");
+            if (admin && createdPaymentId) {
+                await admin.from("payments").update({ status: "failed" }).eq("id", createdPaymentId).eq("status", "pending");
             }
-            if (createdBookingId) {
-                await supabase.from("bookings").update({ status: "cancelled" }).eq("id", createdBookingId).eq("status", "pending");
+            if (admin && createdBookingId) {
+                await admin.from("bookings")
+                    .update({ status: "cancelled", cancel_reason: "checkout_failed" })
+                    .eq("id", createdBookingId)
+                    .eq("status", "pending");
             }
             return Response.json(
                 { error: "Checkout session initialization failed. Please try again." },

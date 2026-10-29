@@ -21,6 +21,8 @@ export const fetchRecentBookings = async () => {
                 profiles:user_id ( full_name )       
             `)
             .in("status", ["confirmed", "completed", "cancelled", "checked_in", "in_progress", "pending"])
+            // Timed-out holds are noise here; they stay listed under Bookings > Expired Holds
+            .or("cancel_reason.is.null,cancel_reason.neq.expired")
             .order("created_at", {
                 ascending: false,
             })

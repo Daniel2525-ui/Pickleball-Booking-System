@@ -30,5 +30,5 @@ test("admin status transitions: populates appropriate Stage 2 audit timestamps p
     assert.deepEqual(buildStatusUpdate("in_progress", now), { status: "in_progress", started_at: now });
     assert.deepEqual(buildStatusUpdate("completed", now), { status: "completed", completed_at: now });
     assert.deepEqual(buildStatusUpdate("no_show", now), { status: "no_show", no_show_at: now });
-    assert.deepEqual(buildStatusUpdate("cancelled", now), { status: "cancelled" });
+    assert.deepEqual(buildStatusUpdate("cancelled", now), { status: "cancelled", cancel_reason: "admin" });
 });

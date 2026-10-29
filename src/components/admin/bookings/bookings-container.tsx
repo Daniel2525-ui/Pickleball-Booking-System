@@ -32,7 +32,8 @@ export default function BookingsContainer() {
             Monitor player reservations, manage slot confirmations, and record walk-in bookings.
           </p>
         </div>
-        <AddBookingModal />
+        {/* A new filters object makes the table reload, so the recorded booking appears */}
+        <AddBookingModal onBookingAdded={() => setFilters((current) => ({ ...current }))} />
       </header>
 
       <div className="flex flex-col gap-4">

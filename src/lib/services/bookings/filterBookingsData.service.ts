@@ -41,9 +41,15 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
             .order("created_at", { referencedTable: "payments", ascending: true })
             .range(offset, offset + BOOKINGS_PAGE_SIZE - 1);
 
-        if (hasStatusFilter) {
-            // Labels such as "Checked In" / "No-Show" map to stored values checked_in / no_show
-            query = query.eq("status", status.toLowerCase().replace(/[\s-]+/g, "_"));
+        if (hasStatusFilter && status.toLowerCase() === "expired") {
+            query = query.eq("status", "cancelled").eq("cancel_reason", "expired");
+        } else {
+            if (hasStatusFilter) {
+                // Labels such as "Checked In" / "No-Show" map to stored values checked_in / no_show
+                query = query.eq("status", status.toLowerCase().replace(/[\s-]+/g, "_"));
+            }
+            // Timed-out holds are kept for history but only listed under the "Expired" filter
+            query = query.or("cancel_reason.is.null,cancel_reason.neq.expired");
         }
 
         if (hasCourtFilter) {

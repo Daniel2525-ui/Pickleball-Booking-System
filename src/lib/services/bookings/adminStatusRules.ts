@@ -27,5 +27,6 @@ export const buildStatusUpdate = (newStatus: string, now: string = new Date().to
     if (newStatus === "in_progress") update.started_at = now;
     if (newStatus === "completed") update.completed_at = now;
     if (newStatus === "no_show") update.no_show_at = now;
+    if (newStatus === "cancelled") update.cancel_reason = "admin";
     return update;
 };

@@ -42,6 +42,7 @@ import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { SettlePaymentModal } from "./settlePaymentModal";
+import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
 const statusStyles: Record<string, string> = {
@@ -52,6 +53,8 @@ const statusStyles: Record<string, string> = {
   in_progress: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20 font-semibold",
   completed: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20 font-semibold",
   no_show: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20 font-semibold",
+  expired: "bg-muted text-muted-foreground border-border font-semibold",
+  hold_expired: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-dashed border-orange-500/40 font-semibold",
 };
 
 const getStatusColor = (status: string) => statusStyles[status?.toLowerCase()] ?? "bg-muted text-muted-foreground";
@@ -64,6 +67,8 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: "In Progress",
   completed: "Completed",
   no_show: "No-Show",
+  expired: "Expired",
+  hold_expired: "Hold Expired",
 };
 const capitalize = (status: string) => STATUS_LABELS[status?.toLowerCase()] ?? (status ? status[0].toUpperCase() + status.slice(1) : "");
 
@@ -292,7 +297,9 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
               ) : (
                 bookingsData.map((booking) => {
                   const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments ?? null);
-                  const isUnpaid = payment?.status === "pending";
+                  const displayStatus = getBookingDisplayStatus(booking);
+                  // An expired online hold cannot be revived at the counter (settle_counter_payment refuses it)
+                  const canCollect = payment?.status === "pending" && displayStatus !== "hold_expired" && booking.status !== "cancelled";
 
                   return (
                     <TableRow key={booking.id} className="group transition-colors hover:bg-muted/30">
@@ -335,8 +342,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                       {/* Reservation and Payment Status */}
                       <TableCell>
                         <div className="flex flex-col items-start gap-1">
-                          <Badge variant="outline" className={`text-xs capitalize ${getStatusColor(booking.status)}`}>
-                            {capitalize(booking.status)}
+                          <Badge variant="outline" className={`text-xs capitalize ${getStatusColor(displayStatus)}`}>
+                            {capitalize(displayStatus)}
                           </Badge>
                           {renderPaymentBadge(booking)}
                         </div>
@@ -363,7 +370,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                               </DropdownMenuLabel>
 
                               {/* Collect Payment Action if Unpaid */}
-                              {isUnpaid && (
+                              {canCollect && (
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setSelectedBookingForSettle(booking);

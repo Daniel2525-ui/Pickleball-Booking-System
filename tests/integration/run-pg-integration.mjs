@@ -3424,6 +3424,102 @@ async function main() {
     runPsqlFile(path.join(PROJECT_ROOT, "supabase/migrations", migration));
   });
 
+  await runTest("booking_cancel_reason: every cancellation path records why; expired holds cannot be settled; Pay Later walk-ins can", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("booking_cancel_reason"));
+    assert.ok(migration, "booking_cancel_reason migration file not found");
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    const day = "2030-01-08"; // Tuesday (open 07:00 - 22:00), not used by other tests
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const pendingHold = (start, expiresSql) => {
+      const end = `${String(Number(start.slice(0, 2)) + 1).padStart(2, "0")}:00:00`;
+      const id = q(`INSERT INTO public.bookings (user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, customer_name)
+        VALUES ('${aliceUid}', '${activeCourtId}', '${day}', '${start}', '${end}', 'pending', 200, ${expiresSql}, 'Alice') RETURNING id;`);
+      const paymentId = q(`INSERT INTO public.payments (booking_id, amount, currency, status) VALUES ('${id}', 200, 'php', 'pending') RETURNING id;`);
+      return { id, paymentId };
+    };
+    const reasonOf = (id) => q(`SELECT status || '|' || coalesce(cancel_reason, '') FROM public.bookings WHERE id = '${id}';`);
+
+    // Rows that exist before the migration: a timed-out hold and a cash booking that was refunded
+    const old = pendingHold("07:00:00", "now() - interval '2 hours'");
+    q(`UPDATE public.payments SET status = 'failed' WHERE id = '${old.paymentId}';
+       UPDATE public.bookings SET status = 'cancelled', updated_at = now() WHERE id = '${old.id}';`);
+    const refunded = pendingHold("08:00:00", "NULL");
+    q(`UPDATE public.payments SET status = 'refunded', payment_method = 'cash', paid_at = now() WHERE id = '${refunded.paymentId}';
+       UPDATE public.bookings SET status = 'cancelled', hold_expires_at = NULL WHERE id = '${refunded.id}';`);
+
+    runPsqlFile(migrationPath);
+    runPsqlFile(migrationPath); // idempotent
+    assert.equal(reasonOf(old.id), "cancelled|expired", "Backfill marks the timed-out hold expired");
+    assert.equal(reasonOf(refunded.id), "cancelled|", "Backfill leaves other cancellations unlabelled");
+    assert.notEqual(runPsqlCommand(`UPDATE public.bookings SET cancel_reason = 'whatever' WHERE id = '${old.id}';`).status, 0, "Unknown reasons are rejected");
+
+    // Cleanup job (cron / checkout.session.expired webhook) records expiry
+    const cron = pendingHold("09:00:00", "now() - interval '30 minutes'");
+    q(`SELECT public.cancel_expired_booking('${cron.id}', '${cron.paymentId}');`, { role: "service_role" });
+    assert.equal(reasonOf(cron.id), "cancelled|expired");
+
+    // A late Stripe payment for the expired hold is refunded automatically; the reason stays 'expired'
+    const late = JSON.parse(q(`SELECT public.reconcile_booking_payment('${cron.id}', '${cron.paymentId}', 'cs_late_reason', 'pi_late_reason', 200, 'php');`, { role: "service_role" }));
+    assert.equal(late.action, "REFUND_SCHEDULED");
+    // The hold's payment was marked failed by cleanup, so the late charge is booked as a duplicate and refunded
+    assert.equal(late.reason, "DUPLICATE_PAYMENT");
+    assert.equal(reasonOf(cron.id), "cancelled|expired");
+    assert.equal(q(`SELECT count(*) FROM public.refund_requests WHERE booking_id = '${cron.id}';`), "1");
+
+    // Slot release: a new hold on the slot of a hold past its grace period cancels it as expired
+    const stale = pendingHold("10:00:00", "now() - interval '25 minutes'");
+    q(`SELECT public.hold_court_booking('${activeCourtId}', '${day}', '10:00:00', '11:00:00', '${bobUid}', 200, now() + interval '35 minutes');`,
+      { role: "authenticated", uid: bobUid });
+    assert.equal(reasonOf(stale.id), "cancelled|expired", "Released hold is labelled expired");
+
+    // Late payment on a court taken out of service is refunded with its own reason
+    const courtGone = pendingHold("12:00:00", "now() + interval '30 minutes'");
+    q(`UPDATE public.courts SET status = 'maintenance' WHERE id = '${activeCourtId}';`);
+    const gone = JSON.parse(q(`SELECT public.reconcile_booking_payment('${courtGone.id}', '${courtGone.paymentId}', 'cs_gone', 'pi_gone', 200, 'php');`, { role: "service_role" }));
+    q(`UPDATE public.courts SET status = 'active' WHERE id = '${activeCourtId}';`);
+    assert.equal(gone.reason, "COURT_UNAVAILABLE");
+    assert.equal(reasonOf(courtGone.id), "cancelled|court_unavailable");
+
+    // Counter payment: an expired online hold is refused; an active one still settles
+    const expired = pendingHold("13:00:00", "now() - interval '1 minute'");
+    const refused = runPsqlCommand(`SELECT public.settle_counter_payment('${expired.id}', '${expired.paymentId}', 'cash', 'REC-X');`, { role: "authenticated", uid: adminUid });
+    assert.notEqual(refused.status, 0, "Expired hold must not be settled");
+    assert.ok(refused.stderr.includes("HOLD_EXPIRED"), refused.stderr);
+    assert.equal(q(`SELECT status FROM public.payments WHERE id = '${expired.paymentId}';`), "pending");
+    const active = pendingHold("14:00:00", "now() + interval '20 minutes'");
+    q(`SELECT public.settle_counter_payment('${active.id}', '${active.paymentId}', 'cash', 'REC-Y');`, { role: "authenticated", uid: adminUid });
+    assert.equal(reasonOf(active.id), "confirmed|");
+
+    // "Pay Later" walk-in (confirmed, payment pending) can now be collected at the counter
+    const walkIn = JSON.parse(q(`SELECT public.create_walk_in_booking(
+        p_court_id => '${activeCourtId}', p_customer_name => 'Pay Later Guest', p_booking_date => '${day}',
+        p_start_time => '15:00:00', p_end_time => '16:00:00', p_amount => 200, p_customer_id => '${guestCustId}');`,
+      { role: "authenticated", uid: adminUid }));
+    const walkInPayment = q(`SELECT id FROM public.payments WHERE booking_id = '${walkIn.booking_id}';`);
+    assert.equal(q(`SELECT b.status || '|' || p.status FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${walkIn.booking_id}';`), "confirmed|pending");
+    q(`SELECT public.settle_counter_payment('${walkIn.booking_id}', '${walkInPayment}', 'gcash', 'GC-123');`, { role: "authenticated", uid: adminUid });
+    assert.equal(q(`SELECT status || '|' || payment_method FROM public.payments WHERE id = '${walkInPayment}';`), "paid|gcash");
+
+    // Customers may release their own pending hold directly only as a customer cancellation
+    const own = pendingHold("17:00:00", "now() + interval '20 minutes'");
+    const asAlice = (set) => runPsqlCommand(`UPDATE public.bookings SET ${set} WHERE id = '${own.id}' RETURNING id`, { role: "authenticated", uid: aliceUid, asRole: true });
+    for (const spoof of ["status = 'cancelled', cancel_reason = 'admin'", "status = 'cancelled'"]) {
+      const r = asAlice(spoof);
+      assert.notEqual(r.status, 0, `Customer update must be refused: ${spoof}`);
+      assert.ok(r.stderr.includes("row-level security"), r.stderr);
+    }
+    assert.equal(asAlice("status = 'cancelled', cancel_reason = 'customer'").stdout.trim(), own.id);
+
+    // Rollback removes the column and restores the old behaviour; the migration re-applies cleanly
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_booking_cancel_reason.sql"));
+    assert.equal(q(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'cancel_reason';`), "0");
+    runPsqlFile(migrationPath);
+  });
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");

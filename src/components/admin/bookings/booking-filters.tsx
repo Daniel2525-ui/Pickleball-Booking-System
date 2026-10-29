@@ -93,6 +93,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
             <SelectItem value="Completed">Completed</SelectItem>
             <SelectItem value="No-Show">No-Show</SelectItem>
             <SelectItem value="Cancelled">Cancelled</SelectItem>
+            <SelectItem value="Expired">Expired Holds</SelectItem>
           </SelectContent>
         </Select>
 
