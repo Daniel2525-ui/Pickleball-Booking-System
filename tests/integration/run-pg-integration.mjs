@@ -3816,6 +3816,63 @@ async function main() {
       || '|' || has_function_privilege('authenticated', 'public.hold_court_basket(date,jsonb,timestamptz)', 'EXECUTE');`), "false|true");
   });
 
+  await runTest("multi_court_basket: customers cannot add a court to a basket or move a booking into one", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("multi_court_basket"));
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    runPsqlFile(migrationPath);
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const C1 = activeCourtId;
+    const C2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    const C3 = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+    q(`INSERT INTO public.courts (id, name, status) VALUES ('${C2}', 'Court 3 - Active', 'active'), ('${C3}', 'Court 4 - Active', 'active') ON CONFLICT (id) DO NOTHING;`);
+    const day = "2030-02-12"; // Tuesday, not used by other tests
+    const hold = (uid, lines) => JSON.parse(q(`SELECT public.hold_court_basket('${day}', '${JSON.stringify(lines)}'::jsonb);`, { role: "authenticated", uid }));
+    const extend = (basketId, court, s, e) => runPsqlCommand(`SELECT public.hold_court_booking(p_court_id => '${court}', p_booking_date => '${day}', p_start_time => '${s}', p_end_time => '${e}',
+      p_user_id => '${aliceUid}', p_amount => NULL, p_basket_id => '${basketId}');`, { role: "authenticated", uid: aliceUid });
+    const count = (basketId) => q(`SELECT count(*) FROM public.bookings WHERE basket_id = '${basketId}';`);
+
+    // Open basket: a direct call with its id is refused (a new court would ride on the basket's Stripe session)
+    const open = hold(aliceUid, [{ court_id: C1, start_time: "09:00", end_time: "10:00" }, { court_id: C2, start_time: "09:00", end_time: "10:00" }]);
+    const addOpen = extend(open.basket_id, C3, "09:00", "10:00");
+    assert.ok(addOpen.stderr.includes("INVALID_ARGUMENT: p_basket_id"), addOpen.stderr);
+    assert.equal(count(open.basket_id), "2");
+
+    // Paid basket (C1): the same call is refused, so no free court can be confirmed on the paid session
+    for (const item of open.items) {
+      q(`SELECT public.reconcile_booking_payment('${item.booking_id}', '${item.payment_id}', 'cs_paid_x', 'pi_paid_x', ${item.amount}, 'php');`, { role: "service_role" });
+    }
+    const addPaid = extend(open.basket_id, C3, "11:00", "12:00");
+    assert.ok(addPaid.stderr.includes("INVALID_ARGUMENT: p_basket_id"), addPaid.stderr);
+    assert.equal(count(open.basket_id), "2");
+
+    // C2: a customer cancelling their own hold cannot re-point it at the paid basket; a plain cancel still works
+    const other = hold(aliceUid, [{ court_id: C3, start_time: "13:00", end_time: "14:00" }]);
+    const otherId = other.items[0].booking_id;
+    const asAlice = (set) => runPsqlCommand(`UPDATE public.bookings SET ${set} WHERE id = '${otherId}' RETURNING id`, { role: "authenticated", uid: aliceUid, asRole: true });
+    const repoint = asAlice(`status = 'cancelled', cancel_reason = 'customer', basket_id = '${open.basket_id}'`);
+    assert.notEqual(repoint.status, 0, "re-pointing basket_id must be refused");
+    assert.ok(repoint.stderr.includes("basket_id"), repoint.stderr);
+    assert.equal(q(`SELECT basket_id || '|' || status FROM public.bookings WHERE id = '${otherId}';`), `${other.basket_id}|pending`);
+    assert.equal(asAlice("status = 'cancelled', cancel_reason = 'customer'").stdout.trim(), otherId);
+    // Staff (admin JWT) cannot change it either; the service role can
+    const asAdmin = runPsqlCommand(`UPDATE public.bookings SET basket_id = gen_random_uuid() WHERE id = '${otherId}'`, { role: "authenticated", uid: adminUid, asRole: true });
+    assert.ok(asAdmin.stderr.includes("basket_id"), `admin JWT must not change basket_id: ${asAdmin.stderr}`);
+    q(`UPDATE public.bookings SET basket_id = '${other.basket_id}' WHERE id = '${otherId}'`, { role: "service_role" });
+
+    // Rollback removes the trigger with the column; the migration re-applies cleanly
+    q(`DELETE FROM public.refund_requests WHERE booking_id IN (SELECT id FROM public.bookings WHERE booking_date = '${day}');
+       DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE booking_date = '${day}');
+       DELETE FROM public.bookings WHERE booking_date = '${day}';`);
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
+    assert.equal(q(`SELECT count(*) FROM pg_trigger WHERE tgname = 'bookings_basket_id_immutable';`), "0");
+    assert.equal(q(`SELECT to_regproc('public.bookings_basket_id_immutable') IS NULL;`), "t");
+    runPsqlFile(migrationPath);
+  });
+
   await runTest("multi_court_basket: staff settle a whole unpaid basket all-or-nothing", () => {
     const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("multi_court_basket"));
     const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);

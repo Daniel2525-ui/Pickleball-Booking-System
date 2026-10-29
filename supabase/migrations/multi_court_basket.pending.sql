@@ -443,7 +443,13 @@ BEGIN
   IF NOT v_is_service_role THEN
     v_hold_expires_at := least(v_hold_expires_at, clock_timestamp() + interval '40 minutes');
 
-    -- p_basket_id comes from the client: it may only extend the caller's own basket, on its date, with a new court
+    -- A customer's p_basket_id is honoured only from hold_court_basket in this transaction: adding a court to an
+    -- existing basket would put it on that basket's (possibly paid) Stripe session. PostgREST cannot set app.* settings.
+    IF p_basket_id IS NOT NULL AND current_setting('app.hold_basket_id', true) IS DISTINCT FROM p_basket_id::text THEN
+      RAISE EXCEPTION 'INVALID_ARGUMENT: p_basket_id is only accepted from hold_court_basket' USING ERRCODE = '22000';
+    END IF;
+
+    -- It may only extend the caller's own basket, on its date, with a new court
     IF p_basket_id IS NOT NULL AND EXISTS (
       SELECT 1 FROM public.bookings
       WHERE basket_id = p_basket_id
@@ -575,6 +581,9 @@ BEGIN
     RAISE EXCEPTION 'INVALID_ARGUMENT: Each court can appear once per booking' USING ERRCODE = '22000';
   END IF;
 
+  -- Lets hold_court_booking accept v_basket for this transaction only (see its p_basket_id guard)
+  PERFORM set_config('app.hold_basket_id', v_basket::text, true);
+
   -- Court order gives every basket the same court-row lock order, so overlapping baskets cannot deadlock
   FOR v_line IN
     SELECT (e->>'court_id')::uuid AS court_id, (e->>'start_time')::time AS start_time, (e->>'end_time')::time AS end_time, c.name AS court_name
@@ -610,6 +619,7 @@ BEGIN
     ));
   END LOOP;
 
+  PERFORM set_config('app.hold_basket_id', '', true);
   RETURN jsonb_build_object('basket_id', v_basket, 'hold_expires_at', v_expires, 'total', v_total, 'items', v_items);
 END;
 $$;
@@ -952,5 +962,23 @@ BEGIN
   RETURN jsonb_build_object('action', 'CONFIRMED', 'booking_id', p_booking_id, 'payment_id', p_payment_id);
 END;
 $$;
+
+-- Section 6: only the service role may change basket_id (a customer re-pointing a cancelled hold at a paid basket
+--   would have it reconciled, and refunded, from that basket's Stripe intent)
+CREATE OR REPLACE FUNCTION public.bookings_basket_id_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF NOT (coalesce(auth.role(), '') = 'service_role' OR (session_user = 'postgres' AND auth.role() IS NULL)) THEN
+    RAISE EXCEPTION 'FORBIDDEN: basket_id cannot be changed' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS bookings_basket_id_immutable ON public.bookings;
+CREATE TRIGGER bookings_basket_id_immutable BEFORE UPDATE ON public.bookings
+  FOR EACH ROW WHEN (OLD.basket_id IS DISTINCT FROM NEW.basket_id) EXECUTE FUNCTION public.bookings_basket_id_immutable();
 
 COMMIT;

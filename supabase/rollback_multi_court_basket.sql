@@ -523,6 +523,8 @@ $$;
 REVOKE ALL ON FUNCTION public.hold_court_booking(uuid, date, time, time, uuid, numeric, timestamptz) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.hold_court_booking(uuid, date, time, time, uuid, numeric, timestamptz) TO authenticated, service_role;
 
+DROP TRIGGER IF EXISTS bookings_basket_id_immutable ON public.bookings;
+DROP FUNCTION IF EXISTS public.bookings_basket_id_immutable();
 DROP INDEX IF EXISTS public.idx_bookings_basket_id;
 ALTER TABLE public.bookings DROP COLUMN IF EXISTS basket_id;
 
