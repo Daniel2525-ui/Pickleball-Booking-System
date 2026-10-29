@@ -443,6 +443,15 @@ BEGIN
   IF NOT v_is_service_role THEN
     v_hold_expires_at := least(v_hold_expires_at, clock_timestamp() + interval '40 minutes');
 
+    -- p_basket_id comes from the client: it may only extend the caller's own basket, on its date, with a new court
+    IF p_basket_id IS NOT NULL AND EXISTS (
+      SELECT 1 FROM public.bookings
+      WHERE basket_id = p_basket_id
+        AND (user_id IS DISTINCT FROM p_user_id OR booking_date != p_booking_date OR court_id = p_court_id)
+    ) THEN
+      RAISE EXCEPTION 'INVALID_ARGUMENT: p_basket_id does not match this court, date and customer' USING ERRCODE = '22000';
+    END IF;
+
     -- One open basket per customer; a legacy hold without basket_id is its own basket
     IF EXISTS (
       SELECT 1 FROM public.bookings

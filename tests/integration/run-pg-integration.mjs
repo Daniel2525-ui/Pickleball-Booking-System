@@ -3709,6 +3709,14 @@ async function main() {
     assert.equal(Number(held.total), Number(q(`SELECT 2 * public.quote_court_price('${day}', '09:00', '11:00');`)));
     assert.ok(held.hold_expires_at, "basket returns its hold expiry");
 
+    // A client-supplied basket id cannot join another user's basket, another date, or a court already in it
+    for (const [uid, date, court] of [[bobUid, day, C3], [aliceUid, "2030-02-05", C3], [aliceUid, day, C1]]) {
+      const r = runPsqlCommand(`SELECT public.hold_court_booking(p_court_id => '${court}', p_booking_date => '${date}', p_start_time => '12:00', p_end_time => '14:00',
+        p_user_id => '${uid}', p_amount => NULL, p_basket_id => '${held.basket_id}');`, { role: "authenticated", uid });
+      assert.ok(r.stderr.includes("INVALID_ARGUMENT: p_basket_id"), `${uid} ${date} ${court}: ${r.stderr}`);
+    }
+    assert.equal(q(`SELECT count(*) FROM public.bookings WHERE basket_id = '${held.basket_id}';`), "2");
+
     // (b) One unavailable line fails the whole basket and names the court; nothing from it is left behind
     q(`INSERT INTO public.bookings (user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount)
        VALUES ('${danaUid}', 'Dana', '${C3}', '${day}', '13:00', '15:00', 'confirmed', 400);`);
@@ -3755,21 +3763,26 @@ async function main() {
     const singleAgain = runPsqlCommand(`SELECT public.hold_court_booking('${C2}', '${day}', '18:00', '20:00', '${bobUid}', NULL);`, { role: "authenticated", uid: bobUid });
     assert.ok(singleAgain.stderr.includes("OPEN_BASKET_EXISTS"), singleAgain.stderr);
 
-    // (f) Overlapping baskets at the same moment: exactly one wins, the loser keeps nothing, no deadlock
+    // (f) Baskets sharing two courts listed in opposite orders, at the same moment: exactly one wins, the loser keeps
+    // nothing, no deadlock. A slow insert on raceDay keeps each session's first court lock held while the other starts,
+    // so locking in list order (instead of court order) would deadlock.
     q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE status = 'pending' AND user_id IN ('${aliceUid}', '${bobUid}');`);
     const raceDay = "2030-01-29"; // Tuesday, not used by other tests
+    q(`CREATE FUNCTION public.test_slow_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(2); RETURN NEW; END; $$;
+       CREATE TRIGGER test_slow_insert BEFORE INSERT ON public.bookings FOR EACH ROW WHEN (NEW.booking_date = '${raceDay}') EXECUTE FUNCTION public.test_slow_insert();`);
     const race = (uid, lines) => new Promise((resolve) => {
       const child = spawn("docker", ["exec", "-i", CONTAINER_NAME, "psql", "-U", POSTGRES_USER, "-d", TEST_DB, "-v", "ON_ERROR_STOP=1", "-q"]);
       let stderr = "";
       child.stderr.on("data", (d) => (stderr += d));
       child.on("close", (code) => resolve({ code, stderr }));
       child.stdin.end(`BEGIN; SET LOCAL request.jwt.claim.role = 'authenticated'; SET LOCAL request.jwt.claim.sub = '${uid}';
-        SELECT public.hold_court_basket('${raceDay}', '${JSON.stringify(lines)}'::jsonb); SELECT pg_sleep(1); COMMIT;`);
+        SELECT public.hold_court_basket('${raceDay}', '${JSON.stringify(lines)}'::jsonb); COMMIT;`);
     });
     const [ra, rb] = await Promise.all([
       race(aliceUid, [line(C1, "10:00", "12:00"), line(C2, "10:00", "12:00")]),
-      race(bobUid, [line(C3, "10:00", "12:00"), line(C2, "10:00", "12:00")]),
+      race(bobUid, [line(C2, "10:00", "12:00"), line(C1, "10:00", "12:00")]),
     ]);
+    q(`DROP TRIGGER test_slow_insert ON public.bookings; DROP FUNCTION public.test_slow_insert();`);
     assert.ok(!ra.stderr.includes("deadlock") && !rb.stderr.includes("deadlock"), ra.stderr + rb.stderr);
     assert.equal([ra, rb].filter((r) => r.code === 0).length, 1, ra.stderr + rb.stderr);
     const loser = ra.code === 0 ? bobUid : aliceUid;
