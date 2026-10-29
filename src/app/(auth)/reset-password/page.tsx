@@ -1,9 +1,10 @@
+import { Metadata } from "next";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
+export const metadata: Metadata = {
+  title: "Choose a New Password | Crosshair Dinkers",
+};
+
 export default function ResetPasswordPage() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-background">
-      <ResetPasswordForm />
-    </div>
-  );
+  return <ResetPasswordForm />;
 }

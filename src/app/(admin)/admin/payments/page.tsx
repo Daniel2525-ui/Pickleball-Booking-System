@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { Suspense } from "react";
 import { CreditCard } from "lucide-react";
 import PaymentsContainer from "@/components/admin/payments/payments-container";
 
@@ -24,7 +25,9 @@ export default function PaymentsPage() {
         </div>
       </header>
 
-      <PaymentsContainer />
+      <Suspense>
+        <PaymentsContainer />
+      </Suspense>
     </div>
   );
 }

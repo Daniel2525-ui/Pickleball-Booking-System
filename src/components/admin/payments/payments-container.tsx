@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PaymentFilters from "./payment-filters";
 import PaymentsTable from "./payments-table";
 
@@ -10,9 +11,11 @@ export interface PaymentFiltersState {
 }
 
 export default function PaymentsContainer() {
+  // ?status= lets the dashboard refund alert open this page pre-filtered
+  const initialStatus = useSearchParams().get("status") || "All Statuses";
   const [filters, setFilters] = useState<PaymentFiltersState>({
     search: "",
-    status: "All Statuses",
+    status: initialStatus,
   });
 
   return (

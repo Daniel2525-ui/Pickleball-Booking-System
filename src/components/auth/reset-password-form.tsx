@@ -6,7 +6,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
@@ -58,7 +58,7 @@ export function ResetPasswordForm() {
   return (
     <Card className="w-full max-w-sm shadow-md border border-border bg-card">
       <CardHeader className="text-center pb-4 pt-6">
-        <CardTitle className="text-2xl font-extrabold tracking-tight text-foreground">Choose a New Password</CardTitle>
+        <h1 data-slot="card-title" className="leading-snug text-2xl font-extrabold tracking-tight text-foreground">Choose a New Password</h1>
         <CardDescription className="text-muted-foreground text-xs sm:text-sm leading-relaxed mt-1">
           Set the password you&apos;ll use to sign in from now on.
         </CardDescription>

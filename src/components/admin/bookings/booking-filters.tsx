@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
@@ -26,7 +26,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All Statuses");
   const [courtId, setCourtId] = useState("All Courts");
-  const [dateTime] = useState("");
+  const [dateTime, setDateTime] = useState("");
   const [courts, setCourts] = useState<CourtOption[]>([]);
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
         <Select
           value={status}
           onValueChange={(value) => {
@@ -88,9 +88,39 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
             <SelectItem value="All Statuses">All Statuses</SelectItem>
             <SelectItem value="Confirmed">Confirmed</SelectItem>
             <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Checked In">Checked In</SelectItem>
+            <SelectItem value="In Progress">In Progress</SelectItem>
+            <SelectItem value="Completed">Completed</SelectItem>
+            <SelectItem value="No-Show">No-Show</SelectItem>
             <SelectItem value="Cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex-1 sm:flex-none flex items-center gap-1">
+          <Input
+            type="date"
+            aria-label="Filter by booking date"
+            value={dateTime}
+            onChange={(e) => {
+              setDateTime(e.target.value);
+              updateFilters(search, status, courtId, e.target.value);
+            }}
+            className="w-full sm:w-[150px] bg-background h-10 text-xs sm:text-sm"
+          />
+          {dateTime && (
+            <button
+              type="button"
+              onClick={() => {
+                setDateTime("");
+                updateFilters(search, status, courtId, "");
+              }}
+              className="size-8 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+              aria-label="Clear date filter"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
 
         <Select
           value={courtId}

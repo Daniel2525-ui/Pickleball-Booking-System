@@ -20,11 +20,13 @@ import { EditCourtModal } from "./editCourtModal";
 import { deleteCourt } from "@/lib/services/courts/deleteCourt.service";
 import StatCard from "@/components/admin/dashboard/stat-card";
 import { toast } from "sonner";
+import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 
 export default function CourtsContainer() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [courts, setCourts] = useState<Court[]>([]);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [courtToEdit, setCourtToEdit] = useState<Court | null>(null);
 
@@ -37,12 +39,17 @@ export default function CourtsContainer() {
     setLoading(false);
   };
 
-  const handleDelete = async (court: Court) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${court.name}"? Existing bookings for this court may be affected.`
-    );
-    if (!confirmed) return;
+  const handleDelete = (court: Court) => {
+    setConfirmRequest({
+      title: `Delete ${court.name}?`,
+      description:
+        "This permanently removes the court. Courts that already have bookings can't be deleted; set them to maintenance instead.",
+      confirmLabel: "Delete Court",
+      onConfirm: () => removeCourt(court),
+    });
+  };
 
+  const removeCourt = async (court: Court) => {
     const { error } = await deleteCourt(court.id);
     if (error) {
       const message = (error as Error)?.message || "Failed to delete court. Please try again.";
@@ -235,6 +242,8 @@ export default function CourtsContainer() {
         onOpenChange={(open) => !open && setCourtToEdit(null)}
         onCourtUpdated={loadCourts}
       />
+
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
     </div>
   );
 }

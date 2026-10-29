@@ -9,10 +9,16 @@ import {
   ShieldCheck,
   ArrowRight,
 } from "lucide-react";
+import type { VenueHoursSummary } from "@/lib/utils/venueHours";
 
 const smoothEase = [0.16, 1, 0.3, 1] as const;
 
-export function HeroSection() {
+interface HeroSectionProps {
+  courtCount: number | null;
+  hours: VenueHoursSummary | null;
+}
+
+export function HeroSection({ courtCount, hours }: HeroSectionProps) {
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
@@ -139,7 +145,7 @@ export function HeroSection() {
               <Layers className="size-3.5 shrink-0" />
               <span>Courts</span>
             </div>
-            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">4 Regulation</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">{courtCount ? `${courtCount} Regulation` : "Regulation"}</p>
             <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">Tournament acrylic cushion</p>
           </motion.div>
 
@@ -167,8 +173,8 @@ export function HeroSection() {
               <Clock className="size-3.5 shrink-0" />
               <span>Facility Hours</span>
             </div>
-            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">7 AM – 10 PM</p>
-            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">Open 7 days a week</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">{hours?.range ?? "See schedule"}</p>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">{hours?.note ?? "Live calendar below"}</p>
           </motion.div>
 
           <motion.div

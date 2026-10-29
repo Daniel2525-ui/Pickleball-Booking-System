@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, Check, LoaderCircle } from "lucide-react";
+import { useState } from "react";
+import { Clock, Check, LoaderCircle, ChevronDown } from "lucide-react";
 import { Slot } from "./types";
 import { SlotStatus, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 
@@ -24,6 +25,10 @@ export const CourtAvailabilityGrid = ({
   isFetching,
 }: CourtAvailabilityGridProps) => {
   const colCount = courts.length;
+  const [showPassed, setShowPassed] = useState(false);
+  // Rows already over on every court (earlier today) are collapsed so open slots show first
+  const passedCount = timeSlots.filter((time) => courts.length > 0 && courts.every((court) => getSlotStatus(selectedDate, court, time) === "passed")).length;
+  const visibleSlots = showPassed ? timeSlots : timeSlots.slice(passedCount);
 
   return (
     <div
@@ -49,10 +54,12 @@ export const CourtAvailabilityGrid = ({
         </div>
       </div>
 
-      {/* Subtle Mobile Scroll Cue */}
+      {/* Subtle Mobile Scroll Cue (phones fit up to 4 courts without scrolling) */}
+      {colCount > 4 && (
       <div className="md:hidden text-[11px] text-muted-foreground/80 px-4 py-2 border-b bg-muted/20 text-center font-medium flex items-center justify-center gap-1.5">
         <span>&larr; Swipe sideways to view all courts &rarr;</span>
       </div>
+      )}
 
       {/* Loading overlay during date transitions */}
       {isFetching && (
@@ -66,9 +73,12 @@ export const CourtAvailabilityGrid = ({
 
       {/* Full Grid Matrix */}
       <div className="overflow-x-auto pb-2">
-        <div className="min-w-[600px] md:min-w-[800px]">
+        <div
+          className="min-w-[var(--grid-min)] md:min-w-[800px]"
+          style={{ "--grid-min": `${76 + colCount * 75}px` } as React.CSSProperties}
+        >
           {/* Grid Header */}
-          <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] border-b">
+          <div className="grid grid-cols-[76px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] border-b">
             <div className="p-4 border-r font-medium text-sm flex items-center justify-center text-muted-foreground sticky left-0 z-20 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
               Time
             </div>
@@ -86,8 +96,19 @@ export const CourtAvailabilityGrid = ({
 
           {/* Grid Body */}
           <div className="divide-y">
-            {timeSlots.map((time, timeIdx) => (
-              <div key={timeIdx} className="grid grid-cols-[110px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] hover:bg-muted/30 transition-colors group">
+            {passedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowPassed((v) => !v)}
+                className="w-full py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center gap-1.5 transition-colors"
+                aria-expanded={showPassed}
+              >
+                <ChevronDown className={`size-3.5 transition-transform ${showPassed ? "rotate-180" : ""}`} />
+                {showPassed ? "Hide" : "Show"} {passedCount} earlier time {passedCount === 1 ? "slot" : "slots"}
+              </button>
+            )}
+            {visibleSlots.map((time, timeIdx) => (
+              <div key={timeIdx} className="grid grid-cols-[76px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] hover:bg-muted/30 transition-colors group">
                 <div className="p-2 border-r flex items-center justify-center text-xs md:text-sm text-center font-medium sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:bg-muted/30 transition-colors">
                   {time}
                 </div>
@@ -108,7 +129,7 @@ export const CourtAvailabilityGrid = ({
                     );
 
                     return (
-                      <div key={courtIdx} className="p-2 border-l first:border-l-0 h-full">
+                      <div key={courtIdx} className="p-1 sm:p-2 border-l first:border-l-0 h-full">
                         {isSelected ? (
                           <button
                             type="button"
@@ -142,14 +163,14 @@ export const CourtAvailabilityGrid = ({
                         ) : status === "pending" ? (
                           <div
                             aria-label={`${court} at ${time} is pending confirmation`}
-                            className="w-full h-full min-h-[48px] bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-lg flex items-center justify-center text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-wider"
+                            className="w-full h-full min-h-[48px] bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-lg flex items-center justify-center text-[10px] sm:text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-normal sm:tracking-wider"
                           >
                             Pending
                           </div>
                         ) : (
                           <div
                             aria-label={`${court} at ${time} is ${status}`}
-                            className="w-full h-full min-h-[48px] bg-muted/60 text-muted-foreground/80 dark:text-muted-foreground/60 rounded-lg flex items-center justify-center text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-wider"
+                            className="w-full h-full min-h-[48px] bg-muted/60 text-muted-foreground/80 dark:text-muted-foreground/60 rounded-lg flex items-center justify-center text-[10px] sm:text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-normal sm:tracking-wider"
                           >
                             {status === "maintenance" ? "Maintenance" : status === "closed" ? "Closed" : status === "passed" ? "Passed" : "Booked"}
                           </div>

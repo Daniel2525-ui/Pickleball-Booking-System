@@ -3,6 +3,7 @@ import TodaysSchedule from "@/components/admin/dashboard/todays-schedule";
 import CourtStatus from "@/components/admin/dashboard/court-status";
 import BookingOverview from "@/components/admin/dashboard/booking-overview";
 import RecentBookings from "@/components/admin/dashboard/recent-bookings";
+import RefundsOwedAlert from "@/components/admin/dashboard/refunds-owed-alert";
 import { Clock } from "lucide-react";
 
 export const metadata = {
@@ -36,6 +37,8 @@ export default function DashboardPage() {
           <span>{currentDate}</span>
         </div>
       </header>
+
+      <RefundsOwedAlert />
 
       {/* KPI Cards Strip */}
       <DashboardStats />

@@ -29,6 +29,21 @@ test.describe("login", () => {
   });
 });
 
+test("auth pages have a heading, their own title and the way back home", async ({ page }) => {
+  const pages = {
+    "/login": ["Sign In", "Sign In | Crosshair Dinkers"],
+    "/register": ["Create Player Account", "Create Account | Crosshair Dinkers"],
+    "/forgot-password": ["Reset Password", "Reset Password | Crosshair Dinkers"],
+    "/reset-password": ["Choose a New Password", "Choose a New Password | Crosshair Dinkers"],
+  };
+  for (const [path, [heading, title]] of Object.entries(pages)) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await expect(page).toHaveTitle(title);
+    await expect(page.getByRole("link", { name: "Back to Courts" })).toBeVisible();
+  }
+});
+
 test.describe("register validation", () => {
   async function fill(page, { password, confirm, phone }) {
     await page.goto("/register");

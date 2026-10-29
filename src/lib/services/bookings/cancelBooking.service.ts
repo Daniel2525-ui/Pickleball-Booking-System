@@ -12,7 +12,11 @@ export const customerCancellableStatuses = ["pending", "confirmed"] as const;
 /** Exact status value stored in the database for cancelled bookings. */
 export const CANCELLED_STATUS = "cancelled";
 
-import { getBookingStart } from "@/lib/utils/bookingTime.ts";
+/** Venue policy: confirmed (paid) reservations can be cancelled, with a full refund, up to this long before start. */
+export const CANCELLATION_CUTOFF_HOURS = 2;
+
+// Relative import so node:test can load this module without the @/ alias
+import { getBookingStart } from "../../utils/bookingTime.ts";
 export { getBookingStart };
 
 interface CancellableBookingFields {
@@ -40,6 +44,12 @@ export const getCancellationBlockReason = (
     if (Number.isNaN(start.getTime())) return "This booking has an invalid date or time.";
     if (start <= now) return "This booking has already started and can no longer be cancelled.";
 
+    // Unpaid holds can be released any time before start; paid ones follow the cutoff
+    const cutoff = start.getTime() - CANCELLATION_CUTOFF_HOURS * 60 * 60 * 1000;
+    if (status === "confirmed" && now.getTime() > cutoff) {
+        return `Confirmed reservations can only be cancelled up to ${CANCELLATION_CUTOFF_HOURS} hours before the start time. Please contact the venue for help.`;
+    }
+
     return null;
 };
 
@@ -49,6 +59,8 @@ export const isBookingCancellable = (booking: CancellableBookingFields, now: Dat
 export interface CancelledBooking {
     id: string;
     status: string;
+    /** What happened to a paid booking's money (null when nothing was paid) */
+    refund: "refunded" | "queued" | "manual" | null;
 }
 
 /**
@@ -74,7 +86,7 @@ export const cancelBooking = async (
             };
         }
 
-        return { data: body.booking as CancelledBooking, error: null };
+        return { data: { ...body.booking, refund: body.refund ?? null } as CancelledBooking, error: null };
     } catch (error) {
         console.error("Failed to cancel booking:", error);
         return {

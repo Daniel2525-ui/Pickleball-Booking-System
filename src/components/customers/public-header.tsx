@@ -92,6 +92,11 @@ export function PublicHeader() {
             My Bookings
           </Link>
         )}
+        {user && (
+          <Link href="/profile" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Profile
+          </Link>
+        )}
       </nav>
 
       {/* Right: Actions */}
@@ -176,6 +181,13 @@ export function PublicHeader() {
                     className="w-full h-11 flex items-center justify-center rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
                   >
                     View My Bookings
+                  </Link>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full h-11 flex items-center justify-center rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                  >
+                    My Profile
                   </Link>
                   <Button
                     variant="outline"

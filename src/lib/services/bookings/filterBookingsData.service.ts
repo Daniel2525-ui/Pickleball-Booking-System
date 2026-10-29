@@ -1,7 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import { Booking, FetchBookingsFilters } from "./bookingsTypes";
 
-export const fetchBookings = async (filters?: FetchBookingsFilters) => {
+export const BOOKINGS_PAGE_SIZE = 100;
+
+export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) => {
     try {
         const courtId = filters?.courtId?.trim() ?? "";
         const status = filters?.status?.trim() ?? "";
@@ -37,10 +39,11 @@ export const fetchBookings = async (filters?: FetchBookingsFilters) => {
             .order("start_time", { ascending: false })
             // A booking can have a later duplicate-charge payment row (20261102); keep the original first for payments[0]
             .order("created_at", { referencedTable: "payments", ascending: true })
-            .limit(100);
+            .range(offset, offset + BOOKINGS_PAGE_SIZE - 1);
 
         if (hasStatusFilter) {
-            query = query.eq("status", status.toLowerCase());
+            // Labels such as "Checked In" / "No-Show" map to stored values checked_in / no_show
+            query = query.eq("status", status.toLowerCase().replace(/[\s-]+/g, "_"));
         }
 
         if (hasCourtFilter) {

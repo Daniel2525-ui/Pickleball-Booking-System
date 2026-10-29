@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
@@ -41,9 +41,9 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-sm shadow-md border border-border bg-card">
       <CardHeader className="text-center pb-4 pt-6">
-        <CardTitle className="text-2xl font-extrabold tracking-tight text-foreground">
+        <h1 data-slot="card-title" className="leading-snug text-2xl font-extrabold tracking-tight text-foreground">
           Sign In
-        </CardTitle>
+        </h1>
         <CardDescription className="text-muted-foreground text-xs sm:text-sm leading-relaxed mt-1">
           Access your court reservations, live availability, and player match pass.
         </CardDescription>

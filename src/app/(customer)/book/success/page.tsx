@@ -1,7 +1,8 @@
 "use client";
 
+import { VENUE_CONTACT } from "@/lib/venue";
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -20,6 +21,7 @@ import { PublicHeader } from "@/components/customers/public-header";
 function BookingSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const router = useRouter();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verifyResult, setVerifyResult] = useState<{
     success: boolean;
@@ -29,9 +31,9 @@ function BookingSuccessContent() {
 
   useEffect(() => {
     async function verifySession() {
+      // Opened directly (bookmark, back button): nothing to verify, show the reservations instead
       if (!sessionId) {
-        setVerifyResult({ success: false, error: "No checkout session ID provided." });
-        setIsVerifying(false);
+        router.replace("/my-bookings");
         return;
       }
       try {
@@ -56,7 +58,7 @@ function BookingSuccessContent() {
       }
     }
     verifySession();
-  }, [sessionId]);
+  }, [sessionId, router]);
 
   if (isVerifying) {
     return (
@@ -126,7 +128,7 @@ function BookingSuccessContent() {
             </div>
 
             <p className="text-center text-[11px] text-muted-foreground pt-2 border-t">
-              Need assistance? Call venue reception at <span className="font-semibold text-foreground">+63 917 123 4567</span>.
+              Need assistance? Call venue reception at <span className="font-semibold text-foreground">{VENUE_CONTACT.phone}</span>.
             </p>
           </div>
         </main>
@@ -172,7 +174,7 @@ function BookingSuccessContent() {
               <div className="flex items-start gap-2.5">
                 <MapPin className="size-4 text-primary shrink-0 mt-0.5" />
                 <span>
-                  <strong>Venue:</strong> Crosshair Dinkers Complex, J.C. Aquino Ave, Butuan City.
+                  <strong>Venue:</strong> Crosshair Dinkers Complex, {VENUE_CONTACT.address}.
                 </span>
               </div>
               <div className="flex items-start gap-2.5">
@@ -216,7 +218,7 @@ function BookingSuccessContent() {
           {/* Support Helpline */}
           <p className="text-center text-[11px] text-muted-foreground pt-2 border-t">
             Questions about your booking? Call venue reception at{" "}
-            <span className="font-semibold text-foreground">+63 917 123 4567</span>.
+            <span className="font-semibold text-foreground">{VENUE_CONTACT.phone}</span>.
           </p>
         </div>
       </main>

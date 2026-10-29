@@ -36,7 +36,9 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
-import { fetchBookings } from "@/lib/services/bookings/filterBookingsData.service";
+import { fetchBookings, BOOKINGS_PAGE_SIZE } from "@/lib/services/bookings/filterBookingsData.service";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { SettlePaymentModal } from "./settlePaymentModal";
@@ -90,6 +92,9 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
   const [bookingsData, setBookingsData] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
 
   // Settle payment modal state
   const [settleModalOpen, setSettleModalOpen] = useState(false);
@@ -100,18 +105,34 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
       setLoading(true);
       const { data } = await fetchBookings(filters);
       if (data) setBookingsData(data);
+      setHasMore(data.length === BOOKINGS_PAGE_SIZE);
       setLoading(false);
     };
     loadBookingsData();
   }, [filters]);
 
-  const handleCancelBooking = async (booking: Booking) => {
-    if (actionLoadingId) return;
-    const ok = window.confirm(
-      `Are you sure you want to cancel the reservation for ${booking.customer_name || "this player"}? The court slot will be released.`
-    );
-    if (!ok) return;
+  const loadMore = async () => {
+    setLoadingMore(true);
+    const { data, error } = await fetchBookings(filters, bookingsData.length);
+    if (error) toast.error("Failed to load more reservations.");
+    else {
+      setBookingsData((prev) => [...prev, ...data]);
+      setHasMore(data.length === BOOKINGS_PAGE_SIZE);
+    }
+    setLoadingMore(false);
+  };
 
+  const handleCancelBooking = (booking: Booking) => {
+    if (actionLoadingId) return;
+    setConfirmRequest({
+      title: "Cancel this reservation?",
+      description: `${booking.customer_name || "This player"}'s reservation will be cancelled and the court slot released.`,
+      confirmLabel: "Cancel Reservation",
+      onConfirm: () => cancelBooking(booking),
+    });
+  };
+
+  const cancelBooking = async (booking: Booking) => {
     setActionLoadingId(booking.id);
     const { error } = await updateBookingStatus(booking.id, "cancelled");
     if (error) {
@@ -125,18 +146,23 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     setActionLoadingId(null);
   };
 
-  const handleStatusChange = async (booking: Booking, newStatus: GameDayStatus) => {
+  const handleStatusChange = (booking: Booking, newStatus: GameDayStatus) => {
     if (actionLoadingId) return;
 
     if (newStatus === "no_show") {
-      const ok = window.confirm(
-        "Warning: Marking this booking as No-Show will release the court slot immediately.\n" +
-        "The original player may still arrive late. Payment status will NOT change.\n\n" +
-        "Proceed?"
-      );
-      if (!ok) return;
+      setConfirmRequest({
+        title: "Mark as no-show?",
+        description:
+          "The court slot is released immediately, even if the player arrives late.\nPayment status will not change.",
+        confirmLabel: "Mark No-Show",
+        onConfirm: () => changeStatus(booking, newStatus),
+      });
+      return;
     }
+    changeStatus(booking, newStatus);
+  };
 
+  const changeStatus = async (booking: Booking, newStatus: GameDayStatus) => {
     setActionLoadingId(booking.id);
     const { error } = await updateBookingStatus(booking.id, newStatus);
     if (error) {
@@ -427,6 +453,16 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
           </Table>
         </div>
       </div>
+
+      {hasMore && !loading && (
+        <div className="flex justify-center pt-4">
+          <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading..." : "Load More Reservations"}
+          </Button>
+        </div>
+      )}
+
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
 
       {/* Settle Payment Modal */}
       <SettlePaymentModal

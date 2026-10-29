@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
@@ -73,9 +73,9 @@ export function RegisterForm() {
   return (
     <Card className="w-full max-w-sm sm:max-w-md shadow-md border border-border bg-card">
       <CardHeader className="text-center pb-4 pt-6">
-        <CardTitle className="text-2xl font-extrabold tracking-tight text-foreground">
+        <h1 data-slot="card-title" className="leading-snug text-2xl font-extrabold tracking-tight text-foreground">
           Create Player Account
-        </CardTitle>
+        </h1>
         <CardDescription className="text-muted-foreground text-xs sm:text-sm leading-relaxed mt-1">
           Sign up to reserve courts, track game sessions, and view live availability in Butuan City.
         </CardDescription>
@@ -227,7 +227,7 @@ export function RegisterForm() {
           </Button>
 
           <div className="pt-2 text-center text-xs text-muted-foreground">
-            Already have an account?
+            Already have an account?{" "}
             <Link
               href="/login"
               className="font-bold text-primary hover:underline underline-offset-4"

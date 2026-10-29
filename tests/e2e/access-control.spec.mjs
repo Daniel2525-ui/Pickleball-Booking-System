@@ -16,6 +16,26 @@ test.describe("unauthenticated page access", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
+  test("/book/success without a checkout session goes to My Bookings", async ({ page }) => {
+    await page.goto("/book/success");
+    await expect(page).toHaveURL(/\/my-bookings$/);
+  });
+
+  test("/profile asks the visitor to sign in", async ({ page }) => {
+    await page.goto("/profile");
+    await expect(page.getByText("Sign in to view and edit your profile.")).toBeVisible();
+  });
+
+  test("privacy and terms pages are linked from sign-up and state the 2-hour cancellation rule", async ({ page }) => {
+    await page.goto("/register");
+    await page.getByRole("link", { name: "Booking Rules" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Terms & Booking Rules" })).toBeVisible();
+    await expect(page.getByText(/up to 2 hours before its start time and receive a full refund/)).toBeVisible();
+    await page.goto("/register");
+    await page.getByRole("link", { name: "Privacy Policy" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Privacy Policy" })).toBeVisible();
+  });
+
   test("/book redirects to the booking section", async ({ page }) => {
     await page.goto("/book");
     await expect(page).toHaveURL(/\/#booking$/);

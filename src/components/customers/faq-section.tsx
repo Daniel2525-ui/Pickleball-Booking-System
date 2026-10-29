@@ -27,12 +27,12 @@ const faqs: FAQItem[] = [
   {
     question: "What is your cancellation and rescheduling policy?",
     answer:
-      "Players can cancel or reschedule reservations up to 2 hours prior to the booked time slot directly from the 'My Bookings' portal. Cancellations within the eligible window receive full credit.",
+      "You can cancel a paid reservation from 'My Bookings' up to 2 hours before your start time and receive a full refund to your card (banks usually take 5–10 business days to show it). Within 2 hours of your slot, online cancellation closes; please call the venue. Online rescheduling isn't available yet, so cancel and book a new slot instead.",
   },
   {
     question: "What does the 'Pending' status on the court grid mean?",
     answer:
-      "When a player selects an open court and proceeds toward payment, the slot is locked as 'Pending' for 10 minutes to guarantee zero double-booking. If checkout is abandoned, the slot releases back to 'Available' automatically.",
+      "When a player proceeds to checkout, the slot is held as 'Pending' for about 35 minutes so nobody else can book it while they pay. If checkout is abandoned, the slot releases back to 'Available' automatically shortly after the hold ends.",
   },
   {
     question: "Are the courts weather-protected for rain and night play?",

@@ -19,7 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { fetchPayments } from "@/lib/services/payments/paymentsData.service";
+import { fetchPayments, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/paymentsData.service";
+import { toast } from "sonner";
 import { Payment } from "@/lib/services/payments/paymentsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { RefundPaymentModal } from "./refundPaymentModal";
@@ -59,6 +60,8 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refundTarget, setRefundTarget] = useState<Payment | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Paid payments on cancelled bookings are owed back to the customer
   const needsRefund = (payment: Payment) => payment.status === "paid" && payment.bookings?.status === "cancelled";
@@ -68,10 +71,22 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
       setLoading(true);
       const { data } = await fetchPayments(filters);
       if (data) setPayments(data);
+      setHasMore(data.length === PAYMENTS_PAGE_SIZE);
       setLoading(false);
     };
     loadPayments();
   }, [filters]);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    const { data, error } = await fetchPayments(filters, payments.length);
+    if (error) toast.error("Failed to load more payments.");
+    else {
+      setPayments((prev) => [...prev, ...data]);
+      setHasMore(data.length === PAYMENTS_PAGE_SIZE);
+    }
+    setLoadingMore(false);
+  };
 
   // Filter out any failed payments
   const validPayments = payments.filter((payment) => {
@@ -363,6 +378,14 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
           </Table>
         </div>
       </div>
+
+      {hasMore && !loading && (
+        <div className="flex justify-center pt-4">
+          <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading..." : "Load More Payments"}
+          </Button>
+        </div>
+      )}
 
       <RefundPaymentModal
         payment={refundTarget}

@@ -1,3 +1,4 @@
+import { VENUE_CONTACT } from "@/lib/venue";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -16,15 +17,31 @@ import { BookingContainer } from "@/components/customers/booking-container";
 import { PublicHeader } from "@/components/customers/public-header";
 import { FAQSection } from "@/components/customers/faq-section";
 import { HeroSection } from "@/components/customers/hero-section";
+import { createClient } from "@supabase/supabase-js";
+import { summarizeVenueHours } from "@/lib/utils/venueHours";
 
-export default function Home() {
+// Hours and courts are edited in the admin; refresh the static page at most every 5 minutes
+export const revalidate = 300;
+
+export default async function Home() {
+  // Anonymous read of public tables (same access the guest booking grid uses)
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    auth: { persistSession: false },
+  });
+  const [{ data: operatingHours }, { count: courtCount }] = await Promise.all([
+    supabase.from("operating_hours").select("day_of_week, is_open, open_time, close_time"),
+    supabase.from("courts").select("id", { count: "exact", head: true }),
+  ]);
+  const hours = summarizeVenueHours(operatingHours ?? []);
+  const courtsLabel = courtCount ? `all ${courtCount} courts` : "every court";
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground selection:bg-primary/20 selection:text-primary">
       <PublicHeader />
 
       <main className="flex-1 flex flex-col">
         {/* Animated Hero Section */}
-        <HeroSection />
+        <HeroSection courtCount={courtCount ?? null} hours={hours} />
 
         {/* 3-Step How It Works Section */}
         <section
@@ -72,11 +89,11 @@ export default function Home() {
                     Choose Court &amp; Slot
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-                    Browse our real-time availability grid across Courts 1 to 4. Click any open slot to see the price and match details.
+                    Browse our real-time availability grid across {courtsLabel}. Click any open slot to see the price and match details.
                   </p>
                   <div className="mt-5 pt-4 border-t border-border/60 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                     <Crosshair className="size-3.5 text-primary shrink-0" />
-                    <span>Courts 1–4 Matrix</span>
+                    <span>Live Court Matrix</span>
                   </div>
                 </div>
 
@@ -250,11 +267,13 @@ export default function Home() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs sm:text-sm">
                   <div className="flex items-center gap-2.5 p-3 rounded-xl border border-border/60 bg-muted/20">
                     <MapPin className="size-4 text-primary shrink-0" />
-                    <span className="font-medium text-foreground">J.C. Aquino Ave, Butuan City</span>
+                    <span className="font-medium text-foreground">{VENUE_CONTACT.address}</span>
                   </div>
                   <div className="flex items-center gap-2.5 p-3 rounded-xl border border-border/60 bg-muted/20">
                     <Clock className="size-4 text-primary shrink-0" />
-                    <span className="font-medium text-foreground">Open 7:00 AM – 10:00 PM Daily</span>
+                    <span className="font-medium text-foreground">
+                      {hours ? `${hours.range} · ${hours.note}` : "See the booking calendar for hours"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -313,7 +332,18 @@ export default function Home() {
             <div className="space-y-2.5">
               <h4 className="font-bold text-xs uppercase tracking-wider text-foreground">Operating Schedule</h4>
               <p className="text-xs text-foreground font-semibold">Standard Venue Hours</p>
-              <p className="text-xs text-muted-foreground">7:00 AM – 10:00 PM Daily</p>
+              {hours ? (
+                <ul className="text-xs text-muted-foreground space-y-0.5">
+                  {hours.groups.map((g) => (
+                    <li key={g.days} className="flex gap-2">
+                      <span className="w-16 shrink-0 font-medium text-foreground/80">{g.days}</span>
+                      <span>{g.hours}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">See the live schedule below.</p>
+              )}
               <a
                 href="#booking"
                 className="inline-block text-[11px] font-semibold text-primary hover:underline underline-offset-4 mt-0.5"
@@ -331,15 +361,15 @@ export default function Home() {
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center gap-2">
                   <Phone className="size-3.5 text-primary" />
-                  <span>+63 917 123 4567</span>
+                  <a href={VENUE_CONTACT.phoneHref} className="hover:text-foreground transition-colors">{VENUE_CONTACT.phone}</a>
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail className="size-3.5 text-primary" />
-                  <span>play@crosshairdinkers.com</span>
+                  <a href={`mailto:${VENUE_CONTACT.email}`} className="hover:text-foreground transition-colors">{VENUE_CONTACT.email}</a>
                 </div>
                 <div className="flex items-start gap-2 pt-1 text-muted-foreground">
                   <MapPin className="size-3.5 text-primary shrink-0 mt-0.5" />
-                  <span>J.C. Aquino Ave, Butuan City</span>
+                  <span>{VENUE_CONTACT.address}</span>
                 </div>
               </div>
             </div>
@@ -352,9 +382,13 @@ export default function Home() {
                 My Bookings
               </Link>
               <span>•</span>
-              <a href="#faq" className="hover:text-foreground transition-colors">
+              <Link href="/terms#cancellation" className="hover:text-foreground transition-colors">
                 Cancellation Policy
-              </a>
+              </Link>
+              <span>•</span>
+              <Link href="/privacy" className="hover:text-foreground transition-colors">
+                Privacy
+              </Link>
             </div>
           </div>
         </div>

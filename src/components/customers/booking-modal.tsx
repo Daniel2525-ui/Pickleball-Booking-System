@@ -1,3 +1,4 @@
+import { VENUE_CONTACT } from "@/lib/venue";
 import { Clock, MapPin, Calendar, LoaderCircle, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,7 +69,7 @@ export const BookingModal = ({
 
             <div className="pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="size-4 shrink-0 text-primary" />
-              <span>Crosshair Dinkers, J.C. Aquino Ave, Butuan City</span>
+              <span>Crosshair Dinkers, {VENUE_CONTACT.address}</span>
             </div>
           </div>
         )}

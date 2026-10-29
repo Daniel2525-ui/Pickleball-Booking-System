@@ -21,26 +21,19 @@ test("to24h converts 12h times accurately", () => {
     assert.equal(to24h("11:59 PM"), "23:59");
 });
 
-// 2. Cancellation eligibility rules test
-const customerCancellableStatuses = ["pending", "confirmed"];
-const venueUtcOffset = "+08:00";
+// 2. Cancellation eligibility rules test (the real shared rule used by the UI and /api/bookings/cancel)
+import { getCancellationBlockReason } from "../src/lib/services/bookings/cancelBooking.service.ts";
 
-const getBookingStart = (booking) => {
-    const time = booking.start_time.length === 5 ? `${booking.start_time}:00` : booking.start_time.slice(0, 8);
-    return new Date(`${booking.booking_date}T${time}${venueUtcOffset}`);
-};
+test("confirmed bookings follow the 2-hour cutoff; unpaid holds can be released until start", () => {
+    const booking = (status) => ({ status, booking_date: "2026-11-01", start_time: "10:00:00" }); // 02:00Z
+    const at = (iso) => new Date(iso);
 
-const getCancellationBlockReason = (booking, now = new Date()) => {
-    const status = (booking.status || "").toLowerCase();
-    if (status === "cancelled") return "This booking has already been cancelled.";
-    if (!customerCancellableStatuses.includes(status)) {
-        return `Bookings with status "${booking.status}" can no longer be cancelled.`;
-    }
-    const start = getBookingStart(booking);
-    if (Number.isNaN(start.getTime())) return "This booking has an invalid date or time.";
-    if (start <= now) return "This booking has already started and can no longer be cancelled.";
-    return null;
-};
+    assert.equal(getCancellationBlockReason(booking("confirmed"), at("2026-11-01T00:00:00Z")), null); // 2h before
+    assert.equal(getCancellationBlockReason(booking("confirmed"), at("2026-10-31T23:59:59Z")), null);
+    assert.match(getCancellationBlockReason(booking("confirmed"), at("2026-11-01T00:00:01Z")), /2 hours before/);
+    assert.equal(getCancellationBlockReason(booking("pending"), at("2026-11-01T01:59:00Z")), null);
+    assert.match(getCancellationBlockReason(booking("pending"), at("2026-11-01T02:00:00Z")), /already started/);
+});
 
 test("cancellation policy permits future confirmed/pending bookings", () => {
     const futureBooking = {

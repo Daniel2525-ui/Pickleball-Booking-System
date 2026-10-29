@@ -57,6 +57,8 @@ export default function PaymentFilters({
             <SelectItem value="All Statuses">All Statuses</SelectItem>
             <SelectItem value="Succeeded">Succeeded (Paid)</SelectItem>
             <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Refunded">Refunded</SelectItem>
+            <SelectItem value="Refund Owed">Refund Owed</SelectItem>
           </SelectContent>
         </Select>
       </div>

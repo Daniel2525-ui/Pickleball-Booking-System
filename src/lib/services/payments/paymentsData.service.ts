@@ -1,13 +1,19 @@
 import { supabase } from "@/lib/supabase";
 import { Payment, FetchPaymentsFilters } from "./paymentsTypes";
 
-export const fetchPayments = async (filters?: FetchPaymentsFilters) => {
+export const PAYMENTS_PAGE_SIZE = 100;
+
+export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) => {
     try {
+        const status = filters?.status?.trim().toLowerCase() ?? "";
+        // Paid payments on cancelled bookings are owed back to the customer
+        const refundOwed = status === "refund owed";
+
         let query = supabase
             .from("payments")
             .select(`
                 *,
-                bookings (
+                bookings${refundOwed ? "!inner" : ""} (
                     status,
                     booking_date,
                     start_time,
@@ -22,10 +28,11 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters) => {
                 )
             `)
             .order("created_at", { ascending: false })
-            .limit(100);
+            .range(offset, offset + PAYMENTS_PAGE_SIZE - 1);
 
-        if (filters?.status && filters.status !== "All Statuses" && filters.status.toLowerCase() !== "all" && filters.status.trim() !== "") {
-            const status = filters.status.toLowerCase();
+        if (refundOwed) {
+            query = query.in("status", ["succeeded", "paid"]).eq("bookings.status", "cancelled");
+        } else if (status !== "" && status !== "all statuses" && status !== "all") {
             if (status === "succeeded" || status === "paid") {
                 query = query.in("status", ["succeeded", "paid"]);
             } else {
@@ -44,4 +51,15 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters) => {
         console.error("Failed to fetch payments:", error);
         return { data: [], error };
     }
+};
+
+/** Number of paid payments whose booking was cancelled, i.e. money owed back to customers. */
+export const countRefundsOwed = async () => {
+    const { count, error } = await supabase
+        .from("payments")
+        .select("id, bookings!inner(status)", { count: "exact", head: true })
+        .in("status", ["succeeded", "paid"])
+        .eq("bookings.status", "cancelled");
+    if (error) console.error("Failed to count refunds owed:", error);
+    return count ?? 0;
 };

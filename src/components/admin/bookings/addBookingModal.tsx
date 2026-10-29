@@ -372,10 +372,10 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
               /* New Walk-In Registration Panel */
               <div className="flex flex-col gap-2.5 mt-1 p-3 bg-muted/30 border border-border rounded-lg">
                 <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-semibold text-foreground">
+                  <Label htmlFor="walkin-name" className="text-xs font-semibold text-foreground">
                     Full Name <span className="text-destructive">*</span>
                   </Label>
-                  <Input
+                  <Input id="walkin-name"
                     type="text"
                     placeholder="e.g. Juan Dela Cruz"
                     value={newFullName}
@@ -415,8 +415,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Phone (Optional)</Label>
-                    <Input
+                    <Label htmlFor="walkin-phone" className="text-[11px] font-medium text-muted-foreground">Phone (Optional)</Label>
+                    <Input id="walkin-phone"
                       type="tel"
                       placeholder="e.g. 09171234567"
                       value={newPhone}
@@ -425,8 +425,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Email (Optional)</Label>
-                    <Input
+                    <Label htmlFor="walkin-email" className="text-[11px] font-medium text-muted-foreground">Email (Optional)</Label>
+                    <Input id="walkin-email"
                       type="email"
                       placeholder="e.g. juan@example.com"
                       value={newEmail}
@@ -441,9 +441,9 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
           {/* Assigned Court */}
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-semibold text-foreground">Assigned Court</Label>
+            <Label htmlFor="walkin-court" className="text-xs font-semibold text-foreground">Assigned Court</Label>
             <Select value={courtId} onValueChange={(value) => setCourtId(value as string)}>
-              <SelectTrigger className="h-9 text-xs sm:text-sm">
+              <SelectTrigger id="walkin-court" className="h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Choose a court">
                   {(value) => {
                     const court = courts.find((court) => court.id === value);
@@ -463,8 +463,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
           {/* Reservation Date */}
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-semibold text-foreground">Reservation Date</Label>
-            <Input
+            <Label htmlFor="walkin-date" className="text-xs font-semibold text-foreground">Reservation Date</Label>
+            <Input id="walkin-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -475,8 +475,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
           {/* Times Grid */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold text-foreground">Start Time</Label>
-              <Input
+              <Label htmlFor="walkin-start" className="text-xs font-semibold text-foreground">Start Time</Label>
+              <Input id="walkin-start"
                 type="time"
                 value={startTime}
                 onChange={(e) => handleStartTimeChange(e.target.value)}
@@ -485,8 +485,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold text-foreground">End Time</Label>
-              <Input
+              <Label htmlFor="walkin-end" className="text-xs font-semibold text-foreground">End Time</Label>
+              <Input id="walkin-end"
                 type="time"
                 value={endTime}
                 onChange={(e) => handleEndTimeChange(e.target.value)}
@@ -497,8 +497,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
           {/* Court Fee */}
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-semibold text-foreground">Court Fee (₱ PHP)</Label>
-            <Input
+            <Label htmlFor="walkin-fee" className="text-xs font-semibold text-foreground">Court Fee (₱ PHP)</Label>
+            <Input id="walkin-fee"
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}

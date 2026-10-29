@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { requestPasswordReset } from "@/lib/services/auth.service";
@@ -33,7 +33,7 @@ export function ForgotPasswordForm() {
   return (
     <Card className="w-full max-w-sm shadow-md border border-border bg-card">
       <CardHeader className="text-center pb-4 pt-6">
-        <CardTitle className="text-2xl font-extrabold tracking-tight text-foreground">Reset Password</CardTitle>
+        <h1 data-slot="card-title" className="leading-snug text-2xl font-extrabold tracking-tight text-foreground">Reset Password</h1>
         <CardDescription className="text-muted-foreground text-xs sm:text-sm leading-relaxed mt-1">
           Enter your account email and we&apos;ll send you a link to choose a new password.
         </CardDescription>

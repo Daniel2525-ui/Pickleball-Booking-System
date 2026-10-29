@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { UserBooking, fetchUserBookings } from "@/lib/services/bookings/fetchUserBookings.service";
-import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/cancelBooking.service";
+import { VENUE_CONTACT } from "@/lib/venue";
+import { cancelBooking, isBookingCancellable, CANCELLATION_CUTOFF_HOURS } from "@/lib/services/bookings/cancelBooking.service";
 import { getBookingStart } from "@/lib/utils/bookingTime";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import {
@@ -121,7 +122,14 @@ export const BookingHistoryContainer = () => {
           booking.id === data.id ? { ...booking, status: data.status } : booking
         )
       );
-      toast.success("Court reservation cancelled successfully.");
+      const refundMessage = {
+        refunded: "Your full refund has been issued to your card.",
+        queued: "Your full refund is being processed to your card.",
+        manual: `Venue staff will refund your payment; questions? Call ${VENUE_CONTACT.phone}.`,
+      } as const;
+      toast.success(
+        data.refund ? `Reservation cancelled. ${refundMessage[data.refund]}` : "Court reservation cancelled successfully."
+      );
     }
 
     setCancellingId(null);
@@ -286,7 +294,7 @@ export const BookingHistoryContainer = () => {
 
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="size-3.5 text-muted-foreground/80 shrink-0" />
-                      <span>Crosshair Dinkers Complex, J.C. Aquino Ave, Butuan City</span>
+                      <span>Crosshair Dinkers Complex, {VENUE_CONTACT.address}</span>
                     </div>
                   </div>
 
@@ -332,6 +340,16 @@ export const BookingHistoryContainer = () => {
                           )}
                           {cancellingId === booking.id ? "Cancelling..." : "Cancel Reservation"}
                         </Button>
+                      )}
+
+                      {!cancellable && booking.status === "confirmed" && getBookingStart(booking) > new Date() && (
+                        <p className="text-[11px] text-muted-foreground sm:text-right max-w-[220px]">
+                          Online cancellation closes {CANCELLATION_CUTOFF_HOURS} hours before start. Need help? Call{" "}
+                          <a href={VENUE_CONTACT.phoneHref} className="font-semibold text-foreground hover:underline">
+                            {VENUE_CONTACT.phone}
+                          </a>
+                          .
+                        </p>
                       )}
                     </div>
                   </div>
@@ -380,7 +398,7 @@ export const BookingHistoryContainer = () => {
             <div className="flex items-start gap-2.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg leading-relaxed">
               <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
               <p>
-                Payments and court credits are handled directly by venue management. Please contact Crosshair Dinkers reception (+63 917 123 4567) regarding your refund.
+                You&apos;ll get a full refund. Card payments go back to your card automatically (banks usually take 5–10 business days to show it); counter payments are refunded by venue staff. Questions? Call {VENUE_CONTACT.phone}.
               </p>
             </div>
           )}
