@@ -299,7 +299,7 @@ BEGIN
 END;
 $$;
 
-DROP FUNCTION IF EXISTS public.settle_counter_basket(uuid, text, text);
+DROP FUNCTION IF EXISTS public.settle_counter_basket(uuid, numeric, text, text);
 DROP FUNCTION IF EXISTS public.hold_court_basket(date, jsonb, timestamptz);
 DROP FUNCTION IF EXISTS public.hold_court_booking(uuid, date, time, time, uuid, numeric, timestamptz, uuid);
 

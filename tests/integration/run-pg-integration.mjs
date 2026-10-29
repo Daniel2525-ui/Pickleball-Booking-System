@@ -3890,8 +3890,8 @@ async function main() {
     const hold = (s, e) => JSON.parse(q(`SELECT public.hold_court_basket('${day}', '${JSON.stringify([
       { court_id: C1, start_time: s, end_time: e }, { court_id: C2, start_time: s, end_time: e }])}'::jsonb);`,
       { role: "authenticated", uid: danaUid })); // an expired hold still blocks its slot during the grace period, so each basket gets its own hours
-    const settle = (basketId, uid, method = "cash") => runPsqlCommand(
-      `SELECT public.settle_counter_basket('${basketId}', '${method}');`, { role: "authenticated", uid });
+    const settle = (basketId, uid, expected = 0, method = "cash") => runPsqlCommand(
+      `SELECT public.settle_counter_basket(p_basket_id => '${basketId}', p_expected_amount => ${expected}, p_payment_method => '${method}');`, { role: "authenticated", uid });
     const state = (basketId) => q(`SELECT string_agg(b.status || '/' || p.status || '/' || coalesce(p.payment_method, '-'), ',' ORDER BY b.court_id)
       FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${basketId}';`);
 
@@ -3908,8 +3908,16 @@ async function main() {
     assert.equal(state(b1.basket_id), "pending/pending/-,pending/pending/-");
 
     // Success: every court confirmed and paid in cash; amount is the sum
+    // A court cancelled after staff saw the total: AMOUNT_CHANGED and nothing is settled
+    const b3 = hold("16:00", "18:00");
+    q(`UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE id = '${b3.items[0].booking_id}';`);
+    const changed = settle(b3.basket_id, adminUid, b3.total);
+    assert.ok(changed.stderr.includes("AMOUNT_CHANGED"), changed.stderr);
+    assert.equal(q(`SELECT b.status || '/' || p.status FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${b3.items[1].booking_id}';`), "pending/pending");
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE basket_id = '${b3.basket_id}';`); // dana's one open basket
+
     const b2 = hold("13:00", "15:00");
-    const ok = settle(b2.basket_id, adminUid);
+    const ok = settle(b2.basket_id, adminUid, b2.total);
     assert.equal(ok.status, 0, ok.stderr);
     const res = JSON.parse(ok.stdout);
     assert.equal(res.settled, 2);
@@ -3928,8 +3936,8 @@ async function main() {
     runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
     assert.equal(q(`SELECT to_regproc('public.settle_counter_basket') IS NULL;`), "t");
     runPsqlFile(migrationPath);
-    assert.equal(q(`SELECT has_function_privilege('anon', 'public.settle_counter_basket(uuid,text,text)', 'EXECUTE')
-      || '|' || has_function_privilege('authenticated', 'public.settle_counter_basket(uuid,text,text)', 'EXECUTE');`), "false|true");
+    assert.equal(q(`SELECT has_function_privilege('anon', 'public.settle_counter_basket(uuid,numeric,text,text)', 'EXECUTE')
+      || '|' || has_function_privilege('authenticated', 'public.settle_counter_basket(uuid,numeric,text,text)', 'EXECUTE');`), "false|true");
   });
 
   console.log("\n================================================================================");

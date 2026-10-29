@@ -627,8 +627,11 @@ $$;
 REVOKE ALL ON FUNCTION public.hold_court_basket(date, jsonb, timestamptz) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.hold_court_basket(date, jsonb, timestamptz) TO authenticated, service_role;
 
--- Section 4: staff settle every pending court of a basket in one transaction (any court failing aborts all)
-CREATE OR REPLACE FUNCTION "public"."settle_counter_basket"("p_basket_id" "uuid", "p_payment_method" "text", "p_payment_reference" "text" DEFAULT NULL::"text") RETURNS "jsonb"
+-- Section 4: staff settle every pending court of a basket in one transaction (any court failing aborts all);
+--   the settled total must equal what staff collected (p_expected_amount)
+DROP FUNCTION IF EXISTS public.settle_counter_basket(uuid, text, text);
+
+CREATE OR REPLACE FUNCTION "public"."settle_counter_basket"("p_basket_id" "uuid", "p_expected_amount" numeric, "p_payment_method" "text", "p_payment_reference" "text" DEFAULT NULL::"text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -662,12 +665,17 @@ BEGIN
     RAISE EXCEPTION 'NOT_FOUND: Basket % has no pending booking', p_basket_id USING ERRCODE = 'P0002';
   END IF;
 
+  -- A court cancelled or added after staff saw the total: undo every settlement above
+  IF v_amount IS DISTINCT FROM p_expected_amount THEN
+    RAISE EXCEPTION 'AMOUNT_CHANGED: Basket % totals % PHP, staff expected % PHP', p_basket_id, v_amount, p_expected_amount USING ERRCODE = 'P0001';
+  END IF;
+
   RETURN jsonb_build_object('basket_id', p_basket_id, 'settled', v_count, 'amount', v_amount);
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.settle_counter_basket(uuid, text, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.settle_counter_basket(uuid, text, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.settle_counter_basket(uuid, numeric, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.settle_counter_basket(uuid, numeric, text, text) TO authenticated, service_role;
 
 -- Section 5: duplicate-payment refund key is per booking, so basket siblings sharing an intent get distinct refunds
 CREATE OR REPLACE FUNCTION "public"."reconcile_booking_payment"("p_booking_id" "uuid", "p_payment_id" "uuid", "p_stripe_session_id" "text", "p_stripe_payment_intent" "text", "p_amount" numeric, "p_currency" "text") RETURNS "jsonb"

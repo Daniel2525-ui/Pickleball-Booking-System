@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
 
         // Staff must collect exactly what the basket RPC records: refuse when the total they saw differs
         // (e.g. the admin list was filtered and hid a court). Checked before any Stripe or DB write.
+        const expectedAmount = body?.expectedAmount;
         if (basketId) {
-            const expectedAmount = body?.expectedAmount;
             if (typeof expectedAmount !== "number" || !Number.isFinite(expectedAmount) || expectedAmount <= 0) {
                 return NextResponse.json({ error: "expectedAmount must be the positive amount shown to staff." }, { status: 400 });
             }
@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
             basketId
                 ? await supabase.rpc("settle_counter_basket", {
                       p_basket_id: basketId,
+                      p_expected_amount: expectedAmount,
                       p_payment_method: paymentMethod,
                       p_payment_reference: paymentReference,
                   })
@@ -119,6 +120,10 @@ export async function POST(request: NextRequest) {
             console.error("Counter settlement RPC error:", settleErr);
             if (settleErr.message?.includes("FORBIDDEN")) {
                 return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+            }
+            // A court changed between the total check above and the settle (RPC rolled everything back)
+            if (settleErr.message?.includes("AMOUNT_CHANGED")) {
+                return NextResponse.json({ error: "This booking has more courts than shown. Refresh and try again." }, { status: 409 });
             }
             if (settleErr.message?.includes("HOLD_EXPIRED")) {
                 return NextResponse.json(
