@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { stripe } from "@/lib/stripe";
+import { sameCentavo } from "@/lib/services/bookings/basketSiblings";
 
 export async function POST(request: NextRequest) {
     try {
@@ -50,6 +51,33 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Could not load the payment. Please try again." }, { status: 500 });
         }
 
+        // An unpaid basket is settled as one unit; the basket id comes from the DB row, never the client
+        const owner = payment?.bookings as { basket_id?: string | null; status?: string } | null | undefined;
+        const basketId = owner?.basket_id && owner.status === "pending" ? owner.basket_id : null;
+
+        // Staff must collect exactly what the basket RPC records: refuse when the total they saw differs
+        // (e.g. the admin list was filtered and hid a court). Checked before any Stripe or DB write.
+        if (basketId) {
+            const expectedAmount = body?.expectedAmount;
+            if (typeof expectedAmount !== "number" || !Number.isFinite(expectedAmount) || expectedAmount <= 0) {
+                return NextResponse.json({ error: "expectedAmount must be the positive amount shown to staff." }, { status: 400 });
+            }
+            const { data: due, error: dueError } = await supabase
+                .from("payments")
+                .select("amount, bookings!inner(basket_id, status)")
+                .eq("status", "pending")
+                .eq("bookings.basket_id", basketId)
+                .eq("bookings.status", "pending");
+            if (dueError) {
+                console.error("Counter settlement: failed to load basket total:", dueError);
+                return NextResponse.json({ error: "Could not load the payment. Please try again." }, { status: 500 });
+            }
+            const basketTotal = (due ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+            if (!sameCentavo(basketTotal, expectedAmount)) {
+                return NextResponse.json({ error: "This booking has more courts than shown. Refresh and try again." }, { status: 409 });
+            }
+        }
+
         if (payment?.stripe_session_id) {
             try {
                 const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
@@ -73,11 +101,10 @@ export async function POST(request: NextRequest) {
 
         // 4. Execute atomic counter settlement via database RPC. An unpaid basket is settled as one unit
         //    (all-or-nothing); its courts share the session closed above. The basket id comes from the DB row.
-        const owner = payment?.bookings as { basket_id?: string | null; status?: string } | null | undefined;
         const { data: settleRes, error: settleErr } =
-            owner?.basket_id && owner.status === "pending"
+            basketId
                 ? await supabase.rpc("settle_counter_basket", {
-                      p_basket_id: owner.basket_id,
+                      p_basket_id: basketId,
                       p_payment_method: paymentMethod,
                       p_payment_reference: paymentReference,
                   })

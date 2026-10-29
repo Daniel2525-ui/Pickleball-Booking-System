@@ -59,6 +59,7 @@ export const SettlePaymentModal = ({
       bookingId: booking.id,
       paymentMethod,
       paymentReference: paymentMethod === "gcash" ? paymentReference : undefined,
+      expectedAmount: amount,
     });
 
     setLoading(false);

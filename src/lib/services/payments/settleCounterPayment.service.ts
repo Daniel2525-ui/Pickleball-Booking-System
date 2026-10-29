@@ -3,6 +3,8 @@ export interface SettleCounterPaymentParams {
     bookingId: string;
     paymentMethod: "cash" | "gcash";
     paymentReference?: string;
+    /** The amount shown to staff; the route refuses a basket whose real total differs */
+    expectedAmount: number;
 }
 
 export const settleCounterPayment = async ({
@@ -10,6 +12,7 @@ export const settleCounterPayment = async ({
     bookingId,
     paymentMethod,
     paymentReference,
+    expectedAmount,
 }: SettleCounterPaymentParams): Promise<{ success: boolean; data: Record<string, unknown> | null; error: Error | null }> => {
     try {
         if (!paymentId || !bookingId || !paymentMethod) {
@@ -28,6 +31,7 @@ export const settleCounterPayment = async ({
                 bookingId,
                 paymentMethod,
                 paymentReference: paymentReference?.trim() || null,
+                expectedAmount,
             }),
         });
 

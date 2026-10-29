@@ -64,3 +64,7 @@ export function counterSettlementDue(booking: Booking, loaded: Booking[]) {
         total: rows.reduce((sum, b) => sum + (Number(firstPayment(b)?.amount ?? b.total_amount) || 0), 0),
     };
 }
+
+/** Money equality to the centavo (amounts arrive as numbers or numeric strings). */
+export const sameCentavo = (a: number | string, b: number | string) =>
+    Math.round(Number(a) * 100) === Math.round(Number(b) * 100);

@@ -37,3 +37,11 @@ test("siblingSessionIds / pendingPaymentIds: one shared session, only pending pa
     assert.deepEqual(siblingSessionIds(sibs), ["cs_1"]);
     assert.deepEqual(pendingPaymentIds(sibs), ["p1"]);
 });
+
+test("sameCentavo: amounts match to the centavo, numeric strings included", async () => {
+    const { sameCentavo } = await import("../src/lib/services/bookings/basketSiblings.ts");
+    assert.equal(sameCentavo(550.5, "550.50"), true);
+    assert.equal(sameCentavo(0.1 + 0.2, 0.3), true);
+    assert.equal(sameCentavo(250, 550), false);
+    assert.equal(sameCentavo(550.5, 550.51), false);
+});
