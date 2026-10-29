@@ -4,14 +4,19 @@ import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import {
-    validateBookingSlot,
+    validateBasketLines,
     getBookingWeekday,
 } from "@/lib/services/bookings/validateBookingSlot.service";
 import { formatTime12h } from "@/lib/utils/formatTime";
 
+interface HeldBasket {
+    basket_id: string;
+    items: { booking_id: string; payment_id: string; court_name: string; start_time: string; end_time: string; amount: number | string }[];
+}
+
 export async function POST(request: NextRequest) {
-    let createdBookingId: string | null = null;
-    let createdPaymentId: string | null = null;
+    let createdBookingIds: string[] = [];
+    let createdPaymentIds: string[] = [];
 
     try {
         if (!process.env.STRIPE_SECRET_KEY) {
@@ -34,39 +39,29 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 2. Parse the booking details from the request body
-        const body = await request.json();
-        const { court_id, booking_date, start_time, end_time } = body;
+        // 2. Parse the basket. A legacy single-court body (old bundle mid-deploy) becomes a one-line basket.
+        const body = await request.json().catch(() => null);
+        const booking_date = body?.booking_date;
+        const lines: unknown =
+            body?.lines ??
+            (body?.court_id && body?.start_time && body?.end_time
+                ? [{ court_id: body.court_id, start_time: body.start_time, end_time: body.end_time }]
+                : undefined);
 
-        if (!court_id || !booking_date || !start_time || !end_time) {
+        if (typeof booking_date !== "string" || !booking_date) {
             return Response.json(
                 { error: "Missing required booking details." },
                 { status: 400 }
             );
         }
 
-        // Fetch true court details from DB for security
-        const { data: court } = await supabase
-            .from("courts")
-            .select("name, status")
-            .eq("id", court_id)
-            .single();
-
-        if (!court) {
-            return Response.json(
-                { error: "Invalid court." },
-                { status: 400 }
-            );
-        }
-
-        if (court.status === "maintenance" || court.status === "closed") {
-            return Response.json(
-                { error: "This court is currently not available for reservations." },
-                { status: 400 }
-            );
-        }
-
-        const court_name = court.name;
+        // One query for every court: true names and status come from the DB for security
+        const courtIds = Array.isArray(lines)
+            ? lines.map((l) => l?.court_id).filter((id): id is string => typeof id === "string")
+            : [];
+        const { data: courts } = courtIds.length
+            ? await supabase.from("courts").select("id, name, status").in("id", courtIds)
+            : { data: [] };
 
         // Query operating hours for target date in Asia/Manila
         const dayOfWeek = getBookingWeekday(booking_date);
@@ -82,11 +77,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Server-side validation of whole-hour boundaries, duration limits, operating hours, and past dates
-        const validation = validateBookingSlot({
+        // Server-side validation of every line: shape, one per court, whole-hour boundaries,
+        // duration limits, operating hours, and past dates
+        const validation = validateBasketLines({
             bookingDate: booking_date,
-            startTime: start_time,
-            endTime: end_time,
+            lines,
+            courts: courts ?? [],
             operatingHour,
             limits,
         });
@@ -98,94 +94,90 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { durationHours, startTimeDb, endTimeDb } = validation;
-        // Price comes from the database (quote_court_price) so Stripe charges exactly what the hold records
-        let amount = 0;
-
-        // 3. Atomically hold the court slot using database row lock.
-        // Grant an initial 35-minute safety buffer (2100s) to guarantee the court remains held
+        // 3. Atomically hold every court slot (all-or-nothing) using database row locks.
+        // Grant an initial 35-minute safety buffer (2100s) to guarantee the courts remain held
         // while database operations and Stripe Checkout Session creation execute.
+        // Prices come from the database so Stripe charges exactly what the holds record.
         const initialHoldExpiresAtIso = new Date(Date.now() + 35 * 60 * 1000).toISOString();
 
-        let bookingId: string | null = null;
-        let paymentId: string | null = null;
-
-        const { data: rpcResult, error: rpcError } = await supabase.rpc("hold_court_booking", {
-            p_court_id: court_id,
+        const { data: rpcResult, error: rpcError } = await supabase.rpc("hold_court_basket", {
             p_booking_date: booking_date,
-            p_start_time: startTimeDb,
-            p_end_time: endTimeDb,
-            p_user_id: user.id,
-            p_amount: null,
+            p_lines: validation.lines.map((l) => ({
+                court_id: l.courtId,
+                start_time: l.startTimeDb,
+                end_time: l.endTimeDb,
+            })),
             p_hold_expires_at: initialHoldExpiresAtIso,
         });
 
         if (rpcError) {
-            const isConflict = rpcError.message?.includes("SLOT_UNAVAILABLE");
-            if (isConflict) {
+            const msg = rpcError.message ?? "";
+
+            if (msg.includes("OPEN_BASKET_EXISTS")) {
                 return Response.json(
-                    { error: "This time slot is no longer available. Please choose another." },
+                    { error: "You already have a reservation awaiting payment. Complete or cancel it under 'My Bookings' first." },
                     { status: 409 }
                 );
             }
 
-            if (rpcError.message?.includes("INVALID_DURATION")) {
-                return Response.json({ error: rpcError.message.replace(/^.*INVALID_DURATION:s*/, "") }, { status: 400 });
+            if (msg.includes("SLOT_UNAVAILABLE")) {
+                // The RPC names the taken line: "SLOT_UNAVAILABLE: <court> <start>–<end>"
+                const taken = msg.split("SLOT_UNAVAILABLE:")[1]?.trim() || "A selected time slot";
+                return Response.json(
+                    { error: `${taken} was just taken. Nothing was reserved — please choose again.` },
+                    { status: 409 }
+                );
             }
 
-            const isVenueClosed = rpcError.message?.includes("VENUE_CLOSED");
-            if (isVenueClosed) {
+            if (msg.includes("INVALID_DURATION")) {
+                return Response.json({ error: msg.replace(/^.*INVALID_DURATION:\s*/, "") }, { status: 400 });
+            }
+
+            if (msg.includes("VENUE_CLOSED")) {
                 return Response.json(
                     { error: "The venue is closed on this date." },
                     { status: 400 }
                 );
             }
 
-            if (rpcError.message?.includes("TOO_MANY_HOLDS")) {
-                return Response.json(
-                    { error: "You already have 3 reservations awaiting payment. Complete or cancel one under 'My Bookings' first." },
-                    { status: 409 }
-                );
-            }
-
-            const isCourtUnavailable = rpcError.message?.includes("COURT_UNAVAILABLE");
-            if (isCourtUnavailable) {
+            if (msg.includes("COURT_UNAVAILABLE")) {
                 return Response.json(
                     { error: "This court is currently not available for reservations." },
                     { status: 400 }
                 );
             }
 
-            const isMissingRpc = rpcError.code === "42883" || rpcError.code === "PGRST202" || rpcError.message?.includes("hold_court_booking");
+            if (msg.includes("INVALID_ARGUMENT")) {
+                return Response.json({ error: "Invalid booking details." }, { status: 400 });
+            }
+
+            const isMissingRpc = rpcError.code === "42883" || rpcError.code === "PGRST202" || msg.includes("hold_court_basket");
             if (isMissingRpc) {
-                console.error("Required RPC hold_court_booking is not configured in database:", rpcError);
+                console.error("Required RPC hold_court_basket is not configured in database:", rpcError);
                 return Response.json(
-                    { error: "Database concurrency lock (hold_court_booking) is not configured. Please ensure the required database migration has been applied." },
+                    { error: "Database concurrency lock (hold_court_basket) is not configured. Please ensure the required database migration has been applied." },
                     { status: 503 }
                 );
             }
 
-            console.error("hold_court_booking RPC failed:", rpcError);
+            console.error("hold_court_basket RPC failed:", rpcError);
             return Response.json(
                 { error: "Failed to create reservation hold. Please try again." },
                 { status: 500 }
             );
-        } else if (rpcResult) {
-            const parsed = typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
-            bookingId = parsed.booking_id;
-            paymentId = parsed.payment_id;
-            amount = Number(parsed.amount);
         }
 
-        if (!bookingId || !paymentId || !(amount > 0)) {
+        const basket: HeldBasket | null = typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
+        const items = basket?.items ?? [];
+        createdBookingIds = items.map((i) => i.booking_id);
+        createdPaymentIds = items.map((i) => i.payment_id);
+
+        if (!basket?.basket_id || items.length !== validation.lines.length || items.some((i) => !(Number(i.amount) > 0))) {
             return Response.json(
                 { error: "Could not create reservation hold. Please try again." },
                 { status: 500 }
             );
         }
-
-        createdBookingId = bookingId;
-        createdPaymentId = paymentId;
 
         // 6. Create a Stripe Checkout Session
         const baseUrl = request.nextUrl.origin;
@@ -197,46 +189,47 @@ export async function POST(request: NextRequest) {
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
-            line_items: [
-                {
-                    price_data: {
-                        currency: "php",
-                        product_data: {
-                            name: `${court_name} — Court Booking (${durationHours} ${durationHours === 1 ? "Hour" : "Hours"})`,
-                            description: `${booking_date} • ${formatTime12h(startTimeDb)} – ${formatTime12h(endTimeDb)}`,
-                        },
-                        unit_amount: Math.round(amount * 100), // Stripe uses cents
+            line_items: items.map((item) => ({
+                price_data: {
+                    currency: "php",
+                    product_data: {
+                        name: `${item.court_name} — ${booking_date} • ${formatTime12h(item.start_time)}–${formatTime12h(item.end_time)}`,
                     },
-                    quantity: 1,
+                    unit_amount: Math.round(Number(item.amount) * 100), // Stripe uses cents
                 },
-            ],
+                quantity: 1,
+            })),
             mode: "payment",
             success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${baseUrl}/book`,
-            metadata: {
-                booking_id: bookingId,
-                payment_id: paymentId,
-            },
+            metadata: { basket_id: basket.basket_id },
             customer_email: user.email,
             expires_at: stripeExpiresAtSec,
         });
 
-        // 7. Atomically confirm hold and persist Stripe session ID.
+        // 7. Atomically confirm each hold and persist the Stripe session ID.
         // Uses confirm_checkout_hold RPC under court row lock to verify that the slot was not claimed
         // if the initial hold expired while Stripe was processing (preventing expired-hold resurrection).
         const authoritativeHoldExpiresAtIso = new Date((session.expires_at + 120) * 1000).toISOString();
 
-        const { error: confirmError } = await supabase.rpc("confirm_checkout_hold", {
-            p_booking_id: bookingId,
-            p_payment_id: paymentId,
-            p_stripe_session_id: session.id,
-            p_hold_expires_at: authoritativeHoldExpiresAtIso,
-        });
+        let confirmError: { message?: string } | null = null;
+        for (const item of items) {
+            const { error } = await supabase.rpc("confirm_checkout_hold", {
+                p_booking_id: item.booking_id,
+                p_payment_id: item.payment_id,
+                p_stripe_session_id: session.id,
+                p_hold_expires_at: authoritativeHoldExpiresAtIso,
+            });
+            if (error) {
+                confirmError = error;
+                break;
+            }
+        }
 
         if (confirmError) {
             console.error("confirm_checkout_hold RPC failed:", confirmError);
 
-            // Case A: The initial hold expired and another booking claimed the slot while Stripe was processing
+            // Case A: A hold expired and another booking claimed the slot while Stripe was processing
             const isConflict = confirmError.message?.includes("SLOT_UNAVAILABLE");
             if (isConflict) {
                 try {
@@ -245,15 +238,15 @@ export async function POST(request: NextRequest) {
                     console.error("Failed to expire superseded Stripe session:", expireErr);
                 }
 
-                // Preserve booking record for audit (do not delete), but report conflict to player
+                // Preserve booking records for audit (do not delete), but report conflict to player
                 return Response.json(
-                    { error: "Your reservation hold expired and the time slot was reserved by another player. Please choose another slot." },
+                    { error: "Your reservation hold expired and a time slot was reserved by another player. Please choose again." },
                     { status: 409 }
                 );
             }
 
             // Case B: Database error or network glitch after Stripe session creation
-            // Do NOT delete booking or payment (Stripe session exists). Attempt to expire session and report error.
+            // Do NOT delete bookings or payments (Stripe session exists). Attempt to expire session and report error.
             try {
                 await stripe.checkout.sessions.expire(session.id);
             } catch (expireErr) {
@@ -279,17 +272,17 @@ export async function POST(request: NextRequest) {
         // Only release records on definite pre-creation failure where no session could exist at Stripe.
         // For network timeouts or connection drops, preserve pending records so payment resumption,
         // webhooks, or cron cleanup can safely resolve them without dropping paid bookings.
-        // Service role: these ids came from our own hold_court_booking call, and RLS only accepts
+        // Service role: these ids came from our own hold_court_basket call, and RLS only accepts
         // customer-labelled direct cancellations. Without the key the hold is left for cron cleanup.
         const admin = isDefinitePreCreationError ? getServiceClient() : null;
         if (isDefinitePreCreationError) {
-            if (admin && createdPaymentId) {
-                await admin.from("payments").update({ status: "failed" }).eq("id", createdPaymentId).eq("status", "pending");
+            if (admin && createdPaymentIds.length) {
+                await admin.from("payments").update({ status: "failed" }).in("id", createdPaymentIds).eq("status", "pending");
             }
-            if (admin && createdBookingId) {
+            if (admin && createdBookingIds.length) {
                 await admin.from("bookings")
                     .update({ status: "cancelled", cancel_reason: "checkout_failed" })
-                    .eq("id", createdBookingId)
+                    .in("id", createdBookingIds)
                     .eq("status", "pending");
             }
             return Response.json(
@@ -299,14 +292,14 @@ export async function POST(request: NextRequest) {
         }
 
         // Ambiguous failure (e.g. StripeConnectionError, socket timeout, or error after sessions.create)
-        if (createdBookingId) {
+        if (createdBookingIds.length) {
             console.error(
-                `[Checkout Ambiguous Failure] Preserving pending hold for asynchronous recovery: booking_id=${createdBookingId}, payment_id=${createdPaymentId}, error=${(error as Error)?.name || "Unknown"}: ${(error as Error)?.message}`
+                `[Checkout Ambiguous Failure] Preserving pending hold for asynchronous recovery: booking_ids=${createdBookingIds.join(",")}, payment_ids=${createdPaymentIds.join(",")}, error=${(error as Error)?.name || "Unknown"}: ${(error as Error)?.message}`
             );
             return Response.json(
                 {
                     error: "A network issue occurred while connecting to payment services. Your court hold is temporarily saved. Please visit 'My Bookings' to complete your reservation or try again.",
-                    bookingId: createdBookingId,
+                    bookingIds: createdBookingIds,
                 },
                 { status: 500 }
             );

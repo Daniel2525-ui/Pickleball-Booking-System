@@ -1,35 +1,29 @@
 import { to24h } from "../bookings/checkSlotAvailability.service";
 
 interface CheckoutParams {
-    courtId: string;
-    courtName: string;
     date: Date;
-    timeRange: string;
+    lines: { courtId: string; timeRange: string }[];
 }
 
 export const createCheckoutSession = async ({
-    courtId,
-    courtName,
     date,
-    timeRange,
+    lines,
 }: CheckoutParams): Promise<string> => {
     const dateStr = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Manila",
     }).format(date);
 
-    const [startStr, endStr] = timeRange.split(" - ");
-    const startTime24 = to24h(startStr.trim());
-    const endTime24 = to24h(endStr.trim());
+    const apiLines = lines.map(({ courtId, timeRange }) => {
+        const [startStr, endStr] = timeRange.split(" - ");
+        return { court_id: courtId, start_time: to24h(startStr.trim()), end_time: to24h(endStr.trim()) };
+    });
 
     const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            court_id: courtId,
-            court_name: courtName,
             booking_date: dateStr,
-            start_time: startTime24,
-            end_time: endTime24,
+            lines: apiLines,
         }),
     });
 

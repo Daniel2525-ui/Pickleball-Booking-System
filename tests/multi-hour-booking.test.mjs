@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import {
     validateBookingSlot,
     getBookingWeekday,
+    validateBasketLines,
 } from "../src/lib/services/bookings/validateBookingSlot.service.ts";
 import { getBookingStart } from "../src/lib/utils/bookingTime.ts";
 
@@ -1790,3 +1791,51 @@ test("simulated concurrent booking race between online customer and walk-in admi
     );
 });
 
+
+// 16. Basket validation: every line is checked, errors name the court (Task 5)
+test("validateBasketLines validates each line and names the offending court", () => {
+    const now = new Date("2026-10-24T06:00:00+08:00");
+    const base = {
+        bookingDate: "2026-10-25",
+        operatingHour: { is_open: true, open_time: "07:00:00", close_time: "22:00:00" },
+        limits: { min_hours: 1, max_hours: 3 },
+        courts: [
+            { id: "c1", name: "Court 1", status: "available" },
+            { id: "c2", name: "Court 2", status: "available" },
+            { id: "c3", name: "Court 3", status: "maintenance" },
+        ],
+        now,
+    };
+    const ok = validateBasketLines({ ...base, lines: [
+        { court_id: "c1", start_time: "08:00", end_time: "09:00" },
+        { court_id: "c2", start_time: "10:00", end_time: "12:00" },
+    ] });
+    assert.deepEqual(ok, { valid: true, lines: [
+        { courtId: "c1", courtName: "Court 1", startTimeDb: "08:00:00", endTimeDb: "09:00:00" },
+        { courtId: "c2", courtName: "Court 2", startTimeDb: "10:00:00", endTimeDb: "12:00:00" },
+    ] });
+
+    const bad = validateBasketLines({ ...base, lines: [
+        { court_id: "c1", start_time: "08:00", end_time: "09:00" },
+        { court_id: "c2", start_time: "05:00", end_time: "06:00" },
+    ] });
+    assert.deepEqual(bad, { valid: false, error: "Court 2: The selected time range falls outside venue operating hours." });
+
+    const dup = validateBasketLines({ ...base, lines: [
+        { court_id: "c1", start_time: "08:00", end_time: "09:00" },
+        { court_id: "c1", start_time: "10:00", end_time: "11:00" },
+    ] });
+    assert.equal(dup.valid, false);
+
+    assert.deepEqual(
+        validateBasketLines({ ...base, lines: [{ court_id: "c3", start_time: "08:00", end_time: "09:00" }] }),
+        { valid: false, error: "Court 3: This court is currently not available for reservations." }
+    );
+    assert.deepEqual(
+        validateBasketLines({ ...base, lines: [{ court_id: "zz", start_time: "08:00", end_time: "09:00" }] }),
+        { valid: false, error: "Line 1: Invalid court." }
+    );
+    assert.equal(validateBasketLines({ ...base, lines: [] }).valid, false);
+    assert.equal(validateBasketLines({ ...base, lines: "x" }).valid, false);
+    assert.equal(validateBasketLines({ ...base, lines: [{ court_id: "c1", start_time: 8, end_time: "09:00" }] }).valid, false);
+});

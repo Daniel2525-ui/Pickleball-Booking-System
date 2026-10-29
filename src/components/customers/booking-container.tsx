@@ -290,10 +290,8 @@ export const BookingContainer = () => {
       if (!court) throw new Error("Court not found");
 
       const url = await createCheckoutSession({
-        courtId: court.id,
-        courtName: court.name,
         date: selectedSlot.date,
-        timeRange: selectedSlot.time,
+        lines: [{ courtId: court.id, timeRange: selectedSlot.time }],
       });
 
       window.location.assign(url);
