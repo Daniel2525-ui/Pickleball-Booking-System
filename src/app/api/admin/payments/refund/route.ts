@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 
@@ -112,12 +112,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Run the worker now so staff see the result; the cron job retries anything left over.
-        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (!serviceRoleKey) {
+        const serviceClient = getServiceClient();
+        if (!serviceClient) {
             return NextResponse.json({ status: "queued" });
         }
 
-        const serviceClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
         await processPendingRefundJobs({ workerId: "admin-refund", maxJobs: 5, supabase: serviceClient }).catch((err: unknown) => {
             console.error("Refund: inline refund worker failed:", err);
         });

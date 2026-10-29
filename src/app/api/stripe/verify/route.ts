@@ -1,10 +1,8 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase/service";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
 export async function POST(req: NextRequest) {
     try {
@@ -85,16 +83,14 @@ export async function POST(req: NextRequest) {
         }
 
         // 5. Reconcile transactionally using privileged service-role client
-        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (!serviceRoleKey || serviceRoleKey.trim() === "") {
+        const supabaseAdmin = getServiceClient();
+        if (!supabaseAdmin) {
             console.error("Payment verification configuration error: SUPABASE_SERVICE_ROLE_KEY is required for reconciliation");
             return Response.json(
                 { error: "Server configuration error: payment reconciliation service key missing" },
                 { status: 500 }
             );
         }
-
-        const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey);
 
         const outcome = await processStripePaymentReconciliation({
             bookingId,

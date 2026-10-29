@@ -5,14 +5,18 @@ import BookingOverview from "@/components/admin/dashboard/booking-overview";
 import RecentBookings from "@/components/admin/dashboard/recent-bookings";
 import RefundsOwedAlert from "@/components/admin/dashboard/refunds-owed-alert";
 import { Clock } from "lucide-react";
+import { connection } from "next/server";
 
 export const metadata = {
   title: "Admin Dashboard | Crosshair Dinkers",
   description: "Facility operations, court schedules, and real-time reservation metrics.",
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  // Render per request in venue time; a prerendered page would show the deploy day in UTC
+  await connection();
   const currentDate = new Date().toLocaleDateString("en-US", {
+    timeZone: "Asia/Manila",
     weekday: "long",
     month: "long",
     day: "numeric",

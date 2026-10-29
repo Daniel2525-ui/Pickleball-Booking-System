@@ -44,6 +44,7 @@ export function resetBookings() {
     DELETE FROM public.refund_requests;
     DELETE FROM public.payments;
     DELETE FROM public.bookings;
+    DELETE FROM public.customers;
     UPDATE public.operating_hours SET is_open = true, open_time = '06:00', close_time = '22:00';
     UPDATE public.courts SET status = 'active';
   `);
@@ -52,4 +53,13 @@ export function resetBookings() {
 export function firstCourt() {
   const [id, name] = sql("SELECT id || '|' || name FROM public.courts ORDER BY name LIMIT 1").split("|");
   return { id, name };
+}
+
+// The local stack's API URL and public anon key, for tests that call Supabase directly
+export function localSupabase() {
+  const url = process.env.E2E_SUPABASE_URL;
+  const anonKey = process.env.E2E_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) throw new Error("E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY are not set");
+  if (!/^http:\/\/(localhost|127\.0\.0\.1)/.test(url)) throw new Error("E2E_SUPABASE_URL must point at the local stack");
+  return { url, anonKey };
 }

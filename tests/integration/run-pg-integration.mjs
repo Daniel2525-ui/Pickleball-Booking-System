@@ -3385,6 +3385,45 @@ async function main() {
     assert.equal(afterRollback.stdout, "0", "Rollback must remove the job and be safe to re-run");
   });
 
+  await runTest("customer_cancel_pending_only: customers can cancel their own pending hold directly, never a confirmed booking", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("customer_cancel_pending_only"));
+    assert.ok(migration, "customer_cancel_pending_only migration file not found");
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/migrations", migration));
+
+    const policyDate = "2029-12-19"; // not used by other tests
+    const insert = (start, status) => runPsqlCommand(`
+      INSERT INTO public.bookings (user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at)
+      VALUES ('${aliceUid}', '${activeCourtId}', '${policyDate}', '${start}', '${start.replace(/^(\d\d)/, (h) => String(+h + 1).padStart(2, "0"))}', '${status}', 200, now() + interval '30 minutes')
+      RETURNING id;`).stdout.trim();
+    const confirmedId = insert("08:00:00", "confirmed");
+    const pendingId = insert("10:00:00", "pending");
+    const cancelAsAlice = (id) => runPsqlCommand(
+      `UPDATE public.bookings SET status = 'cancelled' WHERE id = '${id}' RETURNING id`,
+      { role: "authenticated", uid: aliceUid, asRole: true }
+    );
+
+    const blocked = cancelAsAlice(confirmedId);
+    assert.equal(blocked.status, 0, blocked.stderr);
+    assert.equal(blocked.stdout.trim(), "", "A confirmed booking must not be cancellable by its customer directly");
+    assert.equal(runPsqlCommand(`SELECT status FROM public.bookings WHERE id = '${confirmedId}';`).stdout.trim(), "confirmed");
+
+    const allowed = cancelAsAlice(pendingId);
+    assert.equal(allowed.stdout.trim(), pendingId, "A customer must still be able to release their own unpaid hold");
+
+    // Service role (used by /api/bookings/cancel after its cutoff check) can still cancel confirmed bookings
+    const viaRoute = runPsqlCommand(
+      `UPDATE public.bookings SET status = 'cancelled' WHERE id = '${confirmedId}' AND user_id = '${aliceUid}' RETURNING id`,
+      { role: "service_role", asRole: true }
+    );
+    assert.equal(viaRoute.stdout.trim(), confirmedId, viaRoute.stderr);
+
+    // Rollback restores direct cancellation of confirmed bookings, and the migration re-applies cleanly
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_customer_cancel_pending_only.sql"));
+    const reConfirmed = insert("12:00:00", "confirmed");
+    assert.equal(cancelAsAlice(reConfirmed).stdout.trim(), reConfirmed, "Rollback must restore the previous policy");
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/migrations", migration));
+  });
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");

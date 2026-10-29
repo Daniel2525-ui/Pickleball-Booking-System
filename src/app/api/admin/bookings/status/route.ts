@@ -1,16 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { stripe } from "@/lib/stripe";
-
-/** Valid transitions staff may trigger. No-show requires grace period. */
-const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-    pending: ["cancelled"],
-    confirmed: ["checked_in", "no_show", "completed", "cancelled"],
-    checked_in: ["in_progress", "completed", "cancelled"],
-    in_progress: ["completed", "cancelled"],
-};
-
-const NO_SHOW_GRACE_MINUTES = 15;
+import { canTransition, noShowMinutesLeft, buildStatusUpdate } from "@/lib/services/bookings/adminStatusRules";
 
 export async function POST(request: NextRequest) {
     try {
@@ -59,8 +50,7 @@ export async function POST(request: NextRequest) {
         const currentStatus = booking.status.toLowerCase();
 
         // 4. Validate transition
-        const allowedNext = ALLOWED_TRANSITIONS[currentStatus] ?? [];
-        if (!allowedNext.includes(newStatus)) {
+        if (!canTransition(currentStatus, newStatus)) {
             return Response.json(
                 { error: `Cannot transition from "${currentStatus}" to "${newStatus}".` },
                 { status: 409 }
@@ -69,15 +59,8 @@ export async function POST(request: NextRequest) {
 
         // 5. No-show grace period guard
         if (newStatus === "no_show") {
-            const venueOffset = "+08:00";
-            const time = booking.start_time.length === 5
-                ? `${booking.start_time}:00`
-                : booking.start_time.slice(0, 8);
-            const bookingStart = new Date(`${booking.booking_date}T${time}${venueOffset}`);
-            const graceCutoff = new Date(bookingStart.getTime() + NO_SHOW_GRACE_MINUTES * 60_000);
-
-            if (new Date() < graceCutoff) {
-                const minutesLeft = Math.ceil((graceCutoff.getTime() - Date.now()) / 60_000);
+            const minutesLeft = noShowMinutesLeft(booking);
+            if (minutesLeft > 0) {
                 return Response.json(
                     { error: `No-show grace period has not elapsed. ${minutesLeft} minute(s) remaining.` },
                     { status: 409 }
@@ -126,15 +109,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 7. Conditional update (optimistic lock on current status) with Stage 2 audit timestamps
-        const now = new Date().toISOString();
-        const updatePayload: Record<string, unknown> = {
-            status: newStatus,
-        };
-
-        if (newStatus === "checked_in") updatePayload.checked_in_at = now;
-        if (newStatus === "in_progress") updatePayload.started_at = now;
-        if (newStatus === "completed") updatePayload.completed_at = now;
-        if (newStatus === "no_show") updatePayload.no_show_at = now;
+        const updatePayload = buildStatusUpdate(newStatus);
 
         const { data: updated, error: updateError } = await supabase
             .from("bookings")

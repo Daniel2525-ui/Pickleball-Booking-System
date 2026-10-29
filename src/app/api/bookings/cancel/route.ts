@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase/service";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 import {
     CANCELLED_STATUS,
@@ -15,14 +16,7 @@ type RefundOutcome = "refunded" | "queued" | "manual" | null;
  * refund worker inline; the cron job retries anything left. Cash/GCash payments are left for staff
  * ("Refund Owed" in the admin). Never throws: the cancellation has already succeeded.
  */
-async function refundPaidStripePayments(bookingId: string): Promise<RefundOutcome> {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey) {
-        console.error("Cancel booking: SUPABASE_SERVICE_ROLE_KEY missing; refund left for staff");
-        return "manual";
-    }
-    const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
-
+async function refundPaidStripePayments(admin: SupabaseClient, bookingId: string): Promise<RefundOutcome> {
     try {
         const { data: payments, error } = await admin
             .from("payments")
@@ -72,9 +66,9 @@ async function refundPaidStripePayments(bookingId: string): Promise<RefundOutcom
 /**
  * Customer-initiated booking cancellation.
  *
- * Security: RLS is currently disabled on public.bookings, so ownership and the
- * allowed status transition are enforced here, using the authenticated user from
- * the session cookie (never a user id supplied by the client).
+ * Security: ownership, the 2-hour cutoff and the refund are enforced here, using the
+ * authenticated user from the session cookie (never a user id supplied by the client).
+ * RLS stops customers from cancelling confirmed bookings directly, around this route.
  */
 export async function POST(request: NextRequest) {
     try {
@@ -167,7 +161,14 @@ export async function POST(request: NextRequest) {
 
         // 6. Conditional update: only succeeds if the booking still belongs to the user
         //    and still has the status we validated (guards against races / double clicks).
-        const { data: updated, error: updateError } = await supabase
+        //    Service role because RLS only lets customers cancel unpaid holds directly; confirmed
+        //    bookings must go through this route so the cutoff and refund always apply.
+        const admin = getServiceClient();
+        if (!admin) {
+            console.error("Cancel booking: SUPABASE_SERVICE_ROLE_KEY missing");
+            return Response.json({ error: "Cancellation is temporarily unavailable. Please contact the venue." }, { status: 500 });
+        }
+        const { data: updated, error: updateError } = await admin
             .from("bookings")
             .update({ status: CANCELLED_STATUS })
             .eq("id", booking.id)
@@ -205,7 +206,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 8. Venue policy: a confirmed online booking cancelled within the window is refunded in full.
-        const refund = currentStatus === "confirmed" ? await refundPaidStripePayments(booking.id) : null;
+        const refund = currentStatus === "confirmed" ? await refundPaidStripePayments(admin, booking.id) : null;
 
         return Response.json({ booking: updated, refund });
     } catch (error) {

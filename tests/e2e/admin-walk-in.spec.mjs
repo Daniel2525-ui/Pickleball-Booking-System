@@ -26,7 +26,7 @@ async function recordWalkIn(page, name, start, end) {
   await dialog.getByLabel("Start Time").fill(start);
   await dialog.getByLabel("End Time").fill(end);
   await dialog.getByLabel("Court Fee (₱ PHP)").fill("200");
-  await dialog.getByRole("button", { name: "Cash (Paid)" }).click();
+  await dialog.getByRole("button", { name: "Cash (Paid)", exact: true }).click();
   await dialog.getByRole("button", { name: "Record Reservation" }).click();
   return dialog;
 }
@@ -52,6 +52,11 @@ test("admin records a paid cash walk-in", async ({ page }) => {
 test("admin cannot double-book the walk-in slot", async ({ page }) => {
   await login(page, account("ADMIN"));
   const dialog = await recordWalkIn(page, "E2E Second Walk In", "18:00", "19:00");
-  await expect(dialog.getByText(/SLOT_UNAVAILABLE|already|unavailable/i)).toBeVisible();
+  await expect(dialog.getByText("This court slot is no longer available. Please choose another time or court.")).toBeVisible();
   expect(sql(`SELECT count(*) FROM public.bookings WHERE booking_date = '${date}' AND start_time = '18:00'`)).toBe("1");
+
+  // Retrying the rejected walk-in reuses the customer record instead of creating another
+  await dialog.getByRole("button", { name: "Record Reservation" }).click();
+  await expect(dialog.getByText("This court slot is no longer available. Please choose another time or court.")).toBeVisible();
+  expect(sql(`SELECT count(*) FROM public.customers WHERE full_name = 'E2E Second Walk In'`)).toBe("1");
 });

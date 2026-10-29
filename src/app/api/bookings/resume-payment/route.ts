@@ -127,6 +127,9 @@ export async function POST(request: NextRequest) {
             .from("payments")
             .select("id, status, stripe_session_id, amount")
             .eq("booking_id", booking.id)
+            // A later duplicate-charge payment row can exist (20261102); resume works on the original
+            .order("created_at", { ascending: true })
+            .limit(1)
             .maybeSingle();
 
         if (paymentError) {
@@ -146,6 +149,14 @@ export async function POST(request: NextRequest) {
 
                 if (existingSession.status === "open" && existingSession.url) {
                     return Response.json({ url: existingSession.url });
+                }
+
+                // Paid but not yet confirmed (late webhook): a new session would charge the customer twice
+                if (existingSession.status === "complete") {
+                    return Response.json(
+                        { error: "Payment for this booking has already been received and is being processed. Please refresh the page in a moment." },
+                        { status: 409 }
+                    );
                 }
             } catch (stripeCheckError) {
                 // Expired or invalid session ID in Stripe, proceed to create a fresh one below

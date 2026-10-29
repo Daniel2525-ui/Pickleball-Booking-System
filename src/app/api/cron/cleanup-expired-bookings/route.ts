@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase/service";
 import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
@@ -30,18 +30,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceRole) {
+    const supabase = getServiceClient();
+    if (!supabase) {
       console.error("Cron configuration error: SUPABASE_SERVICE_ROLE_KEY is required to bypass RLS.");
       return NextResponse.json(
         { error: "Server configuration error: SUPABASE_SERVICE_ROLE_KEY is missing." },
         { status: 500 }
       );
     }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceRole);
     const BATCH_SIZE = 25;
     const TOTAL_BUDGET_MS = 8000;
     const CLEANUP_LOOP_BUDGET_MS = 6000;

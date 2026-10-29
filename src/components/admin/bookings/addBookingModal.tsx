@@ -207,6 +207,9 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
         return;
       }
       customerId = createdCust.id;
+      // If the booking below is rejected, a retry reuses this record instead of creating another
+      setSelectedPlayer({ ...createdCust, type: "walk_in" });
+      setPlayerMode("existing");
     }
 
     setLoading(true);
