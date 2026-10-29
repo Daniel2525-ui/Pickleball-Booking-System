@@ -617,4 +617,46 @@ $$;
 REVOKE ALL ON FUNCTION public.hold_court_basket(date, jsonb, timestamptz) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.hold_court_basket(date, jsonb, timestamptz) TO authenticated, service_role;
 
+-- Section 4: staff settle every pending court of a basket in one transaction (any court failing aborts all)
+CREATE OR REPLACE FUNCTION "public"."settle_counter_basket"("p_basket_id" "uuid", "p_payment_method" "text", "p_payment_reference" "text" DEFAULT NULL::"text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_line record;
+  v_count integer := 0;
+  v_amount numeric := 0;
+BEGIN
+  -- Same admin rule as settle_counter_payment, checked first so a non-admin cannot probe basket ids
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Authentication required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'FORBIDDEN: Admin privileges required' USING ERRCODE = '42501';
+  END IF;
+
+  -- court_id order keeps lock order stable across concurrent settlements
+  FOR v_line IN
+    SELECT b.id AS booking_id, p.id AS payment_id, p.amount
+    FROM public.bookings b
+    JOIN public.payments p ON p.booking_id = b.id AND p.status = 'pending'
+    WHERE b.basket_id = p_basket_id AND b.status = 'pending'
+    ORDER BY b.court_id
+  LOOP
+    PERFORM public.settle_counter_payment(v_line.booking_id, v_line.payment_id, p_payment_method, p_payment_reference);
+    v_count := v_count + 1;
+    v_amount := v_amount + v_line.amount;
+  END LOOP;
+
+  IF v_count = 0 THEN
+    RAISE EXCEPTION 'NOT_FOUND: Basket % has no pending booking', p_basket_id USING ERRCODE = 'P0002';
+  END IF;
+
+  RETURN jsonb_build_object('basket_id', p_basket_id, 'settled', v_count, 'amount', v_amount);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.settle_counter_basket(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.settle_counter_basket(uuid, text, text) TO authenticated, service_role;
+
 COMMIT;

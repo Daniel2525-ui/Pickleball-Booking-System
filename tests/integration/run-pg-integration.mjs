@@ -3803,6 +3803,65 @@ async function main() {
       || '|' || has_function_privilege('authenticated', 'public.hold_court_basket(date,jsonb,timestamptz)', 'EXECUTE');`), "false|true");
   });
 
+  await runTest("multi_court_basket: staff settle a whole unpaid basket all-or-nothing", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("multi_court_basket"));
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    runPsqlFile(migrationPath);
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const C1 = activeCourtId;
+    const C2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    q(`INSERT INTO public.courts (id, name, status) VALUES ('${C2}', 'Court 3 - Active', 'active') ON CONFLICT (id) DO NOTHING;`);
+    const day = "2030-01-15"; // Tuesday, not used by other tests
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE user_id = '${danaUid}' AND status = 'pending';`); // earlier tests left dana an open hold
+    const hold = (s, e) => JSON.parse(q(`SELECT public.hold_court_basket('${day}', '${JSON.stringify([
+      { court_id: C1, start_time: s, end_time: e }, { court_id: C2, start_time: s, end_time: e }])}'::jsonb);`,
+      { role: "authenticated", uid: danaUid })); // an expired hold still blocks its slot during the grace period, so each basket gets its own hours
+    const settle = (basketId, uid, method = "cash") => runPsqlCommand(
+      `SELECT public.settle_counter_basket('${basketId}', '${method}');`, { role: "authenticated", uid });
+    const state = (basketId) => q(`SELECT string_agg(b.status || '/' || p.status || '/' || coalesce(p.payment_method, '-'), ',' ORDER BY b.court_id)
+      FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${basketId}';`);
+
+    // Non-admin is refused and nothing changes
+    const b1 = hold("09:00", "11:00");
+    const forbidden = settle(b1.basket_id, bobUid);
+    assert.ok(forbidden.stderr.includes("FORBIDDEN"), forbidden.stderr);
+    assert.equal(state(b1.basket_id), "pending/pending/-,pending/pending/-");
+
+    // Expired hold: HOLD_EXPIRED and nothing changes
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE basket_id = '${b1.basket_id}';`);
+    const expired = settle(b1.basket_id, adminUid);
+    assert.ok(expired.stderr.includes("HOLD_EXPIRED"), expired.stderr);
+    assert.equal(state(b1.basket_id), "pending/pending/-,pending/pending/-");
+
+    // Success: every court confirmed and paid in cash; amount is the sum
+    const b2 = hold("13:00", "15:00");
+    const ok = settle(b2.basket_id, adminUid);
+    assert.equal(ok.status, 0, ok.stderr);
+    const res = JSON.parse(ok.stdout);
+    assert.equal(res.settled, 2);
+    assert.equal(res.basket_id, b2.basket_id);
+    assert.equal(Number(res.amount), Number(b2.total));
+    assert.equal(state(b2.basket_id), "confirmed/paid/cash,confirmed/paid/cash");
+
+    // Unknown basket, and an already-settled one, have nothing pending
+    for (const id of ["99999999-9999-9999-9999-999999999999", b2.basket_id]) {
+      const r = settle(id, adminUid);
+      assert.ok(r.stderr.includes("NOT_FOUND"), r.stderr);
+    }
+    assert.ok(settle(b2.basket_id, bobUid).stderr.includes("FORBIDDEN"), "non-admin gets FORBIDDEN before NOT_FOUND");
+
+    // Rollback drops it; the migration re-applies cleanly
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
+    assert.equal(q(`SELECT to_regproc('public.settle_counter_basket') IS NULL;`), "t");
+    runPsqlFile(migrationPath);
+    assert.equal(q(`SELECT has_function_privilege('anon', 'public.settle_counter_basket(uuid,text,text)', 'EXECUTE')
+      || '|' || has_function_privilege('authenticated', 'public.settle_counter_basket(uuid,text,text)', 'EXECUTE');`), "false|true");
+  });
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");
