@@ -3638,6 +3638,48 @@ async function main() {
     runPsqlFile(migrationPath);
   });
 
+  await runTest("multi_court_basket: sibling payments share a Stripe session and intent", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("multi_court_basket"));
+    assert.ok(migration, "multi_court_basket migration file not found");
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    runPsqlFile(migrationPath);
+    const day = "2030-01-15"; // not used by other tests
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const basket = q(`SELECT gen_random_uuid();`);
+    const sibling = (start, end) => {
+      const b = q(`INSERT INTO public.bookings (user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, customer_name, basket_id)
+        VALUES ('${aliceUid}', '${activeCourtId}', '${day}', '${start}', '${end}', 'pending', 300, now() + interval '20 minutes', 'Alice', '${basket}') RETURNING id;`);
+      const p = q(`INSERT INTO public.payments (booking_id, amount, currency, status, payment_method, stripe_session_id)
+        VALUES ('${b}', 300, 'php', 'pending', 'stripe', 'cs_shared') RETURNING id;`);
+      return { b, p };
+    };
+    const A = sibling("09:00:00", "10:00:00");
+    const B = sibling("10:00:00", "11:00:00");
+    const reconcile = (s) => JSON.parse(q(`SELECT public.reconcile_booking_payment('${s.b}', '${s.p}', 'cs_shared', 'pi_shared', 300, 'php');`, { role: "service_role" }));
+    reconcile(A);
+    reconcile(B);
+    assert.equal(q(`SELECT string_agg(b.status || '|' || p.status || '|' || p.stripe_payment_id, ',' ORDER BY b.start_time) FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${basket}';`),
+      "confirmed|paid|pi_shared,confirmed|paid|pi_shared");
+    assert.equal(reconcile(A).action, "NO_OP");
+
+    // The same intent can still not be recorded twice for the SAME booking
+    const dup = runPsqlCommand(`INSERT INTO public.payments (booking_id, amount, currency, status, payment_method, stripe_payment_id) VALUES ('${A.b}', 300, 'php', 'paid', 'stripe', 'pi_shared');`);
+    assert.notEqual(dup.status, 0);
+    assert.ok(dup.stderr.includes("uq_payments_intent_per_booking"), dup.stderr);
+
+    // Rollback restores the global uniques; the migration re-applies cleanly
+    q(`DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE basket_id = '${basket}'); DELETE FROM public.bookings WHERE basket_id = '${basket}';`);
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
+    assert.equal(q(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'basket_id';`), "0");
+    assert.equal(q(`SELECT count(*) FROM pg_indexes WHERE indexname IN ('idx_payments_stripe_payment_id', 'uq_payments_intent_per_booking');`), "1");
+    assert.equal(q(`SELECT count(*) FROM pg_constraint WHERE conname = 'payments_stripe_session_id_key';`), "1");
+    runPsqlFile(migrationPath);
+  });
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");
