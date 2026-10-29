@@ -86,6 +86,33 @@ test("cancelling one paid court refunds only that court, and cannot be repeated"
   expect(sql(`SELECT count(*) FROM public.refund_requests WHERE booking_id = '${id}'`)).toBe("1");
 });
 
+test("a court lost before a late payment is confirmed is refunded alone, and the success page names it", async ({ page }) => {
+  await login(page, account("CUSTOMER"));
+  // Stand in for a late webhook: the success page (whose verify call confirms the basket) does not load yet
+  await page.route("**/book/success**", (route) => route.fulfill({ contentType: "text/html", body: "<p>held</p>" }));
+  const res = await checkout(page, [["COURT 3", "16:00", "17:00"], ["COURT 4", "16:00", "17:00"]]);
+  expect(res.status()).toBe(200);
+  await page.goto((await res.json()).url);
+  await payOnStripe(page);
+  await page.waitForURL(/\/book\/success\?session_id=/, { timeout: 60_000 });
+  const successUrl = page.url();
+  expect(courtRow("COURT 3", "16:00")).toBe("pending|pending|200.00");
+
+  // COURT 4's hold is lost (timed out) before the payment is reconciled
+  const lostId = bookingId("COURT 4", "16:00");
+  const lostPaymentId = sql(`SELECT id FROM public.payments WHERE booking_id = '${lostId}'`);
+  sql(`UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'expired' WHERE id = '${lostId}'`);
+
+  await page.unroute("**/book/success**");
+  await page.goto(successUrl);
+  await expect(page.getByText("These courts could not be secured and were refunded: COURT 4.")).toBeVisible({ timeout: 30_000 });
+  expect(courtRow("COURT 3", "16:00")).toBe("confirmed|paid|200.00");
+  expect(
+    sql(`SELECT count(*) || '|' || max(amount)::numeric(10, 2) || '|' || bool_and(payment_id = '${lostPaymentId}') FROM public.refund_requests WHERE booking_id = '${lostId}'`)
+  ).toBe("1|200.00|true");
+  expect(sql(`SELECT count(*) FROM public.refund_requests r JOIN public.bookings b ON b.id = r.booking_id WHERE b.start_time = '16:00' AND b.id <> '${lostId}'`)).toBe("0");
+});
+
 test("a court taken mid-basket reserves nothing and is dropped from the basket; the legacy single-court body still works", async ({ page, browser }) => {
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
@@ -129,6 +156,14 @@ test("a second checkout while a basket awaits payment is refused", async ({ page
   expect(sql(`SELECT count(*) FROM public.bookings WHERE booking_date = '${date}' AND start_time = '12:00'`)).toBe("0");
 
   await page.goto("/my-bookings");
+  await expect(page.getByText("Part of a 2-court booking")).toHaveCount(2);
+  const card = page
+    .getByText("Part of a 2-court booking")
+    .first()
+    .locator("xpath=ancestor::*[.//button[normalize-space()='Cancel Reservation']][1]");
+  await card.getByRole("button", { name: "Cancel Reservation" }).click();
+  await expect(page.getByRole("dialog").getByText("This cancels all 2 courts in this unpaid booking.")).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", { name: "Keep Reservation" }).click();
   await expect(page.getByText("Part of a 2-court booking")).toHaveCount(2);
 });
 
