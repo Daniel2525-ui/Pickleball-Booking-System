@@ -3678,6 +3678,12 @@ async function main() {
     assert.equal(q(`SELECT b.status || '|' || p.status || '|' || p.stripe_payment_id FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${B.b}';`), "confirmed|paid|pi_shared");
     assert.equal(reconcile(B).action, "NO_OP");
     assert.equal(q(`SELECT count(*) FROM public.refund_requests WHERE booking_id = '${B.b}';`), "0");
+    // The same duplicate payment for sibling B too: its own refund key, so both shares are refunded
+    const dupB = JSON.parse(q(`SELECT public.reconcile_booking_payment('${B.b}', '${B.p}', 'cs_dup', 'pi_dup', 300, 'php');`, { role: "service_role" }));
+    assert.equal(dupB.action, "REFUND_SCHEDULED");
+    assert.equal(dupB.reason, "DUPLICATE_PAYMENT");
+    assert.equal(dupB.idempotency_key, `ref_duplicate_pi_pi_dup_${B.b}`);
+    assert.equal(q(`SELECT count(DISTINCT idempotency_key) FROM public.refund_requests WHERE booking_id IN ('${A.b}', '${B.b}');`), "2");
 
     // The same intent can still not be recorded twice for the SAME booking
     const dup = runPsqlCommand(`INSERT INTO public.payments (booking_id, amount, currency, status, payment_method, stripe_payment_id) VALUES ('${A.b}', 300, 'php', 'paid', 'stripe', 'pi_shared');`);
