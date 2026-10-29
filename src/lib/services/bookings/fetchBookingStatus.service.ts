@@ -2,6 +2,7 @@ export interface BookingStatusResult {
     id: string;
     status: string;
     hold_expires_at: string | null;
+    cancel_reason: string | null;
 }
 
 /**

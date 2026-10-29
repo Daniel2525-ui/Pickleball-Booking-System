@@ -1,5 +1,6 @@
 // Relative import so node:test can load this module without the @/ alias
 import { getBookingStart } from "../../utils/bookingTime.ts";
+import { cancelReasonFor } from "./bookingDisplayStatus.ts";
 
 /** Valid transitions staff may trigger from /api/admin/bookings/status. */
 export const ALLOWED_TRANSITIONS: Record<string, string[]> = {
@@ -21,12 +22,17 @@ export const noShowMinutesLeft = (booking: { booking_date: string; start_time: s
 };
 
 /** Status update plus the audit timestamp that goes with it. */
-export const buildStatusUpdate = (newStatus: string, now: string = new Date().toISOString()) => {
+export const buildStatusUpdate = (
+    newStatus: string,
+    booking?: Parameters<typeof cancelReasonFor>[0],
+    now: Date = new Date()
+) => {
+    const at = now.toISOString();
     const update: Record<string, unknown> = { status: newStatus };
-    if (newStatus === "checked_in") update.checked_in_at = now;
-    if (newStatus === "in_progress") update.started_at = now;
-    if (newStatus === "completed") update.completed_at = now;
-    if (newStatus === "no_show") update.no_show_at = now;
-    if (newStatus === "cancelled") update.cancel_reason = "admin";
+    if (newStatus === "checked_in") update.checked_in_at = at;
+    if (newStatus === "in_progress") update.started_at = at;
+    if (newStatus === "completed") update.completed_at = at;
+    if (newStatus === "no_show") update.no_show_at = at;
+    if (newStatus === "cancelled") update.cancel_reason = booking ? cancelReasonFor(booking, "admin", now) : "admin";
     return update;
 };

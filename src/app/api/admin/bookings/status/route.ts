@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
         // 3. Load current booking
         const { data: booking, error: fetchError } = await supabase
             .from("bookings")
-            .select("id, status, booking_date, start_time")
+            .select("id, status, booking_date, start_time, hold_expires_at, created_at")
             .eq("id", bookingId)
             .maybeSingle();
 
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 7. Conditional update (optimistic lock on current status) with Stage 2 audit timestamps
-        const updatePayload = buildStatusUpdate(newStatus);
+        const updatePayload = buildStatusUpdate(newStatus, booking);
 
         const { data: updated, error: updateError } = await supabase
             .from("bookings")

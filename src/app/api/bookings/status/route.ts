@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         // Fetch booking record
         const { data: booking, error: fetchError } = await supabase
             .from("bookings")
-            .select("id, user_id, status, hold_expires_at")
+            .select("id, user_id, status, hold_expires_at, cancel_reason")
             .eq("id", bookingId)
             .maybeSingle();
 
@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
             id: booking.id,
             status: booking.status,
             hold_expires_at: booking.hold_expires_at,
+            cancel_reason: booking.cancel_reason,
         });
     } catch (err) {
         console.error("Booking status API error:", err);

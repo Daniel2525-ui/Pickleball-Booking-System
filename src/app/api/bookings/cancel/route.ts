@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceClient } from "@/lib/supabase/service";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
+import { cancelReasonFor } from "@/lib/services/bookings/bookingDisplayStatus";
 import {
     CANCELLED_STATUS,
     getCancellationBlockReason,
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
         //    is indistinguishable from a non-existent one.
         const { data: booking, error: fetchError } = await supabase
             .from("bookings")
-            .select("id, user_id, booking_date, start_time, status")
+            .select("id, user_id, booking_date, start_time, status, hold_expires_at, created_at")
             .eq("id", bookingId)
             .eq("user_id", user.id)
             .maybeSingle();
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
         }
         const { data: updated, error: updateError } = await admin
             .from("bookings")
-            .update({ status: CANCELLED_STATUS, cancel_reason: "customer" })
+            .update({ status: CANCELLED_STATUS, cancel_reason: cancelReasonFor(booking, "customer") })
             .eq("id", booking.id)
             .eq("user_id", user.id)
             .eq("status", booking.status)

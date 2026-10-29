@@ -17,8 +17,12 @@ export const isHoldExpired = (booking: HoldFields, now: Date = new Date()) => {
     return !Number.isNaN(expiry) && expiry <= now.getTime();
 };
 
+/** cancel_reason to record: a hold that had already timed out is 'expired' whoever cancels it. */
+export const cancelReasonFor = (booking: HoldFields, cancelledBy: "admin" | "customer", now: Date = new Date()) =>
+    isHoldExpired(booking, now) ? "expired" : cancelledBy;
+
 /**
- * Status shown to staff: "expired" for holds cleanup cancelled, "hold_expired" for pending holds whose
+ * Status shown to staff and customers: "expired" for holds cleanup cancelled, "hold_expired" for pending holds whose
  * timer ran out but are not cleaned up yet; otherwise the stored status.
  */
 export const getBookingDisplayStatus = (booking: HoldFields, now: Date = new Date()) => {

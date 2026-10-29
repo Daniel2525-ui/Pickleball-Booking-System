@@ -10,7 +10,7 @@ interface BookingCountdownProps {
     bookingId: string;
     holdExpiresAt?: string | null;
     status: string;
-    onStatusChange?: (newStatus: string) => void;
+    onStatusChange?: (newStatus: string, cancelReason: string | null) => void;
     variant?: "badge" | "callout" | "dialog";
     className?: string;
 }
@@ -49,7 +49,7 @@ export const BookingCountdown = ({
 
             const authoritativeStatus = (data.status || "").toLowerCase();
             if (authoritativeStatus !== "pending") {
-                onStatusChange?.(authoritativeStatus);
+                onStatusChange?.(authoritativeStatus, data.cancel_reason ?? null);
             }
         } finally {
             setIsChecking(false);

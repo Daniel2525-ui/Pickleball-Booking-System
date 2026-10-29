@@ -6,6 +6,17 @@ import { UserBooking, fetchUserBookings } from "@/lib/services/bookings/fetchUse
 import { VENUE_CONTACT } from "@/lib/venue";
 import { cancelBooking, isBookingCancellable, CANCELLATION_CUTOFF_HOURS } from "@/lib/services/bookings/cancelBooking.service";
 import { getBookingStart } from "@/lib/utils/bookingTime";
+import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
+
+// Badges for bookings that are no longer awaiting payment or confirmed (EXPIRED = checkout timed out, nothing charged)
+const HISTORY_LABELS: Record<string, string> = {
+  expired: "EXPIRED",
+  cancelled: "CANCELLED",
+  no_show: "NO-SHOW",
+  completed: "COMPLETED",
+  checked_in: "CHECKED IN",
+  in_progress: "IN PROGRESS",
+};
 import { formatTime12h } from "@/lib/utils/formatTime";
 import {
   Calendar,
@@ -260,22 +271,28 @@ export const BookingHistoryContainer = () => {
                           bookingId={booking.id}
                           holdExpiresAt={booking.hold_expires_at}
                           status={booking.status}
-                          onStatusChange={(newStatus) => {
+                          onStatusChange={(newStatus, cancelReason) => {
                             setBookings((prev) =>
                               prev.map((b) =>
-                                b.id === booking.id ? { ...b, status: newStatus } : b
+                                b.id === booking.id ? { ...b, status: newStatus, cancel_reason: cancelReason } : b
                               )
                             );
                           }}
                         />
                       ) : (
-                        <Badge
-                          variant="outline"
-                          className="bg-muted text-muted-foreground border-border font-semibold text-xs gap-1"
-                        >
-                          <XCircle className="size-3" />
-                          CANCELLED
-                        </Badge>
+                        (() => {
+                          const shown = getBookingDisplayStatus(booking);
+                          const played = shown === "completed" || shown === "checked_in" || shown === "in_progress";
+                          return (
+                            <Badge
+                              variant="outline"
+                              className={`${played ? "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20" : "bg-muted text-muted-foreground border-border"} font-semibold text-xs gap-1`}
+                            >
+                              {played ? <CheckCircle2 className="size-3" /> : <XCircle className="size-3" />}
+                              {HISTORY_LABELS[shown] ?? shown.toUpperCase()}
+                            </Badge>
+                          );
+                        })()
                       )}
                     </div>
 
