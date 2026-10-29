@@ -8,11 +8,15 @@ const { processStripePaymentReconciliation } = await import("../src/lib/services
 const rowA = { booking_id: "b-A", payment_id: "p-A", amount: 250, currency: "php", status: "pending" };
 const rowB = { booking_id: "b-B", payment_id: "p-B", amount: 300, currency: "php", status: "pending" };
 
-test("checkoutTargets: basket metadata targets every basket row with its own amount", () => {
-    assert.deepEqual(checkoutTargets({ basket_id: "bk-1" }, [rowA, rowB]), [
+test("checkoutTargets: basket metadata targets exactly its payment_ids, each with its own amount", () => {
+    assert.deepEqual(checkoutTargets({ basket_id: "bk-1", payment_ids: "p-A,p-B" }, [rowA, rowB]), [
         { bookingId: "b-A", paymentId: "p-A", amount: 250, currency: "php" },
         { bookingId: "b-B", paymentId: "p-B", amount: 300, currency: "php" },
     ]);
+    // A row the session did not charge (a court added to, or moved into, the basket later) is ignored
+    const extra = { booking_id: "b-X", payment_id: "p-X", amount: 200, currency: "php", status: "pending" };
+    assert.deepEqual(checkoutTargets({ basket_id: "bk-1", payment_ids: "p-A" }, [rowA, rowB, extra]).map((t) => t.paymentId), ["p-A"]);
+    assert.deepEqual(checkoutTargets({ basket_id: "bk-1" }, [rowA, rowB]), []);
 });
 
 test("checkoutTargets: legacy metadata targets only its booking/payment pair", () => {
@@ -22,19 +26,19 @@ test("checkoutTargets: legacy metadata targets only its booking/payment pair", (
     assert.deepEqual(checkoutTargets({}, [rowA, rowB]), []);
 });
 
-// Chainable stand-in for supabase.from(...).select().eq().or() resolving to the given rows
+// Chainable stand-in for supabase.from(...).select().eq().in() resolving to the given rows
 function mockSupabase(rows, rpc) {
     const filters = [];
     const builder = {
         select: () => builder,
         eq: (col, val) => (filters.push(["eq", col, val]), builder),
-        or: (expr) => (filters.push(["or", expr]), builder),
+        in: (col, vals) => (filters.push(["in", col, vals]), builder),
         then: (resolve, reject) => Promise.resolve({ data: rows, error: null }).then(resolve, reject),
     };
     return { filters, client: { from: () => builder, rpc } };
 }
 
-const basketSession = { id: "cs_basket", metadata: { basket_id: "bk-1" }, payment_intent: "pi_basket", amount_total: 55000, currency: "php" };
+const basketSession = { id: "cs_basket", metadata: { basket_id: "bk-1", payment_ids: "p-A,p-B" }, payment_intent: "pi_basket", amount_total: 55000, currency: "php" };
 
 test("reconcileCheckoutSession: each court reconciles with its own amount; one failure still attempts the rest", async () => {
     const calls = [];
@@ -47,7 +51,7 @@ test("reconcileCheckoutSession: each court reconciles with its own amount; one f
 
     const res = await reconcileCheckoutSession(basketSession, client);
 
-    assert.deepEqual(filters[0], ["eq", "bookings.basket_id", "bk-1"]);
+    assert.deepEqual(filters, [["eq", "bookings.basket_id", "bk-1"], ["in", "id", ["p-A", "p-B"]]]);
     assert.deepEqual(calls.map((c) => [c.p_booking_id, c.p_payment_id, c.p_amount, c.p_stripe_session_id, c.p_stripe_payment_intent]), [
         ["b-A", "p-A", 250, "cs_basket", "pi_basket"],
         ["b-B", "p-B", 300, "cs_basket", "pi_basket"],
@@ -69,6 +73,28 @@ test("reconcileCheckoutSession: no matching rows is an error so Stripe retries",
     const { client } = mockSupabase([], async () => assert.fail("no RPC expected"));
     const res = await reconcileCheckoutSession(basketSession, client);
     assert.ok(res.error);
+});
+
+test("reconcileCheckoutSession: rows that do not add up to the Stripe charge, or another currency, reconcile nothing", async () => {
+    const { client } = mockSupabase([rowA, rowB], async () => assert.fail("no RPC expected"));
+    for (const session of [
+        { ...basketSession, amount_total: 25000 },
+        { ...basketSession, currency: "usd" },
+        { id: "cs_old", metadata: { booking_id: "b-B", payment_id: "p-B" }, payment_intent: "pi_old", amount_total: 1, currency: "php" },
+    ]) {
+        const res = await reconcileCheckoutSession(session, client);
+        assert.ok(res.error && res.error.includes("not reconciled"), res.error);
+        assert.deepEqual(res.confirmed, []);
+    }
+    const upper = await reconcileCheckoutSession({ ...basketSession, currency: "PHP" }, mockSupabase([rowA, rowB], async () => ({ data: { action: "CONFIRMED" }, error: null })).client);
+    assert.deepEqual(upper, { confirmed: ["b-A", "b-B"], refunded: [], error: null });
+});
+
+test("reconcileCheckoutSession: basket metadata without payment_ids is an error, nothing loaded", async () => {
+    const { filters, client } = mockSupabase([rowA, rowB], async () => assert.fail("no RPC expected"));
+    const res = await reconcileCheckoutSession({ ...basketSession, metadata: { basket_id: "bk-1" } }, client);
+    assert.ok(res.error && res.error.includes("Missing metadata"), res.error);
+    assert.deepEqual(filters, []);
 });
 
 test("expireCheckoutSession: basket cancels only pending rows; legacy cancels its booking", async () => {

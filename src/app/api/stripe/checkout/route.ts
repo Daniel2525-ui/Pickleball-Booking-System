@@ -8,6 +8,7 @@ import {
     getBookingWeekday,
 } from "@/lib/services/bookings/validateBookingSlot.service";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 
 interface HeldBasket {
     basket_id: string;
@@ -90,6 +91,14 @@ export async function POST(request: NextRequest) {
         if (!validation.valid) {
             return Response.json(
                 { error: validation.error },
+                { status: 400 }
+            );
+        }
+
+        // Every payment id must fit in the session's metadata, which reconciliation trusts
+        if (validation.lines.length > MAX_SESSION_PAYMENTS) {
+            return Response.json(
+                { error: `A booking can include at most ${MAX_SESSION_PAYMENTS} courts.` },
                 { status: 400 }
             );
         }
@@ -202,7 +211,8 @@ export async function POST(request: NextRequest) {
             mode: "payment",
             success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${baseUrl}/book`,
-            metadata: { basket_id: basket.basket_id },
+            // Reconciliation confirms exactly these payments, never other rows of the basket
+            metadata: { basket_id: basket.basket_id, payment_ids: createdPaymentIds.join(",") },
             customer_email: user.email,
             expires_at: stripeExpiresAtSec,
         });

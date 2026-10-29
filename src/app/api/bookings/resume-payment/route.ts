@@ -5,6 +5,7 @@ import { getBookingStart } from "@/lib/utils/bookingTime.ts";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { getServiceClient } from "@/lib/supabase/service";
 import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
+import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 
 const toDbTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
 
@@ -100,6 +101,13 @@ export async function POST(request: NextRequest) {
             return Response.json(
                 { error: "Could not load the booking. Please try again." },
                 { status: 500 }
+            );
+        }
+        // Every payment id must fit in the session's metadata, which reconciliation trusts
+        if (siblings.length > MAX_SESSION_PAYMENTS) {
+            return Response.json(
+                { error: `A booking can include at most ${MAX_SESSION_PAYMENTS} courts.` },
+                { status: 400 }
             );
         }
         const clicked = siblings.find((s) => s.id === booking.id);
@@ -213,7 +221,7 @@ export async function POST(request: NextRequest) {
             cancel_url: `${baseUrl}/book`,
             // Legacy (pre-basket) bookings keep the booking/payment metadata reconciliation expects for them
             metadata: booking.basket_id
-                ? { basket_id: booking.basket_id }
+                ? { basket_id: booking.basket_id, payment_ids: lines.map((l) => l.paymentId).join(",") }
                 : { booking_id: booking.id, payment_id: lines[0].paymentId },
             customer_email: user.email,
             expires_at: Math.floor(Date.now() / 1000) + (33 * 60), // 3 minutes over Stripe's 30-minute minimum
