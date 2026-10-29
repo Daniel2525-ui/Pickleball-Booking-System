@@ -1,0 +1,24 @@
+/** Pure helpers for the customer's multi-court basket (one line per court). */
+type Line = { court: string; price: number; hasPeak?: boolean };
+
+export const upsertLine = <T extends Line>(lines: T[], line: T): T[] =>
+  lines.some((l) => l.court === line.court)
+    ? lines.map((l) => (l.court === line.court ? line : l))
+    : [...lines, line];
+
+export const removeLine = <T extends Line>(lines: T[], court: string): T[] =>
+  lines.filter((l) => l.court !== court);
+
+export const basketTotal = (lines: Line[]) => ({
+  total: lines.reduce((sum, l) => sum + l.price, 0),
+  hasPeak: lines.some((l) => l.hasPeak),
+});
+
+/** Courts in the same unpaid basket as `booking` (a legacy NULL basket is alone). */
+export const pendingBasketSize = (
+  rows: { basket_id?: string | null; status: string }[],
+  booking: { basket_id?: string | null },
+) =>
+  booking.basket_id
+    ? rows.filter((r) => r.basket_id === booking.basket_id && r.status === "pending").length
+    : 1;
