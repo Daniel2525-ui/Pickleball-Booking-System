@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { upsertLine, removeLine, basketTotal, pendingBasketSize } from "../src/lib/services/bookings/basket.ts";
+import { upsertLine, removeLine, basketTotal, pendingBasketSize, splitTakenLines } from "../src/lib/services/bookings/basket.ts";
 
 const a = { court: "Court 1", price: 200, hasPeak: false };
 const b = { court: "Court 2", price: 300, hasPeak: true };
@@ -29,4 +29,10 @@ test("pendingBasketSize counts pending siblings; legacy NULL basket is alone", (
     ];
     assert.equal(pendingBasketSize(rows, rows[0]), 2);
     assert.equal(pendingBasketSize(rows, rows[3]), 1);
+});
+
+test("splitTakenLines drops lines that are no longer free and names them", () => {
+    const { kept, dropped } = splitTakenLines([a, b], (l) => l.court === "Court 1");
+    assert.deepEqual(kept, [a]);
+    assert.deepEqual(dropped, [b]);
 });

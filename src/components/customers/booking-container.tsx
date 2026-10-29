@@ -35,7 +35,7 @@ import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSes
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
-import { upsertLine, removeLine } from "@/lib/services/bookings/basket";
+import { upsertLine, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
 
 export const BookingContainer = () => {
@@ -311,7 +311,19 @@ export const BookingContainer = () => {
     } catch (err: unknown) {
       setCheckoutError((err as Error).message || "An unexpected error occurred");
       setIsCheckoutLoading(false);
-      await refreshBookings();
+      // Drop courts someone else took meanwhile, or every retry fails with the same 409
+      const { data: fresh } = await fetchBookingsForDate(selectedDate);
+      setBookings(fresh);
+      const { kept, dropped } = splitTakenLines(basket, (line) => {
+        const start = timeSlots.indexOf(line.startSlot || line.time);
+        return Array.from({ length: line.duration || 1 }, (_, i) => timeSlots[start + i]).every(
+          (slot) => slot && checkSlotAvailability(line.court, slot, courts, fresh, selectedDate, user.id) === "available"
+        );
+      });
+      if (dropped.length > 0) {
+        setBasket(kept);
+        toast.error(`Removed from your basket (no longer available): ${dropped.map((l) => l.court).join(", ")}.`);
+      }
     }
   };
 

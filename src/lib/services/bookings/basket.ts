@@ -22,3 +22,9 @@ export const pendingBasketSize = (
   booking.basket_id
     ? rows.filter((r) => r.basket_id === booking.basket_id && r.status === "pending").length
     : 1;
+
+/** After a failed checkout: keep only lines whose slots are all still free. */
+export const splitTakenLines = <T extends Line>(lines: T[], isFree: (line: T) => boolean) => ({
+  kept: lines.filter(isFree),
+  dropped: lines.filter((l) => !isFree(l)),
+});

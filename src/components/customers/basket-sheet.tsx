@@ -25,16 +25,16 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
   return (
     <section
       aria-label="Your basket"
-      className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:w-[90%] sm:max-w-4xl z-50 max-h-72 overflow-y-auto bg-card border-t sm:border sm:rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] sm:shadow-2xl p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-8 duration-300"
+      className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:w-[90%] sm:max-w-4xl z-50 max-h-72 flex flex-col bg-card border-t sm:border sm:rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] sm:shadow-2xl p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-8 duration-300"
     >
-      <h3 className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">
+      <h3 className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2 shrink-0">
         Your basket · {lines.length} {lines.length === 1 ? "court" : "courts"}
       </h3>
-      <ul className="divide-y">
+      <ul className="divide-y min-h-0 overflow-y-auto">
         {lines.map((line) => {
           const maxAvailable = getMaxDuration(line);
           return (
-            <li key={line.court} aria-label={`${line.court} basket line`} className="flex items-center gap-2 py-2">
+            <li key={line.court} role="group" aria-label={`${line.court} basket line`} className="flex items-center gap-2 py-2">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-foreground">{line.court}</p>
                 <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{line.time}</p>
@@ -47,6 +47,7 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
                       key={hours}
                       type="button"
                       disabled={!isAvailable}
+                      aria-pressed={(line.duration || 1) === hours}
                       onClick={() => onDuration(line.court, hours)}
                       title={isAvailable ? undefined : "Consecutive slot unavailable"}
                       className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -75,7 +76,7 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
           );
         })}
       </ul>
-      <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
+      <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60 shrink-0">
         <div>
           <p className="text-[11px] text-muted-foreground">
             Total{hasPeak ? " · includes peak rate" : ""}
