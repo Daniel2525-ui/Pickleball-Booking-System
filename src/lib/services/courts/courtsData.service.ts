@@ -1,6 +1,5 @@
 import { supabase } from "@/lib/supabase";
 import { Court } from "./courtsTypes";
-import { calculateCourtPrice } from "./calculateCourtPrice.service";
 
 export interface ActiveBookingSnippet {
     court_id: string;
@@ -50,8 +49,6 @@ export const fetchCourtsData = async (activeBookingsOverride?: ActiveBookingSnip
                 .map(b => b.court_id)
         );
 
-        const defaultPrice = calculateCourtPrice();
-
         const updatedCourts = (courts || []).map(court => {
             let finalStatus = court.status;
             if ((court.status === "active" || court.status === "available") && occupiedCourtIds.has(court.id)) {
@@ -60,7 +57,6 @@ export const fetchCourtsData = async (activeBookingsOverride?: ActiveBookingSnip
             return {
                 ...court,
                 status: finalStatus,
-                price: defaultPrice
             };
         });
 

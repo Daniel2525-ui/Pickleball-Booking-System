@@ -60,9 +60,8 @@ export const BookingModal = ({
               <div className="text-right">
                 <p className="text-2xl font-bold">₱{selectedSlot.price.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">
-                  {(selectedSlot.duration || 1) > 1
-                    ? `${selectedSlot.duration} hrs × ₱200/hr`
-                    : "₱200 / hr"}
+                  {selectedSlot.duration || 1} {(selectedSlot.duration || 1) === 1 ? "hr" : "hrs"}
+                  {selectedSlot.hasPeak ? " · includes peak rate" : ""}
                 </p>
               </div>
             </div>

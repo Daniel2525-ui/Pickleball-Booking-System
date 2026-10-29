@@ -8,6 +8,17 @@ export type RegisterResult =
     | { success: true }
     | { success: false; error: string }
 
+// Sign-up, sign-in and reset requests go through /api/auth/* so they are rate limited server-side
+async function postAuth(path: string, body: Record<string, string>) {
+    const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => null)
+    return { ok: res.ok, data }
+}
+
 /* Register */
 
 export async function register(
@@ -16,25 +27,9 @@ export async function register(
     fullName: string,
     phone: string
 ): Promise<RegisterResult> {
-    const supabase = createClient()
-
     try {
-        const { error } = await supabase.auth.signUp({
-            email: email.trim(),
-            password,
-            options: {
-                data: {
-                    full_name: fullName.trim(),
-                    phone: phone.trim(),
-                },
-            },
-        })
-
-        if (error) {
-            return { success: false, error: error.message }
-        }
-
-        return { success: true }
+        const { ok, data } = await postAuth("/api/auth/register", { email, password, fullName, phone })
+        return ok ? { success: true } : { success: false, error: data?.error || "Unable to complete registration. Please try again." }
     } catch {
         return {
             success: false,
@@ -49,38 +44,12 @@ export async function login(
     email: string,
     password: string
 ): Promise<LoginResult> {
-    const supabase = createClient()
-
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email.trim(),
-            password,
-        })
-
-        if (error || !data.user) {
-            return {
-                success: false,
-                error: "Invalid email or password. Please try again.",
-            }
+        const { ok, data } = await postAuth("/api/auth/login", { email, password })
+        if (!ok || !data?.role) {
+            return { success: false, error: data?.error || "Invalid email or password. Please try again." }
         }
-
-        const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", data.user.id)
-            .maybeSingle()
-
-        if (profileError || !profile?.role) {
-            return {
-                success: false,
-                error: "Unable to retrieve user profile.",
-            }
-        }
-
-        return {
-            success: true,
-            role: profile.role,
-        }
+        return { success: true, role: data.role }
     } catch {
         return {
             success: false,
@@ -92,19 +61,9 @@ export async function login(
 /* Password reset */
 
 export async function requestPasswordReset(email: string): Promise<RegisterResult> {
-    const supabase = createClient()
-
     try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-            redirectTo: `${window.location.origin}/reset-password`,
-        })
-
-        // Rate limits are worth surfacing; "no such user" is not (Supabase does not reveal it either)
-        if (error && error.status === 429) {
-            return { success: false, error: "Too many reset requests. Please wait a few minutes and try again." }
-        }
-
-        return { success: true }
+        const { ok, data } = await postAuth("/api/auth/forgot-password", { email })
+        return ok ? { success: true } : { success: false, error: data?.error || "Unable to send the reset email. Please try again." }
     } catch {
         return { success: false, error: "Unable to send the reset email. Please try again." }
     }

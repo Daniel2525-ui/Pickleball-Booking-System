@@ -3520,6 +3520,124 @@ async function main() {
     runPsqlFile(migrationPath);
   });
 
+  await runTest("configurable_pricing: settings drive the charged price and booking length; only admins can change them", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("configurable_pricing"));
+    assert.ok(migration, "configurable_pricing migration file not found");
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    runPsqlFile(migrationPath);
+    runPsqlFile(migrationPath); // idempotent
+
+    // Seeded with today's rules, so nothing changes until an admin edits pricing
+    assert.equal(q(`SELECT base_hourly_rate || '|' || min_hours || '|' || max_hours FROM public.booking_settings;`), "200.00|1|3");
+    assert.equal(Number(q(`SELECT public.quote_court_price('2030-01-08', '08:00', '11:00');`)), 600);
+
+    // Same cases as tests/quote-court-price.test.mjs: database and app must agree
+    const peaks = [
+      { label: "Weeknight", days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], start_time: "17:00", end_time: "22:00", hourly_rate: 300 },
+      { label: "Weekend", days: ["Saturday", "Sunday"], start_time: "08:00", end_time: "23:00", hourly_rate: 280 },
+      { label: "Friday prime", days: ["Friday"], start_time: "19:00", end_time: "21:00", hourly_rate: 350 },
+    ];
+    const save = (base, min, max, list, opts = { role: "authenticated", uid: adminUid }) => runPsqlCommand(
+      `SELECT public.save_pricing_settings(${base}, ${min}, ${max}, '${JSON.stringify(list)}'::jsonb);`, opts);
+    assert.equal(save(200, 1, 4, peaks).status, 0);
+    for (const [date, start, end, total] of [
+      ["2026-11-02", "15:00", "17:00", "400"], ["2026-11-02", "16:00", "18:00", "500"], ["2026-11-02", "21:00", "23:00", "500"],
+      ["2026-11-06", "18:00", "20:00", "650"], ["2026-11-07", "07:00", "09:00", "480"],
+    ]) {
+      assert.equal(Number(q(`SELECT public.quote_court_price('${date}', '${start}', '${end}');`)), Number(total), `${date} ${start}-${end}`);
+    }
+
+    // Only admins (or the service role) can change pricing; a bad save changes nothing
+    const nonAdmin = save(999, 1, 3, [], { role: "authenticated", uid: aliceUid });
+    assert.ok(nonAdmin.stderr.includes("FORBIDDEN"), nonAdmin.stderr);
+    const direct = runPsqlCommand(`UPDATE public.booking_settings SET base_hourly_rate = 1 RETURNING id;`, { role: "authenticated", uid: aliceUid, asRole: true });
+    assert.equal(direct.stdout.trim(), "", "Customers cannot edit settings directly");
+    assert.notEqual(runPsqlCommand(`INSERT INTO public.peak_rates (days, start_time, end_time, hourly_rate) VALUES ('{Monday}', '08:00', '09:00', 1);`, { role: "authenticated", uid: aliceUid, asRole: true }).status, 0);
+    assert.equal(runPsqlCommand(`SELECT count(*) FROM public.peak_rates;`, { role: "anon", asRole: true }).stdout.trim(), "3", "Everyone can read peak rates");
+    assert.notEqual(save(200, 4, 2, []).status, 0, "min above max is rejected");
+    assert.notEqual(save(200, 1, 3, [{ days: ["Monday"], start_time: "10:30", end_time: "12:00", hourly_rate: 300 }]).status, 0, "Windows must be on the hour");
+    assert.equal(q(`SELECT max_hours || '|' || (SELECT count(*) FROM public.peak_rates) FROM public.booking_settings;`), "4|3", "A rejected save leaves pricing unchanged");
+
+    // Holds charge the quoted price and follow the configured length; walk-ins too
+    const day = "2030-01-11"; // Friday (fixture: open 07:00 - 22:00)
+    const hold = JSON.parse(q(`SELECT public.hold_court_booking('${activeCourtId}', '${day}', '18:00:00', '20:00:00', '${aliceUid}', NULL, now() + interval '35 minutes');`,
+      { role: "authenticated", uid: aliceUid }));
+    assert.equal(Number(hold.amount), 650);
+    assert.equal(q(`SELECT b.total_amount || '|' || p.amount FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${hold.booking_id}';`), "650.00|650.00");
+    const underpaid = runPsqlCommand(`SELECT public.hold_court_booking('${activeCourtId}', '${day}', '20:00:00', '21:00:00', '${aliceUid}', 200, now() + interval '35 minutes');`,
+      { role: "authenticated", uid: aliceUid });
+    assert.ok(underpaid.stderr.includes("INVALID_AMOUNT"), "A client-sent amount below the quote is rejected");
+
+    assert.equal(save(250, 2, 4, []).status, 0);
+    const tooShort = runPsqlCommand(`SELECT public.hold_court_booking('${activeCourtId}', '${day}', '08:00:00', '09:00:00', '${aliceUid}', NULL, now() + interval '35 minutes');`,
+      { role: "authenticated", uid: aliceUid });
+    assert.ok(tooShort.stderr.includes("between 2 and 4 consecutive hours"), tooShort.stderr);
+    const walkIn = JSON.parse(q(`SELECT public.create_walk_in_booking(p_court_id => '${activeCourtId}', p_customer_name => 'Priced Walk-in', p_booking_date => '${day}',
+        p_start_time => '10:00:00', p_end_time => '14:00:00', p_amount => 1000, p_customer_id => '${guestCustId}', p_payment_method => 'cash');`,
+      { role: "authenticated", uid: adminUid }));
+    assert.equal(Number(walkIn.amount), 1000);
+    assert.equal(q(`SELECT total_amount FROM public.bookings WHERE id = '${hold.booking_id}';`), "650.00", "Existing bookings keep their price");
+
+    // Rollback restores the fixed PHP 200 / 1-3 hour functions; the migration re-applies cleanly
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_configurable_pricing.sql"));
+    assert.equal(q(`SELECT to_regclass('public.booking_settings') IS NULL;`), "t");
+    runPsqlFile(migrationPath);
+  });
+
+  await runTest("auth_rate_limits: counts per key, blocks over the limit, restarts the window, and holds under concurrency", async () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("auth_rate_limits"));
+    assert.ok(migration, "auth_rate_limits migration file not found");
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    runPsqlFile(migrationPath);
+    runPsqlFile(migrationPath); // idempotent
+    const check = (key, limit, increment = true) => {
+      const r = runPsqlCommand(`SELECT public.check_rate_limit('${key}', ${limit}, 900, ${increment});`, { role: "service_role" });
+      assert.equal(r.status, 0, r.stderr);
+      return JSON.parse(r.stdout);
+    };
+
+    // Attempts: allowed while count <= limit
+    assert.deepEqual([1, 2, 3, 4].map(() => check("login:ip:198.51.100.1", 3).allowed), [true, true, true, false]);
+    const blocked = check("login:ip:198.51.100.1", 3);
+    assert.ok(blocked.retry_after_seconds > 0 && blocked.retry_after_seconds <= 900, JSON.stringify(blocked));
+
+    // Failures: a read never counts; allowed while recorded failures < limit
+    assert.equal(check("login:fail:a@example.com", 2, false).allowed, true);
+    check("login:fail:a@example.com", 2);
+    check("login:fail:a@example.com", 2);
+    assert.equal(check("login:fail:a@example.com", 2, false).allowed, false);
+    assert.equal(check("login:fail:b@example.com", 2, false).allowed, true, "Keys are independent");
+
+    // A window older than its length restarts at 1
+    runPsqlCommand(`UPDATE public.auth_rate_limits SET window_start = now() - interval '16 minutes' WHERE key = 'login:ip:198.51.100.1';`);
+    const restarted = check("login:ip:198.51.100.1", 3);
+    assert.equal(restarted.allowed, true);
+    assert.equal(restarted.count, 1);
+
+    // Ten simultaneous requests for one key are all counted (no lost updates)
+    await Promise.all(Array.from({ length: 10 }, () => new Promise((resolve, reject) => {
+      const child = spawn("docker", ["exec", "-i", CONTAINER_NAME, "psql", "-U", POSTGRES_USER, "-d", TEST_DB, "-v", "ON_ERROR_STOP=1", "-At"]);
+      child.stdin.end(`BEGIN; SET LOCAL request.jwt.claim.role = 'service_role'; SELECT public.check_rate_limit('signup:ip:203.0.113.9', 100, 3600); COMMIT;`);
+      child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`psql exited ${code}`))));
+    })));
+    assert.equal(runPsqlCommand(`SELECT count FROM public.auth_rate_limits WHERE key = 'signup:ip:203.0.113.9';`).stdout.trim(), "10");
+
+    // Only the service role may use it
+    for (const role of ["anon", "authenticated"]) {
+      assert.notEqual(runPsqlCommand(`SELECT public.check_rate_limit('x', 1, 60);`, { role, uid: aliceUid, asRole: true }).status, 0, `${role} cannot call the limiter`);
+      assert.notEqual(runPsqlCommand(`SELECT count(*) FROM public.auth_rate_limits;`, { role, uid: aliceUid, asRole: true }).status, 0, `${role} cannot read counters`);
+    }
+
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_auth_rate_limits.sql"));
+    assert.equal(runPsqlCommand(`SELECT to_regclass('public.auth_rate_limits') IS NULL;`).stdout.trim(), "t");
+    runPsqlFile(migrationPath);
+  });
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");

@@ -27,7 +27,9 @@ import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { searchCustomers } from "@/lib/services/customers/searchCustomers.service";
 import { createWalkInCustomer } from "@/lib/services/customers/createWalkInCustomer.service";
 import { createWalkInBooking } from "@/lib/services/bookings/createWalkInBooking.service";
-import { calculateCourtPrice } from "@/lib/services/courts/calculateCourtPrice.service";
+import { supabase as browserSupabase } from "@/lib/supabase";
+import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
+import { quoteCourtPrice, type Pricing } from "@/lib/services/pricing/quoteCourtPrice";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { UnifiedCustomerResult } from "@/lib/services/customers/customersTypes";
 
@@ -41,6 +43,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   const [error, setError] = useState<string | null>(null);
 
   const [courts, setCourts] = useState<Court[]>([]);
+  const [pricing, setPricing] = useState<Pricing | null>(null);
 
   // Player mode: "existing" or "new"
   const [playerMode, setPlayerMode] = useState<"existing" | "new">("existing");
@@ -96,6 +99,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   useEffect(() => {
     if (open) {
       fetchCourtsData().then((res) => setCourts(res.data || []));
+      fetchPricing(browserSupabase).then((res) => setPricing(res.data));
     }
   }, [open]);
 
@@ -130,37 +134,23 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
     return () => clearTimeout(timer);
   }, [newFullName, open, playerMode]);
 
+  // Court fee follows the configured rates (peak windows depend on the date); the database checks it again
+  const updateFee = (nextDate: string, nextStart: string, nextEnd: string) => {
+    if (!pricing || !nextDate || !nextStart || !nextEnd) return;
+    const duration = parseInt(nextEnd.split(":")[0], 10) - parseInt(nextStart.split(":")[0], 10);
+    if (duration >= pricing.settings.min_hours && duration <= pricing.settings.max_hours) {
+      setAmount(String(quoteCourtPrice(pricing, nextDate, nextStart, duration).total));
+    }
+  };
   const handleStartTimeChange = (newStartTime: string) => {
     setStartTime(newStartTime);
-    if (endTime) {
-      const startHour = parseInt(newStartTime.split(":")[0], 10);
-      const endHour = parseInt(endTime.split(":")[0], 10);
-      const duration = endHour - startHour;
-      if (duration >= 1 && duration <= 3) {
-        try {
-          setAmount(String(calculateCourtPrice(duration)));
-        } catch {
-          // ignore
-        }
-      }
-    }
+    updateFee(date, newStartTime, endTime);
   };
-
   const handleEndTimeChange = (newEndTime: string) => {
     setEndTime(newEndTime);
-    if (startTime) {
-      const startHour = parseInt(startTime.split(":")[0], 10);
-      const endHour = parseInt(newEndTime.split(":")[0], 10);
-      const duration = endHour - startHour;
-      if (duration >= 1 && duration <= 3) {
-        try {
-          setAmount(String(calculateCourtPrice(duration)));
-        } catch {
-          // ignore
-        }
-      }
-    }
+    updateFee(date, startTime, newEndTime);
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -470,7 +460,10 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
             <Input id="walkin-date"
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                setDate(e.target.value);
+                updateFee(e.target.value, startTime, endTime);
+              }}
               className="h-9 text-xs sm:text-sm"
             />
           </div>

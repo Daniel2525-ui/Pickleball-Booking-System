@@ -17,20 +17,21 @@ import { BookingContainer } from "@/components/customers/booking-container";
 import { PublicHeader } from "@/components/customers/public-header";
 import { FAQSection } from "@/components/customers/faq-section";
 import { HeroSection } from "@/components/customers/hero-section";
-import { createClient } from "@supabase/supabase-js";
+import { getPublicClient } from "@/lib/supabase/public";
 import { summarizeVenueHours } from "@/lib/utils/venueHours";
+import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
+import { lowestHourlyRate } from "@/lib/services/pricing/quoteCourtPrice";
 
-// Hours and courts are edited in the admin; refresh the static page at most every 5 minutes
+// Hours, courts and pricing are edited in the admin; refresh the static page at most every 5 minutes
 export const revalidate = 300;
 
 export default async function Home() {
   // Anonymous read of public tables (same access the guest booking grid uses)
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-    auth: { persistSession: false },
-  });
-  const [{ data: operatingHours }, { count: courtCount }] = await Promise.all([
+  const supabase = getPublicClient();
+  const [{ data: operatingHours }, { count: courtCount }, { data: pricing }] = await Promise.all([
     supabase.from("operating_hours").select("day_of_week, is_open, open_time, close_time"),
     supabase.from("courts").select("id", { count: "exact", head: true }),
+    fetchPricing(supabase),
   ]);
   const hours = summarizeVenueHours(operatingHours ?? []);
   const courtsLabel = courtCount ? `all ${courtCount} courts` : "every court";
@@ -41,7 +42,7 @@ export default async function Home() {
 
       <main className="flex-1 flex flex-col">
         {/* Animated Hero Section */}
-        <HeroSection courtCount={courtCount ?? null} hours={hours} />
+        <HeroSection courtCount={courtCount ?? null} hours={hours} fromRate={pricing ? lowestHourlyRate(pricing) : null} />
 
         {/* 3-Step How It Works Section */}
         <section

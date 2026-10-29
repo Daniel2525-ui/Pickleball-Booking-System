@@ -16,9 +16,11 @@ const smoothEase = [0.16, 1, 0.3, 1] as const;
 interface HeroSectionProps {
   courtCount: number | null;
   hours: VenueHoursSummary | null;
+  /** Cheapest configured hourly rate */
+  fromRate: number | null;
 }
 
-export function HeroSection({ courtCount, hours }: HeroSectionProps) {
+export function HeroSection({ courtCount, hours, fromRate }: HeroSectionProps) {
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
@@ -159,7 +161,7 @@ export function HeroSection({ courtCount, hours }: HeroSectionProps) {
               <Sparkles className="size-3.5 shrink-0" />
               <span>Court Rate</span>
             </div>
-            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">From ₱200/hr</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-foreground">{fromRate ? `From ₱${fromRate.toLocaleString()}/hr` : "Hourly rates"}</p>
             <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">Transparent hourly rate</p>
           </motion.div>
 

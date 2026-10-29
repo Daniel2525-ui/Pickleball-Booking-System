@@ -1,4 +1,3 @@
-import { calculateCourtPrice } from "../courts/calculateCourtPrice.service.ts";
 import { getBookingStart } from "../../utils/bookingTime.ts";
 
 export interface OperatingHourInfo {
@@ -12,6 +11,8 @@ export interface ValidateBookingSlotParams {
     startTime: string;
     endTime: string;
     operatingHour?: OperatingHourInfo | null;
+    /** Admin-configured booking length limits (booking_settings) */
+    limits: { min_hours: number; max_hours: number };
     now?: Date;
 }
 
@@ -21,7 +22,6 @@ export type ValidateBookingSlotResult =
           durationHours: number;
           startTimeDb: string;
           endTimeDb: string;
-          amount: number;
           dayOfWeek: string;
       }
     | {
@@ -42,13 +42,13 @@ export const getBookingWeekday = (bookingDate: string): string => {
 };
 
 /**
- * Validates date format, whole-hour boundaries, duration limits (1-3 hours),
+ * Validates date format, whole-hour boundaries, the configured duration limits,
  * operating hours, and past dates/times on the server in Asia/Manila context.
  */
 export const validateBookingSlot = (
     params: ValidateBookingSlotParams
 ): ValidateBookingSlotResult => {
-    const { bookingDate, startTime, endTime, operatingHour, now = new Date() } = params;
+    const { bookingDate, startTime, endTime, operatingHour, limits, now = new Date() } = params;
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate) || Number.isNaN(Date.parse(bookingDate))) {
         return { valid: false, error: "Invalid booking date format. Expected YYYY-MM-DD." };
@@ -69,10 +69,10 @@ export const validateBookingSlot = (
     const endHour = parseInt(endTimeDb.slice(0, 2), 10);
     const durationHours = endHour - startHour;
 
-    if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 3) {
+    if (!Number.isInteger(durationHours) || durationHours < limits.min_hours || durationHours > limits.max_hours) {
         return {
             valid: false,
-            error: "Booking duration must be between 1 and 3 consecutive hours.",
+            error: `Booking duration must be between ${limits.min_hours} and ${limits.max_hours} consecutive hours.`,
         };
     }
 
@@ -99,14 +99,11 @@ export const validateBookingSlot = (
         return { valid: false, error: "The requested time slot has already passed." };
     }
 
-    const amount = calculateCourtPrice(durationHours);
-
     return {
         valid: true,
         durationHours,
         startTimeDb,
         endTimeDb,
-        amount,
         dayOfWeek,
     };
 };

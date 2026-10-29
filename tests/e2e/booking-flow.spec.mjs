@@ -51,7 +51,7 @@ test("duration picker prices 1, 2 and 3 hours at PHP 200 per hour", async ({ pag
   await expect(panel.getByText("₱400", { exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "3 hrs" }).click();
   await expect(panel.getByText("₱600", { exact: true })).toBeVisible();
-  await expect(panel.getByText("(3 hrs × ₱200)")).toBeVisible();
+  await expect(panel.getByText("Total for 3 hrs")).toBeVisible();
 });
 
 test("successful Stripe test checkout confirms the booking", async ({ page }) => {

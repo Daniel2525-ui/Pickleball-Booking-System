@@ -18,6 +18,7 @@ import {
     Layers,
     Users,
     Clock,
+    Tag,
     CreditCard,
     Crosshair,
     LogOut,
@@ -55,6 +56,11 @@ const operationsNav: NavItem[] = [
         title: "Operating Hours",
         url: "/admin/schedules",
         icon: Clock,
+    },
+    {
+        title: "Pricing",
+        url: "/admin/pricing",
+        icon: Tag,
     },
 ];
 

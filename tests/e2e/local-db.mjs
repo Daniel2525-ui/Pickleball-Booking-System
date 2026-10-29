@@ -47,6 +47,9 @@ export function resetBookings() {
     DELETE FROM public.customers;
     UPDATE public.operating_hours SET is_open = true, open_time = '06:00', close_time = '22:00';
     UPDATE public.courts SET status = 'active';
+    UPDATE public.booking_settings SET base_hourly_rate = 200, min_hours = 1, max_hours = 3;
+    DELETE FROM public.peak_rates;
+    DELETE FROM public.auth_rate_limits;
   `);
 }
 

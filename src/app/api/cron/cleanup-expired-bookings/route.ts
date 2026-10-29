@@ -264,6 +264,13 @@ export async function GET(request: Request) {
       });
     }
 
+    // Auth rate-limit windows are at most an hour; drop counters older than a day so the table stays small
+    const { error: limiterCleanupError } = await supabase
+      .from("auth_rate_limits")
+      .delete()
+      .lt("window_start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+    if (limiterCleanupError) console.error("Rate limiter cleanup failed:", limiterCleanupError);
+
     return NextResponse.json({
       success: true,
       message: `Cleanup completed. Cancelled: ${cancelledCount}, Reconciled: ${reconciledCount}, Total examined: ${totalProcessed}, Refunds processed: ${refundResult.processed}.`,

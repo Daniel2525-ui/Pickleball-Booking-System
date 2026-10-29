@@ -70,13 +70,12 @@ export async function POST(request: NextRequest) {
 
         // Query operating hours for target date in Asia/Manila
         const dayOfWeek = getBookingWeekday(booking_date);
-        const { data: operatingHour, error: opError } = await supabase
-            .from("operating_hours")
-            .select("is_open, open_time, close_time")
-            .eq("day_of_week", dayOfWeek)
-            .maybeSingle();
+        const [{ data: operatingHour, error: opError }, { data: limits, error: limitsError }] = await Promise.all([
+            supabase.from("operating_hours").select("is_open, open_time, close_time").eq("day_of_week", dayOfWeek).maybeSingle(),
+            supabase.from("booking_settings").select("min_hours, max_hours").maybeSingle(),
+        ]);
 
-        if (opError) {
+        if (opError || limitsError || !limits) {
             return Response.json(
                 { error: "Failed to verify venue operating hours." },
                 { status: 500 }
@@ -89,6 +88,7 @@ export async function POST(request: NextRequest) {
             startTime: start_time,
             endTime: end_time,
             operatingHour,
+            limits,
         });
 
         if (!validation.valid) {
@@ -98,7 +98,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { durationHours, startTimeDb, endTimeDb, amount } = validation;
+        const { durationHours, startTimeDb, endTimeDb } = validation;
+        // Price comes from the database (quote_court_price) so Stripe charges exactly what the hold records
+        let amount = 0;
 
         // 3. Atomically hold the court slot using database row lock.
         // Grant an initial 35-minute safety buffer (2100s) to guarantee the court remains held
@@ -114,7 +116,7 @@ export async function POST(request: NextRequest) {
             p_start_time: startTimeDb,
             p_end_time: endTimeDb,
             p_user_id: user.id,
-            p_amount: amount,
+            p_amount: null,
             p_hold_expires_at: initialHoldExpiresAtIso,
         });
 
@@ -125,6 +127,10 @@ export async function POST(request: NextRequest) {
                     { error: "This time slot is no longer available. Please choose another." },
                     { status: 409 }
                 );
+            }
+
+            if (rpcError.message?.includes("INVALID_DURATION")) {
+                return Response.json({ error: rpcError.message.replace(/^.*INVALID_DURATION:s*/, "") }, { status: 400 });
             }
 
             const isVenueClosed = rpcError.message?.includes("VENUE_CLOSED");
@@ -168,9 +174,10 @@ export async function POST(request: NextRequest) {
             const parsed = typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
             bookingId = parsed.booking_id;
             paymentId = parsed.payment_id;
+            amount = Number(parsed.amount);
         }
 
-        if (!bookingId || !paymentId) {
+        if (!bookingId || !paymentId || !(amount > 0)) {
             return Response.json(
                 { error: "Could not create reservation hold. Please try again." },
                 { status: 500 }

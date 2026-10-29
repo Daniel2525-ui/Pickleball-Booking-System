@@ -23,12 +23,14 @@ import { OperatingHour } from "@/components/admin/schedules/types";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { fetchBookingsForDate, BookingSlot } from "@/lib/services/bookings/fetchBookingsForDate.service";
-import { calculateCourtPrice } from "@/lib/services/courts/calculateCourtPrice.service";
+import { supabase as browserSupabase } from "@/lib/supabase";
+import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
+import { quoteCourtPrice, type Pricing } from "@/lib/services/pricing/quoteCourtPrice";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
-import { checkSlotAvailability, getSlotBooking } from "@/lib/services/bookings/checkSlotAvailability.service";
+import { checkSlotAvailability, getSlotBooking, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
@@ -43,6 +45,7 @@ export const BookingContainer = () => {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [operatingHours, setOperatingHours] = useState<OperatingHour[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
+  const [pricing, setPricing] = useState<Pricing | null>(null);
   const [bookings, setBookings] = useState<BookingSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
@@ -70,11 +73,13 @@ export const BookingContainer = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
-      const [hoursRes, courtsRes] = await Promise.all([
+      const [hoursRes, courtsRes, pricingRes] = await Promise.all([
         fetchOperatingHours(),
         fetchCourtsData(),
+        fetchPricing(browserSupabase),
       ]);
       if (hoursRes.data) setOperatingHours(hoursRes.data);
+      if (pricingRes.data) setPricing(pricingRes.data);
       if (courtsRes.data) {
         setCourts(courtsRes.data);
       }
@@ -129,14 +134,23 @@ export const BookingContainer = () => {
     [courts, bookings, user?.id]
   );
 
-  // Calculate maximum consecutive available hours (1 to 3) starting at slotTime for courtName
+  // Admin-configured booking length (booking_settings); the database enforces the same limits
+  const minHours = pricing?.settings.min_hours ?? 1;
+  const maxHours = pricing?.settings.max_hours ?? 1;
+  const priceFor = (date: Date, startSlotTime: string, duration: number) => {
+    if (!pricing) return { total: 0, hasPeak: false };
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date);
+    return quoteCourtPrice(pricing, day, to24h(startSlotTime.split(" - ")[0].trim()), duration);
+  };
+
+  // Calculate maximum consecutive available hours (up to maxHours) starting at slotTime for courtName
   const getMaxAvailableDuration = useCallback(
     (courtName: string, slotTime: string): number => {
       const startIndex = timeSlots.indexOf(slotTime);
       if (startIndex === -1) return 1;
 
       let maxHours = 1;
-      for (let h = 2; h <= 3; h++) {
+      for (let h = 2; h <= (pricing?.settings.max_hours ?? 1); h++) {
         const nextSlot = timeSlots[startIndex + h - 1];
         if (!nextSlot) break;
         const status = getSlotStatus(selectedDate, courtName, nextSlot);
@@ -145,7 +159,7 @@ export const BookingContainer = () => {
       }
       return maxHours;
     },
-    [timeSlots, selectedDate, getSlotStatus]
+    [timeSlots, selectedDate, getSlotStatus, pricing]
   );
 
   const setSlotWithDuration = (courtName: string, startSlotTime: string, duration: number) => {
@@ -158,13 +172,14 @@ export const BookingContainer = () => {
     const endPart = endSlot.split(" - ")[1].trim();
 
     const formattedRange = `${startPart} - ${endPart}`;
-    const price = calculateCourtPrice(duration);
+    const { total: price, hasPeak } = priceFor(selectedDate, startSlotTime, duration);
 
     setSelectedSlot({
       date: selectedDate,
       court: courtName,
       time: formattedRange,
       price,
+      hasPeak,
       duration,
       startSlot: startSlotTime,
     });
@@ -202,15 +217,15 @@ export const BookingContainer = () => {
       const startIndex = timeSlots.indexOf(startSlot);
       const clickedIndex = timeSlots.indexOf(time);
 
-      // If clicked the exact start slot and duration is 1, deselect
-      if (startSlot === time && (selectedSlot.duration || 1) === 1) {
+      // If clicked the exact start slot at the shortest allowed duration, deselect
+      if (startSlot === time && (selectedSlot.duration || 1) === minHours) {
         setSelectedSlot(null);
         return;
       }
 
       // If clicked consecutive hour right after currently selected duration, expand
       const currentDur = selectedSlot.duration || 1;
-      if (clickedIndex === startIndex + currentDur && currentDur < 3) {
+      if (clickedIndex === startIndex + currentDur && currentDur < maxHours) {
         const maxDur = getMaxAvailableDuration(courtName, startSlot);
         if (maxDur >= currentDur + 1) {
           setSlotWithDuration(courtName, startSlot, currentDur + 1);
@@ -225,8 +240,12 @@ export const BookingContainer = () => {
       }
     }
 
-    // Default: select this slot as starting slot with duration 1
-    setSlotWithDuration(courtName, time, 1);
+    // Default: select this slot as starting slot with the shortest allowed duration
+    if (getMaxAvailableDuration(courtName, time) < minHours) {
+      toast.error(`Bookings need at least ${minHours} consecutive free hours from this start time.`);
+      return;
+    }
+    setSlotWithDuration(courtName, time, minHours);
   };
 
   const handleResumeGridBooking = async () => {
@@ -428,7 +447,7 @@ export const BookingContainer = () => {
                     <div className="flex items-center gap-2 mt-2.5">
                       <span className="text-xs font-semibold text-muted-foreground">Duration:</span>
                       <div className="flex items-center gap-1.5">
-                        {[1, 2, 3].map((hours) => {
+                        {Array.from({ length: maxHours - minHours + 1 }, (_, i) => minHours + i).map((hours) => {
                           const startSlot = selectedSlot.startSlot || selectedSlot.time;
                           const maxAvailable = getMaxAvailableDuration(selectedSlot.court, startSlot);
                           const isAvailable = hours <= maxAvailable;
@@ -440,7 +459,7 @@ export const BookingContainer = () => {
                               type="button"
                               disabled={!isAvailable}
                               onClick={() => setSlotWithDuration(selectedSlot.court, startSlot, hours)}
-                              title={isAvailable ? `${hours} hour${hours > 1 ? "s" : ""} (₱${calculateCourtPrice(hours)})` : "Consecutive slot unavailable"}
+                              title={isAvailable ? `${hours} hour${hours > 1 ? "s" : ""} (₱${priceFor(selectedSlot.date, startSlot, hours).total.toLocaleString()})` : "Consecutive slot unavailable"}
                               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                                 isCurrent
                                   ? "bg-primary text-primary-foreground shadow-xs"
@@ -459,7 +478,7 @@ export const BookingContainer = () => {
                   <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start w-full sm:w-auto gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
                     <div className="text-left sm:text-right">
                       <p className="text-[11px] text-muted-foreground">
-                        Total Price {(selectedSlot.duration || 1) > 1 ? `(${selectedSlot.duration} hrs × ₱200)` : "(₱200 / hr)"}
+                        Total for {selectedSlot.duration || 1} {(selectedSlot.duration || 1) === 1 ? "hr" : "hrs"}{selectedSlot.hasPeak ? " · includes peak rate" : ""}
                       </p>
                       <p className="text-xl sm:text-2xl font-black text-foreground">₱{selectedSlot.price.toLocaleString()}</p>
                     </div>

@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import Stripe from "stripe";
-import { calculateCourtPrice } from "../src/lib/services/courts/calculateCourtPrice.service.ts";
 import {
     validateBookingSlot,
     getBookingWeekday,
@@ -77,22 +76,14 @@ test("Stripe error classifier correctly differentiates definite pre-creation err
     assert.equal(isDefinitePreCreationError(networkErr), false);
 });
 
-// 3. Server-side Pricing Calculation (Production calculateCourtPrice)
-test("pricing calculation computes correct rates and rejects invalid durations", () => {
-    // Valid 1, 2, and 3 hours
-    assert.equal(calculateCourtPrice(1), 200);
-    assert.equal(calculateCourtPrice(2), 400);
-    assert.equal(calculateCourtPrice(3), 600);
-
-    // Omitted duration defaults to 1 hour (preserves legacy caller behavior)
-    assert.equal(calculateCourtPrice(), 200);
-
-    // Invalid durations are rejected with an Error (not silently converted)
-    assert.throws(() => calculateCourtPrice(0), /Invalid booking duration: 0/);
-    assert.throws(() => calculateCourtPrice(-1), /Invalid booking duration: -1/);
-    assert.throws(() => calculateCourtPrice(4), /Invalid booking duration: 4/);
-    assert.throws(() => calculateCourtPrice(1.5), /Invalid booking duration: 1.5/);
-    assert.throws(() => calculateCourtPrice(NaN), /Invalid booking duration: NaN/);
+// 3. Admin-configured duration limits are enforced (pricing itself: tests/quote-court-price.test.mjs)
+test("validateBookingSlot follows the configured min and max booking length", () => {
+    const now = new Date("2026-10-24T06:00:00+08:00");
+    const slot = (endTime, limits) => validateBookingSlot({ bookingDate: "2026-10-25", startTime: "08:00", endTime, now, limits });
+    assert.equal(slot("10:00", { min_hours: 2, max_hours: 4 }).valid, true);
+    assert.equal(slot("12:00", { min_hours: 2, max_hours: 4 }).valid, true);
+    assert.deepEqual(slot("09:00", { min_hours: 2, max_hours: 4 }), { valid: false, error: "Booking duration must be between 2 and 4 consecutive hours." });
+    assert.deepEqual(slot("13:00", { min_hours: 2, max_hours: 4 }), { valid: false, error: "Booking duration must be between 2 and 4 consecutive hours." });
 });
 
 // 4. Server-side Time and Duration Validation (Production validateBookingSlot)
@@ -101,6 +92,7 @@ test("validateBookingSlot accepts valid 1, 2, and 3-hour bookings", () => {
     const openVenue = { is_open: true, open_time: "07:00:00", close_time: "22:00:00" };
 
     const oneHour = validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
         bookingDate: "2026-10-25",
         startTime: "08:00",
         endTime: "09:00",
@@ -112,10 +104,10 @@ test("validateBookingSlot accepts valid 1, 2, and 3-hour bookings", () => {
         assert.equal(oneHour.durationHours, 1);
         assert.equal(oneHour.startTimeDb, "08:00:00");
         assert.equal(oneHour.endTimeDb, "09:00:00");
-        assert.equal(oneHour.amount, 200);
     }
 
     const twoHours = validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
         bookingDate: "2026-10-25",
         startTime: "08:00:00",
         endTime: "10:00:00",
@@ -125,10 +117,10 @@ test("validateBookingSlot accepts valid 1, 2, and 3-hour bookings", () => {
     assert.equal(twoHours.valid, true);
     if (twoHours.valid) {
         assert.equal(twoHours.durationHours, 2);
-        assert.equal(twoHours.amount, 400);
     }
 
     const threeHours = validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
         bookingDate: "2026-10-25",
         startTime: "14:00",
         endTime: "17:00",
@@ -138,7 +130,6 @@ test("validateBookingSlot accepts valid 1, 2, and 3-hour bookings", () => {
     assert.equal(threeHours.valid, true);
     if (threeHours.valid) {
         assert.equal(threeHours.durationHours, 3);
-        assert.equal(threeHours.amount, 600);
     }
 });
 
@@ -148,6 +139,7 @@ test("validateBookingSlot rejects invalid durations, non-whole-hour times, and m
     // 0 hours
     assert.deepEqual(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "08:00",
             endTime: "08:00",
@@ -159,6 +151,7 @@ test("validateBookingSlot rejects invalid durations, non-whole-hour times, and m
     // Inverted times / negative duration
     assert.deepEqual(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "10:00",
             endTime: "08:00",
@@ -170,6 +163,7 @@ test("validateBookingSlot rejects invalid durations, non-whole-hour times, and m
     // Exceeds 3 hours (4 hours)
     assert.deepEqual(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "08:00",
             endTime: "12:00",
@@ -181,6 +175,7 @@ test("validateBookingSlot rejects invalid durations, non-whole-hour times, and m
     // Non-whole hour (minutes)
     assert.deepEqual(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "08:15",
             endTime: "09:15",
@@ -192,6 +187,7 @@ test("validateBookingSlot rejects invalid durations, non-whole-hour times, and m
     // Malformed strings
     assert.deepEqual(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "invalid-date",
             startTime: "08:00",
             endTime: "09:00",
@@ -209,6 +205,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
     // Valid: right at open time
     assert.equal(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "06:00",
             endTime: "08:00",
@@ -221,6 +218,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
     // Valid: right at close time
     assert.equal(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "20:00",
             endTime: "22:00",
@@ -233,6 +231,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
     // Invalid: ends after closing time
     assert.deepEqual(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "21:00",
             endTime: "23:00",
@@ -245,6 +244,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
     // Invalid: starts before opening time
     assert.deepEqual(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "05:00",
             endTime: "07:00",
@@ -257,6 +257,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
     // Invalid: venue closed for the day
     assert.deepEqual(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "08:00",
             endTime: "10:00",
@@ -294,6 +295,7 @@ test("past date and time validation blocks slots that have already started or pa
     // Past date (yesterday)
     assert.equal(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-23",
             startTime: "08:00",
             endTime: "09:00",
@@ -305,6 +307,7 @@ test("past date and time validation blocks slots that have already started or pa
     // Same day, past time (08:00 vs 10:30)
     assert.equal(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-24",
             startTime: "08:00",
             endTime: "09:00",
@@ -316,6 +319,7 @@ test("past date and time validation blocks slots that have already started or pa
     // Same day, currently in-progress (10:00 vs 10:30)
     assert.equal(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-24",
             startTime: "10:00",
             endTime: "11:00",
@@ -327,6 +331,7 @@ test("past date and time validation blocks slots that have already started or pa
     // Same day, future time (11:00 vs 10:30)
     assert.equal(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-24",
             startTime: "11:00",
             endTime: "12:00",
@@ -338,6 +343,7 @@ test("past date and time validation blocks slots that have already started or pa
     // Future date
     assert.equal(
         validateBookingSlot({
+        limits: { min_hours: 1, max_hours: 3 },
             bookingDate: "2026-10-25",
             startTime: "08:00",
             endTime: "09:00",
