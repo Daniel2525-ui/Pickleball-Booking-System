@@ -1,6 +1,6 @@
 // Creates real holds, Stripe test-mode sessions and payments: local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, payOnStripe } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 // Phone width shows the quick-date strip ("Tmrw"), the simplest stable way to pick tomorrow
@@ -28,37 +28,26 @@ const bookingRow = (start) =>
        WHERE b.court_id = '${court.id}' AND b.booking_date = '${date}' AND b.start_time = '${start}'
        ORDER BY b.created_at DESC LIMIT 1`);
 
-async function payOnStripe(page) {
-  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
-  const email = page.locator("#email");
-  if (await email.isVisible().catch(() => false)) await email.fill("e2e-customer@example.com");
-  await page.locator("#cardNumber").fill("4242 4242 4242 4242");
-  await page.locator("#cardExpiry").fill("12 / 34");
-  await page.locator("#cardCvc").fill("123");
-  await page.locator("#billingName").fill("E2E Customer");
-  const postal = page.locator("#billingPostalCode");
-  if (await postal.isVisible().catch(() => false)) await postal.fill("10001");
-  await page.getByTestId("hosted-payment-submit-button").click();
-}
-
 test("duration picker prices 1, 2 and 3 hours at PHP 200 per hour", async ({ page }) => {
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   await slot(page, "8:00 AM - 9:00 AM").click();
-  const panel = page.locator("#booking");
+  const panel = page.getByRole("region", { name: "Your basket" });
+  const line = panel.getByRole("group", { name: `${court.name} basket line` });
   await expect(panel.getByText("₱200", { exact: true })).toBeVisible();
-  await panel.getByRole("button", { name: "2 hrs" }).click();
+  await line.getByRole("button", { name: "2 hrs" }).click();
   await expect(panel.getByText("₱400", { exact: true })).toBeVisible();
-  await panel.getByRole("button", { name: "3 hrs" }).click();
+  await line.getByRole("button", { name: "3 hrs" }).click();
+  await expect(line.getByRole("button", { name: "3 hrs" })).toHaveAttribute("aria-pressed", "true");
   await expect(panel.getByText("₱600", { exact: true })).toBeVisible();
-  await expect(panel.getByText("Total for 3 hrs")).toBeVisible();
+  await expect(panel.getByText("Total", { exact: true })).toBeVisible();
 });
 
 test("successful Stripe test checkout confirms the booking", async ({ page }) => {
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   await slot(page, "10:00 AM - 11:00 AM").click();
-  await page.locator("#booking").getByRole("button", { name: "2 hrs" }).click();
+  await page.getByRole("group", { name: `${court.name} basket line` }).getByRole("button", { name: "2 hrs" }).click();
   await page.locator("#booking").getByRole("button", { name: "Continue to Checkout" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
 
@@ -165,6 +154,8 @@ test("a customer cannot cancel a confirmed booking around the cancel route", asy
 });
 
 test("an expired hold keeps its slot for the grace period, then releases it", async ({ page, browser }) => {
+  // The paid-but-unconfirmed 5 PM hold above still counts as CUSTOMER's one open basket; age it out
+  sql(`UPDATE public.bookings SET hold_expires_at = now() - interval '25 minutes' WHERE booking_date = '${date}' AND start_time = '17:00' AND status = 'pending'`);
   const holdA = await browser.newPage();
   await login(holdA, account("CUSTOMER"));
   const body = { court_id: court.id, booking_date: date, start_time: "15:00", end_time: "16:00" };

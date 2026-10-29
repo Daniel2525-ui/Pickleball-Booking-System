@@ -66,3 +66,17 @@ export function localSupabase() {
   if (!/^http:\/\/(localhost|127\.0\.0\.1)/.test(url)) throw new Error("E2E_SUPABASE_URL must point at the local stack");
   return { url, anonKey };
 }
+
+// Pays the open Stripe Checkout page with the 4242 test card (test mode only)
+export async function payOnStripe(page) {
+  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
+  const email = page.locator("#email");
+  if (await email.isVisible().catch(() => false)) await email.fill("e2e-customer@example.com");
+  await page.locator("#cardNumber").fill("4242 4242 4242 4242");
+  await page.locator("#cardExpiry").fill("12 / 34");
+  await page.locator("#cardCvc").fill("123");
+  await page.locator("#billingName").fill("E2E Customer");
+  const postal = page.locator("#billingPostalCode");
+  if (await postal.isVisible().catch(() => false)) await postal.fill("10001");
+  await page.getByTestId("hosted-payment-submit-button").click();
+}
