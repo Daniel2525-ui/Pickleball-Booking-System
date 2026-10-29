@@ -18,5 +18,6 @@ INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES
 ON CONFLICT (version) DO NOTHING;
 
 -- Verify: 12 rows expected (6 above + the 6 recorded by the MCP migration tool), one per file in
--- supabase/migrations except the not-yet-applied hold_release_grace_period.pending.sql.
+-- supabase/migrations at the time. Applied to the hosted project on 2026-10-29, before
+-- 20261029011012_hold_release_grace_period (13 rows after it).
 SELECT version, name FROM supabase_migrations.schema_migrations ORDER BY version;

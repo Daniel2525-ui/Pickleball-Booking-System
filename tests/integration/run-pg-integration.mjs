@@ -332,7 +332,7 @@ async function main() {
 
   // 17. Apply hold release grace period migration (file renamed to its hosted version once applied)
   const graceMigrationPath = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations"))
-    .filter((f) => f.endsWith("hold_release_grace_period.sql") || f === "hold_release_grace_period.pending.sql")
+    .filter((f) => f.endsWith("hold_release_grace_period.sql"))
     .map((f) => path.join(PROJECT_ROOT, "supabase/migrations", f))[0];
   assert.ok(graceMigrationPath, "hold_release_grace_period migration file not found");
   console.log(`[Setup] Applying grace period migration: ${path.basename(graceMigrationPath)}...`);
