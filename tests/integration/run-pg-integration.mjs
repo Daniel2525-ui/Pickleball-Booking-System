@@ -3931,6 +3931,22 @@ async function main() {
     assert.equal(Number(res.amount), Number(b2.total));
     assert.equal(state(b2.basket_id), "confirmed/paid/cash,confirmed/paid/cash");
 
+    // Centavo prices: staff's JS float sum (250.10 + 250.20 = 500.29999999999995) still settles
+    const baseRate = q(`SELECT base_hourly_rate FROM public.booking_settings;`);
+    q(`UPDATE public.booking_settings SET base_hourly_rate = 250.10;
+       INSERT INTO public.peak_rates (label, days, start_time, end_time, hourly_rate) VALUES ('test-centavo', '{Tuesday}', '12:00', '13:00', 250.20);`);
+    try {
+      const cents = JSON.parse(q(`SELECT public.hold_court_basket('${day}', '${JSON.stringify([
+        { court_id: C1, start_time: "11:00", end_time: "12:00" }, { court_id: C2, start_time: "12:00", end_time: "13:00" }])}'::jsonb);`,
+        { role: "authenticated", uid: danaUid }));
+      assert.equal(cents.total, 500.3);
+      const centsOk = settle(cents.basket_id, adminUid, 250.1 + 250.2);
+      assert.equal(centsOk.status, 0, centsOk.stderr);
+      assert.equal(state(cents.basket_id), "confirmed/paid/cash,confirmed/paid/cash");
+    } finally {
+      q(`UPDATE public.booking_settings SET base_hourly_rate = ${baseRate}; DELETE FROM public.peak_rates WHERE label = 'test-centavo';`);
+    }
+
     // Unknown basket, and an already-settled one, have nothing pending
     for (const id of ["99999999-9999-9999-9999-999999999999", b2.basket_id]) {
       const r = settle(id, adminUid);

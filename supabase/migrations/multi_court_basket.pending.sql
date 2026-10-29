@@ -372,8 +372,8 @@ BEGIN
     RAISE EXCEPTION 'NOT_FOUND: Basket % has no pending booking', p_basket_id USING ERRCODE = 'P0002';
   END IF;
 
-  -- A court cancelled or added after staff saw the total: undo every settlement above
-  IF v_amount IS DISTINCT FROM p_expected_amount THEN
+  -- A court cancelled or added after staff saw the total: undo every settlement above (staff send a float sum)
+  IF round(v_amount, 2) IS DISTINCT FROM round(p_expected_amount, 2) THEN
     RAISE EXCEPTION 'AMOUNT_CHANGED: Basket % totals % PHP, staff expected % PHP', p_basket_id, v_amount, p_expected_amount USING ERRCODE = 'P0001';
   END IF;
 

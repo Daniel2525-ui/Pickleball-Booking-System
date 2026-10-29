@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
             basketId
                 ? await supabase.rpc("settle_counter_basket", {
                       p_basket_id: basketId,
-                      p_expected_amount: expectedAmount,
+                      p_expected_amount: Math.round(expectedAmount * 100) / 100,
                       p_payment_method: paymentMethod,
                       p_payment_reference: paymentReference,
                   })
