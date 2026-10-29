@@ -10,7 +10,7 @@ export interface ProcessRefundJobsOptions {
     stripeClient?: {
         refunds: {
             create: (
-                params: { payment_intent: string },
+                params: { payment_intent: string; amount: number },
                 options?: { idempotencyKey?: string }
             ) => Promise<{ id: string; status?: string }>;
         };
@@ -79,6 +79,7 @@ export async function processPendingRefundJobs({
             const refund = await stripeInstance.refunds.create(
                 {
                     payment_intent: job.stripe_payment_intent,
+                    amount: Math.round(Number(job.amount) * 100),
                 },
                 {
                     idempotencyKey: job.idempotency_key,

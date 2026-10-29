@@ -13,7 +13,7 @@ export interface ReconcileParams {
     stripeClient?: {
         refunds: {
             create: (
-                params: { payment_intent: string },
+                params: { payment_intent: string; amount: number },
                 options?: { idempotencyKey?: string }
             ) => Promise<{ id: string; status?: string }>;
         };
@@ -112,6 +112,7 @@ export async function processStripePaymentReconciliation(
                 const refund = await stripeInstance.refunds.create(
                     {
                         payment_intent: stripePaymentIntent,
+                        amount: Math.round(amount * 100),
                     },
                     {
                         idempotencyKey: data.idempotency_key,

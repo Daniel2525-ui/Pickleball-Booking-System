@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase/service";
-import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
+import { reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
 
@@ -14,7 +14,7 @@ import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
  * 2. Processes in bounded batches (BATCH_SIZE = 25) with an execution time budget (MAX_EXECUTION_MS = 7500)
  *    to comfortably finish before Vercel serverless limits while draining backlogs across multiple iterations.
  * 3. Inspects Stripe Checkout sessions before performing database cancellation.
- * 4. If Stripe session is paid or complete, reconciles via processStripePaymentReconciliation
+ * 4. If Stripe session is paid or complete, reconciles via reconcileCheckoutSession
  *    instead of cancelling.
  * 5. If Stripe session is open, expires the Stripe session to prevent late checkout.
  * 6. If Stripe API retrieval throws an error (network drop, timeout, 5xx), treats status as UNCERTAIN
@@ -174,29 +174,14 @@ export async function GET(request: Request) {
               }
             }
 
-            const { payment, session } = paidPaymentInfo;
-            const paymentIntent = typeof session.payment_intent === "string"
-              ? session.payment_intent
-              : session.payment_intent?.id || "";
+            // Reconciles every court of the session's basket (or the legacy booking), each with its own amount
+            const { session } = paidPaymentInfo;
+            const outcome = await reconcileCheckoutSession(session, supabase);
 
-            if (paymentIntent) {
-              const outcome = await processStripePaymentReconciliation({
-                bookingId: booking.id,
-                paymentId: payment.id,
-                amount: (session.amount_total || 0) / 100,
-                currency: (session.currency || "php").toLowerCase(),
-                stripeSessionId: session.id,
-                stripePaymentIntent: paymentIntent,
-                supabase,
-              });
-
-              if (outcome.success) {
-                reconciledCount++;
-              } else {
-                console.error(`Reconciliation failed for paid session ${session.id}:`, outcome.error);
-              }
+            if (outcome.error) {
+              console.error(`Reconciliation failed for paid session ${session.id} on booking ${booking.id}:`, outcome.error);
             } else {
-              console.error(`Missing payment_intent for paid session ${session.id} on booking ${booking.id}`);
+              reconciledCount++;
             }
 
             skippedIds.push(booking.id);

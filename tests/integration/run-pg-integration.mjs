@@ -3664,7 +3664,20 @@ async function main() {
     reconcile(B);
     assert.equal(q(`SELECT string_agg(b.status || '|' || p.status || '|' || p.stripe_payment_id, ',' ORDER BY b.start_time) FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${basket}';`),
       "confirmed|paid|pi_shared,confirmed|paid|pi_shared");
+    // Stripe redelivery: every basket row reconciled again is a no-op and adds no payments rows
+    const basketPayments = () => q(`SELECT count(*) FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${basket}';`);
     assert.equal(reconcile(A).action, "NO_OP");
+    assert.equal(reconcile(B).action, "NO_OP");
+    assert.equal(basketPayments(), "2");
+
+    // A second payment for booking A only (Subcase 1.3): refund key is per booking, sibling B untouched
+    const dupA = JSON.parse(q(`SELECT public.reconcile_booking_payment('${A.b}', '${A.p}', 'cs_dup', 'pi_dup', 300, 'php');`, { role: "service_role" }));
+    assert.equal(dupA.action, "REFUND_SCHEDULED");
+    assert.equal(dupA.reason, "DUPLICATE_PAYMENT");
+    assert.equal(dupA.idempotency_key, `ref_duplicate_pi_pi_dup_${A.b}`);
+    assert.equal(q(`SELECT b.status || '|' || p.status || '|' || p.stripe_payment_id FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${B.b}';`), "confirmed|paid|pi_shared");
+    assert.equal(reconcile(B).action, "NO_OP");
+    assert.equal(q(`SELECT count(*) FROM public.refund_requests WHERE booking_id = '${B.b}';`), "0");
 
     // The same intent can still not be recorded twice for the SAME booking
     const dup = runPsqlCommand(`INSERT INTO public.payments (booking_id, amount, currency, status, payment_method, stripe_payment_id) VALUES ('${A.b}', 300, 'php', 'paid', 'stripe', 'pi_shared');`);
@@ -3672,7 +3685,7 @@ async function main() {
     assert.ok(dup.stderr.includes("uq_payments_intent_per_booking"), dup.stderr);
 
     // Rollback restores the global uniques; the migration re-applies cleanly
-    q(`DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE basket_id = '${basket}'); DELETE FROM public.bookings WHERE basket_id = '${basket}';`);
+    q(`DELETE FROM public.refund_requests WHERE booking_id IN (SELECT id FROM public.bookings WHERE basket_id = '${basket}'); DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE basket_id = '${basket}'); DELETE FROM public.bookings WHERE basket_id = '${basket}';`);
     runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
     assert.equal(q(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'basket_id';`), "0");
     assert.equal(q(`SELECT count(*) FROM pg_indexes WHERE indexname IN ('idx_payments_stripe_payment_id', 'uq_payments_intent_per_booking');`), "1");
