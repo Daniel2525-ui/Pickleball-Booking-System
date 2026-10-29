@@ -42,6 +42,7 @@ import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { SettlePaymentModal } from "./settlePaymentModal";
+import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
@@ -92,6 +93,11 @@ interface BookingsTableProps {
     dateTime: string;
   };
 }
+
+// Cancelling a pending court cancels its whole unpaid basket (/api/admin/bookings/status)
+const cancelsWith = (b: Booking, target: Booking) =>
+  b.id === target.id ||
+  (target.status === "pending" && !!target.basket_id && b.basket_id === target.basket_id && b.status === "pending");
 
 export default function BookingsTable({ filters }: BookingsTableProps = {}) {
   const [bookingsData, setBookingsData] = useState<Booking[]>([]);
@@ -144,7 +150,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
       toast.error(error);
     } else {
       setBookingsData((prev) =>
-        prev.map((b) => (b.id === booking.id ? { ...b, status: "cancelled" } : b))
+        prev.map((b) => (cancelsWith(b, booking) ? { ...b, status: "cancelled" } : b))
       );
       toast.success("Reservation cancelled successfully.");
     }
@@ -181,20 +187,24 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
         cancelled: "Booking cancelled. Court slot released.",
       };
       setBookingsData((prev) =>
-        prev.map((b) => (b.id === booking.id ? { ...b, status: newStatus } : b))
+        prev.map((b) =>
+          b.id === booking.id || (newStatus === "cancelled" && cancelsWith(b, booking)) ? { ...b, status: newStatus } : b
+        )
       );
       toast.success(label[newStatus]);
     }
     setActionLoadingId(null);
   };
 
-  const handlePaymentSettled = (bookingId: string, updatedPayment: unknown) => {
+  const handlePaymentSettled = (bookingIds: string[], paymentMethod: string) => {
     setBookingsData((prev) =>
       prev.map((b) => {
-        if (b.id !== bookingId) return b;
+        if (!bookingIds.includes(b.id)) return b;
+        const payment = Array.isArray(b.payments) ? b.payments[0] : b.payments;
         return {
           ...b,
-          payments: [updatedPayment as BookingPayment],
+          status: "confirmed",
+          payments: payment ? [{ ...payment, status: "paid", payment_method: paymentMethod } as BookingPayment] : b.payments,
         };
       })
     );
@@ -474,6 +484,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
       {/* Settle Payment Modal */}
       <SettlePaymentModal
         booking={selectedBookingForSettle}
+        due={selectedBookingForSettle ? counterSettlementDue(selectedBookingForSettle, bookingsData) : null}
         open={settleModalOpen}
         onOpenChange={setSettleModalOpen}
         onSettled={handlePaymentSettled}

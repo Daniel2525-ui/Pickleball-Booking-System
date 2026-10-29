@@ -27,6 +27,8 @@ export interface Booking {
     no_show_at?: string | null;
 
     hold_expires_at?: string | null;
+    /** Shared by the courts of one checkout; null for legacy single-court bookings */
+    basket_id?: string | null;
     /** Why a cancelled booking was cancelled (bookings_cancel_reason_check); null when unknown */
     cancel_reason?: string | null;
 

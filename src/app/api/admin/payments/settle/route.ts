@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         //    and be charged twice for a booking settled at the counter.
         const { data: payment, error: paymentError } = await supabase
             .from("payments")
-            .select("stripe_session_id")
+            .select("stripe_session_id, bookings(basket_id, status)")
             .eq("id", paymentId)
             .eq("booking_id", bookingId)
             .maybeSingle();
@@ -71,13 +71,22 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 4. Execute atomic counter settlement via database RPC
-        const { data: settleRes, error: settleErr } = await supabase.rpc("settle_counter_payment", {
-            p_booking_id: bookingId,
-            p_payment_id: paymentId,
-            p_payment_method: paymentMethod,
-            p_payment_reference: paymentReference,
-        });
+        // 4. Execute atomic counter settlement via database RPC. An unpaid basket is settled as one unit
+        //    (all-or-nothing); its courts share the session closed above. The basket id comes from the DB row.
+        const owner = payment?.bookings as { basket_id?: string | null; status?: string } | null | undefined;
+        const { data: settleRes, error: settleErr } =
+            owner?.basket_id && owner.status === "pending"
+                ? await supabase.rpc("settle_counter_basket", {
+                      p_basket_id: owner.basket_id,
+                      p_payment_method: paymentMethod,
+                      p_payment_reference: paymentReference,
+                  })
+                : await supabase.rpc("settle_counter_payment", {
+                      p_booking_id: bookingId,
+                      p_payment_id: paymentId,
+                      p_payment_method: paymentMethod,
+                      p_payment_reference: paymentReference,
+                  });
 
         if (settleErr) {
             console.error("Counter settlement RPC error:", settleErr);
