@@ -12,7 +12,7 @@ test("RefundWorker: successfully claims and processes pending refund job with 'c
     const mockJob = {
         id: "ref-req-1",
         payment_id: "pay-1",
-        amount: 200,
+        amount: 250,
         currency: "PHP",
         stripe_payment_intent: "pi_test_123",
         idempotency_key: "idemp_test_123",
@@ -32,7 +32,7 @@ test("RefundWorker: successfully claims and processes pending refund job with 'c
                 settledRpcCalls++;
                 assert.equal(params.p_refund_request_id, "ref-req-1");
                 assert.equal(params.p_stripe_status, "succeeded");
-                assert.equal(params.p_amount, 200);
+                assert.equal(params.p_amount, 250);
                 assert.equal(params.p_currency, "php");
                 return { data: { success: true }, error: null };
             }
@@ -45,6 +45,7 @@ test("RefundWorker: successfully claims and processes pending refund job with 'c
             create: async (params, opts) => {
                 stripeRefundCalls++;
                 assert.equal(params.payment_intent, "pi_test_123");
+                assert.equal(params.amount, 25000); // PHP 250 in centavos
                 assert.equal(opts.idempotencyKey, "idemp_test_123");
                 return { id: "re_test_123", status: "succeeded" };
             },

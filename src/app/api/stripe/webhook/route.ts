@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase/service";
 import Stripe from "stripe";
-import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
+import { expireCheckoutSession, reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -40,21 +40,13 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
-                const bookingId = session.metadata?.booking_id;
-                const paymentId = session.metadata?.payment_id;
-
-                if (!bookingId || !paymentId) {
+                const m = session.metadata ?? {};
+                if (!m.basket_id && !(m.booking_id && m.payment_id)) {
                     console.error("Missing metadata in session:", session.id);
                     break;
                 }
 
-                const amount = (session.amount_total || 0) / 100;
-                const currency = (session.currency || "php").toLowerCase();
-                const paymentIntent = typeof session.payment_intent === "string"
-                    ? session.payment_intent
-                    : session.payment_intent?.id || "";
-
-                if (!paymentIntent) {
+                if (!session.payment_intent) {
                     console.error("Missing payment_intent in session:", session.id);
                     break;
                 }
@@ -65,22 +57,14 @@ export async function POST(req: NextRequest) {
                     return Response.json({ error: "Server configuration error: missing service role key" }, { status: 500 });
                 }
 
-                const outcome = await processStripePaymentReconciliation({
-                    bookingId,
-                    paymentId,
-                    amount,
-                    currency,
-                    stripeSessionId: session.id,
-                    stripePaymentIntent: paymentIntent,
-                    supabase,
-                });
+                const outcome = await reconcileCheckoutSession(session, supabase);
 
-                if (!outcome.success) {
+                if (outcome.error) {
                     console.error("Webhook payment reconciliation failed:", outcome.error);
                     return Response.json({ error: outcome.error }, { status: 500 });
                 }
 
-                console.log(`Reconciled checkout session ${session.id}: action=${outcome.action}`);
+                console.log(`Reconciled checkout session ${session.id}: confirmed=${outcome.confirmed.length} refunded=${outcome.refunded.length}`);
                 break;
             }
 
@@ -93,21 +77,16 @@ export async function POST(req: NextRequest) {
             case "checkout.session.expired": {
                 const session = event.data.object as Stripe.Checkout.Session;
 
-                const bookingId = session.metadata?.booking_id;
-                const paymentId = session.metadata?.payment_id;
+                const m = session.metadata ?? {};
 
-                if (bookingId && paymentId) {
+                if (m.basket_id || (m.booking_id && m.payment_id)) {
                     const supabase = getServiceClient();
                     if (!supabase) {
                         console.error("Webhook configuration error: SUPABASE_SERVICE_ROLE_KEY is required for expired booking cleanup");
                         return Response.json({ error: "Server configuration error: missing service role key" }, { status: 500 });
                     }
 
-                    const cancelRes = await supabase.rpc("cancel_expired_booking", {
-                        p_booking_id: bookingId,
-                        p_payment_id: paymentId,
-                    });
-                    console.log(`Checkout session expired cleanup for booking ${bookingId}:`, cancelRes.data);
+                    await expireCheckoutSession(session, supabase);
                 }
 
                 break;

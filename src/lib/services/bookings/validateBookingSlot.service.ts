@@ -107,3 +107,56 @@ export const validateBookingSlot = (
         dayOfWeek,
     };
 };
+
+export interface BasketLineInput {
+    court_id: string;
+    start_time: string;
+    end_time: string;
+}
+
+export type ValidateBasketResult =
+    | {
+          valid: true;
+          lines: { courtId: string; courtName: string; startTimeDb: string; endTimeDb: string }[];
+      }
+    | { valid: false; error: string };
+
+/**
+ * Trust-boundary check for a multi-court basket: shape, one line per court, court
+ * exists and is bookable, and every line passes validateBookingSlot. Errors name the court.
+ */
+export const validateBasketLines = (params: {
+    bookingDate: string;
+    lines: unknown;
+    courts: { id: string; name: string; status: string }[];
+    operatingHour?: OperatingHourInfo | null;
+    limits: { min_hours: number; max_hours: number };
+    now?: Date;
+}): ValidateBasketResult => {
+    const { bookingDate, lines, courts, operatingHour, limits, now } = params;
+    if (!Array.isArray(lines) || lines.length === 0) {
+        return { valid: false, error: "Select at least one court and time." };
+    }
+
+    const seen = new Set<string>();
+    const out: { courtId: string; courtName: string; startTimeDb: string; endTimeDb: string }[] = [];
+    for (const [i, line] of lines.entries()) {
+        const { court_id, start_time, end_time } = (line ?? {}) as Partial<BasketLineInput>;
+        if (typeof court_id !== "string" || typeof start_time !== "string" || typeof end_time !== "string" || !court_id) {
+            return { valid: false, error: `Line ${i + 1}: Missing required booking details.` };
+        }
+        const court = courts.find((c) => c.id === court_id);
+        if (!court) return { valid: false, error: `Line ${i + 1}: Invalid court.` };
+        if (seen.has(court_id)) {
+            return { valid: false, error: `${court.name} appears more than once. Book one time range per court.` };
+        }
+        seen.add(court_id);
+        if (court.status === "maintenance" || court.status === "closed") {
+            return { valid: false, error: `${court.name}: This court is currently not available for reservations.` };
+        }
+        const v = validateBookingSlot({ bookingDate, startTime: start_time, endTime: end_time, operatingHour, limits, now });
+        if (!v.valid) return { valid: false, error: `${court.name}: ${v.error}` };
+        out.push({ courtId: court_id, courtName: court.name, startTimeDb: v.startTimeDb, endTimeDb: v.endTimeDb });
+    }
+    return { valid: true, lines: out };
+};

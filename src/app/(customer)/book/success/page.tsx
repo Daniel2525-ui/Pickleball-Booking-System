@@ -27,6 +27,7 @@ function BookingSuccessContent() {
     success: boolean;
     conflict?: boolean;
     error?: string;
+    lostCourts?: string[];
   }>({ success: true });
 
   useEffect(() => {
@@ -48,6 +49,7 @@ function BookingSuccessContent() {
             success: Boolean(data.success),
             conflict: Boolean(data.conflict),
             error: data.error,
+            lostCourts: Array.isArray(data.lostCourts) ? data.lostCourts : [],
           });
         }
       } catch (err) {
@@ -162,6 +164,13 @@ function BookingSuccessContent() {
                 : "Your court reservation has been successfully confirmed."}
             </p>
           </div>
+
+          {verifyResult.lostCourts && verifyResult.lostCourts.length > 0 && (
+            <div role="alert" className="flex items-start gap-2.5 text-xs sm:text-sm text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg leading-relaxed">
+              <Info className="size-4 shrink-0 mt-0.5" />
+              <p>These courts could not be secured and were refunded: {verifyResult.lostCourts.join(", ")}.</p>
+            </div>
+          )}
 
           {/* Match Day Expectations Card */}
           <div className="rounded-xl border border-border bg-muted/30 p-4 sm:p-5 space-y-3.5 text-xs sm:text-sm">

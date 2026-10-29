@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn, Calendar, Clock, X, CreditCard, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { LoaderCircle, LogIn, Calendar, Clock, CreditCard, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -34,13 +34,15 @@ import { checkSlotAvailability, getSlotBooking, to24h } from "@/lib/services/boo
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
+import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
+import { upsertLine, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
 
 export const BookingContainer = () => {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const [selectedDate, setSelectedDateRaw] = useState<Date>(new Date());
+  const [basket, setBasket] = useState<Slot[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [operatingHours, setOperatingHours] = useState<OperatingHour[]>([]);
@@ -119,6 +121,16 @@ export const BookingContainer = () => {
     };
   }, [selectedDate]);
 
+  // A basket belongs to one date, so switching dates clears it
+  const setSelectedDate = (d: Date) => {
+    if (d.toDateString() === selectedDate.toDateString()) return;
+    if (basket.length > 0) {
+      setBasket([]);
+      toast.info("Basket cleared for the new date.");
+    }
+    setSelectedDateRaw(d);
+  };
+
   const courtNames = useMemo(() => courts.map((c) => c.name), [courts]);
 
   const timeSlots = useMemo(
@@ -174,7 +186,7 @@ export const BookingContainer = () => {
     const formattedRange = `${startPart} - ${endPart}`;
     const { total: price, hasPeak } = priceFor(selectedDate, startSlotTime, duration);
 
-    setSelectedSlot({
+    setBasket((prev) => upsertLine(prev, {
       date: selectedDate,
       court: courtName,
       time: formattedRange,
@@ -182,7 +194,7 @@ export const BookingContainer = () => {
       hasPeak,
       duration,
       startSlot: startSlotTime,
-    });
+    }));
   };
 
   const handleSlotClick = (courtName: string, time: string) => {
@@ -211,15 +223,16 @@ export const BookingContainer = () => {
       return;
     }
 
-    // If clicking on an already selected court
-    if (selectedSlot && selectedSlot.court === courtName) {
+    // If clicking on a court already in the basket
+    const selectedSlot = basket.find((l) => l.court === courtName);
+    if (selectedSlot) {
       const startSlot = selectedSlot.startSlot || selectedSlot.time;
       const startIndex = timeSlots.indexOf(startSlot);
       const clickedIndex = timeSlots.indexOf(time);
 
       // If clicked the exact start slot at the shortest allowed duration, deselect
       if (startSlot === time && (selectedSlot.duration || 1) === minHours) {
-        setSelectedSlot(null);
+        setBasket((prev) => removeLine(prev, courtName));
         return;
       }
 
@@ -235,7 +248,7 @@ export const BookingContainer = () => {
 
       // If clicked within the currently selected range, deselect
       if (clickedIndex >= startIndex && clickedIndex < startIndex + currentDur) {
-        setSelectedSlot(null);
+        setBasket((prev) => removeLine(prev, courtName));
         return;
       }
     }
@@ -280,27 +293,37 @@ export const BookingContainer = () => {
   };
 
   const confirmBooking = async () => {
-    if (!selectedSlot || !user) return;
+    if (basket.length === 0 || !user) return;
 
     setIsCheckoutLoading(true);
     setCheckoutError(null);
 
     try {
-      const court = courts.find(court => court.name === selectedSlot.court);
-      if (!court) throw new Error("Court not found");
-
-      const url = await createCheckoutSession({
-        courtId: court.id,
-        courtName: court.name,
-        date: selectedSlot.date,
-        timeRange: selectedSlot.time,
+      const lines = basket.map((line) => {
+        const court = courts.find((c) => c.name === line.court);
+        if (!court) throw new Error("Court not found");
+        return { courtId: court.id, timeRange: line.time };
       });
+
+      const url = await createCheckoutSession({ date: basket[0].date, lines });
 
       window.location.assign(url);
     } catch (err: unknown) {
       setCheckoutError((err as Error).message || "An unexpected error occurred");
       setIsCheckoutLoading(false);
-      await refreshBookings();
+      // Drop courts someone else took meanwhile, or every retry fails with the same 409
+      const { data: fresh } = await fetchBookingsForDate(selectedDate);
+      setBookings(fresh);
+      const { kept, dropped } = splitTakenLines(basket, (line) => {
+        const start = timeSlots.indexOf(line.startSlot || line.time);
+        return Array.from({ length: line.duration || 1 }, (_, i) => timeSlots[start + i]).every(
+          (slot) => slot && checkSlotAvailability(line.court, slot, courts, fresh, selectedDate, user.id) === "available"
+        );
+      });
+      if (dropped.length > 0) {
+        setBasket(kept);
+        toast.error(`Removed from your basket (no longer available): ${dropped.map((l) => l.court).join(", ")}.`);
+      }
     }
   };
 
@@ -401,96 +424,29 @@ export const BookingContainer = () => {
 
         <div className="lg:col-span-8 xl:col-span-9">
           {timeSlots.length > 0 ? (
-            <div className="space-y-6">
+            <div className={`space-y-6 ${basket.length > 0 ? BASKET_SHEET_PADDING : ""}`}>
               <CourtAvailabilityGrid
                 selectedDate={selectedDate}
                 courts={courtNames}
                 timeSlots={timeSlots}
                 onSlotClick={handleSlotClick}
                 getSlotStatus={getSlotStatus}
-                selectedSlot={selectedSlot}
+                selectedSlots={basket}
                 isFetching={isFetchingBookings}
               />
 
-              {/* Selected Slot Summary */}
-              {selectedSlot && (
-                <div className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:w-[90%] sm:max-w-4xl z-50 bg-card border-t sm:border sm:rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] sm:shadow-2xl p-4 sm:p-5 md:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 animate-in slide-in-from-bottom-8 duration-300">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 sm:hidden text-muted-foreground size-8"
-                    onClick={() => setSelectedSlot(null)}
-                    aria-label="Deselect court slot"
-                  >
-                    <X className="size-4" />
-                  </Button>
-                  <div className="w-full sm:w-auto pr-8 sm:pr-0">
-                    <div className="flex items-center justify-between sm:justify-start gap-4 mb-1 sm:mb-2">
-                      <h3 className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-wider">Selected Slot</h3>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-6">
-                      <p className="text-lg sm:text-xl font-black text-foreground">{selectedSlot.court}</p>
-                      <div className="flex items-center text-xs sm:text-sm font-medium gap-1.5">
-                        <Calendar className="size-3.5 sm:size-4 text-primary" />
-                        <span className="font-bold">
-                          {selectedSlot.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                        </span>
-                      </div>
-                      <div className="flex items-center text-xs sm:text-sm font-medium gap-1.5">
-                        <Clock className="size-3.5 sm:size-4 text-emerald-600 dark:text-emerald-400" />
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                          {selectedSlot.time}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Duration Selection Pills */}
-                    <div className="flex items-center gap-2 mt-2.5">
-                      <span className="text-xs font-semibold text-muted-foreground">Duration:</span>
-                      <div className="flex items-center gap-1.5">
-                        {Array.from({ length: maxHours - minHours + 1 }, (_, i) => minHours + i).map((hours) => {
-                          const startSlot = selectedSlot.startSlot || selectedSlot.time;
-                          const maxAvailable = getMaxAvailableDuration(selectedSlot.court, startSlot);
-                          const isAvailable = hours <= maxAvailable;
-                          const isCurrent = (selectedSlot.duration || 1) === hours;
-
-                          return (
-                            <button
-                              key={hours}
-                              type="button"
-                              disabled={!isAvailable}
-                              onClick={() => setSlotWithDuration(selectedSlot.court, startSlot, hours)}
-                              title={isAvailable ? `${hours} hour${hours > 1 ? "s" : ""} (₱${priceFor(selectedSlot.date, startSlot, hours).total.toLocaleString()})` : "Consecutive slot unavailable"}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                                isCurrent
-                                  ? "bg-primary text-primary-foreground shadow-xs"
-                                  : isAvailable
-                                  ? "bg-muted hover:bg-muted/80 text-foreground border border-border"
-                                  : "opacity-35 cursor-not-allowed bg-muted/40 text-muted-foreground border border-border/40"
-                              }`}
-                            >
-                              {hours} {hours === 1 ? "hr" : "hrs"}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start w-full sm:w-auto gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
-                    <div className="text-left sm:text-right">
-                      <p className="text-[11px] text-muted-foreground">
-                        Total for {selectedSlot.duration || 1} {(selectedSlot.duration || 1) === 1 ? "hr" : "hrs"}{selectedSlot.hasPeak ? " · includes peak rate" : ""}
-                      </p>
-                      <p className="text-xl sm:text-2xl font-black text-foreground">₱{selectedSlot.price.toLocaleString()}</p>
-                    </div>
-                    <Button
-                      onClick={() => setIsDialogOpen(true)}
-                      size="lg"
-                      className="min-h-[44px] sm:min-h-[48px] px-6 text-sm font-bold shadow-md hover:shadow-lg transition-all"
-                    >
-                      Continue to Checkout
-                    </Button>
-                  </div>
-                </div>
+              {pricing && (
+                <BasketSheet
+                  lines={basket}
+                  pricing={pricing}
+                  getMaxDuration={(line) => getMaxAvailableDuration(line.court, line.startSlot || line.time)}
+                  onDuration={(court, hours) => {
+                    const line = basket.find((l) => l.court === court);
+                    if (line) setSlotWithDuration(court, line.startSlot || line.time, hours);
+                  }}
+                  onRemove={(court) => setBasket((prev) => removeLine(prev, court))}
+                  onCheckout={() => setIsDialogOpen(true)}
+                />
               )}
             </div>
           ) : (
@@ -507,7 +463,7 @@ export const BookingContainer = () => {
           setIsDialogOpen(open);
           if (!open) setCheckoutError(null);
         }}
-        selectedSlot={selectedSlot}
+        lines={basket}
         isLoading={isCheckoutLoading}
         error={checkoutError}
         onConfirm={confirmBooking}

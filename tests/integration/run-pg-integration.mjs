@@ -3638,6 +3638,330 @@ async function main() {
     runPsqlFile(migrationPath);
   });
 
+  await runTest("multi_court_basket: sibling payments share a Stripe session and intent", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("multi_court_basket"));
+    assert.ok(migration, "multi_court_basket migration file not found");
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    runPsqlFile(migrationPath);
+    const day = "2030-01-15"; // not used by other tests
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const basket = q(`SELECT gen_random_uuid();`);
+    const sibling = (start, end) => {
+      const b = q(`INSERT INTO public.bookings (user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, customer_name, basket_id)
+        VALUES ('${aliceUid}', '${activeCourtId}', '${day}', '${start}', '${end}', 'pending', 300, now() + interval '20 minutes', 'Alice', '${basket}') RETURNING id;`);
+      const p = q(`INSERT INTO public.payments (booking_id, amount, currency, status, payment_method, stripe_session_id)
+        VALUES ('${b}', 300, 'php', 'pending', 'stripe', 'cs_shared') RETURNING id;`);
+      return { b, p };
+    };
+    const A = sibling("09:00:00", "10:00:00");
+    const B = sibling("10:00:00", "11:00:00");
+    const reconcile = (s) => JSON.parse(q(`SELECT public.reconcile_booking_payment('${s.b}', '${s.p}', 'cs_shared', 'pi_shared', 300, 'php');`, { role: "service_role" }));
+    reconcile(A);
+    reconcile(B);
+    assert.equal(q(`SELECT string_agg(b.status || '|' || p.status || '|' || p.stripe_payment_id, ',' ORDER BY b.start_time) FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${basket}';`),
+      "confirmed|paid|pi_shared,confirmed|paid|pi_shared");
+    // Stripe redelivery: every basket row reconciled again is a no-op and adds no payments rows
+    const basketPayments = () => q(`SELECT count(*) FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${basket}';`);
+    assert.equal(reconcile(A).action, "NO_OP");
+    assert.equal(reconcile(B).action, "NO_OP");
+    assert.equal(basketPayments(), "2");
+
+    // A second payment for booking A only (Subcase 1.3): refund key is per booking, sibling B untouched
+    const dupA = JSON.parse(q(`SELECT public.reconcile_booking_payment('${A.b}', '${A.p}', 'cs_dup', 'pi_dup', 300, 'php');`, { role: "service_role" }));
+    assert.equal(dupA.action, "REFUND_SCHEDULED");
+    assert.equal(dupA.reason, "DUPLICATE_PAYMENT");
+    assert.equal(dupA.idempotency_key, `ref_duplicate_pi_pi_dup_${A.b}`);
+    assert.equal(q(`SELECT b.status || '|' || p.status || '|' || p.stripe_payment_id FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${B.b}';`), "confirmed|paid|pi_shared");
+    assert.equal(reconcile(B).action, "NO_OP");
+    assert.equal(q(`SELECT count(*) FROM public.refund_requests WHERE booking_id = '${B.b}';`), "0");
+    // The same duplicate payment for sibling B too: its own refund key, so both shares are refunded
+    const dupB = JSON.parse(q(`SELECT public.reconcile_booking_payment('${B.b}', '${B.p}', 'cs_dup', 'pi_dup', 300, 'php');`, { role: "service_role" }));
+    assert.equal(dupB.action, "REFUND_SCHEDULED");
+    assert.equal(dupB.reason, "DUPLICATE_PAYMENT");
+    assert.equal(dupB.idempotency_key, `ref_duplicate_pi_pi_dup_${B.b}`);
+    assert.equal(q(`SELECT count(DISTINCT idempotency_key) FROM public.refund_requests WHERE booking_id IN ('${A.b}', '${B.b}');`), "2");
+
+    // The same intent can still not be recorded twice for the SAME booking
+    const dup = runPsqlCommand(`INSERT INTO public.payments (booking_id, amount, currency, status, payment_method, stripe_payment_id) VALUES ('${A.b}', 300, 'php', 'paid', 'stripe', 'pi_shared');`);
+    assert.notEqual(dup.status, 0);
+    assert.ok(dup.stderr.includes("uq_payments_intent_per_booking"), dup.stderr);
+
+    // Rollback restores the global uniques; the migration re-applies cleanly
+    q(`DELETE FROM public.refund_requests WHERE booking_id IN (SELECT id FROM public.bookings WHERE basket_id = '${basket}'); DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE basket_id = '${basket}'); DELETE FROM public.bookings WHERE basket_id = '${basket}';`);
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
+    assert.equal(q(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'basket_id';`), "0");
+    assert.equal(q(`SELECT count(*) FROM pg_indexes WHERE indexname IN ('idx_payments_stripe_payment_id', 'uq_payments_intent_per_booking');`), "1");
+    assert.equal(q(`SELECT count(*) FROM pg_constraint WHERE conname = 'payments_stripe_session_id_key';`), "1");
+    runPsqlFile(migrationPath);
+  });
+
+  await runTest("multi_court_basket: basket hold is all-or-nothing and a customer has one open basket", async () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("multi_court_basket"));
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    runPsqlFile(migrationPath);
+    runPsqlFile(migrationPath); // idempotent
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const C1 = activeCourtId;
+    const C2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    const C3 = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+    q(`INSERT INTO public.courts (id, name, status) VALUES ('${C2}', 'Court 3 - Active', 'active'), ('${C3}', 'Court 4 - Active', 'active') ON CONFLICT (id) DO NOTHING;`);
+    const day = "2030-01-22"; // Tuesday, not used by other tests
+    const basket = (uid, lines, date = day) => runPsqlCommand(
+      `SELECT public.hold_court_basket('${date}', '${JSON.stringify(lines)}'::jsonb);`, { role: "authenticated", uid });
+    const line = (court_id, start_time, end_time) => ({ court_id, start_time, end_time });
+
+    // (a) Two courts in one basket share basket_id; total is the sum of the quoted prices
+    const a = basket(aliceUid, [line(C2, "09:00", "11:00"), line(C1, "09:00", "11:00")]);
+    assert.equal(a.status, 0, a.stderr);
+    const held = JSON.parse(a.stdout);
+    assert.equal(held.items.length, 2);
+    assert.deepEqual(held.items.map((i) => i.court_name), ["Court 1 - Active", "Court 3 - Active"]);
+    assert.equal(q(`SELECT count(*) || '|' || count(DISTINCT basket_id) || '|' || bool_and(basket_id = '${held.basket_id}') FROM public.bookings WHERE id IN ('${held.items[0].booking_id}', '${held.items[1].booking_id}');`), "2|1|true");
+    assert.equal(Number(held.total), Number(q(`SELECT 2 * public.quote_court_price('${day}', '09:00', '11:00');`)));
+    assert.ok(held.hold_expires_at, "basket returns its hold expiry");
+
+    // A client-supplied basket id cannot join another user's basket, another date, or a court already in it
+    for (const [uid, date, court] of [[bobUid, day, C3], [aliceUid, "2030-02-05", C3], [aliceUid, day, C1]]) {
+      const r = runPsqlCommand(`SELECT public.hold_court_booking(p_court_id => '${court}', p_booking_date => '${date}', p_start_time => '12:00', p_end_time => '14:00',
+        p_user_id => '${uid}', p_amount => NULL, p_basket_id => '${held.basket_id}');`, { role: "authenticated", uid });
+      assert.ok(r.stderr.includes("INVALID_ARGUMENT: p_basket_id"), `${uid} ${date} ${court}: ${r.stderr}`);
+    }
+    assert.equal(q(`SELECT count(*) FROM public.bookings WHERE basket_id = '${held.basket_id}';`), "2");
+
+    // (b) One unavailable line fails the whole basket and names the court; nothing from it is left behind
+    q(`INSERT INTO public.bookings (user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount)
+       VALUES ('${danaUid}', 'Dana', '${C3}', '${day}', '13:00', '15:00', 'confirmed', 400);`);
+    const b = basket(bobUid, [line(C3, "14:00", "16:00"), line(C1, "13:00", "15:00")]);
+    assert.notEqual(b.status, 0, "basket with a taken line must fail");
+    assert.ok(b.stderr.includes("SLOT_UNAVAILABLE: Court 4 - Active 02:00 PM–04:00 PM"), b.stderr);
+    assert.equal(q(`SELECT count(*) FROM public.bookings WHERE user_id = '${bobUid}' AND booking_date = '${day}';`), "0");
+
+    // (c) Bad lines are rejected at the boundary
+    for (const [lines, msg] of [
+      [[line(C1, "16:00", "18:00"), line(C1, "18:00", "20:00")], "Each court can appear once per booking"],
+      [[], "INVALID_ARGUMENT"],
+      [[{ court_id: C1, start_time: "16:00" }], "INVALID_ARGUMENT"],
+      [Array.from({ length: 5 }, (_, i) => line(C1, `${10 + i}:00`, `${11 + i}:00`)), "INVALID_ARGUMENT"],
+    ]) {
+      const r = basket(bobUid, lines);
+      assert.notEqual(r.status, 0, JSON.stringify(lines));
+      assert.ok(r.stderr.includes(msg), r.stderr);
+    }
+    const notArray = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '{}'::jsonb);`, { role: "authenticated", uid: bobUid });
+    assert.ok(notArray.stderr.includes("INVALID_ARGUMENT"), notArray.stderr);
+
+    // (d) A second basket (or single hold) while the first is open is refused; once it expires a new one succeeds
+    const second = basket(aliceUid, [line(C3, "16:00", "18:00")]);
+    assert.ok(second.stderr.includes("OPEN_BASKET_EXISTS"), second.stderr);
+    const legacySecond = runPsqlCommand(`SELECT public.hold_court_booking(p_court_id => '${C3}', p_booking_date => '${day}', p_start_time => '18:00', p_end_time => '20:00',
+      p_user_id => '${aliceUid}', p_amount => NULL, p_hold_expires_at => now() + interval '35 minutes');`, { role: "authenticated", uid: aliceUid });
+    assert.ok(legacySecond.stderr.includes("OPEN_BASKET_EXISTS"), legacySecond.stderr);
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE basket_id = '${held.basket_id}';`);
+    const afterExpiry = basket(aliceUid, [line(C3, "16:00", "18:00")]);
+    assert.equal(afterExpiry.status, 0, afterExpiry.stderr);
+
+    // (e) A legacy pending hold without basket_id blocks a new basket
+    const legacyHold = q(`INSERT INTO public.bookings (user_id, customer_name, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at)
+       VALUES ('${bobUid}', 'Bob', '${C1}', '${day}', '19:00', '20:00', 'pending', 200, now() + interval '20 minutes') RETURNING id;`);
+    const blocked = basket(bobUid, [line(C2, "16:00", "18:00")]);
+    assert.ok(blocked.stderr.includes("OPEN_BASKET_EXISTS"), blocked.stderr);
+
+    // The old app's single-court call still works and becomes a basket of one; it is the customer's one open basket
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE id = '${legacyHold}';`);
+    const single = JSON.parse(q(`SELECT public.hold_court_booking(p_court_id => '${C2}', p_booking_date => '${day}', p_start_time => '16:00', p_end_time => '18:00',
+      p_user_id => '${bobUid}', p_amount => NULL, p_hold_expires_at => now() + interval '35 minutes');`, { role: "authenticated", uid: bobUid }));
+    assert.equal(q(`SELECT basket_id FROM public.bookings WHERE id = '${single.booking_id}';`), single.basket_id);
+    const singleAgain = runPsqlCommand(`SELECT public.hold_court_booking('${C2}', '${day}', '18:00', '20:00', '${bobUid}', NULL);`, { role: "authenticated", uid: bobUid });
+    assert.ok(singleAgain.stderr.includes("OPEN_BASKET_EXISTS"), singleAgain.stderr);
+
+    // (f) Baskets sharing two courts listed in opposite orders, at the same moment: exactly one wins, the loser keeps
+    // nothing, no deadlock. A slow insert on raceDay keeps each session's first court lock held while the other starts,
+    // so locking in list order (instead of court order) would deadlock.
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE status = 'pending' AND user_id IN ('${aliceUid}', '${bobUid}');`);
+    const raceDay = "2030-01-29"; // Tuesday, not used by other tests
+    q(`CREATE FUNCTION public.test_slow_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(2); RETURN NEW; END; $$;
+       CREATE TRIGGER test_slow_insert BEFORE INSERT ON public.bookings FOR EACH ROW WHEN (NEW.booking_date = '${raceDay}') EXECUTE FUNCTION public.test_slow_insert();`);
+    const race = (uid, lines) => new Promise((resolve) => {
+      const child = spawn("docker", ["exec", "-i", CONTAINER_NAME, "psql", "-U", POSTGRES_USER, "-d", TEST_DB, "-v", "ON_ERROR_STOP=1", "-q"]);
+      let stderr = "";
+      child.stderr.on("data", (d) => (stderr += d));
+      child.on("close", (code) => resolve({ code, stderr }));
+      child.stdin.end(`BEGIN; SET LOCAL request.jwt.claim.role = 'authenticated'; SET LOCAL request.jwt.claim.sub = '${uid}';
+        SELECT public.hold_court_basket('${raceDay}', '${JSON.stringify(lines)}'::jsonb); COMMIT;`);
+    });
+    const [ra, rb] = await Promise.all([
+      race(aliceUid, [line(C1, "10:00", "12:00"), line(C2, "10:00", "12:00")]),
+      race(bobUid, [line(C2, "10:00", "12:00"), line(C1, "10:00", "12:00")]),
+    ]);
+    q(`DROP TRIGGER test_slow_insert ON public.bookings; DROP FUNCTION public.test_slow_insert();`);
+    assert.ok(!ra.stderr.includes("deadlock") && !rb.stderr.includes("deadlock"), ra.stderr + rb.stderr);
+    assert.equal([ra, rb].filter((r) => r.code === 0).length, 1, ra.stderr + rb.stderr);
+    const loser = ra.code === 0 ? bobUid : aliceUid;
+    assert.ok((ra.code === 0 ? rb : ra).stderr.includes("SLOT_UNAVAILABLE"), ra.stderr + rb.stderr);
+    assert.equal(q(`SELECT count(*) FROM public.bookings WHERE user_id = '${loser}' AND booking_date = '${raceDay}';`), "0");
+    assert.equal(q(`SELECT count(*) FROM public.bookings WHERE booking_date = '${raceDay}';`), "2");
+
+    // Rollback restores the 7-argument hold with its 3-hold cap; the migration re-applies cleanly
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
+    assert.equal(q(`SELECT (to_regproc('public.hold_court_basket') IS NULL)
+      || '|' || (to_regprocedure('public.hold_court_booking(uuid,date,time,time,uuid,numeric,timestamptz)') IS NOT NULL)
+      || '|' || (SELECT count(*) FROM pg_proc WHERE proname = 'hold_court_booking')
+      || '|' || (SELECT prosrc LIKE '%TOO_MANY_HOLDS%' FROM pg_proc WHERE proname = 'hold_court_booking')
+      || '|' || has_function_privilege('authenticated', 'public.hold_court_booking(uuid,date,time,time,uuid,numeric,timestamptz)', 'EXECUTE')
+      || '|' || has_function_privilege('anon', 'public.hold_court_booking(uuid,date,time,time,uuid,numeric,timestamptz)', 'EXECUTE');`), "true|true|1|true|true|false");
+    runPsqlFile(migrationPath);
+    assert.equal(q(`SELECT has_function_privilege('anon', 'public.hold_court_basket(date,jsonb,timestamptz)', 'EXECUTE')
+      || '|' || has_function_privilege('authenticated', 'public.hold_court_basket(date,jsonb,timestamptz)', 'EXECUTE');`), "false|true");
+  });
+
+  await runTest("multi_court_basket: customers cannot add a court to a basket or move a booking into one", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("multi_court_basket"));
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    runPsqlFile(migrationPath);
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const C1 = activeCourtId;
+    const C2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    const C3 = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+    q(`INSERT INTO public.courts (id, name, status) VALUES ('${C2}', 'Court 3 - Active', 'active'), ('${C3}', 'Court 4 - Active', 'active') ON CONFLICT (id) DO NOTHING;`);
+    const day = "2030-02-12"; // Tuesday, not used by other tests
+    const hold = (uid, lines) => JSON.parse(q(`SELECT public.hold_court_basket('${day}', '${JSON.stringify(lines)}'::jsonb);`, { role: "authenticated", uid }));
+    const extend = (basketId, court, s, e) => runPsqlCommand(`SELECT public.hold_court_booking(p_court_id => '${court}', p_booking_date => '${day}', p_start_time => '${s}', p_end_time => '${e}',
+      p_user_id => '${aliceUid}', p_amount => NULL, p_basket_id => '${basketId}');`, { role: "authenticated", uid: aliceUid });
+    const count = (basketId) => q(`SELECT count(*) FROM public.bookings WHERE basket_id = '${basketId}';`);
+
+    // Open basket: a direct call with its id is refused (a new court would ride on the basket's Stripe session)
+    const open = hold(aliceUid, [{ court_id: C1, start_time: "09:00", end_time: "10:00" }, { court_id: C2, start_time: "09:00", end_time: "10:00" }]);
+    const addOpen = extend(open.basket_id, C3, "09:00", "10:00");
+    assert.ok(addOpen.stderr.includes("INVALID_ARGUMENT: p_basket_id"), addOpen.stderr);
+    assert.equal(count(open.basket_id), "2");
+
+    // Paid basket (C1): the same call is refused, so no free court can be confirmed on the paid session
+    for (const item of open.items) {
+      q(`SELECT public.reconcile_booking_payment('${item.booking_id}', '${item.payment_id}', 'cs_paid_x', 'pi_paid_x', ${item.amount}, 'php');`, { role: "service_role" });
+    }
+    const addPaid = extend(open.basket_id, C3, "11:00", "12:00");
+    assert.ok(addPaid.stderr.includes("INVALID_ARGUMENT: p_basket_id"), addPaid.stderr);
+    assert.equal(count(open.basket_id), "2");
+
+    // C2: a customer cancelling their own hold cannot re-point it at the paid basket; a plain cancel still works
+    const other = hold(aliceUid, [{ court_id: C3, start_time: "13:00", end_time: "14:00" }]);
+    const otherId = other.items[0].booking_id;
+    const asAlice = (set) => runPsqlCommand(`UPDATE public.bookings SET ${set} WHERE id = '${otherId}' RETURNING id`, { role: "authenticated", uid: aliceUid, asRole: true });
+    const repoint = asAlice(`status = 'cancelled', cancel_reason = 'customer', basket_id = '${open.basket_id}'`);
+    assert.notEqual(repoint.status, 0, "re-pointing basket_id must be refused");
+    assert.ok(repoint.stderr.includes("basket_id"), repoint.stderr);
+    assert.equal(q(`SELECT basket_id || '|' || status FROM public.bookings WHERE id = '${otherId}';`), `${other.basket_id}|pending`);
+    assert.equal(asAlice("status = 'cancelled', cancel_reason = 'customer'").stdout.trim(), otherId);
+    // Staff (admin JWT) cannot change it either; the service role can
+    const asAdmin = runPsqlCommand(`UPDATE public.bookings SET basket_id = gen_random_uuid() WHERE id = '${otherId}'`, { role: "authenticated", uid: adminUid, asRole: true });
+    assert.ok(asAdmin.stderr.includes("basket_id"), `admin JWT must not change basket_id: ${asAdmin.stderr}`);
+    q(`UPDATE public.bookings SET basket_id = '${other.basket_id}' WHERE id = '${otherId}'`, { role: "service_role" });
+
+    // Rollback removes the trigger with the column; the migration re-applies cleanly
+    q(`DELETE FROM public.refund_requests WHERE booking_id IN (SELECT id FROM public.bookings WHERE booking_date = '${day}');
+       DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE booking_date = '${day}');
+       DELETE FROM public.bookings WHERE booking_date = '${day}';`);
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
+    assert.equal(q(`SELECT count(*) FROM pg_trigger WHERE tgname = 'bookings_basket_id_immutable';`), "0");
+    assert.equal(q(`SELECT to_regproc('public.bookings_basket_id_immutable') IS NULL;`), "t");
+    runPsqlFile(migrationPath);
+  });
+
+  await runTest("multi_court_basket: staff settle a whole unpaid basket all-or-nothing", () => {
+    const migration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("multi_court_basket"));
+    const migrationPath = path.join(PROJECT_ROOT, "supabase/migrations", migration);
+    runPsqlFile(migrationPath);
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const C1 = activeCourtId;
+    const C2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    q(`INSERT INTO public.courts (id, name, status) VALUES ('${C2}', 'Court 3 - Active', 'active') ON CONFLICT (id) DO NOTHING;`);
+    const day = "2030-01-15"; // Tuesday, not used by other tests
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE user_id = '${danaUid}' AND status = 'pending';`); // earlier tests left dana an open hold
+    const hold = (s, e) => JSON.parse(q(`SELECT public.hold_court_basket('${day}', '${JSON.stringify([
+      { court_id: C1, start_time: s, end_time: e }, { court_id: C2, start_time: s, end_time: e }])}'::jsonb);`,
+      { role: "authenticated", uid: danaUid })); // an expired hold still blocks its slot during the grace period, so each basket gets its own hours
+    const settle = (basketId, uid, expected = 0, method = "cash") => runPsqlCommand(
+      `SELECT public.settle_counter_basket(p_basket_id => '${basketId}', p_expected_amount => ${expected}, p_payment_method => '${method}');`, { role: "authenticated", uid });
+    const state = (basketId) => q(`SELECT string_agg(b.status || '/' || p.status || '/' || coalesce(p.payment_method, '-'), ',' ORDER BY b.court_id)
+      FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${basketId}';`);
+
+    // Non-admin is refused and nothing changes
+    const b1 = hold("09:00", "11:00");
+    const forbidden = settle(b1.basket_id, bobUid);
+    assert.ok(forbidden.stderr.includes("FORBIDDEN"), forbidden.stderr);
+    assert.equal(state(b1.basket_id), "pending/pending/-,pending/pending/-");
+
+    // Expired hold: HOLD_EXPIRED and nothing changes
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE basket_id = '${b1.basket_id}';`);
+    const expired = settle(b1.basket_id, adminUid);
+    assert.ok(expired.stderr.includes("HOLD_EXPIRED"), expired.stderr);
+    assert.equal(state(b1.basket_id), "pending/pending/-,pending/pending/-");
+
+    // Success: every court confirmed and paid in cash; amount is the sum
+    // A court cancelled after staff saw the total: AMOUNT_CHANGED and nothing is settled
+    const b3 = hold("16:00", "18:00");
+    q(`UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE id = '${b3.items[0].booking_id}';`);
+    const changed = settle(b3.basket_id, adminUid, b3.total);
+    assert.ok(changed.stderr.includes("AMOUNT_CHANGED"), changed.stderr);
+    assert.equal(q(`SELECT b.status || '/' || p.status FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${b3.items[1].booking_id}';`), "pending/pending");
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE basket_id = '${b3.basket_id}';`); // dana's one open basket
+
+    const b2 = hold("13:00", "15:00");
+    const ok = settle(b2.basket_id, adminUid, b2.total);
+    assert.equal(ok.status, 0, ok.stderr);
+    const res = JSON.parse(ok.stdout);
+    assert.equal(res.settled, 2);
+    assert.equal(res.basket_id, b2.basket_id);
+    assert.equal(Number(res.amount), Number(b2.total));
+    assert.equal(state(b2.basket_id), "confirmed/paid/cash,confirmed/paid/cash");
+
+    // Centavo prices: staff's JS float sum (250.10 + 250.20 = 500.29999999999995) still settles
+    const baseRate = q(`SELECT base_hourly_rate FROM public.booking_settings;`);
+    q(`UPDATE public.booking_settings SET base_hourly_rate = 250.10;
+       INSERT INTO public.peak_rates (label, days, start_time, end_time, hourly_rate) VALUES ('test-centavo', '{Tuesday}', '12:00', '13:00', 250.20);`);
+    try {
+      const cents = JSON.parse(q(`SELECT public.hold_court_basket('${day}', '${JSON.stringify([
+        { court_id: C1, start_time: "11:00", end_time: "12:00" }, { court_id: C2, start_time: "12:00", end_time: "13:00" }])}'::jsonb);`,
+        { role: "authenticated", uid: danaUid }));
+      assert.equal(cents.total, 500.3);
+      const centsOk = settle(cents.basket_id, adminUid, 250.1 + 250.2);
+      assert.equal(centsOk.status, 0, centsOk.stderr);
+      assert.equal(state(cents.basket_id), "confirmed/paid/cash,confirmed/paid/cash");
+    } finally {
+      q(`UPDATE public.booking_settings SET base_hourly_rate = ${baseRate}; DELETE FROM public.peak_rates WHERE label = 'test-centavo';`);
+    }
+
+    // Unknown basket, and an already-settled one, have nothing pending
+    for (const id of ["99999999-9999-9999-9999-999999999999", b2.basket_id]) {
+      const r = settle(id, adminUid);
+      assert.ok(r.stderr.includes("NOT_FOUND"), r.stderr);
+    }
+    assert.ok(settle(b2.basket_id, bobUid).stderr.includes("FORBIDDEN"), "non-admin gets FORBIDDEN before NOT_FOUND");
+
+    // Rollback drops it; the migration re-applies cleanly
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_multi_court_basket.sql"));
+    assert.equal(q(`SELECT to_regproc('public.settle_counter_basket') IS NULL;`), "t");
+    runPsqlFile(migrationPath);
+    assert.equal(q(`SELECT has_function_privilege('anon', 'public.settle_counter_basket(uuid,numeric,text,text)', 'EXECUTE')
+      || '|' || has_function_privilege('authenticated', 'public.settle_counter_basket(uuid,numeric,text,text)', 'EXECUTE');`), "false|true");
+  });
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");

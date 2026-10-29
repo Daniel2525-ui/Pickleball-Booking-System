@@ -3,6 +3,11 @@ import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getBookingStart } from "@/lib/utils/bookingTime.ts";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { getServiceClient } from "@/lib/supabase/service";
+import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
+import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
+
+const toDbTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
 
 /**
  * Customer-initiated payment resumption for an unfinished pending booking.
@@ -15,6 +20,7 @@ import { formatTime12h } from "@/lib/utils/formatTime";
  * - Checks for conflicting confirmed reservations.
  * - Reuses existing open Stripe Checkout session if still valid, or safely
  *   generates a fresh Checkout session for the existing booking.
+ * - An unpaid basket resumes as one unit: every pending court of the user's basket, in one session.
  */
 export async function POST(request: NextRequest) {
     try {
@@ -42,19 +48,7 @@ export async function POST(request: NextRequest) {
         // 3. Load the booking scoped to current user
         const { data: booking, error: fetchError } = await supabase
             .from("bookings")
-            .select(`
-                id,
-                user_id,
-                court_id,
-                booking_date,
-                start_time,
-                end_time,
-                status,
-                total_amount,
-                courts (
-                    name
-                )
-            `)
+            .select("id, user_id, status, basket_id")
             .eq("id", bookingId)
             .eq("user_id", user.id)
             .maybeSingle();
@@ -92,60 +86,71 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 5. Check if the scheduled match time has already passed
-        const startInstant = getBookingStart(booking);
-        if (startInstant <= new Date()) {
+        // Every pending court of the basket, derived from the loaded booking and scoped to this user
+        const admin = getServiceClient();
+        if (!admin) {
+            console.error("Resume payment: SUPABASE_SERVICE_ROLE_KEY missing");
             return Response.json(
-                { error: "The scheduled match time has already passed." },
-                { status: 409 }
-            );
-        }
-
-        // 6. Check for double booking conflicts with confirmed bookings
-        const startTimeDb = booking.start_time.length === 5 ? `${booking.start_time}:00` : booking.start_time;
-        const endTimeDb = booking.end_time.length === 5 ? `${booking.end_time}:00` : booking.end_time;
-
-        const { data: conflicts } = await supabase
-            .from("bookings")
-            .select("id")
-            .eq("court_id", booking.court_id)
-            .eq("booking_date", booking.booking_date)
-            .neq("id", booking.id)
-            .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
-            .lt("start_time", endTimeDb)
-            .gt("end_time", startTimeDb);
-
-        if (conflicts && conflicts.length > 0) {
-            return Response.json(
-                { error: "This time slot is no longer available. Please choose another slot." },
-                { status: 409 }
-            );
-        }
-
-        // 7. Check existing payment record
-        const { data: payment, error: paymentError } = await supabase
-            .from("payments")
-            .select("id, status, stripe_session_id, amount")
-            .eq("booking_id", booking.id)
-            // A later duplicate-charge payment row can exist (20261102); resume works on the original
-            .order("created_at", { ascending: true })
-            .limit(1)
-            .maybeSingle();
-
-        if (paymentError) {
-            console.error("Resume payment: failed to load payment:", paymentError);
-            return Response.json(
-                { error: "Could not load payment record. Please try again." },
+                { error: "Payment is temporarily unavailable. Please contact the venue." },
                 { status: 500 }
             );
         }
+        const { siblings, error: siblingsError } = await loadPendingSiblings(admin, booking, user.id);
+        if (siblingsError) {
+            console.error("Resume payment: failed to load basket:", siblingsError);
+            return Response.json(
+                { error: "Could not load the booking. Please try again." },
+                { status: 500 }
+            );
+        }
+        // Every payment id must fit in the session's metadata, which reconciliation trusts
+        if (siblings.length > MAX_SESSION_PAYMENTS) {
+            return Response.json(
+                { error: `A booking can include at most ${MAX_SESSION_PAYMENTS} courts.` },
+                { status: 400 }
+            );
+        }
+        const clicked = siblings.find((s) => s.id === booking.id);
+        if (!clicked) {
+            return Response.json(
+                { error: "This booking was just updated. Please refresh the page." },
+                { status: 409 }
+            );
+        }
 
-        // If the Stripe session is already open and valid, reuse it
-        if (payment?.stripe_session_id) {
-            try {
-                const existingSession = await stripe.checkout.sessions.retrieve(
-                    payment.stripe_session_id
+        for (const line of siblings) {
+            // 5. Check if the scheduled match time has already passed
+            if (getBookingStart(line) <= new Date()) {
+                return Response.json(
+                    { error: "The scheduled match time has already passed." },
+                    { status: 409 }
                 );
+            }
+
+            // 6. Check for double booking conflicts with confirmed bookings
+            const { data: conflicts } = await supabase
+                .from("bookings")
+                .select("id")
+                .eq("court_id", line.court_id)
+                .eq("booking_date", line.booking_date)
+                .neq("id", line.id)
+                .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
+                .lt("start_time", toDbTime(line.end_time))
+                .gt("end_time", toDbTime(line.start_time));
+
+            if (conflicts && conflicts.length > 0) {
+                return Response.json(
+                    { error: "This time slot is no longer available. Please choose another slot." },
+                    { status: 409 }
+                );
+            }
+        }
+
+        // 7. If the shared Stripe session is already open and valid, reuse it
+        const sharedSessionId = clicked.payments[0]?.stripe_session_id;
+        if (sharedSessionId) {
+            try {
+                const existingSession = await stripe.checkout.sessions.retrieve(sharedSessionId);
 
                 if (existingSession.status === "open" && existingSession.url) {
                     return Response.json({ url: existingSession.url });
@@ -164,73 +169,80 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 8. Ensure payment record exists before creating Stripe session
+        // 8. Ensure every court has a payment record before creating the Stripe session
+        //    (payments[0] is the original; a later duplicate-charge payment row can exist, 20261102)
         const baseUrl = request.nextUrl.origin;
-        const amount = booking.total_amount || payment?.amount || 200;
-        const courtName = (booking.courts as { name?: string } | null)?.name || "Crosshair Dinkers Court";
-        let paymentRecordId = payment?.id;
+        const lines: { sibling: BasketSibling; paymentId: string; amount: number }[] = [];
 
-        if (!paymentRecordId) {
-            const { data: newPayment, error: createPaymentError } = await supabase
-                .from("payments")
-                .insert({
-                    booking_id: booking.id,
-                    amount,
-                    currency: "php",
-                    status: "pending",
-                })
-                .select("id")
-                .single();
+        for (const sibling of siblings) {
+            const payment = sibling.payments[0];
+            // Charge each court its own payment amount, the figure reconciliation checks against
+            const amount = Number(payment?.amount) || sibling.total_amount || 200;
+            let paymentRecordId = payment?.id;
 
-            if (createPaymentError || !newPayment) {
-                return Response.json(
-                    { error: "Could not create payment record for booking." },
-                    { status: 500 }
-                );
+            if (!paymentRecordId) {
+                const { data: newPayment, error: createPaymentError } = await supabase
+                    .from("payments")
+                    .insert({
+                        booking_id: sibling.id,
+                        amount,
+                        currency: "php",
+                        status: "pending",
+                    })
+                    .select("id")
+                    .single();
+
+                if (createPaymentError || !newPayment) {
+                    return Response.json(
+                        { error: "Could not create payment record for booking." },
+                        { status: 500 }
+                    );
+                }
+                paymentRecordId = newPayment.id as string;
             }
-            paymentRecordId = newPayment.id;
+            lines.push({ sibling, paymentId: paymentRecordId, amount });
         }
 
-        // 9. Create a fresh Stripe Checkout Session with verified payment_id in metadata
-        const startHour = parseInt(startTimeDb.slice(0, 2), 10);
-        const endHour = parseInt(endTimeDb.slice(0, 2), 10);
-        const durationHours = Math.max(1, endHour - startHour);
-
+        // 9. Create one fresh Stripe Checkout Session, one line per court (same shape as /api/stripe/checkout)
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
-            line_items: [
-                {
-                    price_data: {
-                        currency: "php",
-                        product_data: {
-                            name: `${courtName} — Court Booking (${durationHours} ${durationHours === 1 ? "Hour" : "Hours"})`,
-                            description: `${booking.booking_date} • ${formatTime12h(startTimeDb)} – ${formatTime12h(endTimeDb)}`,
-                        },
-                        unit_amount: Math.round(amount * 100),
+            line_items: lines.map(({ sibling, amount }) => ({
+                price_data: {
+                    currency: "php",
+                    product_data: {
+                        name: `${sibling.courts?.name || "Crosshair Dinkers Court"} — ${sibling.booking_date} • ${formatTime12h(toDbTime(sibling.start_time))}–${formatTime12h(toDbTime(sibling.end_time))}`,
                     },
-                    quantity: 1,
+                    unit_amount: Math.round(amount * 100),
                 },
-            ],
+                quantity: 1,
+            })),
             mode: "payment",
             success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${baseUrl}/book`,
-            metadata: {
-                booking_id: booking.id,
-                payment_id: paymentRecordId,
-            },
+            // Legacy (pre-basket) bookings keep the booking/payment metadata reconciliation expects for them
+            metadata: booking.basket_id
+                ? { basket_id: booking.basket_id, payment_ids: lines.map((l) => l.paymentId).join(",") }
+                : { booking_id: booking.id, payment_id: lines[0].paymentId },
             customer_email: user.email,
-            expires_at: Math.floor(Date.now() / 1000) + (31 * 60), // 31 minutes to safely exceed Stripe 30-min minimum
+            expires_at: Math.floor(Date.now() / 1000) + (33 * 60), // 3 minutes over Stripe's 30-minute minimum
         });
 
-        // 10. Atomically confirm hold extension under court lock and persist new Stripe session ID
+        // 10. Atomically confirm each hold extension under court lock and persist the new Stripe session ID
         const authoritativeHoldExpiresAtIso = new Date((session.expires_at + 120) * 1000).toISOString();
 
-        const { error: confirmError } = await supabase.rpc("confirm_checkout_hold", {
-            p_booking_id: booking.id,
-            p_payment_id: paymentRecordId,
-            p_stripe_session_id: session.id,
-            p_hold_expires_at: authoritativeHoldExpiresAtIso,
-        });
+        let confirmError: { message?: string } | null = null;
+        for (const { sibling, paymentId } of lines) {
+            const { error } = await supabase.rpc("confirm_checkout_hold", {
+                p_booking_id: sibling.id,
+                p_payment_id: paymentId,
+                p_stripe_session_id: session.id,
+                p_hold_expires_at: authoritativeHoldExpiresAtIso,
+            });
+            if (error) {
+                confirmError = error;
+                break;
+            }
+        }
 
         if (confirmError) {
             console.error("confirm_checkout_hold RPC failed on resume:", confirmError);

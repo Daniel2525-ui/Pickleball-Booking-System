@@ -11,7 +11,7 @@ interface CourtAvailabilityGridProps {
   timeSlots: string[];
   onSlotClick: (court: string, time: string) => void;
   getSlotStatus: (date: Date, court: string, time: string) => SlotStatus;
-  selectedSlot?: Slot | null;
+  selectedSlots?: Slot[];
   isFetching?: boolean;
 }
 
@@ -21,7 +21,7 @@ export const CourtAvailabilityGrid = ({
   timeSlots,
   onSlotClick,
   getSlotStatus,
-  selectedSlot,
+  selectedSlots = [],
   isFetching,
 }: CourtAvailabilityGridProps) => {
   const colCount = courts.length;
@@ -118,8 +118,7 @@ export const CourtAvailabilityGrid = ({
                 >
                   {courts.map((court, courtIdx) => {
                     const status = getSlotStatus(selectedDate, court, time);
-                    const isSelected = Boolean(
-                      selectedSlot &&
+                    const isSelected = selectedSlots.some((selectedSlot) =>
                       selectedSlot.court === court &&
                       (selectedSlot.time === time || (() => {
                         const [cellStart, cellEnd] = time.split(" - ").map((t) => to24h(t.trim()));

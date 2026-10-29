@@ -7,6 +7,7 @@ import { VENUE_CONTACT } from "@/lib/venue";
 import { cancelBooking, isBookingCancellable, CANCELLATION_CUTOFF_HOURS } from "@/lib/services/bookings/cancelBooking.service";
 import { getBookingStart } from "@/lib/utils/bookingTime";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
+import { pendingBasketSize } from "@/lib/services/bookings/basket";
 
 // Badges for bookings that are no longer awaiting payment or confirmed (EXPIRED = checkout timed out, nothing charged)
 const HISTORY_LABELS: Record<string, string> = {
@@ -127,10 +128,13 @@ export const BookingHistoryContainer = () => {
       const latest = await fetchCurrentUserBookings();
       if (latest) setBookings(latest.bookings);
     } else {
-      // Apply the status confirmed by the backend.
+      // Apply the status confirmed by the backend; the server also cancels every pending court of the same basket.
       setBookings((prev) =>
         prev.map((booking) =>
-          booking.id === data.id ? { ...booking, status: data.status } : booking
+          booking.id === data.id ||
+          (bookingToCancel.status === "pending" && bookingToCancel.basket_id && booking.status === "pending" && booking.basket_id === bookingToCancel.basket_id)
+            ? { ...booking, status: data.status }
+            : booking
         )
       );
       const refundMessage = {
@@ -296,6 +300,12 @@ export const BookingHistoryContainer = () => {
                       )}
                     </div>
 
+                    {booking.status === "pending" && pendingBasketSize(bookings, booking) > 1 && (
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        Part of a {pendingBasketSize(bookings, booking)}-court booking
+                      </p>
+                    )}
+
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm">
                       <div className="flex items-center gap-2 text-foreground font-semibold">
                         <Calendar className="size-4 text-primary shrink-0" />
@@ -409,6 +419,12 @@ export const BookingHistoryContainer = () => {
                 </span>
               </div>
             </div>
+          )}
+
+          {bookingToCancel?.status === "pending" && pendingBasketSize(bookings, bookingToCancel) > 1 && (
+            <p className="text-xs text-muted-foreground">
+              This cancels all {pendingBasketSize(bookings, bookingToCancel)} courts in this unpaid booking.
+            </p>
           )}
 
           {bookingToCancel?.status === "confirmed" && (

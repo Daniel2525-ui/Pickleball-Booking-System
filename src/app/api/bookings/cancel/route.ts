@@ -9,6 +9,12 @@ import {
     CANCELLED_STATUS,
     getCancellationBlockReason,
 } from "@/lib/services/bookings/cancelBooking.service";
+import {
+    type BasketSibling,
+    loadPendingSiblings,
+    pendingPaymentIds,
+    siblingSessionIds,
+} from "@/lib/services/bookings/basketSiblings";
 
 type RefundOutcome = "refunded" | "queued" | "manual" | null;
 
@@ -95,7 +101,7 @@ export async function POST(request: NextRequest) {
         //    is indistinguishable from a non-existent one.
         const { data: booking, error: fetchError } = await supabase
             .from("bookings")
-            .select("id, user_id, booking_date, start_time, status, hold_expires_at, created_at")
+            .select("id, user_id, booking_date, start_time, status, hold_expires_at, created_at, basket_id")
             .eq("id", bookingId)
             .eq("user_id", user.id)
             .maybeSingle();
@@ -117,27 +123,29 @@ export async function POST(request: NextRequest) {
 
         const currentStatus = booking.status.toLowerCase();
 
-        // 5. Pending bookings may still have an open Stripe Checkout session.
-        //    Expire it first so the customer cannot pay for a cancelled booking.
-        let pendingPaymentId: string | null = null;
+        // Service role because RLS only lets customers cancel unpaid holds directly; confirmed
+        // bookings must go through this route so the cutoff and refund always apply.
+        const admin = getServiceClient();
+        if (!admin) {
+            console.error("Cancel booking: SUPABASE_SERVICE_ROLE_KEY missing");
+            return Response.json({ error: "Cancellation is temporarily unavailable. Please contact the venue." }, { status: 500 });
+        }
+
+        // 5. An unpaid basket is cancelled as one unit: every pending court of this user's basket.
+        //    Its shared Stripe Checkout may still be open; expire it first so nobody pays for a cancelled booking.
+        let siblings: BasketSibling[] = [];
 
         if (currentStatus === "pending") {
-            const { data: payment, error: paymentError } = await supabase
-                .from("payments")
-                .select("id, status, stripe_session_id")
-                .eq("booking_id", booking.id)
-                .maybeSingle();
-
-            if (paymentError) {
-                console.error("Cancel booking: failed to load payment:", paymentError);
+            const loaded = await loadPendingSiblings(admin, booking, user.id);
+            if (loaded.error) {
+                console.error("Cancel booking: failed to load basket:", loaded.error);
                 return Response.json({ error: "Could not verify the payment for this booking. Please try again." }, { status: 500 });
             }
+            siblings = loaded.siblings;
 
-            if (payment?.status === "pending") pendingPaymentId = payment.id;
-
-            if (payment?.stripe_session_id) {
+            for (const sessionId of siblingSessionIds(siblings)) {
                 try {
-                    const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
+                    const session = await stripe.checkout.sessions.retrieve(sessionId);
 
                     if (session.status === "complete") {
                         // Payment already went through; the webhook will confirm the booking.
@@ -148,7 +156,7 @@ export async function POST(request: NextRequest) {
                     }
 
                     if (session.status === "open") {
-                        await stripe.checkout.sessions.expire(payment.stripe_session_id);
+                        await stripe.checkout.sessions.expire(sessionId);
                     }
                 } catch (stripeError) {
                     console.error("Cancel booking: failed to expire Stripe session:", stripeError);
@@ -162,13 +170,6 @@ export async function POST(request: NextRequest) {
 
         // 6. Conditional update: only succeeds if the booking still belongs to the user
         //    and still has the status we validated (guards against races / double clicks).
-        //    Service role because RLS only lets customers cancel unpaid holds directly; confirmed
-        //    bookings must go through this route so the cutoff and refund always apply.
-        const admin = getServiceClient();
-        if (!admin) {
-            console.error("Cancel booking: SUPABASE_SERVICE_ROLE_KEY missing");
-            return Response.json({ error: "Cancellation is temporarily unavailable. Please contact the venue." }, { status: 500 });
-        }
         const { data: updated, error: updateError } = await admin
             .from("bookings")
             .update({ status: CANCELLED_STATUS, cancel_reason: cancelReasonFor(booking, "customer") })
@@ -190,14 +191,30 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // The rest of the unpaid basket, each with its own reason; a court changed meanwhile is left alone
+        const cancelled = siblings.filter((s) => s.id === booking.id);
+        for (const sibling of siblings.filter((s) => s.id !== booking.id)) {
+            const { data: done, error } = await admin
+                .from("bookings")
+                .update({ status: CANCELLED_STATUS, cancel_reason: cancelReasonFor(sibling, "customer") })
+                .eq("id", sibling.id)
+                .eq("user_id", user.id)
+                .eq("status", "pending")
+                .select("id")
+                .maybeSingle();
+            if (error) console.error(`Cancel booking: failed to cancel basket court ${sibling.id}:`, error);
+            else if (done) cancelled.push(sibling);
+        }
+
         // 7. Mirror the existing cron cleanup: an unpaid (pending) payment is marked failed
         //    (payments.status check constraint: pending, paid, failed, refunded).
         //    Paid payments are refunded in step 8.
-        if (pendingPaymentId) {
+        const failedPaymentIds = pendingPaymentIds(cancelled);
+        if (failedPaymentIds.length) {
             const { error: paymentUpdateError } = await supabase
                 .from("payments")
                 .update({ status: "failed" })
-                .eq("id", pendingPaymentId)
+                .in("id", failedPaymentIds)
                 .eq("status", "pending");
 
             if (paymentUpdateError) {

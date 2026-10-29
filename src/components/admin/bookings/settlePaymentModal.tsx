@@ -19,13 +19,16 @@ import { Booking } from "@/lib/services/bookings/bookingsTypes";
 
 interface SettlePaymentModalProps {
   booking: Booking | null;
+  /** Every court this settlement collects (the whole unpaid basket) and their total */
+  due: { ids: string[]; total: number } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSettled: (bookingId: string, updatedPayment: unknown) => void;
+  onSettled: (bookingIds: string[], paymentMethod: "cash" | "gcash") => void;
 }
 
 export const SettlePaymentModal = ({
   booking,
+  due,
   open,
   onOpenChange,
   onSettled,
@@ -38,7 +41,8 @@ export const SettlePaymentModal = ({
   if (!booking) return null;
 
   const payment = Array.isArray(booking.payments) ? booking.payments[0] : booking.payments;
-  const amount = booking.total_amount || 0;
+  const courts = due?.ids.length ?? 1;
+  const amount = due?.total ?? (booking.total_amount || 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +59,7 @@ export const SettlePaymentModal = ({
       bookingId: booking.id,
       paymentMethod,
       paymentReference: paymentMethod === "gcash" ? paymentReference : undefined,
+      expectedAmount: amount,
     });
 
     setLoading(false);
@@ -62,8 +67,10 @@ export const SettlePaymentModal = ({
     if (settleErr || !success) {
       setError(settleErr?.message || "Failed to settle payment.");
     } else {
-      toast.success(`Payment of ₱${amount.toLocaleString()} received via ${paymentMethod.toUpperCase()}`);
-      onSettled(booking.id, data);
+      // The basket RPC reports what it actually settled, including courts not loaded in this list
+      const settled = Number(data?.amount) || amount;
+      toast.success(`Payment of ₱${settled.toLocaleString()} received via ${paymentMethod.toUpperCase()}`);
+      onSettled(due?.ids ?? [booking.id], paymentMethod);
       onOpenChange(false);
     }
   };
@@ -97,10 +104,12 @@ export const SettlePaymentModal = ({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Court:</span>
-              <span className="font-semibold text-primary">{booking.courts?.name || `Court ${booking.court_id}`}</span>
+              <span className="font-semibold text-primary">
+                {courts > 1 ? `${courts} courts` : booking.courts?.name || `Court ${booking.court_id}`}
+              </span>
             </div>
             <div className="flex items-center justify-between border-t border-border/60 pt-1.5 mt-0.5">
-              <span className="font-semibold text-muted-foreground">Amount Due:</span>
+              <span className="font-semibold text-muted-foreground">{courts > 1 ? "Basket Total:" : "Amount Due:"}</span>
               <span className="font-extrabold text-sm text-foreground">₱{amount.toLocaleString()}</span>
             </div>
           </div>

@@ -2,6 +2,12 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { stripe } from "@/lib/stripe";
 import { canTransition, noShowMinutesLeft, buildStatusUpdate } from "@/lib/services/bookings/adminStatusRules";
+import {
+    type BasketSibling,
+    loadPendingSiblings,
+    pendingPaymentIds,
+    siblingSessionIds,
+} from "@/lib/services/bookings/basketSiblings";
 
 export async function POST(request: NextRequest) {
     try {
@@ -35,7 +41,7 @@ export async function POST(request: NextRequest) {
         // 3. Load current booking
         const { data: booking, error: fetchError } = await supabase
             .from("bookings")
-            .select("id, status, booking_date, start_time, hold_expires_at, created_at")
+            .select("id, status, booking_date, start_time, hold_expires_at, created_at, basket_id")
             .eq("id", bookingId)
             .maybeSingle();
 
@@ -68,27 +74,20 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 6. A pending booking may have an open Stripe Checkout. Close it before cancelling, and stop if
-        //    that fails, so the customer cannot pay for a cancelled booking (same rule as /api/bookings/cancel).
-        let pendingPaymentId: string | null = null;
+        // 6. An unpaid basket is cancelled as one unit. Its shared Stripe Checkout may be open: close it
+        //    first, and stop if that fails, so nobody pays for a cancelled booking (same rule as /api/bookings/cancel).
+        let siblings: BasketSibling[] = [];
         if (newStatus === "cancelled" && currentStatus === "pending") {
-            const { data: payment, error: paymentError } = await supabase
-                .from("payments")
-                .select("id, status, stripe_session_id")
-                .eq("booking_id", bookingId)
-                .eq("status", "pending")
-                .maybeSingle();
-
-            if (paymentError) {
-                console.error("Admin cancel: failed to load payment:", paymentError);
+            const loaded = await loadPendingSiblings(supabase, booking);
+            if (loaded.error) {
+                console.error("Admin cancel: failed to load basket:", loaded.error);
                 return Response.json({ error: "Could not verify the payment for this booking." }, { status: 500 });
             }
+            siblings = loaded.siblings;
 
-            pendingPaymentId = payment?.id ?? null;
-
-            if (payment?.stripe_session_id) {
+            for (const sessionId of siblingSessionIds(siblings)) {
                 try {
-                    const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
+                    const session = await stripe.checkout.sessions.retrieve(sessionId);
                     if (session.status === "complete") {
                         return Response.json(
                             { error: "The customer has already paid for this booking. Refresh to see its confirmed status." },
@@ -96,7 +95,7 @@ export async function POST(request: NextRequest) {
                         );
                     }
                     if (session.status === "open") {
-                        await stripe.checkout.sessions.expire(payment.stripe_session_id);
+                        await stripe.checkout.sessions.expire(sessionId);
                     }
                 } catch (stripeErr) {
                     console.error("Admin cancel: failed to expire Stripe session:", stripeErr);
@@ -137,11 +136,26 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (pendingPaymentId) {
+        // The rest of the unpaid basket; a court changed meanwhile is left alone
+        const cancelled = siblings.filter((s) => s.id === booking.id);
+        for (const sibling of siblings.filter((s) => s.id !== booking.id)) {
+            const { data: done, error } = await supabase
+                .from("bookings")
+                .update(buildStatusUpdate("cancelled", sibling))
+                .eq("id", sibling.id)
+                .eq("status", "pending")
+                .select("id")
+                .maybeSingle();
+            if (error) console.error(`Admin cancel: failed to cancel basket court ${sibling.id}:`, error);
+            else if (done) cancelled.push(sibling);
+        }
+
+        const failedPaymentIds = pendingPaymentIds(cancelled);
+        if (failedPaymentIds.length) {
             const { error: paymentUpdateError } = await supabase
                 .from("payments")
                 .update({ status: "failed" })
-                .eq("id", pendingPaymentId)
+                .in("id", failedPaymentIds)
                 .eq("status", "pending");
 
             if (paymentUpdateError) {

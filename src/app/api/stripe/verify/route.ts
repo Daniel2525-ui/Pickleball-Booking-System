@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase/service";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { processStripePaymentReconciliation } from "@/lib/services/payments/processStripePaymentReconciliation";
+import { reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
 
 export async function POST(req: NextRequest) {
     try {
@@ -28,26 +28,41 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: "Session not found" }, { status: 404 });
         }
 
+        const basketId = session.metadata?.basket_id;
         const bookingId = session.metadata?.booking_id;
         const paymentId = session.metadata?.payment_id;
 
-        if (!bookingId || !paymentId) {
+        if (!basketId && (!bookingId || !paymentId)) {
             return Response.json({ error: "Missing metadata" }, { status: 400 });
         }
 
-        // 3. Verify user ownership of the booking
-        const { data: booking, error: bookingErr } = await authClient
-            .from("bookings")
-            .select("id, user_id, status")
-            .eq("id", bookingId)
-            .single();
+        // Rows are loaded with the service role so no court of a basket is hidden from the ownership check
+        const supabaseAdmin = getServiceClient();
+        if (!supabaseAdmin) {
+            console.error("Payment verification configuration error: SUPABASE_SERVICE_ROLE_KEY is required for reconciliation");
+            return Response.json(
+                { error: "Server configuration error: payment reconciliation service key missing" },
+                { status: 500 }
+            );
+        }
 
-        if (bookingErr || !booking) {
+        const loadBookings = async () => {
+            const { data, error } = await supabaseAdmin
+                .from("bookings")
+                .select("id, user_id, status, courts(name)")
+                .eq(basketId ? "basket_id" : "id", basketId ?? bookingId);
+            return error ? null : (data as unknown as { id: string; user_id: string; status: string; courts: { name: string } | null }[]);
+        };
+
+        // 3. Verify user ownership of every booking in the checkout
+        const bookings = await loadBookings();
+
+        if (!bookings || bookings.length === 0) {
             return Response.json({ error: "Booking not found" }, { status: 404 });
         }
 
-        // Check if user owns booking or has admin role
-        if (booking.user_id !== user.id) {
+        // Check if user owns all bookings or has admin role
+        if (bookings.some((b) => b.user_id !== user.id)) {
             const { data: profile } = await authClient
                 .from("profiles")
                 .select("role")
@@ -72,37 +87,14 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const amount = (session.amount_total || 0) / 100;
-        const currency = (session.currency || "php").toLowerCase();
-        const paymentIntent = typeof session.payment_intent === "string"
-            ? session.payment_intent
-            : session.payment_intent?.id || "";
-
-        if (!paymentIntent) {
+        if (!session.payment_intent) {
             return Response.json({ error: "Missing payment_intent in Stripe session" }, { status: 400 });
         }
 
-        // 5. Reconcile transactionally using privileged service-role client
-        const supabaseAdmin = getServiceClient();
-        if (!supabaseAdmin) {
-            console.error("Payment verification configuration error: SUPABASE_SERVICE_ROLE_KEY is required for reconciliation");
-            return Response.json(
-                { error: "Server configuration error: payment reconciliation service key missing" },
-                { status: 500 }
-            );
-        }
+        // 5. Reconcile each court transactionally using privileged service-role client
+        const outcome = await reconcileCheckoutSession(session, supabaseAdmin);
 
-        const outcome = await processStripePaymentReconciliation({
-            bookingId,
-            paymentId,
-            amount,
-            currency,
-            stripeSessionId: session.id,
-            stripePaymentIntent: paymentIntent,
-            supabase: supabaseAdmin,
-        });
-
-        if (!outcome.success) {
+        if (outcome.error) {
             console.error("Payment verification reconciliation failed:", outcome.error);
             return Response.json(
                 { error: "Payment reconciliation failed. Your payment is safe; please check 'My Bookings' shortly." },
@@ -110,15 +102,29 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        if (outcome.action === "REFUND_SCHEDULED") {
+        // Read lost courts from the final rows: the webhook may have refunded them first (this call is then a NO_OP)
+        const finalBookings = await loadBookings();
+        if (!finalBookings) {
+            console.error(`Payment verification: re-reading bookings after reconciling ${session.id} failed`);
+            return Response.json(
+                { error: "Payment reconciliation failed. Your payment is safe; please check 'My Bookings' shortly." },
+                { status: 500 }
+            );
+        }
+        const lostCourts = finalBookings
+            .filter((b) => b.status === "cancelled")
+            .map((b) => b.courts?.name ?? "Court");
+
+        if (lostCourts.length === finalBookings.length) {
             return Response.json({
                 success: false,
                 conflict: true,
+                lostCourts,
                 error: "This slot is no longer available. A full refund has been initiated.",
             });
         }
 
-        return Response.json({ success: true, status: session.payment_status });
+        return Response.json({ success: true, status: session.payment_status, lostCourts });
     } catch (err: unknown) {
         console.error("Verification error:", err);
         return Response.json({ error: "Verification failed" }, { status: 500 });

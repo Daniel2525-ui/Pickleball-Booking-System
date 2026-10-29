@@ -9,12 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { basketTotal } from "@/lib/services/bookings/basket";
 import { Slot } from "./types";
 
 interface BookingModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedSlot: Slot | null;
+  lines: Slot[];
   isLoading?: boolean;
   error?: string | null;
   onConfirm: () => void;
@@ -23,11 +24,12 @@ interface BookingModalProps {
 export const BookingModal = ({
   isOpen,
   onOpenChange,
-  selectedSlot,
+  lines,
   isLoading,
   error,
   onConfirm,
 }: BookingModalProps) => {
+  const { total, hasPeak } = basketTotal(lines);
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -38,34 +40,37 @@ export const BookingModal = ({
           </DialogDescription>
         </DialogHeader>
 
-        {selectedSlot && (
+        {lines.length > 0 && (
           <div className="bg-muted p-4 rounded-xl my-4 space-y-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-semibold">{selectedSlot.court}</p>
-                <div className="flex items-center text-sm text-muted-foreground mt-1 gap-1">
-                  <Calendar className="size-3.5" />
-                  {selectedSlot.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                </div>
-                <div className="flex items-center text-sm text-muted-foreground mt-1 gap-1.5 flex-wrap">
-                  <Clock className="size-3.5 text-primary" />
-                  <span>{selectedSlot.time}</span>
-                  {(selectedSlot.duration || 1) > 1 && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                      {selectedSlot.duration} Hours
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold">₱{selectedSlot.price.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedSlot.duration || 1} {(selectedSlot.duration || 1) === 1 ? "hr" : "hrs"}
-                  {selectedSlot.hasPeak ? " · includes peak rate" : ""}
-                </p>
-              </div>
+            <div className="flex items-center text-sm text-muted-foreground gap-1">
+              <Calendar className="size-3.5" />
+              {lines[0].date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
             </div>
-
+            <ul className="space-y-2">
+              {lines.map((line) => (
+                <li key={line.court} className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{line.court}</p>
+                    <div className="flex items-center text-sm text-muted-foreground mt-0.5 gap-1.5 flex-wrap">
+                      <Clock className="size-3.5 text-primary" />
+                      <span>{line.time}</span>
+                      {(line.duration || 1) > 1 && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          {line.duration} Hours
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="font-bold">₱{line.price.toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+            <div className="pt-3 border-t flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                Total{hasPeak ? " · includes peak rate" : ""}
+              </span>
+              <span className="text-2xl font-bold">₱{total.toLocaleString()}</span>
+            </div>
             <div className="pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="size-4 shrink-0 text-primary" />
               <span>Crosshair Dinkers, {VENUE_CONTACT.address}</span>
