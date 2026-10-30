@@ -464,6 +464,7 @@ export const BookingContainer = () => {
             title: "Clear your basket?",
             description: `Going back to simple booking removes the ${basket.length} ${basket.length === 1 ? "slot" : "slots"} in your basket.`,
             confirmLabel: "Clear and go back",
+            cancelLabel: "Keep my slots",
             onConfirm: leave,
           });
         }}

@@ -14,6 +14,7 @@ export interface ConfirmRequest {
   title: string;
   description: string;
   confirmLabel: string;
+  cancelLabel?: string;
   onConfirm: () => void;
 }
 
@@ -28,7 +29,7 @@ export function ConfirmDialog({ request, onClose }: { request: ConfirmRequest | 
         </DialogHeader>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>
-            Go Back
+            {request?.cancelLabel ?? "Go Back"}
           </Button>
           <Button
             variant="destructive"
