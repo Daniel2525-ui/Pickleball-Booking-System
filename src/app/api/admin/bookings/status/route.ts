@@ -1,13 +1,8 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { stripe } from "@/lib/stripe";
 import { canTransition, noShowMinutesLeft, buildStatusUpdate } from "@/lib/services/bookings/adminStatusRules";
-import {
-    type BasketSibling,
-    loadPendingSiblings,
-    pendingPaymentIds,
-    siblingSessionIds,
-} from "@/lib/services/bookings/basketSiblings";
+import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
+import { cancelRestOfBasket, closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 
 export async function POST(request: NextRequest) {
     try {
@@ -85,25 +80,19 @@ export async function POST(request: NextRequest) {
             }
             siblings = loaded.siblings;
 
-            for (const sessionId of siblingSessionIds(siblings)) {
-                try {
-                    const session = await stripe.checkout.sessions.retrieve(sessionId);
-                    if (session.status === "complete") {
-                        return Response.json(
-                            { error: "The customer has already paid for this booking. Refresh to see its confirmed status." },
-                            { status: 409 }
-                        );
-                    }
-                    if (session.status === "open") {
-                        await stripe.checkout.sessions.expire(sessionId);
-                    }
-                } catch (stripeErr) {
-                    console.error("Admin cancel: failed to expire Stripe session:", stripeErr);
+            try {
+                if ((await closeSiblingSessions(siblings)) === "paid") {
                     return Response.json(
-                        { error: "Could not close the customer's payment session. Please try again." },
-                        { status: 502 }
+                        { error: "The customer has already paid for this booking. Refresh to see its confirmed status." },
+                        { status: 409 }
                     );
                 }
+            } catch (stripeErr) {
+                console.error("Admin cancel: failed to expire Stripe session:", stripeErr);
+                return Response.json(
+                    { error: "Could not close the customer's payment session. Please try again." },
+                    { status: 502 }
+                );
             }
         }
 
@@ -136,33 +125,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // The rest of the unpaid basket; a court changed meanwhile is left alone
-        const cancelled = siblings.filter((s) => s.id === booking.id);
-        for (const sibling of siblings.filter((s) => s.id !== booking.id)) {
-            const { data: done, error } = await supabase
-                .from("bookings")
-                .update(buildStatusUpdate("cancelled", sibling))
-                .eq("id", sibling.id)
-                .eq("status", "pending")
-                .select("id")
-                .maybeSingle();
-            if (error) console.error(`Admin cancel: failed to cancel basket court ${sibling.id}:`, error);
-            else if (done) cancelled.push(sibling);
-        }
-
-        const failedPaymentIds = pendingPaymentIds(cancelled);
-        if (failedPaymentIds.length) {
-            const { error: paymentUpdateError } = await supabase
-                .from("payments")
-                .update({ status: "failed" })
-                .in("id", failedPaymentIds)
-                .eq("status", "pending");
-
-            if (paymentUpdateError) {
-                // The booking itself is cancelled; log so the payment row can be reconciled.
-                console.error("Admin cancel: failed to mark payment failed:", paymentUpdateError);
-            }
-        }
+        // The rest of the unpaid basket; pending payments are marked failed
+        await cancelRestOfBasket(supabase, booking.id, siblings, (s) => buildStatusUpdate("cancelled", s));
 
         return Response.json({ booking: updated });
     } catch (error) {

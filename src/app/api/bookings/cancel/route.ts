@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceClient } from "@/lib/supabase/service";
@@ -9,12 +8,8 @@ import {
     CANCELLED_STATUS,
     getCancellationBlockReason,
 } from "@/lib/services/bookings/cancelBooking.service";
-import {
-    type BasketSibling,
-    loadPendingSiblings,
-    pendingPaymentIds,
-    siblingSessionIds,
-} from "@/lib/services/bookings/basketSiblings";
+import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
+import { cancelRestOfBasket, closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 
 type RefundOutcome = "refunded" | "queued" | "manual" | null;
 
@@ -143,28 +138,20 @@ export async function POST(request: NextRequest) {
             }
             siblings = loaded.siblings;
 
-            for (const sessionId of siblingSessionIds(siblings)) {
-                try {
-                    const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-                    if (session.status === "complete") {
-                        // Payment already went through; the webhook will confirm the booking.
-                        return Response.json(
-                            { error: "Payment for this booking has already been received and is being processed. Please refresh the page and try again." },
-                            { status: 409 }
-                        );
-                    }
-
-                    if (session.status === "open") {
-                        await stripe.checkout.sessions.expire(sessionId);
-                    }
-                } catch (stripeError) {
-                    console.error("Cancel booking: failed to expire Stripe session:", stripeError);
+            try {
+                if ((await closeSiblingSessions(siblings)) === "paid") {
+                    // Payment already went through; the webhook will confirm the booking.
                     return Response.json(
-                        { error: "Could not close the pending payment session. Please try again." },
-                        { status: 502 }
+                        { error: "Payment for this booking has already been received and is being processed. Please refresh the page and try again." },
+                        { status: 409 }
                     );
                 }
+            } catch (stripeError) {
+                console.error("Cancel booking: failed to expire Stripe session:", stripeError);
+                return Response.json(
+                    { error: "Could not close the pending payment session. Please try again." },
+                    { status: 502 }
+                );
             }
         }
 
@@ -191,37 +178,14 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // The rest of the unpaid basket, each with its own reason; a court changed meanwhile is left alone
-        const cancelled = siblings.filter((s) => s.id === booking.id);
-        for (const sibling of siblings.filter((s) => s.id !== booking.id)) {
-            const { data: done, error } = await admin
-                .from("bookings")
-                .update({ status: CANCELLED_STATUS, cancel_reason: cancelReasonFor(sibling, "customer") })
-                .eq("id", sibling.id)
-                .eq("user_id", user.id)
-                .eq("status", "pending")
-                .select("id")
-                .maybeSingle();
-            if (error) console.error(`Cancel booking: failed to cancel basket court ${sibling.id}:`, error);
-            else if (done) cancelled.push(sibling);
-        }
-
-        // 7. Mirror the existing cron cleanup: an unpaid (pending) payment is marked failed
-        //    (payments.status check constraint: pending, paid, failed, refunded).
-        //    Paid payments are refunded in step 8.
-        const failedPaymentIds = pendingPaymentIds(cancelled);
-        if (failedPaymentIds.length) {
-            const { error: paymentUpdateError } = await supabase
-                .from("payments")
-                .update({ status: "failed" })
-                .in("id", failedPaymentIds)
-                .eq("status", "pending");
-
-            if (paymentUpdateError) {
-                // The booking itself is cancelled; log so an admin can reconcile the payment row.
-                console.error("Cancel booking: failed to mark payment failed:", paymentUpdateError);
-            }
-        }
+        // 7. The rest of the unpaid basket, each with its own reason; pending payments are marked failed
+        await cancelRestOfBasket(
+            admin,
+            booking.id,
+            siblings,
+            (s) => ({ status: CANCELLED_STATUS, cancel_reason: cancelReasonFor(s, "customer") }),
+            user.id
+        );
 
         // 8. Venue policy: a confirmed online booking cancelled within the window is refunded in full.
         const refund = currentStatus === "confirmed" ? await refundPaidStripePayments(admin, booking.id) : null;
