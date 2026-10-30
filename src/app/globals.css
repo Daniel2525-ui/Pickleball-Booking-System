@@ -241,6 +241,16 @@
     font-family: var(--font-manrope), system-ui, sans-serif;
 }
 
+/* Page entrance; ends at transform: none so fixed children (basket sheet) position normally afterwards */
+@keyframes page-enter {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+.page-enter {
+    animation: page-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Landing court: a crosscourt rally that visits all four corners, crossing the net every hit */
 @keyframes cd-rally {
     0%, 100% { transform: translate(0, 30px); }
