@@ -22,6 +22,8 @@ const slot = (page, court, time) => page.locator("#booking").getByRole("button",
 
 async function openTomorrow(page) {
   await page.goto("/#booking");
+  // The grid lives behind the quick picker's "full board" link
+  await page.getByRole("button", { name: "See the full board" }).click();
   await page.getByRole("button", { name: /Tmrw/ }).click();
 }
 

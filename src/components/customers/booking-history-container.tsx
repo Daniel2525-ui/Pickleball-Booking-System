@@ -171,8 +171,8 @@ export const BookingHistoryContainer = () => {
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-          My Court Reservations
+        <h1 className="text-5xl sm:text-6xl leading-[0.9] text-foreground">
+          My bookings
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base mt-1.5 leading-relaxed">
           View your upcoming match passes, check reservation status, and review past court sessions.
@@ -250,9 +250,9 @@ export const BookingHistoryContainer = () => {
               return (
                 <div
                   key={booking.id}
-                  className={`flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center p-5 sm:p-6 rounded-2xl border bg-card shadow-xs hover:shadow-md transition-all ${booking.status === "cancelled" ? "opacity-60 bg-muted/20" : ""
-                    }`}
+                  className={`grid grid-cols-[minmax(0,1fr)_76px] sm:grid-cols-[minmax(0,1fr)_96px] rounded-2xl border bg-card overflow-hidden ${booking.status === "pending" ? "border-amber-500/60" : ""} ${booking.status === "cancelled" ? "opacity-60" : ""}`}
                 >
+                <div className="flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center p-5 sm:p-6 min-w-0">
                   <div className="space-y-3.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
@@ -380,6 +380,17 @@ export const BookingHistoryContainer = () => {
                       )}
                     </div>
                   </div>
+                </div>
+                {/* Ticket stub: the day at a glance */}
+                <div className="border-l-2 border-dashed flex flex-col items-center justify-center gap-0.5 p-2 text-center" aria-hidden>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                    {new Date(`${booking.booking_date}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })}
+                  </span>
+                  <span className="font-display text-4xl font-black leading-none">{Number(booking.booking_date.slice(8, 10))}</span>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                    {new Date(`${booking.booking_date}T00:00:00`).toLocaleDateString("en-US", { month: "short" })}
+                  </span>
+                </div>
                 </div>
               );
             })}

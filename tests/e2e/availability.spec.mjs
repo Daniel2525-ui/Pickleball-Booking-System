@@ -1,22 +1,29 @@
 // Read-only: browses the live grid as a guest; never creates a hold.
 import { test, expect } from "@playwright/test";
 
-test("guest picking an open slot is sent to login @mobile", async ({ page }) => {
+test("guest can fill a basket and is asked to sign in only at checkout @mobile", async ({ page }) => {
   await page.goto("/#booking");
+  await page.getByRole("button", { name: "See the full board" }).click();
   const grid = page.locator("#booking");
   const open = grid.getByRole("button", { name: /^Select .+ at / });
   // Wait for the grid to finish loading; today may have no open slot (closed, late, or fully booked).
   await expect(
     grid.locator('[aria-label*=" at "]').first()
       .or(grid.getByText(/venue is closed/))
-      .or(grid.getByRole("button", { name: /^Show \d+ earlier time slot/ })),
+      .or(grid.getByRole("button", { name: /^Show \d+ earlier time slot/ }))
+      .first(),
   ).toBeVisible();
   test.skip((await open.count()) === 0, "no open slot today on the live grid");
 
   await open.first().click();
+  const basket = page.getByRole("region", { name: "Your basket" });
+  await expect(basket).toBeVisible();
+  await basket.getByRole("button", { name: "Continue to Checkout" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("Login Required")).toBeVisible();
-  await dialog.getByRole("button", { name: "Go to Login" }).click();
+  await expect(dialog.getByText("Sign in to pay")).toBeVisible();
+  // The basket is parked for after sign-in
+  expect(await page.evaluate(() => sessionStorage.getItem("crosshair:pending-basket"))).toContain('"lines"');
+  await dialog.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/login$/);
 });
 

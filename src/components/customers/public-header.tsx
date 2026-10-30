@@ -1,32 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { Crosshair, LogOut, LoaderCircle, Menu, X, CalendarDays } from "lucide-react";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { Crosshair, LoaderCircle, ChevronDown, CalendarDays, UserRound, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logout } from "@/lib/services/auth.service";
 import { User } from "@supabase/supabase-js";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function PublicHeader() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState<boolean>(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const supabase = createClient();
 
-    const checkUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      setUser(user);
+    const loadProfile = async (u: User | null) => {
+      setUser(u);
       setLoading(false);
+      if (!u) return setFullName("");
+      const { data } = await supabase.from("profiles").select("full_name").eq("id", u.id).maybeSingle();
+      setFullName(data?.full_name ?? "");
     };
 
-    checkUser();
+    supabase.auth.getUser().then(({ data: { user } }) => loadProfile(user));
 
     const {
       data: { subscription },
@@ -40,185 +48,89 @@ export function PublicHeader() {
   const handleLogout = async () => {
     await logout();
     setUser(null);
-    setMobileMenuOpen(false);
+    router.push("/");
+    router.refresh();
   };
 
-  const navLinks = [
-    { label: "Home", href: "/#home" },
-    { label: "How It Works", href: "/#how-it-works" },
-    { label: "Courts & Amenities", href: "/#courts" },
-    { label: "Book a Court", href: "/#booking" },
-    { label: "Player FAQ", href: "/#faq" },
-  ];
+  const name = fullName || user?.email?.split("@")[0] || "";
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "?";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/90 backdrop-blur-md px-4 sm:px-6 md:px-8 py-3.5 pt-[max(0.875rem,env(safe-area-inset-top))] flex items-center justify-between transition-colors">
-      {/* Left: Logo */}
-      <div className="flex items-center gap-6">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="size-8 sm:size-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200">
-            <Crosshair className="size-4 sm:size-4.5 transition-transform group-hover:rotate-45" />
-          </div>
+    <header className="sticky top-0 z-50 w-full border-b bg-background/90 backdrop-blur-md px-4 sm:px-6 md:px-8 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] flex items-center justify-between gap-3">
+      <Link href="/" className="flex items-center gap-2.5 group min-w-0">
+        <div className="size-8 sm:size-9 shrink-0 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200">
+          <Crosshair className="size-4 sm:size-4.5 transition-transform group-hover:rotate-45" />
+        </div>
+        <span className="font-display font-black text-lg sm:text-2xl tracking-wide leading-none text-foreground uppercase whitespace-nowrap">
+          Crosshair <span className="text-primary">Dinkers</span>
+        </span>
+      </Link>
 
-          <div className="flex flex-col">
-            <span className="font-extrabold text-base sm:text-lg tracking-tight leading-none text-foreground">
-              Crosshair Dinkers
-            </span>
-            <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-widest mt-0.5">
-              Butuan City
-            </span>
-          </div>
+      <nav aria-label="Main" className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <Link href="/#booking" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-foreground hover:bg-muted transition-colors">
+          Book
         </Link>
-      </div>
-
-      {/* Center: Desktop Nav Links */}
-      <nav className="hidden lg:flex items-center gap-7">
-        {navLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {link.label}
-          </Link>
-        ))}
-
         {user && (
-          <Link
-            href="/my-bookings"
-            className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors flex items-center gap-1.5"
-          >
-            <CalendarDays className="size-3.5" />
-            My Bookings
+          <Link href="/my-bookings" className="px-2 sm:px-3 py-2 rounded-lg text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            My bookings
           </Link>
         )}
-        {user && (
-          <Link href="/profile" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            Profile
-          </Link>
-        )}
-      </nav>
 
-      {/* Right: Actions */}
-      <div className="flex items-center gap-2 sm:gap-3">
         {loading ? (
-          <div className="flex items-center justify-center w-8 h-8">
+          <div className="flex items-center justify-center size-10">
             <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
           </div>
         ) : user ? (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="gap-1.5 text-xs text-muted-foreground hover:text-foreground h-9 px-3"
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded-full border bg-card pl-1 pr-2.5 py-1 min-h-[40px] font-bold text-sm hover:border-muted-foreground/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              }
             >
-              <LogOut className="size-3.5" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
-          </div>
+              <span className="size-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-extrabold" aria-hidden>
+                {initials}
+              </span>
+              <span className="hidden sm:inline max-w-[8rem] truncate">{name.split(/\s+/)[0]}</span>
+              <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
+              <span className="sr-only">Account menu</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="flex flex-col py-2">
+                  <span className="font-bold text-foreground truncate">{fullName || "Player"}</span>
+                  <span className="text-xs font-normal text-muted-foreground truncate">{user.email}</span>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => router.push("/my-bookings")} className="gap-2 min-h-[40px]">
+                  <CalendarDays className="size-4" />
+                  My bookings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/profile")} className="gap-2 min-h-[40px]">
+                  <UserRound className="size-4" />
+                  Profile and password
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={handleLogout} className="gap-2 min-h-[40px]">
+                <LogOut className="size-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
-          <Link href="/login">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs font-semibold text-foreground hover:text-primary transition-colors h-9 px-3"
-            >
-              Sign In
-            </Button>
+          <Link
+            href="/login"
+            className="inline-flex items-center px-4 min-h-[40px] rounded-lg bg-primary text-primary-foreground text-sm font-extrabold hover:bg-primary/90 transition-colors"
+          >
+            Sign in
           </Link>
         )}
-
-        <ThemeToggle className="text-muted-foreground hover:text-foreground" />
-
-        <Link
-          href="/#booking"
-          className="hidden sm:inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-xs font-bold hover:bg-primary/90 transition-all shadow-sm hover:shadow"
-        >
-          <CalendarDays className="size-3.5" />
-          Reserve Court
-        </Link>
-
-        {/* Mobile Menu Hamburger with 44x44px touch area */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="lg:hidden size-10 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileMenuOpen}
-        >
-          {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-        </button>
-      </div>
-
-      {/* Mobile Backdrop & Drawer */}
-      {mobileMenuOpen && (
-        <>
-          <div
-            className="fixed inset-0 top-[calc(57px+env(safe-area-inset-top))] bg-black/40 backdrop-blur-xs z-40 lg:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="lg:hidden absolute top-full left-0 right-0 bg-background/98 border-b border-border shadow-2xl backdrop-blur-xl px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] flex flex-col gap-3.5 animate-in slide-in-from-top-2 duration-200 z-50">
-            <div className="flex flex-col gap-1 border-b border-border/80 pb-3">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="min-h-[44px] flex items-center px-3 rounded-lg text-sm font-semibold text-foreground hover:bg-muted/80 transition-colors"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-
-            <div className="flex flex-col gap-2.5 pt-1">
-              {user ? (
-                <>
-                  <Link
-                    href="/my-bookings"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full h-11 flex items-center justify-center rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                  >
-                    View My Bookings
-                  </Link>
-                  <Link
-                    href="/profile"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full h-11 flex items-center justify-center rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                  >
-                    My Profile
-                  </Link>
-                  <Button
-                    variant="outline"
-                    onClick={handleLogout}
-                    className="w-full h-11 text-sm font-semibold justify-center gap-2 rounded-xl"
-                  >
-                    <LogOut className="size-4" />
-                    Logout
-                  </Button>
-                </>
-              ) : (
-                <Link
-                  href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full h-11 flex items-center justify-center rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                >
-                  Sign In
-                </Link>
-              )}
-
-              <Link
-                href="/#booking"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full h-11 flex items-center justify-center rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-md hover:bg-primary/90 transition-all"
-              >
-                Book a Court
-              </Link>
-            </div>
-          </div>
-        </>
-      )}
+      </nav>
     </header>
   );
 }
