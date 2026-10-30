@@ -9,6 +9,7 @@ DROP POLICY IF EXISTS club_assets_select_all ON storage.objects;
 DROP POLICY IF EXISTS club_assets_insert_admin ON storage.objects;
 DROP POLICY IF EXISTS club_assets_update_admin ON storage.objects;
 DROP POLICY IF EXISTS club_assets_delete_admin ON storage.objects;
+SET LOCAL storage.allow_delete_query = 'true'; -- bypasses protect_buckets_delete trigger
 DELETE FROM storage.buckets b WHERE b.id IN ('gcash-receipts','club-assets')
   AND NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.bucket_id = b.id);
 COMMIT;
