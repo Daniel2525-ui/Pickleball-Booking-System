@@ -439,6 +439,7 @@ export const BookingContainer = () => {
           <QuickBooking
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
+            operatingHours={operatingHours}
             courts={courtNames}
             timeSlots={timeSlots}
             getSlotStatus={getSlotStatus}

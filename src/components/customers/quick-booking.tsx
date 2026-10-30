@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { Slot } from "./types";
+import { DateSelector } from "./date-selector";
+import { OperatingHour } from "@/components/admin/schedules/types";
 import { SlotStatus, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { compactRange, pickCourts, quickStarts } from "@/lib/services/bookings/quickStarts";
 
 interface QuickBookingProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
+  operatingHours: OperatingHour[];
   courts: string[];
   timeSlots: string[];
   getSlotStatus: (date: Date, court: string, time: string) => SlotStatus;
@@ -31,6 +34,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 export const QuickBooking = ({
   selectedDate,
   onSelectDate,
+  operatingHours,
   courts,
   timeSlots,
   getSlotStatus,
@@ -47,6 +51,7 @@ export const QuickBooking = ({
   const [start, setStart] = useState<{ day: string; slot: string } | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const [showCourts, setShowCourts] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const dayKey = selectedDate.toDateString();
   const today = new Date();
@@ -116,9 +121,27 @@ export const QuickBooking = ({
                 );
               })}
             </div>
-            <button type="button" onClick={onOpenBoard} className="self-start min-h-[44px] text-sm font-semibold text-muted-foreground">
-              Another date? <span className="font-extrabold text-primary underline underline-offset-4">Open the calendar →</span>
+            <button
+              type="button"
+              aria-expanded={showCalendar}
+              onClick={() => setShowCalendar((v) => !v)}
+              className="self-start min-h-[44px] text-sm font-semibold text-muted-foreground"
+            >
+              {days.some((d) => d.toDateString() === dayKey)
+                ? "Another date?"
+                : `${selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ·`}{" "}
+              <span className="font-extrabold text-primary underline underline-offset-4">{showCalendar ? "Hide the calendar" : "Open the calendar"}</span>
             </button>
+            {showCalendar && (
+              <DateSelector
+                selectedDate={selectedDate}
+                onSelectDate={(d) => {
+                  onSelectDate(d);
+                  setShowCalendar(false);
+                }}
+                operatingHours={operatingHours}
+              />
+            )}
           </fieldset>
 
           <fieldset className="rounded-2xl border bg-card p-4 flex flex-col gap-3">
