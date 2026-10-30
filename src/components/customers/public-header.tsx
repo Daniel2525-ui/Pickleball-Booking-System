@@ -10,6 +10,8 @@ import { AccountMenu } from "@/components/account-menu";
 export function PublicHeader() {
   const [user, setUser] = useState<User | null>(null);
   const [fullName, setFullName] = useState("");
+  // Only shows a link; /admin itself is still gated by the proxy
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -18,9 +20,14 @@ export function PublicHeader() {
     const loadProfile = async (u: User | null) => {
       setUser(u);
       setLoading(false);
-      if (!u) return setFullName("");
-      const { data } = await supabase.from("profiles").select("full_name").eq("id", u.id).maybeSingle();
+      if (!u) {
+        setFullName("");
+        setIsAdmin(false);
+        return;
+      }
+      const { data } = await supabase.from("profiles").select("full_name, role").eq("id", u.id).maybeSingle();
       setFullName(data?.full_name ?? "");
+      setIsAdmin(data?.role === "admin");
     };
 
     supabase.auth.getUser().then(({ data: { user } }) => loadProfile(user));
@@ -49,6 +56,11 @@ export function PublicHeader() {
         <Link href="/#booking" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-foreground hover:bg-muted transition-colors">
           Book
         </Link>
+        {user && isAdmin && (
+          <Link href="/admin/dashboard" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-primary hover:bg-muted transition-colors">
+            Admin panel
+          </Link>
+        )}
         {user && (
           <Link href="/my-bookings" className="px-2 sm:px-3 py-2 rounded-lg text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             My bookings
@@ -65,6 +77,7 @@ export function PublicHeader() {
             email={user.email ?? ""}
             signOutTo="/"
             links={[
+              ...(isAdmin ? [{ label: "Admin panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
               { label: "My bookings", href: "/my-bookings", icon: "bookings" },
               { label: "Profile and password", href: "/profile", icon: "profile" },
             ]}

@@ -3,6 +3,7 @@
 import {
     Sidebar,
     SidebarContent,
+    SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
     SidebarGroupLabel,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AccountMenu } from "@/components/account-menu";
 
 interface NavItem {
     title: string;
@@ -71,7 +73,7 @@ const managementNav: NavItem[] = [
     },
 ];
 
-export default function AppSidebar() {
+export default function AppSidebar({ account }: { account: { name: string; email: string } | null }) {
     const currentPath = usePathname();
 
     return (
@@ -163,6 +165,21 @@ export default function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
+
+            {account && (
+                <SidebarFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    <AccountMenu
+                        inSidebar
+                        name={account.name}
+                        email={account.email}
+                        signOutTo="/login"
+                        links={[
+                            { label: "Customer site", href: "/", icon: "home" },
+                            { label: "Profile and password", href: "/profile", icon: "profile" },
+                        ]}
+                    />
+                </SidebarFooter>
+            )}
         </Sidebar>
     );
 }
