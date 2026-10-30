@@ -208,6 +208,21 @@ test("cleanupExpiredBooking: reconciles a paid session, expires the redundant on
   assert.deepEqual(calls.cancelled, []);
 });
 
+test("cleanupExpiredBooking: a basket's shared paid session is reconciled once per run", async () => {
+  const { calls, deps } = fakes({ cs_basket: { status: "complete", payment_status: "paid" } });
+  const reconciledSessions = new Set();
+  assert.equal(await cleanupExpiredBooking(pending("b-1", ["cs_basket"]), { ...deps, reconciledSessions }), "reconciled");
+  assert.equal(await cleanupExpiredBooking(pending("b-2", ["cs_basket"]), { ...deps, reconciledSessions }), "skipped");
+  assert.deepEqual(calls.reconciled, ["cs_basket"]);
+});
+
+test("cleanupExpiredBooking: a failed reconciliation is retried next run", async () => {
+  const { deps } = fakes({ cs_paid: { status: "complete", payment_status: "paid" } }, { reconcileError: "lock timeout" });
+  const reconciledSessions = new Set();
+  assert.equal(await cleanupExpiredBooking(pending("b-1", ["cs_paid"]), { ...deps, reconciledSessions }), "skipped");
+  assert.equal(reconciledSessions.size, 0);
+});
+
 test("cleanupExpiredBooking: reports skipped when the RPC refuses to cancel", async () => {
   const { deps } = fakes({}, { cancelResult: { cancelled: false, reason: "PAYMENT_SETTLED" } });
   assert.equal(await cleanupExpiredBooking({ id: "b-1", payments: [] }, deps), "skipped");

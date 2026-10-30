@@ -12,6 +12,8 @@ export interface CleanupDeps {
     supabase: SupabaseClient;
     stripeClient?: { checkout: { sessions: Pick<Stripe["checkout"]["sessions"], "retrieve" | "expire"> } };
     reconcile?: (session: Stripe.Checkout.Session, supabase: SupabaseClient) => Promise<{ error: string | null }>;
+    /** Sessions already reconciled this run: a basket shares one session across its courts */
+    reconciledSessions?: Set<string>;
 }
 
 export type CleanupResult = "cancelled" | "reconciled" | "skipped";
@@ -22,7 +24,7 @@ export type CleanupResult = "cancelled" | "reconciled" | "skipped";
  */
 export async function cleanupExpiredBooking(
     booking: ExpiredBooking,
-    { supabase, stripeClient = defaultStripe, reconcile = reconcileCheckoutSession }: CleanupDeps
+    { supabase, stripeClient = defaultStripe, reconcile = reconcileCheckoutSession, reconciledSessions = new Set() }: CleanupDeps
 ): Promise<CleanupResult> {
     const payments = booking.payments ?? [];
 
@@ -65,11 +67,13 @@ export async function cleanupExpiredBooking(
                 console.warn(`Could not expire redundant open session ${id}:`, (err as Error).message);
             }
         }
+        if (reconciledSessions.has(paidSession.id)) return "skipped";
         const outcome = await reconcile(paidSession, supabase);
         if (outcome.error) {
             console.error(`Reconciliation failed for paid session ${paidSession.id} on booking ${booking.id}:`, outcome.error);
             return "skipped";
         }
+        reconciledSessions.add(paidSession.id);
         return "reconciled";
     }
 

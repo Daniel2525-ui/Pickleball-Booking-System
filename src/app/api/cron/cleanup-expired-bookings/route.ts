@@ -42,6 +42,7 @@ export async function GET(request: Request) {
     const CLEANUP_LOOP_BUDGET_MS = 6000;
     const startTime = Date.now();
     const skippedIds: string[] = [];
+    const reconciledSessions = new Set<string>();
 
     let reconciledCount = 0;
     let cancelledCount = 0;
@@ -99,7 +100,7 @@ export async function GET(request: Request) {
         try {
           // PostgREST embeds a single object while payments.booking_id is UNIQUE (pre-20261102), an array after
           const payments = ([] as typeof booking.payments).concat(booking.payments ?? []);
-          const result = await cleanupExpiredBooking({ ...booking, payments }, { supabase });
+          const result = await cleanupExpiredBooking({ ...booking, payments }, { supabase, reconciledSessions });
           if (result === "cancelled") cancelledCount++;
           else skippedIds.push(booking.id);
           if (result === "reconciled") reconciledCount++;
