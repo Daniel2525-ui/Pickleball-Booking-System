@@ -23,6 +23,8 @@ Four new RPCs (hold, submit, approve, reject) do the GCash work. The existing `/
 - Receipt screenshots live in a private bucket. Only admins read them, through signed URLs.
 - New SQL functions use `SECURITY DEFINER`, `SET search_path TO ''`, `REVOKE ALL ... FROM PUBLIC, anon` and `GRANT EXECUTE ... TO authenticated, service_role`, matching `multi_court_basket.sql`.
 - Each migration ships a rollback in `supabase/rollback_<name>.sql`, following the existing pattern.
+- **Deploy order:** apply both migrations before deploying the app code. The booking page reads the new `booking_settings.gcash_*` columns, and selecting a missing column would break it.
+- Refunds need no change: `/api/admin/payments/refund` and `/api/bookings/cancel` already route `payment_method = 'gcash'` to manual staff refunds.
 - Status label copy: **"Awaiting verification"**. Reject reason copy (player-facing): **"GCash payment could not be verified"**.
 
 ## Review Focus
@@ -146,7 +148,7 @@ This migration is not applied by the integration runner, because its plain Postg
   - an authenticated non-admin cannot select from `gcash-receipts`;
   - an insert outside the user's own folder is refused.
 
-  Also apply Task 1 and Task 2's migration to staging, and confirm a PostgREST read of an awaiting booking returns `"hold_expires_at": "infinity"`. Task 4 depends on that exact string.
+  You can use the local Supabase stack (`supabase_db_localdb`, the one the e2e tests use) instead of staging, because it has the `storage` schema. Already checked on 2026-10-31: Postgres serialises `'infinity'::timestamptz` to JSON as the string `"infinity"`, which is what Task 4 relies on.
 
 - [ ] **Step 3: Commit** with the message `feat(db): storage buckets for GCash receipts and club QR`.
 
