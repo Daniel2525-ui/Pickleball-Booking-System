@@ -263,3 +263,32 @@ test("on a phone the basket keeps checkout in view without covering the last gri
     expect(onTop, `${court}'s last row is covered`).toBe(true);
   }
 });
+
+test("GCash checkout lands on the pay page; GCash hidden when not configured", async ({ page }) => {
+  const setGcash = (v) =>
+    sql(`UPDATE public.booking_settings SET gcash_account_name = ${v ? "'Club'" : "NULL"}, gcash_number = ${v ? "'09171234567'" : "NULL"}`);
+  try {
+    await login(page, account("CUSTOMER"));
+    setGcash(false);
+    await openTomorrow(page);
+    await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
+    await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
+    await expect(page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" })).toBeVisible();
+    await expect(page.getByRole("dialog").getByRole("radio", { name: "GCash" })).toHaveCount(0);
+
+    setGcash(true);
+    await page.reload();
+    await openTomorrow(page);
+    await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
+    await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
+    await page.getByRole("dialog").getByRole("radio", { name: "GCash" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
+    await page.waitForURL(/\/book\/gcash\?basket=/);
+    expect(courtRow("COURT 1", "07:00")).toBe("pending|pending|200.00");
+    expect(sql(`SELECT p.payment_method FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.start_time = '07:00' AND b.booking_date = '${date}' AND b.user_id = '${userId("CUSTOMER")}'`)).toBe("gcash");
+  } finally {
+    setGcash(false);
+    sql(`UPDATE public.payments SET status = 'failed' WHERE booking_id IN (SELECT id FROM public.bookings WHERE start_time = '07:00' AND booking_date = '${date}');
+         UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+  }
+});
