@@ -129,522 +129,88 @@ test("checkSlotAvailability: slot status calculation correctly differentiates ac
   assert.equal(statusActive, "pending");
 });
 
-/**
- * Pure simulation of the enhanced cancel_expired_booking RPC logic
- * matching supabase/migrations/20261030_cancel_expired_booking_resilience.sql
- */
-function simulateCancelExpiredBookingRpc({
-  bookingId,
-  paymentId,
-  booking,
-  payments = [],
-  refundRequests = [],
-  now = new Date(),
-}) {
-  if (!booking || booking.id !== bookingId) {
-    return { cancelled: false, reason: "BOOKING_NOT_FOUND" };
-  }
+// cancel_expired_booking itself is covered against real Postgres in tests/integration/run-pg-integration.mjs
+const { cleanupExpiredBooking } = await import("../src/lib/services/payments/cleanupExpiredBooking.ts");
 
-  if (booking.status !== "pending") {
-    return { cancelled: false, reason: "BOOKING_NOT_PENDING", status: booking.status };
-  }
-
-  const effectiveExpiry = booking.hold_expires_at
-    ? new Date(booking.hold_expires_at)
-    : new Date(new Date(booking.created_at).getTime() + 35 * 60 * 1000);
-
-  if (effectiveExpiry > now) {
-    return { cancelled: false, reason: "HOLD_NOT_EXPIRED", hold_expires_at: booking.hold_expires_at };
-  }
-
-  // Guard: Settled payments
-  const hasSettledPayment = payments.some(
-    (p) => ["paid", "succeeded", "refunded"].includes((p.status || "").toLowerCase()) || Boolean(p.paid_at)
-  );
-  if (hasSettledPayment) {
-    return { cancelled: false, reason: "PAYMENT_ALREADY_SETTLED" };
-  }
-
-  // Guard: Refund ledger
-  const hasActiveRefund = refundRequests.some(
-    (r) => ["pending", "processing", "succeeded", "pending_cash_handover", "cash_refunded", "requires_admin_review"].includes((r.status || "").toLowerCase())
-  );
-  if (hasActiveRefund) {
-    return { cancelled: false, reason: "REFUND_IN_PROGRESS" };
-  }
-
-  // Payment row lock & update
-  if (paymentId) {
-    const payment = payments.find((p) => p.id === paymentId && p.booking_id === bookingId);
-    if (!payment) {
-      return { cancelled: false, reason: "PAYMENT_NOT_FOUND" };
-    }
-    if (payment.status === "pending") {
-      payment.status = "failed";
-    }
-  } else {
-    // Null payment ID: mark any pending payments as failed
-    for (const p of payments) {
-      if (p.booking_id === bookingId && p.status === "pending") {
-        p.status = "failed";
-      }
-    }
-  }
-
-  booking.status = "cancelled";
-  booking.updated_at = now.toISOString();
-
-  return { cancelled: true, booking_id: bookingId, payment_id: paymentId };
+/** Stripe and Supabase fakes recording what the cleanup did. */
+function fakes(sessions, { cancelResult = { cancelled: true }, reconcileError = null } = {}) {
+  const calls = { expired: [], cancelled: [], reconciled: [] };
+  const stripeClient = {
+    checkout: {
+      sessions: {
+        retrieve: async (id) => {
+          const s = sessions[id];
+          if (s instanceof Error) throw s;
+          return { id, ...s };
+        },
+        expire: async (id) => { calls.expired.push(id); },
+      },
+    },
+  };
+  const supabase = {
+    rpc: async (fn, params) => {
+      assert.equal(fn, "cancel_expired_booking");
+      calls.cancelled.push(params);
+      return { data: cancelResult, error: null };
+    },
+  };
+  const reconcile = async (session) => {
+    calls.reconciled.push(session.id);
+    return { error: reconcileError };
+  };
+  return { calls, deps: { supabase, stripeClient, reconcile } };
 }
 
-test("cancel_expired_booking RPC: allows cancellation when p_payment_id is null (0 payments)", () => {
-  const pastExpiry = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const booking = { id: "b-zero-pay", status: "pending", hold_expires_at: pastExpiry, created_at: pastExpiry };
-
-  const res = simulateCancelExpiredBookingRpc({
-    bookingId: "b-zero-pay",
-    paymentId: null,
-    booking,
-    payments: [],
-  });
-
-  assert.equal(res.cancelled, true);
-  assert.equal(booking.status, "cancelled");
+const pending = (id, sessionIds) => ({
+  id,
+  payments: sessionIds.map((s, i) => ({ id: `p-${i}`, status: "pending", stripe_session_id: s, paid_at: null })),
 });
 
-test("cancel_expired_booking RPC: cancels booking when existing payment is already 'failed'", () => {
-  const pastExpiry = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const booking = { id: "b-failed-pay", status: "pending", hold_expires_at: pastExpiry, created_at: pastExpiry };
-  const payments = [{ id: "p-failed", booking_id: "b-failed-pay", status: "failed" }];
-
-  const res = simulateCancelExpiredBookingRpc({
-    bookingId: "b-failed-pay",
-    paymentId: "p-failed",
-    booking,
-    payments,
-  });
-
-  assert.equal(res.cancelled, true);
-  assert.equal(booking.status, "cancelled");
-  assert.equal(payments[0].status, "failed");
+test("cleanupExpiredBooking: keeps the hold when Stripe cannot be reached", async () => {
+  const { calls, deps } = fakes({ cs_ok: { status: "open", payment_status: "unpaid" }, cs_err: new Error("Stripe 503") });
+  assert.equal(await cleanupExpiredBooking(pending("b-1", ["cs_ok", "cs_err"]), deps), "skipped");
+  assert.deepEqual(calls.cancelled, []);
 });
 
-test("cancel_expired_booking RPC: refuses cancellation if payment is settled ('paid', 'succeeded', 'refunded', or paid_at)", () => {
-  const pastExpiry = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-
-  // Case A: status = 'paid'
-  const bPaid = { id: "b-paid", status: "pending", hold_expires_at: pastExpiry, created_at: pastExpiry };
-  const pPaid = [{ id: "p-1", booking_id: "b-paid", status: "paid" }];
-  const resPaid = simulateCancelExpiredBookingRpc({
-    bookingId: "b-paid",
-    paymentId: "p-1",
-    booking: bPaid,
-    payments: pPaid,
-  });
-  assert.equal(resPaid.cancelled, false);
-  assert.equal(resPaid.reason, "PAYMENT_ALREADY_SETTLED");
-  assert.equal(bPaid.status, "pending");
-
-  // Case B: status = 'succeeded'
-  const bSucc = { id: "b-succ", status: "pending", hold_expires_at: pastExpiry, created_at: pastExpiry };
-  const pSucc = [{ id: "p-2", booking_id: "b-succ", status: "succeeded" }];
-  const resSucc = simulateCancelExpiredBookingRpc({
-    bookingId: "b-succ",
-    paymentId: "p-2",
-    booking: bSucc,
-    payments: pSucc,
-  });
-  assert.equal(resSucc.cancelled, false);
-  assert.equal(resSucc.reason, "PAYMENT_ALREADY_SETTLED");
-
-  // Case C: paid_at is set
-  const bPaidAt = { id: "b-paidat", status: "pending", hold_expires_at: pastExpiry, created_at: pastExpiry };
-  const pPaidAt = [{ id: "p-3", booking_id: "b-paidat", status: "pending", paid_at: new Date().toISOString() }];
-  const resPaidAt = simulateCancelExpiredBookingRpc({
-    bookingId: "b-paidat",
-    paymentId: "p-3",
-    booking: bPaidAt,
-    payments: pPaidAt,
-  });
-  assert.equal(resPaidAt.cancelled, false);
-  assert.equal(resPaidAt.reason, "PAYMENT_ALREADY_SETTLED");
+test("cleanupExpiredBooking: keeps the hold when a session is complete but not yet paid", async () => {
+  const { calls, deps } = fakes({ cs_delayed: { status: "complete", payment_status: "unpaid" } });
+  assert.equal(await cleanupExpiredBooking(pending("b-1", ["cs_delayed"]), deps), "skipped");
+  assert.deepEqual(calls.cancelled, []);
+  assert.deepEqual(calls.reconciled, []);
 });
 
-test("cancel_expired_booking RPC: refuses cancellation if refund is in progress", () => {
-  const pastExpiry = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const booking = { id: "b-ref", status: "pending", hold_expires_at: pastExpiry, created_at: pastExpiry };
-  const refundRequests = [{ id: "ref-1", booking_id: "b-ref", status: "processing" }];
-
-  const res = simulateCancelExpiredBookingRpc({
-    bookingId: "b-ref",
-    paymentId: null,
-    booking,
-    payments: [],
-    refundRequests,
-  });
-
-  assert.equal(res.cancelled, false);
-  assert.equal(res.reason, "REFUND_IN_PROGRESS");
-  assert.equal(booking.status, "pending");
+test("cleanupExpiredBooking: never touches a booking with a settled payment row", async () => {
+  const { calls, deps } = fakes({});
+  const booking = { id: "b-1", payments: [{ id: "p-1", status: "paid", stripe_session_id: null, paid_at: null }] };
+  assert.equal(await cleanupExpiredBooking(booking, deps), "skipped");
+  assert.deepEqual(calls.cancelled, []);
 });
 
-/**
- * Pure simulation of the hardened cleanup route workflow in
- * src/app/api/cron/cleanup-expired-bookings/route.ts
- */
-async function simulateCronCleanup({
-  bookings,
-  stripeMock,
-  reconcileServiceMock,
-  rpcMock,
-  maxBudgetMs = 6000,
-  batchSize = 25,
-}) {
-  const startTime = Date.now();
-  const skippedIds = [];
-  let cancelledCount = 0;
-  let reconciledCount = 0;
-  let totalProcessed = 0;
-
-  while (Date.now() - startTime < maxBudgetMs) {
-    const availableCandidates = bookings.filter(
-      (b) => b.status === "pending" && !skippedIds.includes(b.id)
-    );
-    const batch = availableCandidates.slice(0, batchSize);
-
-    if (batch.length === 0) break;
-
-    for (const booking of batch) {
-      if (Date.now() - startTime >= maxBudgetMs) break;
-      totalProcessed++;
-
-      try {
-        const payments = booking.payments || [];
-
-        // 1. Check settled payments in DB
-        const hasSettledPayment = payments.some(
-          (p) => ["paid", "succeeded", "refunded"].includes((p.status || "").toLowerCase()) || Boolean(p.paid_at)
-        );
-
-        if (hasSettledPayment) {
-          skippedIds.push(booking.id);
-          continue;
-        }
-
-        // 2. Check Stripe status for all payments associated with this booking
-        let isStripeUncertain = false;
-        let paidPaymentInfo = null;
-        const openSessionsToExpire = [];
-
-        for (const payment of payments) {
-          if (!payment.stripe_session_id) continue;
-
-          try {
-            const session = await stripeMock.retrieve(payment.stripe_session_id);
-
-            if (session.payment_status === "paid") {
-              if (!paidPaymentInfo) {
-                paidPaymentInfo = { payment, session };
-              }
-            } else if (session.status === "complete") {
-              // Complete session with unpaid/delayed payment status is uncertain
-              isStripeUncertain = true;
-            } else if (session.status === "open") {
-              openSessionsToExpire.push(session.id);
-            } else if (session.status === "expired") {
-              // Safely expired
-            } else {
-              isStripeUncertain = true;
-            }
-          } catch {
-            isStripeUncertain = true;
-            break;
-          }
-        }
-
-        if (isStripeUncertain) {
-          skippedIds.push(booking.id);
-          continue;
-        }
-
-        if (paidPaymentInfo) {
-          // Expire redundant open sessions
-          for (const openId of openSessionsToExpire) {
-            try {
-              await stripeMock.expire(openId);
-            } catch {
-              // Non-blocking warning
-            }
-          }
-
-          const recOutcome = await reconcileServiceMock({
-            bookingId: booking.id,
-            paymentId: paidPaymentInfo.payment.id,
-          });
-
-          if (recOutcome.success) {
-            reconciledCount++;
-            booking.status = "confirmed";
-          }
-          skippedIds.push(booking.id);
-          continue;
-        }
-
-        // Expire all open sessions
-        let expireFailed = false;
-        for (const openId of openSessionsToExpire) {
-          try {
-            await stripeMock.expire(openId);
-          } catch {
-            expireFailed = true;
-            break;
-          }
-        }
-
-        if (expireFailed) {
-          skippedIds.push(booking.id);
-          continue;
-        }
-
-        // 3. Find pending payment (if any)
-        const pendingPayment = payments.find((p) => p.status === "pending");
-
-        // 4. Call cancel_expired_booking RPC
-        const cancelResult = await rpcMock({
-          p_booking_id: booking.id,
-          p_payment_id: pendingPayment?.id ?? null,
-        });
-
-        if (cancelResult?.cancelled) {
-          cancelledCount++;
-          booking.status = "cancelled";
-        } else {
-          skippedIds.push(booking.id);
-        }
-      } catch {
-        skippedIds.push(booking.id);
-      }
-    }
-
-    if (batch.length < batchSize) break;
-  }
-
-  return { cancelledCount, reconciledCount, totalProcessed, skippedIds };
-}
-
-test("Cron Cleanup: preserves bookings when Stripe Checkout session retrieval fails (uncertain status)", async () => {
-  const bookings = [
-    {
-      id: "b-uncertain",
-      status: "pending",
-      payments: [{ id: "p-1", status: "pending", stripe_session_id: "cs_timeout" }],
-    },
-  ];
-
-  const stripeMock = {
-    retrieve: async () => {
-      throw new Error("Stripe network timeout / 503");
-    },
-    expire: async () => {},
-  };
-
-  let rpcCalls = 0;
-  const rpcMock = async () => {
-    rpcCalls++;
-    return { cancelled: true };
-  };
-
-  const res = await simulateCronCleanup({
-    bookings,
-    stripeMock,
-    reconcileServiceMock: async () => ({ success: true }),
-    rpcMock,
-  });
-
-  assert.equal(res.cancelledCount, 0, "Must not cancel when Stripe status is uncertain");
-  assert.equal(rpcCalls, 0, "Must not call cancel RPC when Stripe status is uncertain");
-  assert.equal(bookings[0].status, "pending", "Booking remains pending for next retry");
-  assert.deepEqual(res.skippedIds, ["b-uncertain"]);
+test("cleanupExpiredBooking: expires every open session, then cancels with the pending payment", async () => {
+  const { calls, deps } = fakes({ cs_1: { status: "open" }, cs_2: { status: "open" } });
+  assert.equal(await cleanupExpiredBooking(pending("b-1", ["cs_1", "cs_2"]), deps), "cancelled");
+  assert.deepEqual(calls.expired, ["cs_1", "cs_2"]);
+  assert.deepEqual(calls.cancelled, [{ p_booking_id: "b-1", p_payment_id: "p-0" }]);
 });
 
-test("Cron Cleanup: preserves bookings when Stripe Checkout session is complete but payment is unpaid/delayed", async () => {
-  const bookings = [
-    {
-      id: "b-delayed",
-      status: "pending",
-      payments: [{ id: "p-delayed", status: "pending", stripe_session_id: "cs_delayed_123" }],
-    },
-  ];
-
-  const stripeMock = {
-    retrieve: async () => ({ id: "cs_delayed_123", status: "complete", payment_status: "unpaid" }),
-    expire: async () => {},
-  };
-
-  let rpcCalls = 0;
-  let reconcileCalls = 0;
-
-  const res = await simulateCronCleanup({
-    bookings,
-    stripeMock,
-    reconcileServiceMock: async () => {
-      reconcileCalls++;
-      return { success: true };
-    },
-    rpcMock: async () => {
-      rpcCalls++;
-      return { cancelled: true };
-    },
-  });
-
-  assert.equal(res.cancelledCount, 0, "Must never cancel a booking with delayed/unpaid complete session");
-  assert.equal(rpcCalls, 0, "Must not call cancel RPC");
-  assert.equal(reconcileCalls, 0, "Must not reconcile complete session as paid when payment_status is unpaid");
-  assert.equal(bookings[0].status, "pending");
-  assert.deepEqual(res.skippedIds, ["b-delayed"]);
+test("cleanupExpiredBooking: does not cancel when expiring an open session fails", async () => {
+  const { calls, deps } = fakes({ cs_1: { status: "open" } });
+  deps.stripeClient.checkout.sessions.expire = async () => { throw new Error("Stripe 500"); };
+  assert.equal(await cleanupExpiredBooking(pending("b-1", ["cs_1"]), deps), "skipped");
+  assert.deepEqual(calls.cancelled, []);
 });
 
-test("Cron Cleanup: handles multiple sessions per booking: expires all open sessions before cancelling", async () => {
-  const bookings = [
-    {
-      id: "b-multi-open",
-      status: "pending",
-      payments: [
-        { id: "p-1", status: "pending", stripe_session_id: "cs_open_1" },
-        { id: "p-2", status: "pending", stripe_session_id: "cs_open_2" },
-      ],
-    },
-  ];
-
-  const expiredSessionIds = [];
-  const stripeMock = {
-    retrieve: async (id) => ({ id, status: "open", payment_status: "unpaid" }),
-    expire: async (id) => {
-      expiredSessionIds.push(id);
-    },
-  };
-
-  const res = await simulateCronCleanup({
-    bookings,
-    stripeMock,
-    reconcileServiceMock: async () => ({ success: true }),
-    rpcMock: async ({ p_booking_id }) => ({ cancelled: true, booking_id: p_booking_id }),
-  });
-
-  assert.equal(res.cancelledCount, 1);
-  assert.deepEqual(expiredSessionIds, ["cs_open_1", "cs_open_2"], "All open sessions must be expired before cancellation");
-  assert.equal(bookings[0].status, "cancelled");
+test("cleanupExpiredBooking: reconciles a paid session, expires the redundant one, never cancels", async () => {
+  const { calls, deps } = fakes({ cs_open: { status: "open" }, cs_paid: { status: "complete", payment_status: "paid" } });
+  assert.equal(await cleanupExpiredBooking(pending("b-1", ["cs_open", "cs_paid"]), deps), "reconciled");
+  assert.deepEqual(calls.reconciled, ["cs_paid"]);
+  assert.deepEqual(calls.expired, ["cs_open"]);
+  assert.deepEqual(calls.cancelled, []);
 });
 
-test("Cron Cleanup: handles multiple sessions per booking: reconciles paid session and expires redundant open session", async () => {
-  const bookings = [
-    {
-      id: "b-multi-paid",
-      status: "pending",
-      payments: [
-        { id: "p-open", status: "pending", stripe_session_id: "cs_open_redundant" },
-        { id: "p-paid", status: "pending", stripe_session_id: "cs_paid_actual" },
-      ],
-    },
-  ];
-
-  const expiredSessionIds = [];
-  const stripeMock = {
-    retrieve: async (id) => {
-      if (id === "cs_open_redundant") return { id, status: "open", payment_status: "unpaid" };
-      if (id === "cs_paid_actual") return { id, status: "complete", payment_status: "paid" };
-      throw new Error(`Unexpected session ID: ${id}`);
-    },
-    expire: async (id) => {
-      expiredSessionIds.push(id);
-    },
-  };
-
-  let reconciledPaymentId = null;
-  const res = await simulateCronCleanup({
-    bookings,
-    stripeMock,
-    reconcileServiceMock: async ({ paymentId }) => {
-      reconciledPaymentId = paymentId;
-      return { success: true };
-    },
-    rpcMock: async () => {
-      throw new Error("Must never call cancel RPC for paid booking");
-    },
-  });
-
-  assert.equal(res.reconciledCount, 1);
-  assert.equal(res.cancelledCount, 0);
-  assert.equal(reconciledPaymentId, "p-paid");
-  assert.deepEqual(expiredSessionIds, ["cs_open_redundant"], "Redundant open session must be expired to prevent duplicate payment");
-  assert.equal(bookings[0].status, "confirmed");
-});
-
-test("Cron Cleanup: multi-session booking skips cancellation if any session's retrieval fails", async () => {
-  const bookings = [
-    {
-      id: "b-multi-fail",
-      status: "pending",
-      payments: [
-        { id: "p-1", status: "pending", stripe_session_id: "cs_ok" },
-        { id: "p-2", status: "pending", stripe_session_id: "cs_err" },
-      ],
-    },
-  ];
-
-  const stripeMock = {
-    retrieve: async (id) => {
-      if (id === "cs_ok") return { id, status: "open", payment_status: "unpaid" };
-      throw new Error("Stripe 500 error on cs_err");
-    },
-    expire: async () => {},
-  };
-
-  let rpcCalls = 0;
-  const res = await simulateCronCleanup({
-    bookings,
-    stripeMock,
-    reconcileServiceMock: async () => ({ success: true }),
-    rpcMock: async () => {
-      rpcCalls++;
-      return { cancelled: true };
-    },
-  });
-
-  assert.equal(res.cancelledCount, 0, "Must not cancel if any session status fails verification");
-  assert.equal(rpcCalls, 0);
-  assert.deepEqual(res.skippedIds, ["b-multi-fail"]);
-});
-
-test("Cron Cleanup: multi-batch processing drains backlog across pages and isolates per-booking errors", async () => {
-  const bookings = Array.from({ length: 60 }, (_, i) => ({
-    id: `b-${i}`,
-    status: "pending",
-    payments: [],
-  }));
-
-  const stripeMock = {
-    retrieve: async () => ({ status: "expired" }),
-    expire: async () => {},
-  };
-
-  const res = await simulateCronCleanup({
-    bookings,
-    stripeMock,
-    reconcileServiceMock: async () => ({ success: true }),
-    rpcMock: async ({ p_booking_id }) => {
-      if (p_booking_id === "b-5") {
-        throw new Error("Simulated transient lock collision on b-5");
-      }
-      return { cancelled: true, booking_id: p_booking_id };
-    },
-    batchSize: 25,
-  });
-
-  assert.equal(res.totalProcessed, 60, "Must process all 60 bookings across multiple batches");
-  assert.equal(res.cancelledCount, 59, "All 59 valid bookings cancelled");
-  assert.deepEqual(res.skippedIds, ["b-5"], "Only the single failed booking was skipped");
-  assert.equal(bookings.find((b) => b.id === "b-5").status, "pending");
+test("cleanupExpiredBooking: reports skipped when the RPC refuses to cancel", async () => {
+  const { deps } = fakes({}, { cancelResult: { cancelled: false, reason: "PAYMENT_SETTLED" } });
+  assert.equal(await cleanupExpiredBooking({ id: "b-1", payments: [] }, deps), "skipped");
 });
 
 test("processStripePaymentReconciliation: reports error when settle_stripe_refund fails in database", async () => {

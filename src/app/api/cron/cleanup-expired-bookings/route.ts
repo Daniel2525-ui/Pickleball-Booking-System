@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase/service";
-import { reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
+import { cleanupExpiredBooking } from "@/lib/services/payments/cleanupExpiredBooking";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
 
@@ -100,129 +99,10 @@ export async function GET(request: Request) {
         try {
           // PostgREST embeds a single object while payments.booking_id is UNIQUE (pre-20261102), an array after
           const payments = ([] as typeof booking.payments).concat(booking.payments ?? []);
-
-          // 1. Check if any DB payment record is already settled/paid
-          const hasSettledPayment = payments.some(
-            (p) => ["paid", "succeeded", "refunded"].includes(p.status?.toLowerCase()) || Boolean(p.paid_at)
-          );
-
-          if (hasSettledPayment) {
-            console.warn(`Booking ${booking.id} has settled payment; skipping cancellation.`);
-            skippedIds.push(booking.id);
-            continue;
-          }
-
-          // 2. Inspect Stripe status for all payments associated with this booking
-          let isStripeUncertain = false;
-          let paidPaymentInfo: {
-            payment: (typeof payments)[0];
-            session: import("stripe").Stripe.Checkout.Session;
-          } | null = null;
-          const openSessionsToExpire: string[] = [];
-
-          for (const payment of payments) {
-            if (!payment.stripe_session_id) continue;
-
-            try {
-              const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
-
-              if (session.payment_status === "paid") {
-                // Verified paid session
-                if (!paidPaymentInfo) {
-                  paidPaymentInfo = { payment, session };
-                }
-              } else if (session.status === "complete") {
-                // Complete session but payment_status !== "paid" (e.g. async/delayed payment method).
-                // Do not confirm as paid and do not cancel while payment may settle asynchronously.
-                console.warn(
-                  `Booking ${booking.id} has complete session ${session.id} with payment_status '${session.payment_status}'; treating as uncertain.`
-                );
-                isStripeUncertain = true;
-              } else if (session.status === "open") {
-                openSessionsToExpire.push(session.id);
-              } else if (session.status === "expired") {
-                // Safely expired unpaid session
-              } else {
-                console.warn(
-                  `Booking ${booking.id} has session ${session.id} in unexpected status '${session.status}'; treating as uncertain.`
-                );
-                isStripeUncertain = true;
-              }
-            } catch (stripeErr: unknown) {
-              console.error(
-                `Uncertain Stripe state for payment ${payment.id} on booking ${booking.id}:`,
-                (stripeErr as Error).message
-              );
-              isStripeUncertain = true;
-              break;
-            }
-          }
-
-          // Safety guard: if any Stripe session state is uncertain or delayed, never cancel
-          if (isStripeUncertain) {
-            skippedIds.push(booking.id);
-            continue;
-          }
-
-          // If a session was paid, reconcile and expire any remaining open sessions
-          if (paidPaymentInfo) {
-            for (const openSessionId of openSessionsToExpire) {
-              try {
-                await stripe.checkout.sessions.expire(openSessionId);
-              } catch (expireErr: unknown) {
-                console.warn(`Could not expire redundant open session ${openSessionId}:`, (expireErr as Error).message);
-              }
-            }
-
-            // Reconciles every court of the session's basket (or the legacy booking), each with its own amount
-            const { session } = paidPaymentInfo;
-            const outcome = await reconcileCheckoutSession(session, supabase);
-
-            if (outcome.error) {
-              console.error(`Reconciliation failed for paid session ${session.id} on booking ${booking.id}:`, outcome.error);
-            } else {
-              reconciledCount++;
-            }
-
-            skippedIds.push(booking.id);
-            continue;
-          }
-
-          // If no sessions were paid, expire all open sessions before cancelling
-          let expireFailed = false;
-          for (const openSessionId of openSessionsToExpire) {
-            try {
-              await stripe.checkout.sessions.expire(openSessionId);
-            } catch (expireErr: unknown) {
-              console.error(`Failed to expire Stripe session ${openSessionId}:`, (expireErr as Error).message);
-              expireFailed = true;
-              break;
-            }
-          }
-
-          if (expireFailed) {
-            skippedIds.push(booking.id);
-            continue;
-          }
-
-          // 3. Find primary pending payment ID (if any)
-          const pendingPayment = payments.find((p) => p.status === "pending");
-
-          // 4. Cancel booking and mark pending payments failed under DB locks
-          const { data: cancelResult, error: cancelErr } = await supabase.rpc("cancel_expired_booking", {
-            p_booking_id: booking.id,
-            p_payment_id: pendingPayment?.id ?? null,
-          });
-
-          if (cancelErr) {
-            console.error(`cancel_expired_booking RPC failed for ${booking.id}:`, cancelErr);
-            skippedIds.push(booking.id);
-          } else if (cancelResult?.cancelled) {
-            cancelledCount++;
-          } else {
-            console.log(`Booking ${booking.id} was not cancelled:`, cancelResult?.reason);
-            skippedIds.push(booking.id);
-          }
+          const result = await cleanupExpiredBooking({ ...booking, payments }, { supabase });
+          if (result === "cancelled") cancelledCount++;
+          else skippedIds.push(booking.id);
+          if (result === "reconciled") reconciledCount++;
         } catch (bookingErr: unknown) {
           console.error(`Error processing booking ${booking.id}:`, bookingErr);
           skippedIds.push(booking.id);
