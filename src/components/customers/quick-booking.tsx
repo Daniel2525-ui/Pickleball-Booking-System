@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { LayoutGrid } from "lucide-react";
 import { Slot } from "./types";
 import { SlotStatus, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { compactRange, pickCourts, quickStarts } from "@/lib/services/bookings/quickStarts";
@@ -117,8 +116,8 @@ export const QuickBooking = ({
                 );
               })}
             </div>
-            <button type="button" onClick={onOpenBoard} className="self-start text-xs font-bold text-primary underline underline-offset-4">
-              Another date? Open the calendar
+            <button type="button" onClick={onOpenBoard} className="self-start min-h-[44px] text-sm font-semibold text-muted-foreground">
+              Another date? <span className="font-extrabold text-primary underline underline-offset-4">Open the calendar →</span>
             </button>
           </fieldset>
 
@@ -248,9 +247,8 @@ export const QuickBooking = ({
             </div>
           )}
 
-          <button type="button" onClick={onOpenBoard} className="self-start inline-flex items-center gap-1.5 text-xs font-bold text-primary underline underline-offset-4">
-            <LayoutGrid className="size-3.5" />
-            Different times per court? See the full board
+          <button type="button" onClick={onOpenBoard} className="self-start min-h-[44px] text-sm font-semibold text-muted-foreground text-left">
+            Different times per court? <span className="font-extrabold text-primary underline underline-offset-4">See the full board →</span>
           </button>
         </section>
       </div>

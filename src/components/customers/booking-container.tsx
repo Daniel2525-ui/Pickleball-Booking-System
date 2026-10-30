@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, LogIn, Calendar, Clock, CreditCard, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog, type ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -61,6 +62,7 @@ export const BookingContainer = () => {
   const [isFetchingBookings, setIsFetchingBookings] = useState(false);
   const [showMobileCalendar, setShowMobileCalendar] = useState(false);
   const [view, setView] = useState<"quick" | "board">("quick");
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   // Check auth state on mount
   useEffect(() => {
     const supabase = createClient();
@@ -453,13 +455,23 @@ export const BookingContainer = () => {
       <button
         type="button"
         onClick={() => {
-          setView("quick");
-          setBasket([]);
+          const leave = () => {
+            setView("quick");
+            setBasket([]);
+          };
+          if (basket.length === 0) return leave();
+          setConfirmRequest({
+            title: "Clear your basket?",
+            description: `Going back to simple booking removes the ${basket.length} ${basket.length === 1 ? "slot" : "slots"} in your basket.`,
+            confirmLabel: "Clear and go back",
+            onConfirm: leave,
+          });
         }}
-        className="self-start text-sm font-bold text-primary underline underline-offset-4"
+        className="self-start min-h-[44px] text-sm font-extrabold text-primary underline underline-offset-4"
       >
-        Back to simple booking
+        ← Back to simple booking
       </button>
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Mobile Quick-Date Strip */}
         <div className="lg:hidden col-span-1 space-y-2">
