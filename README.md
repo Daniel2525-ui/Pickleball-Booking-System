@@ -39,74 +39,34 @@ Booking a court at a local venue usually means messaging a page, waiting for a r
 
 This isn't just a pretty UI. The booking engine is designed so the venue **never double-books a court**:
 
-- **Database-level conflict prevention** through Postgres RPCs and row-level security in Supabase
-- **Slot holds that expire** on their own, with a grace period and scheduled cleanup jobs
-- **Payment reconciliation and a refund ledger** that keep Stripe and the database in sync
-- **Booking lifecycle**: `pending → confirmed → completed` (or `cancelled`), with all cancellation rules based on venue local time (Asia/Manila)
+- **Conflict prevention** that guarantees one booking per court per time slot
+- **Temporary slot holds** so a player's slot is reserved while they pay
+- **Payment and refund tracking** that keeps every booking in sync with its payment
+- **Clear booking lifecycle**: `pending → confirmed → completed` (or `cancelled`), based on venue local time (Asia/Manila)
 - **Configurable pricing** that staff manage without touching code
-- **Every migration has a matching rollback script** in `supabase/`
+- **Automated tests**: unit, integration and end-to-end browser tests
 
-### 🧪 Tested
-
-```
-tests/
-├── booking-rules · multi-hour-booking · venue-hours · countdown
-├── quote-court-price · validate-pricing-input
-├── reconcile-checkout-session · refund-worker · expired-booking-cleanup
-├── admin-status-transitions · cron-auth
-├── integration/   → real Postgres integration tests
-└── e2e/           → Playwright browser tests
-```
-
-## 🧱 Architecture
+## 🧱 How it works
 
 ```mermaid
 flowchart LR
-    P[Player] -->|browse and book| W[Next.js App Router]
-    A[Admin / Staff] -->|manage| W
-    W -->|SSR auth + queries| S[(Supabase Postgres)]
-    W -->|checkout session| ST[Stripe]
-    ST -->|webhook| W
-    C[Scheduled cleanup] -->|release expired holds| S
+    P[Player] -->|browse and book| W[Crosshair Dinkers web app]
+    A[Venue staff] -->|manage| W
+    W --> S[(Database)]
+    W -->|secure checkout| ST[Stripe]
 ```
 
-## 🗺️ Routes
+## 🔒 Usage and license
 
-| Route | What it does |
-| --- | --- |
-| `/` | Landing page with venue info and the interactive booking grid |
-| `/book` | Booking flow and checkout |
-| `/my-bookings` | A player's upcoming and past reservations |
-| `/admin/dashboard` | Revenue, occupancy and today's activity |
-| `/admin/schedules` · `/admin/courts` | Daily schedules and court status |
-| `/admin/bookings` · `/admin/payments` · `/admin/customers` | Operations management |
+This is **proprietary software** built for the Crosshair Dinkers venue. The source code is shared publicly **for portfolio and viewing purposes only**.
 
-## 🚀 Run it locally
+- ❌ No permission is granted to copy, modify, deploy, host or redistribute this project, in whole or in part
+- ❌ Do not attempt to access, test or probe the live system, its admin areas or its data without written permission
+- ✅ You're welcome to read the code and use it as a reference for learning
 
-```bash
-git clone https://github.com/Daniel2525-ui/Pickleball-Booking-System.git
-cd Pickleball-Booking-System
-npm install
-```
+**© 2026 Erle Daniel Sudario. All rights reserved.**
 
-Create a `.env.local` file:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-CRON_SECRET=
-```
-
-Apply the SQL files in `supabase/migrations`, then:
-
-```bash
-npm run dev          # start the app on http://localhost:3000
-npm test             # unit tests
-npm run test:e2e     # Playwright end-to-end tests
-```
+Interested in a booking system for your own venue, or found a security issue? [Contact me through GitHub](https://github.com/Daniel2525-ui) instead.
 
 ---
 
