@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { stripe } from "../../stripe.ts";
 import { withDbRetry } from "./withDbRetry.ts";
+import { createStripeRefund, type RefundStripeClient } from "./refundWorker.ts";
 
 export interface ReconcileParams {
     bookingId: string;
@@ -10,14 +11,7 @@ export interface ReconcileParams {
     stripeSessionId: string;
     stripePaymentIntent: string;
     supabase: SupabaseClient;
-    stripeClient?: {
-        refunds: {
-            create: (
-                params: { payment_intent: string; amount: number },
-                options?: { idempotencyKey?: string }
-            ) => Promise<{ id: string; status?: string }>;
-        };
-    };
+    stripeClient?: RefundStripeClient;
 }
 
 export interface ReconcileOutcome {
@@ -107,39 +101,12 @@ export async function processStripePaymentReconciliation(
         let stripeRefundStatus = "pending";
 
         if (stripePaymentIntent && data.idempotency_key) {
-            try {
-                const stripeInstance = stripeClient || stripe;
-                const refund = await stripeInstance.refunds.create(
-                    {
-                        payment_intent: stripePaymentIntent,
-                        amount: Math.round(amount * 100),
-                    },
-                    {
-                        idempotencyKey: data.idempotency_key,
-                    }
-                );
-                stripeRefundId = refund.id;
-                stripeRefundStatus = refund.status || "succeeded";
-            } catch (err: unknown) {
-                const stripeErr = err as {
-                    code?: string;
-                    type?: string;
-                    raw?: { refund?: { id?: string; status?: string } };
-                };
-                console.error("Stripe refund inline execution error:", err);
-                if (stripeErr?.code === "charge_already_refunded") {
-                    stripeRefundStatus = "succeeded";
-                } else if (stripeErr?.raw?.refund) {
-                    stripeRefundId = stripeErr.raw.refund.id || null;
-                    stripeRefundStatus = stripeErr.raw.refund.status || "failed";
-                } else if (stripeErr?.type === "StripeInvalidRequestError") {
-                    // Terminal client request error from Stripe
-                    stripeRefundStatus = "failed";
-                } else {
-                    // Network or uncertain Stripe error
-                    stripeRefundStatus = "uncertain";
-                }
-            }
+            ({ id: stripeRefundId, status: stripeRefundStatus } = await createStripeRefund(
+                stripeClient || stripe,
+                stripePaymentIntent,
+                amount,
+                data.idempotency_key
+            ));
         }
 
         if (data.refund_request_id) {

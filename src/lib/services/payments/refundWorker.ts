@@ -2,19 +2,47 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { stripe } from "../../stripe.ts";
 import { withDbRetry } from "./withDbRetry.ts";
 
+export interface RefundStripeClient {
+    refunds: {
+        create: (
+            params: { payment_intent: string; amount: number },
+            options?: { idempotencyKey?: string }
+        ) => Promise<{ id: string; status?: string | null }>;
+    };
+}
+
 export interface ProcessRefundJobsOptions {
     workerId: string;
     leaseSeconds?: number;
     maxJobs?: number;
     supabase: SupabaseClient;
-    stripeClient?: {
-        refunds: {
-            create: (
-                params: { payment_intent: string; amount: number },
-                options?: { idempotencyKey?: string }
-            ) => Promise<{ id: string; status?: string }>;
-        };
-    };
+    stripeClient?: RefundStripeClient;
+}
+
+/**
+ * Full refund of `amount` PHP, never throws. Status is Stripe's, or "succeeded" when the charge was
+ * already refunded, "failed" for a terminal request error, "uncertain" for network errors (retried later).
+ */
+export async function createStripeRefund(
+    stripeClient: RefundStripeClient,
+    paymentIntent: string,
+    amount: number,
+    idempotencyKey: string
+): Promise<{ id: string | null; status: string }> {
+    try {
+        const refund = await stripeClient.refunds.create(
+            { payment_intent: paymentIntent, amount: Math.round(Number(amount) * 100) },
+            { idempotencyKey }
+        );
+        return { id: refund.id, status: refund.status || "succeeded" };
+    } catch (err: unknown) {
+        const stripeErr = err as { code?: string; type?: string; raw?: { refund?: { id?: string; status?: string } } };
+        console.error(`Stripe refund error (${idempotencyKey}):`, err);
+        if (stripeErr?.code === "charge_already_refunded") return { id: null, status: "succeeded" };
+        if (stripeErr?.raw?.refund) return { id: stripeErr.raw.refund.id || null, status: stripeErr.raw.refund.status || "failed" };
+        if (stripeErr?.type === "StripeInvalidRequestError") return { id: null, status: "failed" };
+        return { id: null, status: "uncertain" };
+    }
 }
 
 export interface ProcessRefundJobResult {
@@ -71,40 +99,12 @@ export async function processPendingRefundJobs({
         const job = claimData.refund_request;
         processed++;
 
-        let stripeRefundId: string | null = null;
-        let stripeRefundStatus = "pending";
-
-        try {
-            const stripeInstance = stripeClient || stripe;
-            const refund = await stripeInstance.refunds.create(
-                {
-                    payment_intent: job.stripe_payment_intent,
-                    amount: Math.round(Number(job.amount) * 100),
-                },
-                {
-                    idempotencyKey: job.idempotency_key,
-                }
-            );
-            stripeRefundId = refund.id;
-            stripeRefundStatus = refund.status || "succeeded";
-        } catch (err: unknown) {
-            const stripeErr = err as {
-                code?: string;
-                type?: string;
-                raw?: { refund?: { id?: string; status?: string } };
-            };
-            console.error(`RefundWorker: Stripe error for job ${job.id}:`, err);
-            if (stripeErr?.code === "charge_already_refunded") {
-                stripeRefundStatus = "succeeded";
-            } else if (stripeErr?.raw?.refund) {
-                stripeRefundId = stripeErr.raw.refund.id || null;
-                stripeRefundStatus = stripeErr.raw.refund.status || "failed";
-            } else if (stripeErr?.type === "StripeInvalidRequestError") {
-                stripeRefundStatus = "failed";
-            } else {
-                stripeRefundStatus = "uncertain";
-            }
-        }
+        const { id: stripeRefundId, status: stripeRefundStatus } = await createStripeRefund(
+            stripeClient || stripe,
+            job.stripe_payment_intent,
+            job.amount,
+            job.idempotency_key
+        );
 
         const settleRes = await withDbRetry(() =>
             supabase.rpc("settle_stripe_refund", {
