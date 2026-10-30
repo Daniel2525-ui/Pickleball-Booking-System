@@ -1,28 +1,13 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/server";
 import { canTransition, noShowMinutesLeft, buildStatusUpdate } from "@/lib/services/bookings/adminStatusRules";
 import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { cancelRestOfBasket, closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 
 export async function POST(request: NextRequest) {
     try {
-        const supabase = await createClient();
-
-        // 1. Admin-only
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            return Response.json({ error: "Unauthorized." }, { status: 401 });
-        }
-
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .maybeSingle();
-
-        if (profile?.role !== "admin") {
-            return Response.json({ error: "Admin access required." }, { status: 403 });
-        }
+        const { supabase, denied } = await requireAdmin();
+        if (denied) return denied;
 
         // 2. Validate body
         const body = await request.json().catch(() => null);

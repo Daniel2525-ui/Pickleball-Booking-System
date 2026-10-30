@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/server";
 import { validatePricingInput } from "@/lib/services/pricing/validatePricingInput";
 
 /** Saves the base rate, booking length limits and peak windows (replaces all windows). Admin only. */
 export async function POST(request: NextRequest) {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-        if (profile?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+        const { supabase, denied } = await requireAdmin();
+        if (denied) return denied;
 
         const parsed = validatePricingInput(await request.json().catch(() => null));
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });

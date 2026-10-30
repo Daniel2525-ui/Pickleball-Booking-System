@@ -17,3 +17,18 @@ export async function createClient() {
         }
     )
 }
+
+/**
+ * The signed-in admin's client, or the 401/403 response to return. proxy.ts checks the same;
+ * this still guards a route if the matcher ever misses it.
+ */
+export async function requireAdmin() {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { supabase: null, denied: Response.json({ error: "Unauthorized." }, { status: 401 }) }
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    if (profile?.role !== 'admin') return { supabase: null, denied: Response.json({ error: "Admin access required." }, { status: 403 }) }
+
+    return { supabase, denied: null }
+}

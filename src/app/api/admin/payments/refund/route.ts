@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase/service";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/server";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 
 /**
@@ -14,12 +14,8 @@ import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.t
  */
 export async function POST(request: NextRequest) {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-        if (profile?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+        const { supabase, denied } = await requireAdmin();
+        if (denied) return denied;
 
         const body = await request.json().catch(() => null);
         const paymentId = typeof body?.paymentId === "string" ? body.paymentId.trim() : "";

@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-        if (profile?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+        const { supabase, denied } = await requireAdmin();
+        if (denied) return denied;
 
         const body = await request.json().catch(() => null);
         const name = typeof body?.name === "string" ? body.name.trim() : "";
@@ -38,12 +34,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-        if (profile?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+        const { supabase, denied } = await requireAdmin();
+        if (denied) return denied;
 
         const body = await request.json().catch(() => null);
         const id = typeof body?.id === "string" ? body.id.trim() : "";
@@ -75,12 +67,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-        if (profile?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+        const { supabase, denied } = await requireAdmin();
+        if (denied) return denied;
 
         const body = await request.json().catch(() => null);
         const id = typeof body?.id === "string" ? body.id.trim() : "";
