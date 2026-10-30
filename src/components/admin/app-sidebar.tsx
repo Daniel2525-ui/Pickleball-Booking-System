@@ -21,14 +21,12 @@ import {
     Tag,
     CreditCard,
     Crosshair,
-    LogOut,
     Moon,
     Sun,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { logout } from "@/lib/services/auth.service";
 
 interface NavItem {
     title: string;
@@ -79,14 +77,7 @@ const managementNav: NavItem[] = [
 
 export default function AppSidebar() {
     const currentPath = usePathname();
-    const router = useRouter();
     const { setTheme, resolvedTheme } = useTheme();
-
-    async function handleLogout() {
-        await logout();
-        router.push("/login");
-        router.refresh();
-    }
 
     return (
         <Sidebar collapsible="icon">
@@ -178,7 +169,7 @@ export default function AppSidebar() {
                 </SidebarGroup>
             </SidebarContent>
 
-            {/* Sidebar Footer / Logout */}
+            {/* Sidebar Footer / Theme */}
             <SidebarFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <SidebarMenu>
                     <SidebarMenuItem>
@@ -191,16 +182,6 @@ export default function AppSidebar() {
                             <Moon className="hidden size-4 dark:block" />
                             <span className="dark:hidden">Light Mode</span>
                             <span className="hidden dark:inline">Dark Mode</span>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton
-                            onClick={handleLogout}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 font-semibold cursor-pointer py-5"
-                            tooltip="Sign out of Admin"
-                        >
-                            <LogOut className="size-4" />
-                            <span>Sign Out</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
