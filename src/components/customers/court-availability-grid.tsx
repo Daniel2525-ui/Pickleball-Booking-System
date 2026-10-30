@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Clock, Check, LoaderCircle, ChevronDown } from "lucide-react";
 import { Slot } from "./types";
 import { SlotStatus, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
+import { compactRange } from "@/lib/services/bookings/quickStarts";
 
 interface CourtAvailabilityGridProps {
   selectedDate: Date;
@@ -13,6 +14,8 @@ interface CourtAvailabilityGridProps {
   getSlotStatus: (date: Date, court: string, time: string) => SlotStatus;
   selectedSlots?: Slot[];
   isFetching?: boolean;
+  /** One-hour price shown in open cells */
+  priceOf?: (time: string) => number;
 }
 
 export const CourtAvailabilityGrid = ({
@@ -23,6 +26,7 @@ export const CourtAvailabilityGrid = ({
   getSlotStatus,
   selectedSlots = [],
   isFetching,
+  priceOf,
 }: CourtAvailabilityGridProps) => {
   const colCount = courts.length;
   const [showPassed, setShowPassed] = useState(false);
@@ -43,7 +47,7 @@ export const CourtAvailabilityGrid = ({
         </h2>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-primary" /> Available
+            <span className="size-2 rounded-full bg-primary" /> Open · price per hour
           </span>
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-amber-500" /> Pending / Resume
@@ -110,7 +114,7 @@ export const CourtAvailabilityGrid = ({
             {visibleSlots.map((time, timeIdx) => (
               <div key={timeIdx} className="grid grid-cols-[76px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] hover:bg-muted/30 transition-colors group">
                 <div className="p-2 border-r flex items-center justify-center text-xs md:text-sm text-center font-medium sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:bg-muted/30 transition-colors">
-                  {time}
+                  {compactRange([time], 0, 1)}
                 </div>
                 <div
                   className="grid"
@@ -146,7 +150,7 @@ export const CourtAvailabilityGrid = ({
                             aria-label={`Select ${court} at ${time}`}
                             className="w-full h-full min-h-[48px] bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground rounded-lg transition-all duration-200 text-xs md:text-sm font-semibold flex items-center justify-center border border-primary/30 shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           >
-                            Available
+                            {priceOf ? `₱${priceOf(time).toLocaleString()}` : "Available"}
                           </button>
                         ) : status === "user_pending" ? (
                           <button

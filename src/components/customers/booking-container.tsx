@@ -37,6 +37,12 @@ import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
 import { upsertLine, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
+import { QuickBooking } from "@/components/customers/quick-booking";
+import { CourtRally } from "@/components/customers/court-rally";
+import { compactRange } from "@/lib/services/bookings/quickStarts";
+
+// A guest's basket survives the trip to /login (this tab only); restored once they are signed in
+const PENDING_BASKET_KEY = "crosshair:pending-basket";
 
 export const BookingContainer = () => {
   const router = useRouter();
@@ -54,6 +60,7 @@ export const BookingContainer = () => {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isFetchingBookings, setIsFetchingBookings] = useState(false);
   const [showMobileCalendar, setShowMobileCalendar] = useState(false);
+  const [view, setView] = useState<"quick" | "board">("quick");
   // Check auth state on mount
   useEffect(() => {
     const supabase = createClient();
@@ -61,6 +68,25 @@ export const BookingContainer = () => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      if (!user) return;
+
+      let saved: { date: string; lines: Omit<Slot, "date">[] } | null = null;
+      try {
+        saved = JSON.parse(sessionStorage.getItem(PENDING_BASKET_KEY) ?? "null");
+        sessionStorage.removeItem(PENDING_BASKET_KEY);
+      } catch {
+        return;
+      }
+      if (!saved?.lines?.length) return;
+      const date = new Date(saved.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (isNaN(date.getTime()) || new Date(date).setHours(0, 0, 0, 0) < today.getTime()) return;
+      // Availability is re-checked by the checkout API; a taken court is dropped from the basket there
+      setSelectedDateRaw(date);
+      setBasket(saved.lines.map((line) => ({ ...line, date })));
+      setView("board");
+      setIsDialogOpen(true);
     };
     checkUser();
 
@@ -217,12 +243,6 @@ export const BookingContainer = () => {
 
     if (status !== "available") return;
 
-    // If not logged in, show login prompt
-    if (!user) {
-      setShowLoginPrompt(true);
-      return;
-    }
-
     // If clicking on a court already in the basket
     const selectedSlot = basket.find((l) => l.court === courtName);
     if (selectedSlot) {
@@ -260,6 +280,35 @@ export const BookingContainer = () => {
     }
     setSlotWithDuration(courtName, time, minHours);
   };
+
+  // Guests build a basket freely and sign in only to pay
+  const startCheckout = (lines: Slot[] = basket) => {
+    setBasket(lines);
+    if (user) {
+      setIsDialogOpen(true);
+      return;
+    }
+    try {
+      sessionStorage.setItem(
+        PENDING_BASKET_KEY,
+        JSON.stringify({ date: selectedDate.toISOString(), lines })
+      );
+    } catch {
+      // Storage blocked (private mode): the guest just picks again after signing in
+    }
+    setShowLoginPrompt(true);
+  };
+
+  const openHours = courtNames.reduce(
+    (n, court) => n + timeSlots.filter((time) => getSlotStatus(selectedDate, court, time) === "available").length,
+    0
+  );
+  const isToday = selectedDate.toDateString() === new Date().toDateString();
+  const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
+  const closesAt = timeSlots.at(-1)?.split(" - ")[1];
+  const myHold = user
+    ? courtNames.flatMap((court) => timeSlots.filter((time) => getSlotStatus(selectedDate, court, time) === "user_pending").map((time) => ({ court, time })))[0]
+    : undefined;
 
   const handleResumeGridBooking = async () => {
     if (!pendingBookingToResume || isResumingGridBooking) return;
@@ -327,10 +376,74 @@ export const BookingContainer = () => {
     }
   };
 
-  return loading ? (
-    <BookingScheduleSkeleton />
-  ) : (
+  return (
     <>
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-6 md:gap-10 items-end pb-8">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.14em] text-primary">
+            <span className="size-2 rounded-full bg-primary animate-pulse" aria-hidden />
+            {loading
+              ? "Live availability"
+              : `${isToday ? "Live · " : ""}${selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}${closesAt ? ` · open till ${closesAt}` : " · closed"}`}
+          </p>
+          <h1 className="mt-3 text-5xl sm:text-7xl lg:text-8xl leading-[0.88] text-balance">
+            {loading ? (
+              "Book a court"
+            ) : timeSlots.length === 0 ? (
+              `Closed on ${dayName}`
+            ) : (
+              <>
+                <span className="text-primary tabular-nums">{openHours}</span> court hours open {isToday ? "today" : `on ${dayName}`}
+              </>
+            )}
+          </h1>
+          <p className="mt-4 text-muted-foreground font-semibold max-w-md leading-relaxed">
+            Answer three quick questions and pick a time.{pricing ? ` ₱${Number(pricing.settings.base_hourly_rate).toLocaleString()} an hour per court,` : ""} paddles and balls included.
+          </p>
+        </div>
+        <CourtRally className="w-full max-w-sm md:max-w-none justify-self-center" />
+      </div>
+
+      {loading ? (
+        <BookingScheduleSkeleton />
+      ) : view === "quick" ? (
+        <div className="flex flex-col gap-4">
+          {myHold && (
+            <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm">
+              <span>
+                You have an unpaid hold on <b>{myHold.court}</b>, {compactRange([myHold.time], 0, 1)}. Pay before it expires.
+              </span>
+              <Button size="sm" className="font-bold" onClick={() => handleSlotClick(myHold.court, myHold.time)}>
+                Resume
+              </Button>
+            </div>
+          )}
+          <QuickBooking
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            courts={courtNames}
+            timeSlots={timeSlots}
+            getSlotStatus={getSlotStatus}
+            minHours={minHours}
+            maxHours={maxHours}
+            baseRate={Number(pricing?.settings.base_hourly_rate ?? 0)}
+            priceFor={priceFor}
+            onBook={startCheckout}
+            onOpenBoard={() => setView("board")}
+          />
+        </div>
+      ) : (
+      <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => {
+          setView("quick");
+          setBasket([]);
+        }}
+        className="self-start text-sm font-bold text-primary underline underline-offset-4"
+      >
+        Back to simple booking
+      </button>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Mobile Quick-Date Strip */}
         <div className="lg:hidden col-span-1 space-y-2">
@@ -433,6 +546,7 @@ export const BookingContainer = () => {
                 getSlotStatus={getSlotStatus}
                 selectedSlots={basket}
                 isFetching={isFetchingBookings}
+                priceOf={(time) => priceFor(selectedDate, time, 1).total}
               />
 
               {pricing && (
@@ -445,7 +559,7 @@ export const BookingContainer = () => {
                     if (line) setSlotWithDuration(court, line.startSlot || line.time, hours);
                   }}
                   onRemove={(court) => setBasket((prev) => removeLine(prev, court))}
-                  onCheckout={() => setIsDialogOpen(true)}
+                  onCheckout={() => startCheckout()}
                 />
               )}
             </div>
@@ -456,6 +570,8 @@ export const BookingContainer = () => {
           )}
         </div>
       </div>
+      </div>
+      )}
 
       <BookingModal
         isOpen={isDialogOpen}
@@ -473,18 +589,21 @@ export const BookingContainer = () => {
       <Dialog open={showLoginPrompt} onOpenChange={setShowLoginPrompt}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Login Required</DialogTitle>
+            <DialogTitle>Sign in to pay</DialogTitle>
             <DialogDescription>
-              You need to be logged in to book a court. Please log in or create an account to continue.
+              Your {basket.length === 1 ? "court stays" : "courts stay"} in your basket while you sign in or create an account.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
-            <Button variant="outline" onClick={() => setShowLoginPrompt(false)} className="w-full sm:w-auto">
-              Cancel
+          <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+            <Button variant="ghost" onClick={() => setShowLoginPrompt(false)} className="w-full sm:w-auto">
+              Keep browsing
+            </Button>
+            <Button variant="outline" onClick={() => router.push("/register")} className="w-full sm:w-auto">
+              Create account
             </Button>
             <Button onClick={() => router.push("/login")} className="w-full sm:w-auto gap-2">
               <LogIn className="size-4" />
-              Go to Login
+              Sign in
             </Button>
           </DialogFooter>
         </DialogContent>

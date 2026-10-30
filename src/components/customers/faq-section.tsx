@@ -22,7 +22,7 @@ const faqs: FAQItem[] = [
   {
     question: "How does the online court reservation and payment work?",
     answer:
-      "Select your date on our live schedule, choose your preferred court and time slot, and click 'Continue to Checkout'. Payments are processed securely via Stripe. Once complete, your booking confirmation pass appears immediately in your 'My Bookings' tab.",
+      "Pick a day, how many courts and how long, then tap a start time and Book. You only need to sign in when you pay; your courts stay in your basket. Payments are processed securely via Stripe, and your booking pass appears right away under My bookings. Need different times on different courts? Open the full board.",
   },
   {
     question: "What is your cancellation and rescheduling policy?",

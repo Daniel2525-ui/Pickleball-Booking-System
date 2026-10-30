@@ -23,8 +23,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <Crosshair className="size-5 transition-transform group-hover:rotate-45" />
         </div>
         <div className="flex flex-col">
-          <span className="font-extrabold text-xl tracking-tight leading-none text-foreground">
-            Crosshair Dinkers
+          <span className="font-black text-xl tracking-tight leading-none text-foreground uppercase">
+            Crosshair <span className="text-primary">Dinkers</span>
           </span>
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
             Butuan City

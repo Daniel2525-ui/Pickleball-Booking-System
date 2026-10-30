@@ -54,10 +54,12 @@ test("admin sees a clear error for an impossible booking length, and nothing is 
 test("customers see the configured prices, and the hold is charged what the database quotes", async ({ page }) => {
   await login(page, account("CUSTOMER"));
   await page.goto("/#booking");
+  await page.getByRole("button", { name: "See the full board" }).click();
   await page.getByRole("button", { name: /Tmrw/ }).click();
   await page.locator("#booking").getByRole("button", { name: `Select ${court.name} at 4:00 PM - 5:00 PM` }).click();
 
-  const panel = page.locator("#booking");
+  // Grid cells show prices too, so read totals from the basket
+  const panel = page.getByRole("region", { name: "Your basket" });
   await expect(panel.getByText("₱250", { exact: true })).toBeVisible();
   await expect(panel.getByRole("button", { name: "4 hrs" })).toBeVisible();
   await panel.getByRole("button", { name: "2 hrs" }).click();
