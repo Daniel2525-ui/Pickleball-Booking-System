@@ -67,7 +67,8 @@ export const createWalkInBooking = async (
             return { bookingId, error: null };
         }
 
-        if (rpcError && (rpcError.message?.includes("SLOT_UNAVAILABLE") || rpcError.code === "P0001")) {
+        // P0001 also covers VENUE_CLOSED / COURT_UNAVAILABLE, so match the message only
+        if (rpcError?.message?.includes("SLOT_UNAVAILABLE")) {
             return { bookingId: null, error: new Error("This court slot is no longer available. Please choose another time or court.") };
         }
 
