@@ -3,7 +3,6 @@
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
     SidebarGroupLabel,
@@ -21,12 +20,9 @@ import {
     Tag,
     CreditCard,
     Crosshair,
-    Moon,
-    Sun,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTheme } from "next-themes";
 
 interface NavItem {
     title: string;
@@ -77,7 +73,6 @@ const managementNav: NavItem[] = [
 
 export default function AppSidebar() {
     const currentPath = usePathname();
-    const { setTheme, resolvedTheme } = useTheme();
 
     return (
         <Sidebar collapsible="icon">
@@ -168,24 +163,6 @@ export default function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
-
-            {/* Sidebar Footer / Theme */}
-            <SidebarFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton
-                            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-                            className="cursor-pointer py-5 font-medium"
-                            tooltip="Toggle theme"
-                        >
-                            <Sun className="size-4 dark:hidden" />
-                            <Moon className="hidden size-4 dark:block" />
-                            <span className="dark:hidden">Light Mode</span>
-                            <span className="hidden dark:inline">Dark Mode</span>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarFooter>
         </Sidebar>
     );
 }
