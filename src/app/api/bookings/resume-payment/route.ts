@@ -2,10 +2,10 @@ import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getBookingStart } from "@/lib/utils/bookingTime.ts";
-import { formatTime12h } from "@/lib/utils/formatTime";
 import { getServiceClient } from "@/lib/supabase/service";
-import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
+import { loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
+import { openBasketCheckout } from "@/lib/services/payments/openBasketCheckout";
 
 const toDbTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
 
@@ -169,89 +169,33 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 8. Ensure every court has a payment record before creating the Stripe session
-        //    (payments[0] is the original; a later duplicate-charge payment row can exist, 20261102)
-        const baseUrl = request.nextUrl.origin;
-        const lines: { sibling: BasketSibling; paymentId: string; amount: number }[] = [];
-
-        for (const sibling of siblings) {
-            const payment = sibling.payments[0];
-            // Charge each court its own payment amount, the figure reconciliation checks against
-            const amount = Number(payment?.amount) || sibling.total_amount || 200;
-            let paymentRecordId = payment?.id;
-
-            if (!paymentRecordId) {
-                const { data: newPayment, error: createPaymentError } = await supabase
-                    .from("payments")
-                    .insert({
-                        booking_id: sibling.id,
-                        amount,
-                        currency: "php",
-                        status: "pending",
-                    })
-                    .select("id")
-                    .single();
-
-                if (createPaymentError || !newPayment) {
-                    return Response.json(
-                        { error: "Could not create payment record for booking." },
-                        { status: 500 }
-                    );
-                }
-                paymentRecordId = newPayment.id as string;
-            }
-            lines.push({ sibling, paymentId: paymentRecordId, amount });
+        // 8. hold_court_basket always creates the payment row, and customers cannot insert one (RLS)
+        if (siblings.some((s) => !s.payments[0]?.id)) {
+            return Response.json(
+                { error: "This reservation can no longer be paid. Please book again." },
+                { status: 409 }
+            );
         }
 
-        // 9. Create one fresh Stripe Checkout Session, one line per court (same shape as /api/stripe/checkout)
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ["card"],
-            line_items: lines.map(({ sibling, amount }) => ({
-                price_data: {
-                    currency: "php",
-                    product_data: {
-                        name: `${sibling.courts?.name || "Crosshair Dinkers Court"} — ${sibling.booking_date} • ${formatTime12h(toDbTime(sibling.start_time))}–${formatTime12h(toDbTime(sibling.end_time))}`,
-                    },
-                    unit_amount: Math.round(amount * 100),
-                },
-                quantity: 1,
+        // 9. One fresh Stripe Checkout, one line per court, each charged its own payment amount
+        //    (the figure reconciliation checks against)
+        const { url, confirmError } = await openBasketCheckout({
+            supabase,
+            basketId: booking.basket_id,
+            customerEmail: user.email,
+            baseUrl: request.nextUrl.origin,
+            lines: siblings.map((s) => ({
+                bookingId: s.id,
+                paymentId: s.payments[0].id,
+                courtName: s.courts?.name || "Crosshair Dinkers Court",
+                bookingDate: s.booking_date,
+                startTime: s.start_time,
+                endTime: s.end_time,
+                amount: Number(s.payments[0].amount),
             })),
-            mode: "payment",
-            success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${baseUrl}/book`,
-            // Legacy (pre-basket) bookings keep the booking/payment metadata reconciliation expects for them
-            metadata: booking.basket_id
-                ? { basket_id: booking.basket_id, payment_ids: lines.map((l) => l.paymentId).join(",") }
-                : { booking_id: booking.id, payment_id: lines[0].paymentId },
-            customer_email: user.email,
-            expires_at: Math.floor(Date.now() / 1000) + (33 * 60), // 3 minutes over Stripe's 30-minute minimum
         });
 
-        // 10. Atomically confirm each hold extension under court lock and persist the new Stripe session ID
-        const authoritativeHoldExpiresAtIso = new Date((session.expires_at + 120) * 1000).toISOString();
-
-        let confirmError: { message?: string } | null = null;
-        for (const { sibling, paymentId } of lines) {
-            const { error } = await supabase.rpc("confirm_checkout_hold", {
-                p_booking_id: sibling.id,
-                p_payment_id: paymentId,
-                p_stripe_session_id: session.id,
-                p_hold_expires_at: authoritativeHoldExpiresAtIso,
-            });
-            if (error) {
-                confirmError = error;
-                break;
-            }
-        }
-
         if (confirmError) {
-            console.error("confirm_checkout_hold RPC failed on resume:", confirmError);
-            try {
-                await stripe.checkout.sessions.expire(session.id);
-            } catch (expireErr) {
-                console.error("Failed to expire superseded Stripe session on resume:", expireErr);
-            }
-
             // INVALID_STATUS: the expired hold was released when another player claimed the slot (20261102)
             const isConflict =
                 confirmError.message?.includes("SLOT_UNAVAILABLE") || confirmError.message?.includes("INVALID_STATUS");
@@ -268,7 +212,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        return Response.json({ url: session.url });
+        return Response.json({ url });
     } catch (error: unknown) {
         console.error("Resume payment error:", error);
         return Response.json(

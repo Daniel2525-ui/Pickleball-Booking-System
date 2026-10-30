@@ -1,13 +1,12 @@
 import { NextRequest } from "next/server";
 import Stripe from "stripe";
-import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import {
     validateBasketLines,
     getBookingWeekday,
 } from "@/lib/services/bookings/validateBookingSlot.service";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { openBasketCheckout } from "@/lib/services/payments/openBasketCheckout";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 
 interface HeldBasket {
@@ -188,88 +187,38 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 6. Create a Stripe Checkout Session
-        const baseUrl = request.nextUrl.origin;
-
-        // Stripe requires expires_at to be at least 30 minutes in the future from the moment of session creation.
-        // We set 33 minutes (1980s), providing a robust 3-minute (180s) safety margin over Stripe's 30-minute minimum
-        // to comfortably absorb network transit, clock skew, and DNS/TLS latency.
-        const stripeExpiresAtSec = Math.floor(Date.now() / 1000) + (33 * 60);
-
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ["card"],
-            line_items: items.map((item) => ({
-                price_data: {
-                    currency: "php",
-                    product_data: {
-                        name: `${item.court_name} — ${booking_date} • ${formatTime12h(item.start_time)}–${formatTime12h(item.end_time)}`,
-                    },
-                    unit_amount: Math.round(Number(item.amount) * 100), // Stripe uses cents
-                },
-                quantity: 1,
+        // 4. One Stripe Checkout for every held court, each hold tied to it under the court lock
+        const { url, confirmError } = await openBasketCheckout({
+            supabase,
+            basketId: basket.basket_id,
+            customerEmail: user.email,
+            baseUrl: request.nextUrl.origin,
+            lines: items.map((item) => ({
+                bookingId: item.booking_id,
+                paymentId: item.payment_id,
+                courtName: item.court_name,
+                bookingDate: booking_date,
+                startTime: item.start_time,
+                endTime: item.end_time,
+                amount: Number(item.amount),
             })),
-            mode: "payment",
-            success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${baseUrl}/book`,
-            // Reconciliation confirms exactly these payments, never other rows of the basket
-            metadata: { basket_id: basket.basket_id, payment_ids: createdPaymentIds.join(",") },
-            customer_email: user.email,
-            expires_at: stripeExpiresAtSec,
         });
 
-        // 7. Atomically confirm each hold and persist the Stripe session ID.
-        // Uses confirm_checkout_hold RPC under court row lock to verify that the slot was not claimed
-        // if the initial hold expired while Stripe was processing (preventing expired-hold resurrection).
-        const authoritativeHoldExpiresAtIso = new Date((session.expires_at + 120) * 1000).toISOString();
-
-        let confirmError: { message?: string } | null = null;
-        for (const item of items) {
-            const { error } = await supabase.rpc("confirm_checkout_hold", {
-                p_booking_id: item.booking_id,
-                p_payment_id: item.payment_id,
-                p_stripe_session_id: session.id,
-                p_hold_expires_at: authoritativeHoldExpiresAtIso,
-            });
-            if (error) {
-                confirmError = error;
-                break;
-            }
-        }
-
         if (confirmError) {
-            console.error("confirm_checkout_hold RPC failed:", confirmError);
-
-            // Case A: A hold expired and another booking claimed the slot while Stripe was processing
-            const isConflict = confirmError.message?.includes("SLOT_UNAVAILABLE");
-            if (isConflict) {
-                try {
-                    await stripe.checkout.sessions.expire(session.id);
-                } catch (expireErr) {
-                    console.error("Failed to expire superseded Stripe session:", expireErr);
-                }
-
-                // Preserve booking records for audit (do not delete), but report conflict to player
+            // Booking records are kept for audit; the session was expired so nobody pays for them
+            if (confirmError.message?.includes("SLOT_UNAVAILABLE")) {
                 return Response.json(
                     { error: "Your reservation hold expired and a time slot was reserved by another player. Please choose again." },
                     { status: 409 }
                 );
             }
-
-            // Case B: Database error or network glitch after Stripe session creation
-            // Do NOT delete bookings or payments (Stripe session exists). Attempt to expire session and report error.
-            try {
-                await stripe.checkout.sessions.expire(session.id);
-            } catch (expireErr) {
-                console.error("Failed to expire Stripe session on DB failure:", expireErr);
-            }
-
             return Response.json(
                 { error: "Unable to confirm court reservation hold. If payment was initiated, your booking will be preserved under 'My Bookings'." },
                 { status: 500 }
             );
         }
 
-        return Response.json({ url: session.url });
+        return Response.json({ url });
     } catch (error: unknown) {
         console.error("Checkout session error:", error);
 
