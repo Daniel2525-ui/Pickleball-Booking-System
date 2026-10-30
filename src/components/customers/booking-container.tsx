@@ -306,6 +306,9 @@ export const BookingContainer = () => {
   const isToday = selectedDate.toDateString() === new Date().toDateString();
   const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
   const closesAt = timeSlots.at(-1)?.split(" - ")[1];
+  const slotWord = openHours === 1 ? "slot" : "slots";
+  // Warn once free slots drop to half the court count (4 courts → 2, 6 → 3)
+  const goingFast = openHours > 0 && openHours <= Math.ceil(courtNames.length / 2);
   const myHold = user
     ? courtNames.flatMap((court) => timeSlots.filter((time) => getSlotStatus(selectedDate, court, time) === "user_pending").map((time) => ({ court, time })))[0]
     : undefined;
@@ -391,12 +394,25 @@ export const BookingContainer = () => {
               "Book a court"
             ) : timeSlots.length === 0 ? (
               `Closed on ${dayName}`
+            ) : openHours === 0 ? (
+              <>
+                <span className="text-primary">Fully booked</span> {isToday ? "tonight" : `on ${dayName}`}
+              </>
+            ) : goingFast ? (
+              <>
+                Only <span className="text-primary tabular-nums">{openHours} {slotWord}</span> left {isToday ? "tonight" : `on ${dayName}`}
+              </>
             ) : (
               <>
-                <span className="text-primary tabular-nums">{openHours}</span> court hours open {isToday ? "today" : `on ${dayName}`}
+                <span className="text-primary tabular-nums">{openHours}</span> {slotWord} open {isToday ? "today" : `on ${dayName}`}
               </>
             )}
           </h1>
+          {!loading && timeSlots.length > 0 && goingFast && (
+            <span className="mt-4 inline-block text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              Going fast
+            </span>
+          )}
           <p className="mt-4 text-muted-foreground font-semibold max-w-md leading-relaxed">
             Answer three quick questions and pick a time.{pricing ? ` ₱${Number(pricing.settings.base_hourly_rate).toLocaleString()} an hour per court,` : ""} paddles and balls included.
           </p>
