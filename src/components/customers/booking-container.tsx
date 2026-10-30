@@ -19,6 +19,7 @@ import { DateSelector } from "@/components/customers/date-selector";
 import { CourtAvailabilityGrid } from "@/components/customers/court-availability-grid";
 import { BookingModal } from "@/components/customers/booking-modal";
 import { BookingScheduleSkeleton } from "@/components/skeletons/booking-schedule-skeleton";
+import { QuickBookingSkeleton } from "@/components/skeletons/quick-booking-skeleton";
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service";
 import { OperatingHour } from "@/components/admin/schedules/types";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
@@ -423,7 +424,7 @@ export const BookingContainer = () => {
       </div>
 
       {loading ? (
-        <BookingScheduleSkeleton />
+        view === "quick" ? <QuickBookingSkeleton /> : <BookingScheduleSkeleton />
       ) : view === "quick" ? (
         <div className="flex flex-col gap-4">
           {myHold && (

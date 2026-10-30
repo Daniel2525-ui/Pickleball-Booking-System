@@ -305,7 +305,7 @@ export const QuickBooking = ({
   );
 };
 
-const Step = ({ n }: { n: number }) => (
+export const Step = ({ n }: { n: number }) => (
   <span aria-hidden className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-extrabold">
     {n}
   </span>
