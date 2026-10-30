@@ -1,4 +1,4 @@
--- Rollback: gcash_manual_payment — drops the GCash functions and columns and restores the customer update policy
+-- Rollback: gcash_manual_payment — drops the GCash functions and columns and restores the customer update policies
 -- and cancel_reason check. Fails if a booking has cancel_reason 'gcash_rejected': change it first.
 -- Submitted bookings (hold_expires_at = 'infinity') are left as they are: confirm or cancel them first.
 BEGIN;
@@ -19,7 +19,23 @@ CREATE POLICY bookings_update_policy ON public.bookings
     coalesce(auth.role(), '') = 'service_role'
     OR (current_user = 'postgres' AND auth.role() IS NULL)
     OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-    OR (user_id = auth.uid() AND status = 'cancelled')
+    OR (user_id = auth.uid() AND status = 'cancelled' AND cancel_reason = 'customer')
+  );
+
+DROP POLICY IF EXISTS payments_update_policy ON public.payments;
+CREATE POLICY payments_update_policy ON public.payments
+  FOR UPDATE
+  USING (
+    coalesce(auth.role(), '') = 'service_role'
+    OR (current_user = 'postgres' AND auth.role() IS NULL)
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    OR (EXISTS (SELECT 1 FROM public.bookings b WHERE b.id = booking_id AND b.user_id = auth.uid()) AND status = 'pending')
+  )
+  WITH CHECK (
+    coalesce(auth.role(), '') = 'service_role'
+    OR (current_user = 'postgres' AND auth.role() IS NULL)
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    OR (EXISTS (SELECT 1 FROM public.bookings b WHERE b.id = booking_id AND b.user_id = auth.uid()) AND status = 'failed')
   );
 
 ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_cancel_reason_check;

@@ -3990,6 +3990,12 @@ async function main() {
     assert.ok(unconf.stderr.includes("GCASH_NOT_CONFIGURED"), unconf.stderr);
     q(`UPDATE public.booking_settings SET gcash_account_name = 'Test Club', gcash_number = '09171234567';`);
 
+    for (const set of ["gcash_account_name = 'Only Name'", "gcash_number = '09179999999'"]) {
+      const p = runPsqlCommand(`UPDATE public.booking_settings SET gcash_account_name = NULL, gcash_number = NULL; UPDATE public.booking_settings SET ${set};`);
+      assert.ok(p.stderr.includes("booking_settings_gcash_check"), p.stderr);
+    }
+    q(`UPDATE public.booking_settings SET gcash_account_name = 'Test Club', gcash_number = '09171234567';`);
+
     const h = JSON.parse(q(holdSql, as(danaUid)));
     assert.equal(h.items.length, 2);
     assert.equal(q(`SELECT string_agg(p.payment_method || '/' || p.status, ',') FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${h.basket_id}';`), "gcash/pending,gcash/pending");
@@ -4003,12 +4009,16 @@ async function main() {
     }
     assert.ok(submit(h.basket_id, "1234567890", `${bobUid}/x.png`, bobUid).stderr.includes("NOT_FOUND"));
 
+    // a customer's unsubmitted pending booking can only be cancelled as 'customer'
+    assert.ok(runPsqlCommand(`UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'admin' WHERE basket_id = '${h.basket_id}'`, as(danaUid, true)).stderr.includes("row-level security")); // WITH CHECK rejects it
+
     const ok = submit(h.basket_id, "1234 5678 90123", okPath);
     assert.equal(ok.status, 0, ok.stderr);
     assert.equal(JSON.parse(ok.stdout).submitted, 2);
     assert.equal(state(h.basket_id), "pending/infinity/1234567890123/true,pending/infinity/1234567890123/true");
     assert.equal(q(`SELECT count(*) FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${h.basket_id}' AND p.gcash_submitted_at IS NULL;`), "0");
     assert.ok(submit(h.basket_id, "1234567890", okPath).stderr.includes("ALREADY_SUBMITTED"));
+    assert.equal(q(`WITH u AS (UPDATE public.payments SET payment_reference = 'X' WHERE booking_id = '${h.items[0].booking_id}' RETURNING 1) SELECT count(*) FROM u;`, as(danaUid, true)), "0");
 
     // Still held: others cannot take the slot, expiry sweeps skip it
     const bobHold = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '${lines(C1)}'::jsonb);`, as(bobUid));
@@ -4031,6 +4041,10 @@ async function main() {
     runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_gcash_manual_payment.sql"));
     for (const f of ["hold_gcash_basket", "submit_gcash_proof"]) assert.equal(q(`SELECT to_regproc('public.${f}') IS NULL;`), "t");
     runPsqlFile(migrationPath);
+    assert.equal(q(`SELECT has_function_privilege('anon', 'public.hold_gcash_basket(date,jsonb,timestamptz)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.hold_gcash_basket(date,jsonb,timestamptz)', 'EXECUTE')::text
+      || has_function_privilege('anon', 'public.submit_gcash_proof(uuid,text,text)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.submit_gcash_proof(uuid,text,text)', 'EXECUTE')::text;`), "falsetruefalsetrue");
   });
 
   console.log("\n================================================================================");

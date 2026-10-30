@@ -9,7 +9,7 @@
 --   2. cancel_reason may be 'gcash_rejected'.
 --   3. hold_gcash_basket = hold_court_basket + payment_method 'gcash'.
 --   4. submit_gcash_proof records the reference and proof path and makes the hold permanent.
---   5. Customers can no longer cancel a submitted booking directly (staff decide).
+--   5. Customers can no longer cancel a submitted booking or edit its payment directly (staff decide).
 --   Idempotent: safe to re-run. Rollback: supabase/rollback_gcash_manual_payment.sql.
 -- ==============================================================================
 
@@ -22,7 +22,8 @@ ALTER TABLE public.booking_settings
 ALTER TABLE public.booking_settings DROP CONSTRAINT IF EXISTS booking_settings_gcash_check;
 ALTER TABLE public.booking_settings ADD CONSTRAINT booking_settings_gcash_check CHECK (
   (gcash_account_name IS NULL AND gcash_number IS NULL)
-  OR (char_length(gcash_account_name) BETWEEN 1 AND 100 AND gcash_number ~ '^09[0-9]{9}$')
+  OR (gcash_account_name IS NOT NULL AND gcash_number IS NOT NULL
+      AND char_length(gcash_account_name) BETWEEN 1 AND 100 AND gcash_number ~ '^09[0-9]{9}$')
 );
 
 ALTER TABLE public.payments
@@ -48,7 +49,23 @@ CREATE POLICY bookings_update_policy ON public.bookings
     coalesce(auth.role(), '') = 'service_role'
     OR (current_user = 'postgres' AND auth.role() IS NULL)
     OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-    OR (user_id = auth.uid() AND status = 'cancelled')
+    OR (user_id = auth.uid() AND status = 'cancelled' AND cancel_reason = 'customer')
+  );
+
+DROP POLICY IF EXISTS payments_update_policy ON public.payments;
+CREATE POLICY payments_update_policy ON public.payments
+  FOR UPDATE
+  USING (
+    coalesce(auth.role(), '') = 'service_role'
+    OR (current_user = 'postgres' AND auth.role() IS NULL)
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    OR (EXISTS (SELECT 1 FROM public.bookings b WHERE b.id = booking_id AND b.user_id = auth.uid()) AND status = 'pending' AND gcash_submitted_at IS NULL)
+  )
+  WITH CHECK (
+    coalesce(auth.role(), '') = 'service_role'
+    OR (current_user = 'postgres' AND auth.role() IS NULL)
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    OR (EXISTS (SELECT 1 FROM public.bookings b WHERE b.id = booking_id AND b.user_id = auth.uid()) AND status = 'failed')
   );
 
 CREATE OR REPLACE FUNCTION public.hold_gcash_basket(p_booking_date date, p_lines jsonb, p_hold_expires_at timestamptz DEFAULT NULL) RETURNS jsonb
