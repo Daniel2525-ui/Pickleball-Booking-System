@@ -112,7 +112,7 @@ npm run test:e2e     # Playwright end-to-end tests
 
 <div align="center">
 
-Built by **[Erle Daniel Sudario](https://github.com/Daniel2525-ui)** · Butuan City 🇵🇭
+Built by **[Erle Daniel Sudario](https://github.com/Daniel2525-ui)** · Cabadbaran City 🇵🇭
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:84cc16,100:0f766e&height=100&section=footer" />
 
