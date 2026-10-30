@@ -1,14 +1,23 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import AppSidebar from "@/components/admin/app-sidebar"
 import { Crosshair } from "lucide-react"
+import { AccountMenu } from "@/components/account-menu"
+import { createClient } from "@/lib/supabase/server"
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // The proxy already gates /admin to admins; this only reads who is signed in for the account menu
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle()
+    : { data: null }
+
   return (
     <SidebarProvider>
       <AppSidebar />
       <main className="w-full min-h-screen flex flex-col bg-background text-foreground">
         {/* Responsive Admin App Header */}
-        <header className="sticky top-0 z-30 h-14 flex items-center bg-background/90 backdrop-blur-md px-4 sm:px-6 pt-[env(safe-area-inset-top)]">
+        <header className="sticky top-0 z-30 h-14 flex items-center justify-between gap-3 bg-background/90 backdrop-blur-md px-4 sm:px-6 pt-[env(safe-area-inset-top)]">
           <div className="flex items-center gap-3">
             <SidebarTrigger className="size-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted" />
             <div className="flex items-center gap-2 md:hidden">
@@ -20,6 +29,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </span>
             </div>
           </div>
+          {user && (
+            <AccountMenu
+              name={profile?.full_name ?? ""}
+              email={user.email ?? ""}
+              signOutTo="/login"
+              links={[
+                { label: "Customer site", href: "/", icon: "home" },
+                { label: "Profile and password", href: "/profile", icon: "profile" },
+              ]}
+            />
+          )}
         </header>
 
         <div className="flex-1 pb-safe">
