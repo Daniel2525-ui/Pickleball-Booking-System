@@ -4039,12 +4039,84 @@ async function main() {
     assert.ok(submit(a.basket_id, "1234567890", `${aliceUid}/a.png`, aliceUid).stderr.includes("HOLD_EXPIRED"));
 
     runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_gcash_manual_payment.sql"));
-    for (const f of ["hold_gcash_basket", "submit_gcash_proof"]) assert.equal(q(`SELECT to_regproc('public.${f}') IS NULL;`), "t");
+    for (const f of ["hold_gcash_basket", "submit_gcash_proof", "approve_gcash_basket", "reject_gcash_basket"]) assert.equal(q(`SELECT to_regproc('public.${f}') IS NULL;`), "t");
     runPsqlFile(migrationPath);
     assert.equal(q(`SELECT has_function_privilege('anon', 'public.hold_gcash_basket(date,jsonb,timestamptz)', 'EXECUTE')::text
       || has_function_privilege('authenticated', 'public.hold_gcash_basket(date,jsonb,timestamptz)', 'EXECUTE')::text
       || has_function_privilege('anon', 'public.submit_gcash_proof(uuid,text,text)', 'EXECUTE')::text
-      || has_function_privilege('authenticated', 'public.submit_gcash_proof(uuid,text,text)', 'EXECUTE')::text;`), "falsetruefalsetrue");
+      || has_function_privilege('authenticated', 'public.submit_gcash_proof(uuid,text,text)', 'EXECUTE')::text
+      || has_function_privilege('anon', 'public.approve_gcash_basket(uuid)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.approve_gcash_basket(uuid)', 'EXECUTE')::text
+      || has_function_privilege('anon', 'public.reject_gcash_basket(uuid)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.reject_gcash_basket(uuid)', 'EXECUTE')::text;`), "falsetruefalsetruefalsetruefalsetrue");
+  });
+
+  await runTest("gcash: admin approves or rejects a whole basket", () => {
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const as = (uid) => ({ role: "authenticated", uid });
+    const C1 = activeCourtId;
+    const C2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    const day = "2030-02-19";
+    q(`UPDATE public.booking_settings SET gcash_account_name = 'Test Club', gcash_number = '09171234567';`); // the previous test's rollback dropped the columns
+    q(`UPDATE public.bookings SET status = 'cancelled' WHERE user_id = '${danaUid}' AND status = 'pending' AND hold_expires_at = 'infinity';`); // earlier test left a submitted basket open
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE user_id = '${danaUid}' AND status = 'pending' AND hold_expires_at <> 'infinity';`);
+    const lines = (hour, ...courts) => JSON.stringify(courts.map((c) => ({ court_id: c, start_time: `${hour}:00`, end_time: `${Number(hour) + 1}:00` })));
+    const hold = (hour, uid, ...courts) => JSON.parse(q(`SELECT public.hold_gcash_basket('${day}', '${lines(hour, ...courts)}'::jsonb);`, as(uid)));
+    const submitted = (hour, ...courts) => {
+      const h = hold(hour, danaUid, ...courts);
+      q(`SELECT public.submit_gcash_proof('${h.basket_id}', 'REF123456', '${danaUid}/${h.basket_id}.png');`, as(danaUid));
+      return h;
+    };
+    const approve = (b, uid = adminUid) => runPsqlCommand(`SELECT public.approve_gcash_basket('${b}');`, as(uid));
+    const reject = (b, uid = adminUid) => runPsqlCommand(`SELECT public.reject_gcash_basket('${b}');`, as(uid));
+    const state = (b) => q(`SELECT string_agg(b.status || '/' || p.status || '/' || coalesce(b.cancel_reason, '-') || '/' || coalesce(b.hold_expires_at::text, 'null') || '/' || (p.paid_at IS NOT NULL), ',' ORDER BY b.court_id)
+      FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${b}';`);
+
+    // Never submitted: NOT_FOUND for admin, FORBIDDEN for bob (checked first)
+    const unsub = hold("11", aliceUid, C1);
+    assert.ok(approve(unsub.basket_id).stderr.includes("NOT_FOUND"));
+    assert.ok(reject(unsub.basket_id).stderr.includes("NOT_FOUND"));
+
+    // Approve works even after the start time has passed
+    const a = submitted("09", C1, C2);
+    assert.ok(approve(a.basket_id, bobUid).stderr.includes("FORBIDDEN"));
+    assert.ok(reject(a.basket_id, bobUid).stderr.includes("FORBIDDEN"));
+    q(`UPDATE public.bookings SET booking_date = current_date - 1 WHERE basket_id = '${a.basket_id}';`);
+    const ra = approve(a.basket_id);
+    assert.equal(ra.status, 0, ra.stderr);
+    assert.equal(JSON.parse(ra.stdout).approved, 2);
+    assert.equal(state(a.basket_id), "confirmed/paid/-/null/true,confirmed/paid/-/null/true");
+    assert.equal(q(`SELECT string_agg(DISTINCT payment_method, ',') FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${a.basket_id}';`), "gcash");
+
+    // Partial basket: the cancelled court is left alone
+    const b = submitted("10", C1, C2);
+    q(`UPDATE public.bookings SET status = 'cancelled' WHERE basket_id = '${b.basket_id}' AND court_id = '${C2}';`);
+    const rb = approve(b.basket_id);
+    assert.equal(rb.status, 0, rb.stderr);
+    const out = JSON.parse(rb.stdout);
+    assert.equal(out.approved, 1);
+    assert.equal(Number(out.amount), Number(q(`SELECT total_amount FROM public.bookings WHERE basket_id = '${b.basket_id}' AND court_id = '${C1}';`)));
+    assert.equal(q(`SELECT status FROM public.bookings WHERE basket_id = '${b.basket_id}' AND court_id = '${C2}';`), "cancelled");
+    assert.equal(q(`SELECT p.status FROM public.payments p JOIN public.bookings bk ON bk.id = p.booking_id WHERE bk.basket_id = '${b.basket_id}' AND bk.court_id = '${C2}';`), "pending");
+
+    // Reject frees the slot
+    const c = submitted("12", C1, C2);
+    const rc = reject(c.basket_id);
+    assert.equal(rc.status, 0, rc.stderr);
+    assert.equal(JSON.parse(rc.stdout).rejected, 2);
+    assert.equal(state(c.basket_id), "cancelled/failed/gcash_rejected/infinity/false,cancelled/failed/gcash_rejected/infinity/false");
+    const bobHold = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '${lines("12", C1)}'::jsonb);`, as(bobUid));
+    assert.equal(bobHold.status, 0, bobHold.stderr);
+
+    // Already decided
+    for (const id of [a.basket_id, b.basket_id, c.basket_id]) {
+      assert.ok(approve(id).stderr.includes("NOT_FOUND"));
+      assert.ok(reject(id).stderr.includes("NOT_FOUND"));
+    }
   });
 
   console.log("\n================================================================================");

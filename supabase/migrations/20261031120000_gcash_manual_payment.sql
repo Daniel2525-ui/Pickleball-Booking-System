@@ -9,7 +9,8 @@
 --   2. cancel_reason may be 'gcash_rejected'.
 --   3. hold_gcash_basket = hold_court_basket + payment_method 'gcash'.
 --   4. submit_gcash_proof records the reference and proof path and makes the hold permanent.
---   5. Customers can no longer cancel a submitted booking or edit its payment directly (staff decide).
+--   5. approve_gcash_basket / reject_gcash_basket let staff confirm or cancel a submitted basket.
+--   6. Customers can no longer cancel a submitted booking or edit its payment directly (staff decide).
 --   Idempotent: safe to re-run. Rollback: supabase/rollback_gcash_manual_payment.sql.
 -- ==============================================================================
 
@@ -138,9 +139,87 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.approve_gcash_basket(p_basket_id uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+  v_ids uuid[];
+  v_amount numeric;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Authentication required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'FORBIDDEN: Admin privileges required' USING ERRCODE = '42501';
+  END IF;
+
+  -- Only submitted rows: a court cancelled meanwhile is left alone
+  SELECT array_agg(id), sum(total_amount) INTO v_ids, v_amount
+  FROM (
+    SELECT b.id, b.total_amount FROM public.bookings b
+    WHERE b.basket_id = p_basket_id AND b.status = 'pending' AND b.hold_expires_at = 'infinity'
+      AND EXISTS (SELECT 1 FROM public.payments p WHERE p.booking_id = b.id AND p.payment_method = 'gcash'
+                  AND p.status = 'pending' AND p.gcash_submitted_at IS NOT NULL)
+    ORDER BY b.court_id FOR UPDATE
+  ) b;
+  IF v_ids IS NULL THEN
+    RAISE EXCEPTION 'NOT_FOUND: No submitted GCash bookings in this basket' USING ERRCODE = 'P0001';
+  END IF;
+  PERFORM 1 FROM public.payments WHERE booking_id = ANY (v_ids) ORDER BY booking_id FOR UPDATE;
+
+  -- Deliberately no start-time or hold-expiry check: the customer already paid.
+  UPDATE public.payments SET status = 'paid', paid_at = now() WHERE booking_id = ANY (v_ids);
+  UPDATE public.bookings SET status = 'confirmed', hold_expires_at = NULL, updated_at = now() WHERE id = ANY (v_ids);
+
+  RETURN jsonb_build_object('basket_id', p_basket_id, 'approved', cardinality(v_ids), 'amount', v_amount);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.reject_gcash_basket(p_basket_id uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+  v_ids uuid[];
+  v_amount numeric;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Authentication required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'FORBIDDEN: Admin privileges required' USING ERRCODE = '42501';
+  END IF;
+
+  -- Only submitted rows: a court cancelled meanwhile is left alone
+  SELECT array_agg(id), sum(total_amount) INTO v_ids, v_amount
+  FROM (
+    SELECT b.id, b.total_amount FROM public.bookings b
+    WHERE b.basket_id = p_basket_id AND b.status = 'pending' AND b.hold_expires_at = 'infinity'
+      AND EXISTS (SELECT 1 FROM public.payments p WHERE p.booking_id = b.id AND p.payment_method = 'gcash'
+                  AND p.status = 'pending' AND p.gcash_submitted_at IS NOT NULL)
+    ORDER BY b.court_id FOR UPDATE
+  ) b;
+  IF v_ids IS NULL THEN
+    RAISE EXCEPTION 'NOT_FOUND: No submitted GCash bookings in this basket' USING ERRCODE = 'P0001';
+  END IF;
+  PERFORM 1 FROM public.payments WHERE booking_id = ANY (v_ids) ORDER BY booking_id FOR UPDATE;
+
+  UPDATE public.payments SET status = 'failed' WHERE booking_id = ANY (v_ids);
+  UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'gcash_rejected', updated_at = now() WHERE id = ANY (v_ids);
+
+  RETURN jsonb_build_object('basket_id', p_basket_id, 'rejected', cardinality(v_ids));
+END;
+$$;
+
 REVOKE ALL ON FUNCTION public.hold_gcash_basket(date, jsonb, timestamptz) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.hold_gcash_basket(date, jsonb, timestamptz) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.submit_gcash_proof(uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.submit_gcash_proof(uuid, text, text) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.approve_gcash_basket(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.approve_gcash_basket(uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.reject_gcash_basket(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.reject_gcash_basket(uuid) TO authenticated, service_role;
 
 COMMIT;

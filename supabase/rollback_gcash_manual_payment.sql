@@ -3,6 +3,8 @@
 -- Submitted bookings (hold_expires_at = 'infinity') are left as they are: confirm or cancel them first.
 BEGIN;
 
+DROP FUNCTION IF EXISTS public.reject_gcash_basket(uuid);
+DROP FUNCTION IF EXISTS public.approve_gcash_basket(uuid);
 DROP FUNCTION IF EXISTS public.submit_gcash_proof(uuid, text, text);
 DROP FUNCTION IF EXISTS public.hold_gcash_basket(date, jsonb, timestamptz);
 
