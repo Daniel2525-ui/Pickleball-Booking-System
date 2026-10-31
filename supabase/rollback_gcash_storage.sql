@@ -1,4 +1,4 @@
--- Rollback for 20261031120100_gcash_storage.sql.
+-- Rollback for 20261031032012_gcash_storage.sql.
 -- Buckets are deleted only if empty (storage rows can't be dropped while holding objects);
 -- non-empty buckets are left in place so uploaded receipts are never lost.
 BEGIN;
