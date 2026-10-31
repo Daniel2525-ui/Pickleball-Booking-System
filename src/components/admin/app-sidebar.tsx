@@ -21,6 +21,7 @@ import {
     Tag,
     CreditCard,
     Crosshair,
+    Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -70,6 +71,11 @@ const managementNav: NavItem[] = [
         title: "Payments & Revenue",
         url: "/admin/payments",
         icon: CreditCard,
+    },
+    {
+        title: "Settings",
+        url: "/admin/settings",
+        icon: Settings,
     },
 ];
 

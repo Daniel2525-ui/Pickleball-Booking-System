@@ -100,3 +100,60 @@ test("admin approves and rejects GCash payments", async ({ page }) => {
     resetBookings();
   }
 });
+
+test("admin edits GCash details", async ({ page }) => {
+  const saved = () => sql("SELECT coalesce(gcash_account_name, '-') || '|' || coalesce(gcash_number, '-') || '|' || (gcash_qr_url IS NOT NULL) FROM public.booking_settings");
+  sql("UPDATE public.booking_settings SET gcash_account_name = NULL, gcash_number = NULL, gcash_qr_url = NULL");
+  try {
+    await login(page, account("ADMIN"));
+    await page.goto("/admin/dashboard");
+    await page.getByRole("link", { name: "Settings" }).click();
+    await expect(page).toHaveURL(/\/admin\/settings/);
+    const name = page.getByLabel("Account name");
+    const number = page.getByLabel("GCash number");
+    const save = page.getByRole("button", { name: "Save GCash details" });
+
+    // Invalid number: inline error, nothing saved
+    await name.fill("Pickle Club Co.");
+    await number.fill("12345");
+    await save.click();
+    await expect(page.getByText("Enter an 11-digit GCash number starting with 09.")).toBeVisible();
+    expect(saved()).toBe("-|-|false");
+
+    // Only one field filled: nothing saved
+    await number.fill("");
+    await save.click();
+    await expect(page.getByText("Enter both the account name and the GCash number, or clear both to turn GCash off.")).toBeVisible();
+    expect(saved()).toBe("-|-|false");
+
+    // Valid: spaces are stripped, and it survives a reload
+    await number.fill("0917 123 4567");
+    await save.click();
+    await expect(page.getByText("GCash details saved.").first()).toBeVisible();
+    expect(saved()).toBe("Pickle Club Co.|09171234567|false");
+    await page.reload();
+    await expect(name).toHaveValue("Pickle Club Co.");
+    await expect(number).toHaveValue("09171234567");
+
+    // QR upload stores the public URL; Remove QR clears it
+    await page.getByLabel("QR code image").setInputFiles({ name: "qr.png", mimeType: "image/png", buffer: PNG_1X1 });
+    await expect(page.getByRole("img", { name: "GCash QR code" })).toBeVisible();
+    expect(saved()).toBe("Pickle Club Co.|09171234567|true");
+    await page.getByRole("button", { name: "Remove QR" }).click();
+    await expect(page.getByRole("img", { name: "GCash QR code" })).toHaveCount(0);
+    expect(saved()).toBe("Pickle Club Co.|09171234567|false");
+
+    // Clearing both turns GCash off, which hides it in the booking modal
+    await name.fill("");
+    await number.fill("");
+    await save.click();
+    await expect(page.getByText("GCash details saved.").first()).toBeVisible();
+    expect(saved()).toBe("-|-|false");
+  } finally {
+    sql("UPDATE public.booking_settings SET gcash_account_name = NULL, gcash_number = NULL, gcash_qr_url = NULL");
+    const admin = await signedIn("ADMIN");
+    const { data } = await admin.storage.from("club-assets").list();
+    const stale = (data ?? []).filter((f) => f.name.startsWith("gcash-qr-")).map((f) => f.name);
+    if (stale.length) await admin.storage.from("club-assets").remove(stale);
+  }
+});
