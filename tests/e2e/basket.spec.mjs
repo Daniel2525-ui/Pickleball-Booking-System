@@ -301,3 +301,44 @@ test("GCash checkout lands on the pay page; GCash hidden when not configured", a
          UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
   }
 });
+
+const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+
+test("GCash pay page submits reference and screenshot", async ({ page }) => {
+  const setGcash = (v) =>
+    sql(`UPDATE public.booking_settings SET gcash_account_name = ${v ? "'Club'" : "NULL"}, gcash_number = ${v ? "'09171234567'" : "NULL"}`);
+  try {
+    setGcash(true);
+    await login(page, account("CUSTOMER"));
+    await openTomorrow(page);
+    await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
+    await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
+    await page.getByRole("dialog").getByRole("radio", { name: "GCash" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
+    await page.waitForURL(/\/book\/gcash\?basket=/);
+
+    await expect(page.getByText("Send exactly ₱200")).toBeVisible();
+    await expect(page.getByText("09171234567")).toBeVisible();
+    const submit = page.getByRole("button", { name: "Submit payment" });
+    await expect(submit).toBeDisabled();
+    await page.getByLabel("GCash reference number").fill("1234567890123");
+    await expect(submit).toBeDisabled();
+    await page.getByLabel("Payment screenshot").setInputFiles({ name: "receipt.png", mimeType: "image/png", buffer: PNG_1X1 });
+    await expect(submit).toBeEnabled();
+    await submit.click();
+    await expect(page.getByText("Payment submitted")).toBeVisible();
+
+    await page.goto("/my-bookings");
+    await expect(page.getByText("Awaiting verification").first()).toBeVisible();
+
+    // An expired hold shows the expired view
+    sql(`UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+    await page.goBack();
+    await page.reload();
+    await expect(page.getByText("This reservation has expired")).toBeVisible();
+  } finally {
+    setGcash(false);
+    sql(`UPDATE public.payments SET status = 'failed' WHERE booking_id IN (SELECT id FROM public.bookings WHERE start_time = '07:00' AND booking_date = '${date}');
+         UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+  }
+});
