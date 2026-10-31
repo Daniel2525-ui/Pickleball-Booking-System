@@ -13,7 +13,11 @@ import { login } from "@/lib/services/auth.service";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const justRegistered = searchParams.get("registered") === "true";
+  const notice = searchParams.get("registered") === "true"
+    ? { title: "Account created successfully!", body: "Please check your inbox to confirm your email, then sign in below." }
+    : searchParams.get("confirmed") === "true" // set by the sign-up email's link (api/auth/register)
+      ? { title: "Email confirmed!", body: "You can sign in below." }
+      : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -52,14 +56,12 @@ export function LoginForm() {
       <CardContent>
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           {/* Registration Success Confirmation */}
-          {justRegistered && (
+          {notice && (
             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm leading-relaxed">
               <CheckCircle2 className="size-4.5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
               <div>
-                <p className="font-semibold">Account created successfully!</p>
-                <p className="text-xs opacity-90 mt-0.5">
-                  Please check your inbox to confirm your email, then sign in below.
-                </p>
+                <p className="font-semibold">{notice.title}</p>
+                <p className="text-xs opacity-90 mt-0.5">{notice.body}</p>
               </div>
             </div>
           )}

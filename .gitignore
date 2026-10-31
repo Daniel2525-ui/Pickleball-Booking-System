@@ -52,3 +52,5 @@ next-env.d.ts
 
 # AI assistant tooling, kept locally
 /.agents/
+/.agent/
+/.gemini/

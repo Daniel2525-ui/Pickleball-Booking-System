@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
         const { error } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { full_name: fullName, phone } },
+            // Must be in Supabase Auth > URL Configuration > Redirect URLs, or Supabase falls back to the Site URL
+            options: { data: { full_name: fullName, phone }, emailRedirectTo: `${request.nextUrl.origin}/login?confirmed=true` },
         });
         if (error) return NextResponse.json({ error: error.message }, { status: error.status === 429 ? 429 : 400 });
 

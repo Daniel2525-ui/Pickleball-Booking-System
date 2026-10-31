@@ -20,6 +20,13 @@ export async function POST(request: NextRequest) {
 
         const supabase = await createClient();
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        // Right password, unconfirmed email: say so, and don't count it as a failed guess
+        if (error?.code === "email_not_confirmed") {
+            return NextResponse.json(
+                { error: "Please confirm your email first. Check your inbox (and spam) for the email from Crosshair Dinkers." },
+                { status: 403 }
+            );
+        }
         if (error || !data.user) {
             await checkRateLimit(failKey, AUTH_LIMITS.loginFailuresPerEmail);
             return NextResponse.json({ error: "Invalid email or password. Please try again." }, { status: 401 });

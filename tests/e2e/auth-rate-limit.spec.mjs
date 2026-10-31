@@ -34,6 +34,25 @@ test("five wrong passwords lock that account's sign-in for 15 minutes, even with
   expect(sql(`SELECT count(*) FROM public.auth_rate_limits WHERE key = 'login:fail:${email}'`)).toBe("0");
 });
 
+test("the right password on an unconfirmed email says to confirm, and is not counted as a failure", async ({ page }) => {
+  const { email, password } = account("CUSTOMER2");
+  sql(`DELETE FROM public.auth_rate_limits WHERE key = 'login:fail:${email}'`);
+  const confirmedAt = sql(`SELECT email_confirmed_at FROM auth.users WHERE email = '${email}'`);
+  sql(`UPDATE auth.users SET email_confirmed_at = NULL WHERE email = '${email}'`);
+  try {
+    await tryLogin(page, email, password);
+    await expect(page.getByText("Please confirm your email first. Check your inbox (and spam) for the email from Crosshair Dinkers.")).toBeVisible();
+    expect(sql(`SELECT count(*) FROM public.auth_rate_limits WHERE key = 'login:fail:${email}'`)).toBe("0");
+  } finally {
+    sql(`UPDATE auth.users SET email_confirmed_at = '${confirmedAt}' WHERE email = '${email}'`);
+  }
+});
+
+test("the sign-up email's link lands on sign-in with a confirmed notice", async ({ page }) => {
+  await page.goto("/login?confirmed=true");
+  await expect(page.getByText("Email confirmed!")).toBeVisible();
+});
+
 test("sign-ups from one network are capped at 10 per hour", async ({ request }) => {
   const signUp = (n) => request.post("/api/auth/register", {
     data: { email: `e2e-limit-${Date.now()}-${n}@example.com`, password: "secret123", fullName: "Limit Tester", phone: "09170000099" },
