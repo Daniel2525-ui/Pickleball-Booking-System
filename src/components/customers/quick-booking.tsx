@@ -271,7 +271,7 @@ export const QuickBooking = ({
           )}
 
           <button type="button" onClick={onOpenBoard} className="self-start min-h-[44px] text-sm font-semibold text-muted-foreground text-left">
-            Different times per court? <span className="font-extrabold text-primary underline underline-offset-4">See the full board →</span>
+            Different times per court? <span className="font-extrabold text-primary underline underline-offset-4">See the full board</span>
           </button>
         </section>
       </div>
