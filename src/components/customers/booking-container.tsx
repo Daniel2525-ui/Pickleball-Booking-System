@@ -236,6 +236,10 @@ export const BookingContainer = () => {
     // If user clicked their own pending slot, allow them to resume or cancel
     if (status === "user_pending") {
       const slotBooking = getSlotBooking(courtName, time, courts, bookings);
+      if (isAwaitingVerification({ status: "pending", created_at: "", hold_expires_at: slotBooking?.hold_expires_at })) {
+        toast.info("Your GCash payment is being verified. You can book again once the club confirms it.");
+        return;
+      }
       if (slotBooking?.id) {
         setPendingBookingToResume({
           bookingId: slotBooking.id,

@@ -286,6 +286,15 @@ test("GCash checkout lands on the pay page; GCash hidden when not configured", a
     await page.waitForURL(/\/book\/gcash\?basket=/);
     expect(courtRow("COURT 1", "07:00")).toBe("pending|pending|200.00");
     expect(sql(`SELECT p.payment_method FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.start_time = '07:00' AND b.booking_date = '${date}' AND b.user_id = '${userId("CUSTOMER")}'`)).toBe("gcash");
+
+    // Awaiting verification: the player's own slot opens no resume dialog, only a toast
+    sql(`UPDATE public.bookings SET hold_expires_at = 'infinity' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+    await page.goto("/#booking");
+    await page.getByRole("button", { name: "See the full board" }).click();
+    await page.getByRole("button", { name: /Tmrw/ }).click();
+    await page.locator("#booking").getByRole("button", { name: "Resume your pending booking for COURT 1 at 7:00 AM - 8:00 AM" }).click();
+    await expect(page.getByText("Your GCash payment is being verified. You can book again once the club confirms it.").first()).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   } finally {
     setGcash(false);
     sql(`UPDATE public.payments SET status = 'failed' WHERE booking_id IN (SELECT id FROM public.bookings WHERE start_time = '07:00' AND booking_date = '${date}');
