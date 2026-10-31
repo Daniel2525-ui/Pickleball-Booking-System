@@ -63,6 +63,7 @@ export function SettingsContainer() {
 
   const upload = async (file: File) => {
     const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    // shortcut: replaced or removed QR files stay in club-assets, delete the old file here if the bucket gets cluttered
     const path = `gcash-qr-${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("club-assets").upload(path, file, { contentType: file.type });
     if (error) return toast.error(error.message);

@@ -479,7 +479,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                 </DropdownMenuItem>
                               )}
 
-                              {booking.status?.toLowerCase() !== "cancelled" && (
+                              {/* Awaiting GCash: approve first, so a cancel goes through the refund-owed flow */}
+                              {booking.status?.toLowerCase() !== "cancelled" && !awaiting && (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem

@@ -127,6 +127,19 @@ export async function POST(request: NextRequest) {
             const msg = rpcError.message ?? "";
 
             if (msg.includes("OPEN_BASKET_EXISTS")) {
+                // The open basket may be a GCash payment only the club can settle, possibly on another date
+                const { count: verifying } = await supabase
+                    .from("bookings")
+                    .select("id", { count: "exact", head: true })
+                    .eq("user_id", user.id)
+                    .eq("status", "pending")
+                    .eq("hold_expires_at", "infinity");
+                if (verifying) {
+                    return Response.json(
+                        { error: "Your GCash payment is being verified. You can book again once the club confirms it." },
+                        { status: 409 }
+                    );
+                }
                 return Response.json(
                     { error: "You already have a reservation awaiting payment. Complete or cancel it under 'My Bookings' first." },
                     { status: 409 }

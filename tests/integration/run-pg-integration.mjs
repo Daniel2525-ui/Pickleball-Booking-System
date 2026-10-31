@@ -4110,12 +4110,14 @@ async function main() {
     assert.equal(q(`SELECT status FROM public.bookings WHERE basket_id = '${b.basket_id}' AND court_id = '${C2}';`), "cancelled");
     assert.equal(q(`SELECT p.status FROM public.payments p JOIN public.bookings bk ON bk.id = p.booking_id WHERE bk.basket_id = '${b.basket_id}' AND bk.court_id = '${C2}';`), "pending");
 
-    // Reject frees the slot
+    // Reject frees the slot and clears the awaiting-verification marker
+    const rejectMigration = fs.readdirSync(path.join(PROJECT_ROOT, "supabase/migrations")).find((f) => f.includes("gcash_reject_clears_hold"));
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/migrations", rejectMigration));
     const c = submitted("12", C1, C2);
     const rc = reject(c.basket_id);
     assert.equal(rc.status, 0, rc.stderr);
     assert.equal(JSON.parse(rc.stdout).rejected, 2);
-    assert.equal(state(c.basket_id), "cancelled/failed/gcash_rejected/infinity/false,cancelled/failed/gcash_rejected/infinity/false");
+    assert.equal(state(c.basket_id), "cancelled/failed/gcash_rejected/null/false,cancelled/failed/gcash_rejected/null/false");
     const bobHold = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '${lines("12", C1)}'::jsonb);`, as(bobUid));
     assert.equal(bobHold.status, 0, bobHold.stderr);
 

@@ -91,6 +91,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
       const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
       const path = `${user.id}/${basketId}-${Date.now()}.${ext}`;
       // Players can only INSERT into their folder (no read-back), so never upsert
+      // shortcut: a failed submit leaves this file behind (players can't delete it), add an admin sweep of unreferenced receipts if storage grows
       const { error: uploadError } = await supabase.storage.from("gcash-receipts").upload(path, file);
       if (uploadError) throw uploadError;
       const { error } = await supabase.rpc("submit_gcash_proof", { p_basket_id: basketId, p_reference: reference.trim(), p_proof_path: path });

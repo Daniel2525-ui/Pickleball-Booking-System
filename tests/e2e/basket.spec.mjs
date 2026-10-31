@@ -301,6 +301,11 @@ test("GCash checkout lands on the pay page; GCash hidden when not configured", a
     await page.locator("#booking").getByRole("button", { name: "Resume your pending booking for COURT 1 at 7:00 AM - 8:00 AM" }).click();
     await expect(page.getByText("Your GCash payment is being verified. You can book again once the club confirms it.").first()).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // Booking another slot while verifying: told why, not sent to My Bookings
+    const blocked = await checkout(page, [["COURT 2", "09:00", "10:00"]]);
+    expect(blocked.status()).toBe(409);
+    expect((await blocked.json()).error).toBe("Your GCash payment is being verified. You can book again once the club confirms it.");
   } finally {
     setGcash(false);
     sql(`UPDATE public.payments SET status = 'failed' WHERE booking_id IN (SELECT id FROM public.bookings WHERE start_time = '07:00' AND booking_date = '${date}');

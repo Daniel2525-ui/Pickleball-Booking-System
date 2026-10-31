@@ -92,6 +92,7 @@ test("admin approves and rejects GCash payments", async ({ page }) => {
     // Approve the two-court basket as one unit
     await rowFor(page, "E2E Gcash Approve").first().getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByRole("menuitem", { name: "Collect Payment" })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "Cancel Reservation" })).toHaveCount(0);
     await page.getByRole("menuitem", { name: "Verify" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("5550002")).toBeVisible();

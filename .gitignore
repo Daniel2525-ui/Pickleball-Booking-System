@@ -49,3 +49,6 @@ next-env.d.ts
 
 # SDD workspace (scratch)
 /.superpowers/
+
+# AI assistant tooling, kept locally
+/.agents/
