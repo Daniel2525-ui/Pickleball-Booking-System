@@ -426,7 +426,7 @@ export const BookingContainer = () => {
             </span>
           )}
           <p className="mt-4 text-muted-foreground font-semibold max-w-md leading-relaxed">
-            Answer three quick questions and pick a time and book seamlessly.
+            Answer three quick questions, pick a time and book seamlessly.
           </p>
         </div>
         <CourtRally className="w-full max-w-sm md:max-w-none justify-self-center" />
