@@ -37,6 +37,10 @@ test("checkSlotAvailability: handles null hold_expires_at with 35m created_at fa
   assert.equal(isBookingActive(explicit(5), now), true, "Hold expired 5m ago is inside the grace period");
   assert.equal(isBookingActive(explicit(25), now), false, "Hold expired 25m ago is past the grace period");
 
+  // 2d. GCash awaiting verification ('infinity') stays active however old it is
+  const awaiting = { id: "b-2d", status: "pending", hold_expires_at: "infinity", created_at: new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString() };
+  assert.equal(isBookingActive(awaiting, now), true, "Awaiting-verification hold must never be released by age");
+
   // 3. Conservative fallback: Missing or invalid timestamps fail safe to active (never silently free slot)
   const invalidDateString = {
     id: "b-3",

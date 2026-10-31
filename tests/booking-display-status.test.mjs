@@ -34,3 +34,9 @@ test("non-pending bookings are never treated as expired holds", () => {
         assert.equal(getBookingDisplayStatus(booking({ status, hold_expires_at: "2026-10-29T09:00:00Z" }), now), status);
     }
 });
+
+test("awaiting verification: infinite hold is never expired and shows its own status", () => {
+    const awaiting = booking({ hold_expires_at: "infinity" });
+    assert.equal(getBookingDisplayStatus(awaiting, now), "awaiting_verification");
+    assert.equal(isHoldExpired(awaiting, now), false);
+});

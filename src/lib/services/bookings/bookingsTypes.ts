@@ -3,6 +3,8 @@ export interface BookingPayment {
     status: string;
     payment_method?: string | null;
     payment_reference?: string | null;
+    gcash_proof_path?: string | null;
+    gcash_submitted_at?: string | null;
     amount?: number;
 }
 

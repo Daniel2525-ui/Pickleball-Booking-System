@@ -33,7 +33,7 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
                 ${courtsJoin},
                 profiles(full_name),
                 customers(full_name, phone, email),
-                payments(id, status, amount, payment_method, payment_reference, paid_at)
+                payments(id, status, amount, payment_method, payment_reference, paid_at, gcash_proof_path, gcash_submitted_at)
             `)
             .order("booking_date", { ascending: false })
             .order("start_time", { ascending: false })
@@ -43,6 +43,9 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
 
         if (hasStatusFilter && status.toLowerCase() === "expired") {
             query = query.eq("status", "cancelled").eq("cancel_reason", "expired");
+        } else if (hasStatusFilter && status.toLowerCase() === "awaiting verification") {
+            // Same two conditions as isAwaitingVerification
+            query = query.eq("status", "pending").eq("hold_expires_at", "infinity");
         } else {
             if (hasStatusFilter) {
                 // Labels such as "Checked In" / "No-Show" map to stored values checked_in / no_show

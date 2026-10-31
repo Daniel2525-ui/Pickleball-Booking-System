@@ -263,3 +263,91 @@ test("on a phone the basket keeps checkout in view without covering the last gri
     expect(onTop, `${court}'s last row is covered`).toBe(true);
   }
 });
+
+test("GCash checkout lands on the pay page; GCash hidden when not configured", async ({ page }) => {
+  const setGcash = (v) =>
+    sql(`UPDATE public.booking_settings SET gcash_account_name = ${v ? "'Club'" : "NULL"}, gcash_number = ${v ? "'09171234567'" : "NULL"}`);
+  try {
+    await login(page, account("CUSTOMER"));
+    setGcash(false);
+    await openTomorrow(page);
+    await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
+    await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
+    await expect(page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" })).toBeVisible();
+    await expect(page.getByRole("dialog").getByRole("radio", { name: "GCash" })).toHaveCount(0);
+
+    setGcash(true);
+    await page.reload();
+    await openTomorrow(page);
+    await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
+    await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
+    await page.getByRole("dialog").getByRole("radio", { name: "GCash" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
+    await page.waitForURL(/\/book\/gcash\?basket=/);
+    expect(courtRow("COURT 1", "07:00")).toBe("pending|pending|200.00");
+    expect(sql(`SELECT p.payment_method FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.start_time = '07:00' AND b.booking_date = '${date}' AND b.user_id = '${userId("CUSTOMER")}'`)).toBe("gcash");
+
+    // GCash turned off while the basket is held: no form, point the player to Card
+    setGcash(false);
+    await page.reload();
+    await expect(page.getByText("GCash payment is unavailable right now. Cancel this booking in My Bookings and book with Card.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Submit payment" })).toHaveCount(0);
+
+    // Awaiting verification: the player's own slot opens no resume dialog, only a toast
+    sql(`UPDATE public.bookings SET hold_expires_at = 'infinity' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+    await page.goto("/#booking");
+    await page.getByRole("button", { name: "See the full board" }).click();
+    await page.getByRole("button", { name: /Tmrw/ }).click();
+    await page.locator("#booking").getByRole("button", { name: "Resume your pending booking for COURT 1 at 7:00 AM - 8:00 AM" }).click();
+    await expect(page.getByText("Your GCash payment is being verified. You can book again once the club confirms it.").first()).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  } finally {
+    setGcash(false);
+    sql(`UPDATE public.payments SET status = 'failed' WHERE booking_id IN (SELECT id FROM public.bookings WHERE start_time = '07:00' AND booking_date = '${date}');
+         UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+  }
+});
+
+const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+
+test("GCash pay page submits reference and screenshot", async ({ page }) => {
+  const setGcash = (v) =>
+    sql(`UPDATE public.booking_settings SET gcash_account_name = ${v ? "'Club'" : "NULL"}, gcash_number = ${v ? "'09171234567'" : "NULL"}`);
+  try {
+    setGcash(true);
+    await login(page, account("CUSTOMER"));
+    await openTomorrow(page);
+    await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
+    await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
+    await page.getByRole("dialog").getByRole("radio", { name: "GCash" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
+    await page.waitForURL(/\/book\/gcash\?basket=/);
+
+    await expect(page.getByText("Send exactly ₱200")).toBeVisible();
+    const until = sql(`SELECT to_char(min(hold_expires_at) AT TIME ZONE 'Asia/Manila', 'FMHH12:MI AM') FROM public.bookings WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+    await expect(page.getByText(`Your courts are held until ${until}.`)).toBeVisible();
+    await expect(page.getByText("09171234567")).toBeVisible();
+    const submit = page.getByRole("button", { name: "Submit payment" });
+    await expect(submit).toBeDisabled();
+    await page.getByLabel("GCash reference number").fill("1234567890123");
+    await expect(submit).toBeDisabled();
+    await page.getByLabel("Payment screenshot").setInputFiles({ name: "receipt.png", mimeType: "image/png", buffer: PNG_1X1 });
+    await expect(submit).toBeEnabled();
+    await submit.click();
+    await expect(page.getByText("Payment submitted")).toBeVisible();
+
+    await page.goto("/my-bookings");
+    await expect(page.getByText("Awaiting verification").first()).toBeVisible();
+
+    // An expired hold shows the expired view
+    sql(`UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+    await page.goBack();
+    await page.reload();
+    await expect(page.getByText("This reservation has expired")).toBeVisible();
+    await expect(page.getByText("Already sent the money? Contact the club at +63 917 123 4567 with your GCash reference.")).toBeVisible();
+  } finally {
+    setGcash(false);
+    sql(`UPDATE public.payments SET status = 'failed' WHERE booking_id IN (SELECT id FROM public.bookings WHERE start_time = '07:00' AND booking_date = '${date}');
+         UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
+  }
+});

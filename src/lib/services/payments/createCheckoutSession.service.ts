@@ -3,11 +3,13 @@ import { to24h } from "../bookings/checkSlotAvailability.service";
 interface CheckoutParams {
     date: Date;
     lines: { courtId: string; timeRange: string }[];
+    paymentMethod: "card" | "gcash";
 }
 
 export const createCheckoutSession = async ({
     date,
     lines,
+    paymentMethod,
 }: CheckoutParams): Promise<string> => {
     const dateStr = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Manila",
@@ -24,6 +26,7 @@ export const createCheckoutSession = async ({
         body: JSON.stringify({
             booking_date: dateStr,
             lines: apiLines,
+            payment_method: paymentMethod,
         }),
     });
 

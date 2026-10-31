@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { VENUE_CONTACT } from "@/lib/venue";
 import { Clock, MapPin, Calendar, LoaderCircle, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,8 @@ interface BookingModalProps {
   lines: Slot[];
   isLoading?: boolean;
   error?: string | null;
-  onConfirm: () => void;
+  gcashEnabled: boolean;
+  onConfirm: (paymentMethod: "card" | "gcash") => void;
 }
 
 export const BookingModal = ({
@@ -27,8 +29,10 @@ export const BookingModal = ({
   lines,
   isLoading,
   error,
+  gcashEnabled,
   onConfirm,
 }: BookingModalProps) => {
+  const [method, setMethod] = useState<"card" | "gcash">("card");
   const { total, hasPeak } = basketTotal(lines);
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -85,11 +89,28 @@ export const BookingModal = ({
           </div>
         )}
 
+        {gcashEnabled && (
+          <div role="radiogroup" aria-label="Payment method" className="grid grid-cols-2 gap-2">
+            {(["card", "gcash"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={method === m}
+                onClick={() => setMethod(m)}
+                className={`h-11 rounded-xl border text-sm font-bold ${method === m ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
+              >
+                {m === "card" ? "Card" : "GCash"}
+              </button>
+            ))}
+          </div>
+        )}
+
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-11 text-sm font-semibold" disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} className="w-full sm:w-auto h-11 text-sm font-bold gap-2" disabled={isLoading}>
+          <Button onClick={() => onConfirm(gcashEnabled ? method : "card")} className="w-full sm:w-auto h-11 text-sm font-bold gap-2" disabled={isLoading}>
             {isLoading ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : (

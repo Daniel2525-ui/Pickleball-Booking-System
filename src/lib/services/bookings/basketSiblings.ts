@@ -15,7 +15,7 @@ export interface BasketSibling {
     created_at: string;
     basket_id: string | null;
     courts: { name?: string } | null;
-    payments: { id: string; status: string; stripe_session_id: string | null; amount: number | string | null }[];
+    payments: { id: string; status: string; stripe_session_id: string | null; payment_method: string | null; amount: number | string | null }[];
 }
 
 /** Pending siblings of a booking (itself included while pending), court order for a stable lock order. */
@@ -26,7 +26,7 @@ export async function loadPendingSiblings(
 ) {
     let query = client
         .from("bookings")
-        .select("id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at, basket_id, courts(name), payments(id, status, stripe_session_id, amount)")
+        .select("id, user_id, court_id, booking_date, start_time, end_time, status, total_amount, hold_expires_at, created_at, basket_id, courts(name), payments(id, status, stripe_session_id, payment_method, amount)")
         .eq("status", "pending")
         .order("court_id")
         // A later duplicate-charge payment row can exist (20261102); the original comes first

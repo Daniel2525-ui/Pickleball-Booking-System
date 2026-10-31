@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
         // 2. Parse the basket. A legacy single-court body (old bundle mid-deploy) becomes a one-line basket.
         const body = await request.json().catch(() => null);
         const booking_date = body?.booking_date;
+        const isGcash = body?.payment_method === "gcash";
         const lines: unknown =
             body?.lines ??
             (body?.court_id && body?.start_time && body?.end_time
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
         const dayOfWeek = getBookingWeekday(booking_date);
         const [{ data: operatingHour, error: opError }, { data: limits, error: limitsError }] = await Promise.all([
             supabase.from("operating_hours").select("is_open, open_time, close_time").eq("day_of_week", dayOfWeek).maybeSingle(),
-            supabase.from("booking_settings").select("min_hours, max_hours").maybeSingle(),
+            supabase.from("booking_settings").select("min_hours, max_hours, gcash_number").maybeSingle(),
         ]);
 
         if (opError || limitsError || !limits) {
@@ -75,6 +76,10 @@ export async function POST(request: NextRequest) {
                 { error: "Failed to verify venue operating hours." },
                 { status: 500 }
             );
+        }
+
+        if (isGcash && !limits.gcash_number) {
+            return Response.json({ error: "GCash payments are not available right now." }, { status: 400 });
         }
 
         // Server-side validation of every line: shape, one per court, whole-hour boundaries,
@@ -108,7 +113,7 @@ export async function POST(request: NextRequest) {
         // Prices come from the database so Stripe charges exactly what the holds record.
         const initialHoldExpiresAtIso = new Date(Date.now() + 35 * 60 * 1000).toISOString();
 
-        const { data: rpcResult, error: rpcError } = await supabase.rpc("hold_court_basket", {
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(isGcash ? "hold_gcash_basket" : "hold_court_basket", {
             p_booking_date: booking_date,
             p_lines: validation.lines.map((l) => ({
                 court_id: l.courtId,
@@ -155,6 +160,10 @@ export async function POST(request: NextRequest) {
                 );
             }
 
+            if (msg.includes("GCASH_NOT_CONFIGURED")) {
+                return Response.json({ error: "GCash payments are not available right now." }, { status: 400 });
+            }
+
             if (msg.includes("INVALID_ARGUMENT")) {
                 return Response.json({ error: "Invalid booking details." }, { status: 400 });
             }
@@ -185,6 +194,11 @@ export async function POST(request: NextRequest) {
                 { error: "Could not create reservation hold. Please try again." },
                 { status: 500 }
             );
+        }
+
+        // GCash: the player pays outside Stripe, on our pay page
+        if (isGcash) {
+            return Response.json({ url: `/book/gcash?basket=${basket.basket_id}` });
         }
 
         // 4. One Stripe Checkout for every held court, each hold tied to it under the court lock

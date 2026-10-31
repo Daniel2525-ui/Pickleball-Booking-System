@@ -3962,6 +3962,170 @@ async function main() {
       || '|' || has_function_privilege('authenticated', 'public.settle_counter_basket(uuid,numeric,text,text)', 'EXECUTE');`), "false|true");
   });
 
+  await runTest("gcash: hold, proof submission, and the slot stays held", () => {
+    const dir = path.join(PROJECT_ROOT, "supabase/migrations");
+    runPsqlFile(path.join(dir, fs.readdirSync(dir).find((f) => f.includes("multi_court_basket"))));
+    const migrationPath = path.join(dir, fs.readdirSync(dir).find((f) => f.includes("gcash_manual_payment")));
+    runPsqlFile(migrationPath);
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const as = (uid, asRole = false) => ({ role: "authenticated", uid, asRole });
+    const C1 = activeCourtId;
+    const C2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    q(`INSERT INTO public.courts (id, name, status) VALUES ('${C2}', 'Court 3 - Active', 'active') ON CONFLICT (id) DO NOTHING;`);
+    const day = "2030-02-12"; // Tuesday, not used by other tests
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE user_id = '${danaUid}' AND status = 'pending';`);
+    const lines = (...courts) => JSON.stringify(courts.map((c) => ({ court_id: c, start_time: "09:00", end_time: "10:00" })));
+    const holdSql = `SELECT public.hold_gcash_basket('${day}', '${lines(C1, C2)}'::jsonb);`;
+    const submit = (basket, ref, p, uid = danaUid) => runPsqlCommand(
+      `SELECT public.submit_gcash_proof('${basket}', '${ref}', '${p}');`, as(uid));
+    const state = (basket) => q(`SELECT string_agg(b.status || '/' || b.hold_expires_at || '/' || coalesce(p.payment_reference, '-') || '/' || (p.gcash_proof_path IS NOT NULL), ',' ORDER BY b.court_id)
+      FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${basket}';`);
+
+    q(`UPDATE public.booking_settings SET gcash_account_name = NULL, gcash_number = NULL;`);
+    const unconf = runPsqlCommand(holdSql, as(danaUid));
+    assert.ok(unconf.stderr.includes("GCASH_NOT_CONFIGURED"), unconf.stderr);
+    q(`UPDATE public.booking_settings SET gcash_account_name = 'Test Club', gcash_number = '09171234567';`);
+
+    for (const set of ["gcash_account_name = 'Only Name'", "gcash_number = '09179999999'"]) {
+      const p = runPsqlCommand(`UPDATE public.booking_settings SET gcash_account_name = NULL, gcash_number = NULL; UPDATE public.booking_settings SET ${set};`);
+      assert.ok(p.stderr.includes("booking_settings_gcash_check"), p.stderr);
+    }
+    q(`UPDATE public.booking_settings SET gcash_account_name = 'Test Club', gcash_number = '09171234567';`);
+
+    const h = JSON.parse(q(holdSql, as(danaUid)));
+    assert.equal(h.items.length, 2);
+    assert.equal(q(`SELECT string_agg(p.payment_method || '/' || p.status, ',') FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${h.basket_id}';`), "gcash/pending,gcash/pending");
+    const before = state(h.basket_id);
+
+    const okPath = `${danaUid}/${h.basket_id}.png`;
+    for (const [ref, p] of [["abc", okPath], ["1234567890", `${bobUid}/x.png`], ["1234567890", `${danaUid}/../x.png`]]) {
+      const r = submit(h.basket_id, ref, p);
+      assert.ok(r.stderr.includes("INVALID_ARGUMENT"), r.stderr);
+      assert.equal(state(h.basket_id), before);
+    }
+    assert.ok(submit(h.basket_id, "1234567890", `${bobUid}/x.png`, bobUid).stderr.includes("NOT_FOUND"));
+
+    // a customer's unsubmitted pending booking can only be cancelled as 'customer'
+    assert.ok(runPsqlCommand(`UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'admin' WHERE basket_id = '${h.basket_id}'`, as(danaUid, true)).stderr.includes("row-level security")); // WITH CHECK rejects it
+
+    const ok = submit(h.basket_id, "1234 5678 90123", okPath);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.equal(JSON.parse(ok.stdout).submitted, 2);
+    assert.equal(state(h.basket_id), "pending/infinity/1234567890123/true,pending/infinity/1234567890123/true");
+    assert.equal(q(`SELECT count(*) FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${h.basket_id}' AND p.gcash_submitted_at IS NULL;`), "0");
+    assert.ok(submit(h.basket_id, "1234567890", okPath).stderr.includes("ALREADY_SUBMITTED"));
+    assert.equal(q(`WITH u AS (UPDATE public.payments SET payment_reference = 'X' WHERE booking_id = '${h.items[0].booking_id}' RETURNING 1) SELECT count(*) FROM u;`, as(danaUid, true)), "0");
+    // The owner cannot turn a submitted GCash hold back into a 40-minute Stripe hold
+    const cch = runPsqlCommand(`SELECT public.confirm_checkout_hold('${h.items[0].booking_id}', '${h.items[0].payment_id}', 'cs_gcash', now() + interval '30 minutes');`, as(danaUid));
+    assert.ok(cch.stderr.includes("INVALID_STATUS"), cch.stderr);
+    assert.equal(state(h.basket_id), "pending/infinity/1234567890123/true,pending/infinity/1234567890123/true");
+
+    // Still held: others cannot take the slot, expiry sweeps skip it
+    const bobHold = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '${lines(C1)}'::jsonb);`, as(bobUid));
+    assert.ok(bobHold.stderr.includes("SLOT_UNAVAILABLE"), bobHold.stderr);
+    q(`SELECT public.release_expired_court_holds('${C1}', '${day}', '09:00', '10:00');`, { role: "service_role" });
+    assert.equal(state(h.basket_id), "pending/infinity/1234567890123/true,pending/infinity/1234567890123/true");
+    const skip = JSON.parse(q(`SELECT public.cancel_expired_booking('${h.items[0].booking_id}');`, { role: "service_role" }));
+    assert.equal(skip.reason, "HOLD_NOT_EXPIRED");
+
+    // One open basket, and no direct customer cancel of a submitted booking
+    const other = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '${JSON.stringify([{ court_id: C1, start_time: "12:00", end_time: "13:00" }])}'::jsonb);`, as(danaUid));
+    assert.ok(other.stderr.includes("OPEN_BASKET_EXISTS"), other.stderr);
+    assert.equal(q(`WITH u AS (UPDATE public.bookings SET status = 'cancelled' WHERE basket_id = '${h.basket_id}' RETURNING 1) SELECT count(*) FROM u;`, as(danaUid, true)), "0");
+
+    // Hold ran out before the proof arrived
+    const a = JSON.parse(q(`SELECT public.hold_gcash_basket('${day}', '${JSON.stringify([{ court_id: C1, start_time: "14:00", end_time: "15:00" }])}'::jsonb);`, as(aliceUid)));
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE basket_id = '${a.basket_id}';`);
+    assert.ok(submit(a.basket_id, "1234567890", `${aliceUid}/a.png`, aliceUid).stderr.includes("HOLD_EXPIRED"));
+
+    runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_gcash_manual_payment.sql"));
+    for (const f of ["hold_gcash_basket", "submit_gcash_proof", "approve_gcash_basket", "reject_gcash_basket"]) assert.equal(q(`SELECT to_regproc('public.${f}') IS NULL;`), "t");
+    assert.equal(q(`SELECT prosrc LIKE '%gcash%' FROM pg_proc WHERE proname = 'confirm_checkout_hold';`), "f");
+    runPsqlFile(migrationPath);
+    assert.equal(q(`SELECT has_function_privilege('anon', 'public.confirm_checkout_hold(uuid,uuid,text,timestamptz)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.confirm_checkout_hold(uuid,uuid,text,timestamptz)', 'EXECUTE')::text;`), "falsetrue");
+    assert.equal(q(`SELECT has_function_privilege('anon', 'public.hold_gcash_basket(date,jsonb,timestamptz)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.hold_gcash_basket(date,jsonb,timestamptz)', 'EXECUTE')::text
+      || has_function_privilege('anon', 'public.submit_gcash_proof(uuid,text,text)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.submit_gcash_proof(uuid,text,text)', 'EXECUTE')::text
+      || has_function_privilege('anon', 'public.approve_gcash_basket(uuid)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.approve_gcash_basket(uuid)', 'EXECUTE')::text
+      || has_function_privilege('anon', 'public.reject_gcash_basket(uuid)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.reject_gcash_basket(uuid)', 'EXECUTE')::text;`), "falsetruefalsetruefalsetruefalsetrue");
+  });
+
+  await runTest("gcash: admin approves or rejects a whole basket", () => {
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const as = (uid) => ({ role: "authenticated", uid });
+    const C1 = activeCourtId;
+    const C2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    const day = "2030-02-19";
+    q(`UPDATE public.booking_settings SET gcash_account_name = 'Test Club', gcash_number = '09171234567';`); // the previous test's rollback dropped the columns
+    q(`UPDATE public.bookings SET status = 'cancelled' WHERE user_id = '${danaUid}' AND status = 'pending' AND hold_expires_at = 'infinity';`); // earlier test left a submitted basket open
+    q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 second' WHERE user_id = '${danaUid}' AND status = 'pending' AND hold_expires_at <> 'infinity';`);
+    const lines = (hour, ...courts) => JSON.stringify(courts.map((c) => ({ court_id: c, start_time: `${hour}:00`, end_time: `${Number(hour) + 1}:00` })));
+    const hold = (hour, uid, ...courts) => JSON.parse(q(`SELECT public.hold_gcash_basket('${day}', '${lines(hour, ...courts)}'::jsonb);`, as(uid)));
+    const submitted = (hour, ...courts) => {
+      const h = hold(hour, danaUid, ...courts);
+      q(`SELECT public.submit_gcash_proof('${h.basket_id}', 'REF123456', '${danaUid}/${h.basket_id}.png');`, as(danaUid));
+      return h;
+    };
+    const approve = (b, uid = adminUid) => runPsqlCommand(`SELECT public.approve_gcash_basket('${b}');`, as(uid));
+    const reject = (b, uid = adminUid) => runPsqlCommand(`SELECT public.reject_gcash_basket('${b}');`, as(uid));
+    const state = (b) => q(`SELECT string_agg(b.status || '/' || p.status || '/' || coalesce(b.cancel_reason, '-') || '/' || coalesce(b.hold_expires_at::text, 'null') || '/' || (p.paid_at IS NOT NULL), ',' ORDER BY b.court_id)
+      FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.basket_id = '${b}';`);
+
+    // Never submitted: NOT_FOUND for admin, FORBIDDEN for bob (checked first)
+    const unsub = hold("11", aliceUid, C1);
+    assert.ok(approve(unsub.basket_id).stderr.includes("NOT_FOUND"));
+    assert.ok(reject(unsub.basket_id).stderr.includes("NOT_FOUND"));
+
+    // Approve works even after the start time has passed
+    const a = submitted("09", C1, C2);
+    assert.ok(approve(a.basket_id, bobUid).stderr.includes("FORBIDDEN"));
+    assert.ok(reject(a.basket_id, bobUid).stderr.includes("FORBIDDEN"));
+    q(`UPDATE public.bookings SET booking_date = current_date - 1 WHERE basket_id = '${a.basket_id}';`);
+    const ra = approve(a.basket_id);
+    assert.equal(ra.status, 0, ra.stderr);
+    assert.equal(JSON.parse(ra.stdout).approved, 2);
+    assert.equal(state(a.basket_id), "confirmed/paid/-/null/true,confirmed/paid/-/null/true");
+    assert.equal(q(`SELECT string_agg(DISTINCT payment_method, ',') FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${a.basket_id}';`), "gcash");
+
+    // Partial basket: the cancelled court is left alone
+    const b = submitted("10", C1, C2);
+    q(`UPDATE public.bookings SET status = 'cancelled' WHERE basket_id = '${b.basket_id}' AND court_id = '${C2}';`);
+    const rb = approve(b.basket_id);
+    assert.equal(rb.status, 0, rb.stderr);
+    const out = JSON.parse(rb.stdout);
+    assert.equal(out.approved, 1);
+    assert.equal(Number(out.amount), Number(q(`SELECT total_amount FROM public.bookings WHERE basket_id = '${b.basket_id}' AND court_id = '${C1}';`)));
+    assert.equal(q(`SELECT status FROM public.bookings WHERE basket_id = '${b.basket_id}' AND court_id = '${C2}';`), "cancelled");
+    assert.equal(q(`SELECT p.status FROM public.payments p JOIN public.bookings bk ON bk.id = p.booking_id WHERE bk.basket_id = '${b.basket_id}' AND bk.court_id = '${C2}';`), "pending");
+
+    // Reject frees the slot
+    const c = submitted("12", C1, C2);
+    const rc = reject(c.basket_id);
+    assert.equal(rc.status, 0, rc.stderr);
+    assert.equal(JSON.parse(rc.stdout).rejected, 2);
+    assert.equal(state(c.basket_id), "cancelled/failed/gcash_rejected/infinity/false,cancelled/failed/gcash_rejected/infinity/false");
+    const bobHold = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '${lines("12", C1)}'::jsonb);`, as(bobUid));
+    assert.equal(bobHold.status, 0, bobHold.stderr);
+
+    // Already decided
+    for (const id of [a.basket_id, b.basket_id, c.basket_id]) {
+      assert.ok(approve(id).stderr.includes("NOT_FOUND"));
+      assert.ok(reject(id).stderr.includes("NOT_FOUND"));
+    }
+  });
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");
