@@ -527,7 +527,6 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
       <VerifyGcashModal
         key={verifyBooking?.id}
         booking={verifyBooking}
-        due={verifyBooking ? counterSettlementDue(verifyBooking, bookingsData) : null}
         open={!!verifyBooking}
         onOpenChange={(open) => !open && setVerifyBooking(null)}
         onVerified={handleGcashVerified}

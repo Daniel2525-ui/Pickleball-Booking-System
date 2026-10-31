@@ -49,8 +49,39 @@ test("admin approves and rejects GCash payments", async ({ page }) => {
   await seedSubmitted(customer, "33333333-3333-4333-8333-333333333333", "E2E Gcash Dup", ["11:00"], "5550002");
   // A two-court basket whose reference nobody else used: its own sibling court must not trigger the warning
   await seedSubmitted(customer, "44444444-4444-4444-8444-444444444444", "E2E Gcash Own", ["13:00", "14:00"], "5550003");
+  // The basket's second court on another court, so a court filter hides it
+  const court = firstCourt();
+  sql(`UPDATE public.bookings SET court_id = (SELECT id FROM public.courts WHERE name > '${court.name}' ORDER BY name LIMIT 1)
+    WHERE basket_id = '${BASKET_B}' AND start_time = '09:00'`);
+  // A paid GCash booking with no basket (legacy) using the reject basket's reference is a duplicate too
+  const walkIn = sql(`INSERT INTO public.bookings (user_id, court_id, booking_date, start_time, end_time, status, total_amount, customer_name)
+    VALUES ((SELECT id FROM public.profiles WHERE email = '${account("CUSTOMER2").email}'), '${court.id}', '${date}', '16:00', '17:00', 'confirmed', 200, 'E2E Gcash Legacy') RETURNING id`).split(/\s+/)[0];
+  sql(`INSERT INTO public.payments (booking_id, amount, currency, status, payment_method, payment_reference, paid_at)
+    VALUES ('${walkIn}', 200, 'php', 'paid', 'gcash', '5550001', now())`);
   try {
+    // Receipts are private: neither the uploader nor another player can read one back
+    const other = await signedIn("CUSTOMER2");
+    for (const client of [customer, other]) {
+      const signed = await client.storage.from("gcash-receipts").createSignedUrl(paths[0], 60);
+      expect(signed.data?.signedUrl).toBeFalsy();
+      expect(signed.error).toBeTruthy();
+      const file = await client.storage.from("gcash-receipts").download(paths[0]);
+      expect(file.data).toBeNull();
+      expect(file.error).toBeTruthy();
+    }
+
     await login(page, account("ADMIN"));
+    // Filtered to one court of the two-court basket: Verify still shows the whole basket
+    await page.goto("/admin/bookings");
+    await page.getByRole("combobox").filter({ hasText: "All Courts" }).click();
+    await page.getByRole("option", { name: court.name, exact: true }).click();
+    await expect(rowFor(page, "E2E Gcash Approve")).toHaveCount(1);
+    await rowFor(page, "E2E Gcash Approve").getByRole("button", { name: "Open menu" }).click();
+    await page.getByRole("menuitem", { name: "Verify" }).click();
+    await expect(page.getByRole("dialog").getByText("2 courts")).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("₱400")).toBeVisible();
+    await page.keyboard.press("Escape");
+
     await page.goto("/admin/bookings");
     await page.getByRole("combobox").first().click();
     await expect(page.getByRole("option", { name: /Awaiting Verification \(6\)/ })).toBeVisible();
@@ -79,10 +110,10 @@ test("admin approves and rejects GCash payments", async ({ page }) => {
     await expect(dialog.getByText("This reference was also used on another booking")).toHaveCount(0);
     await page.keyboard.press("Escape");
 
-    // Reject the single court
+    // Reject the single court (its reference was also used by the legacy booking)
     await rowFor(page, "E2E Gcash Reject").getByRole("button", { name: "Open menu" }).click();
     await page.getByRole("menuitem", { name: "Verify" }).click();
-    await expect(dialog.getByText("This reference was also used on another booking")).toHaveCount(0);
+    await expect(dialog.getByText("This reference was also used on another booking")).toBeVisible();
     await dialog.getByRole("button", { name: "Reject & release slots" }).click();
     await expect(rowFor(page, "E2E Gcash Reject").getByText("Cancelled")).toBeVisible();
 
@@ -109,6 +140,14 @@ test("admin edits GCash details", async ({ page }) => {
     await page.goto("/admin/dashboard");
     await page.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL(/\/admin\/settings/);
+
+    // Settings that fail to load leave nothing to edit or save
+    await page.route("**/rest/v1/booking_settings*", (route) => route.fulfill({ status: 500, contentType: "application/json", body: "{}" }));
+    await page.reload();
+    await expect(page.getByText("Could not load settings. Reload the page to try again.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save GCash details" })).toHaveCount(0);
+    await page.unroute("**/rest/v1/booking_settings*");
+    await page.reload();
     const name = page.getByLabel("Account name");
     const number = page.getByLabel("GCash number");
     const save = page.getByRole("button", { name: "Save GCash details" });
@@ -125,6 +164,14 @@ test("admin edits GCash details", async ({ page }) => {
     await save.click();
     await expect(page.getByText("Enter both the account name and the GCash number, or clear both to turn GCash off.")).toBeVisible();
     expect(saved()).toBe("-|-|false");
+
+    // A save that updates no row (e.g. RLS) is an error, not "saved"
+    await page.route("**/rest/v1/booking_settings*", (route) =>
+      route.request().method() === "PATCH" ? route.fulfill({ status: 200, contentType: "application/json", body: "[]" }) : route.continue());
+    await number.fill("09171234567");
+    await save.click();
+    await expect(page.getByText("GCash details were not saved. Reload the page and try again.")).toBeVisible();
+    await page.unroute("**/rest/v1/booking_settings*");
 
     // Valid: spaces are stripped, and it survives a reload
     await number.fill("0917 123 4567");

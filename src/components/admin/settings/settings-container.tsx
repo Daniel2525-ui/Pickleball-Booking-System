@@ -13,6 +13,7 @@ const BOTH_OR_NONE = "Enter both the account name and the GCash number, or clear
 
 export function SettingsContainer() {
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
@@ -26,7 +27,7 @@ export function SettingsContainer() {
         setNumber(data.gcash_number ?? "");
         setQrUrl(data.gcash_qr_url);
       } else {
-        toast.error("Could not load settings.");
+        setLoadFailed(true);
       }
       setLoading(false);
     });
@@ -39,12 +40,15 @@ export function SettingsContainer() {
     if (digits && !/^09\d{9}$/.test(digits)) return setErrors({ number: "Enter an 11-digit GCash number starting with 09." });
     setErrors({});
     setSaving(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("booking_settings")
       .update({ gcash_account_name: trimmed || null, gcash_number: digits || null })
-      .eq("id", true);
+      .eq("id", true)
+      .select("id");
     setSaving(false);
     if (error) return setErrors({ form: error.message });
+    // RLS can silently match no row: that is not a save
+    if (!data?.length) return setErrors({ form: "GCash details were not saved. Reload the page and try again." });
     setName(trimmed);
     setNumber(digits);
     toast.success("GCash details saved.");
@@ -66,6 +70,7 @@ export function SettingsContainer() {
   };
 
   if (loading) return <Loader2 className="size-6 animate-spin text-primary" />;
+  if (loadFailed) return <p role="alert" className="text-sm text-destructive">Could not load settings. Reload the page to try again.</p>;
 
   return (
     <Card className="shadow-sm">

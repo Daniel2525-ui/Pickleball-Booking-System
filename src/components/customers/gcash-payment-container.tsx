@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
+import { VENUE_CONTACT } from "@/lib/venue";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const REFERENCE_ERROR = "Enter the reference number from your GCash receipt (6 to 20 letters or digits).";
@@ -19,6 +20,7 @@ type View = "loading" | "form" | "submitted" | "expired";
 
 // Same normalisation as submit_gcash_proof: spaces and dashes are ignored
 const normaliseReference = (ref: string) => ref.replace(/[\s-]/g, "");
+const holdEnd = (r: Row) => new Date(r.hold_expires_at ?? new Date(r.created_at).getTime() + 35 * 60_000).getTime();
 
 export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
   const [view, setView] = useState<View>("loading");
@@ -51,7 +53,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
       }
       // The resume path skips the server's expiry checks, so repeat them: hold timer and match start (Asia/Manila)
       const now = Date.now();
-      const holdOver = pending.some((r) => new Date(r.hold_expires_at ?? new Date(r.created_at).getTime() + 35 * 60_000).getTime() <= now);
+      const holdOver = pending.some((r) => holdEnd(r) <= now);
       const started = Math.min(...pending.map((r) => new Date(`${r.booking_date}T${r.start_time}+08:00`).getTime())) <= now;
       setView(holdOver || started ? "expired" : "form");
     };
@@ -114,6 +116,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
         <Info className="size-10 text-destructive mx-auto" />
         <h1 className="text-2xl font-extrabold tracking-tight">This reservation has expired</h1>
         <p className="text-sm text-muted-foreground">The hold on your courts has ended. Pick a new time to book again.</p>
+        <p className="text-sm text-muted-foreground">Already sent the money? Contact the club at <a href={VENUE_CONTACT.phoneHref} className="font-semibold text-foreground">{VENUE_CONTACT.phone}</a> with your GCash reference.</p>
         <Link href="/book" className="block"><Button className="w-full h-11 font-bold">Book again</Button></Link>
       </div>
     );
@@ -130,9 +133,22 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
     );
   }
 
+  if (!settings?.gcash_number) {
+    return (
+      <div className="max-w-lg w-full bg-card border border-border rounded-2xl shadow-md p-6 sm:p-8 text-center space-y-4">
+        <Info className="size-10 text-muted-foreground mx-auto" />
+        <p className="text-sm text-muted-foreground">GCash payment is unavailable right now. Cancel this booking in My Bookings and book with Card.</p>
+        <Link href="/my-bookings" className="block"><Button className="w-full h-11 font-bold">View My Bookings</Button></Link>
+      </div>
+    );
+  }
+
+  const heldUntil = new Date(Math.min(...rows.map(holdEnd))).toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+
   return (
     <form onSubmit={submit} className="max-w-lg w-full bg-card border border-border rounded-2xl shadow-md p-6 sm:p-8 space-y-5">
       <h1 className="text-2xl font-extrabold tracking-tight">Send exactly ₱{total.toLocaleString()}</h1>
+      <p className="text-sm text-muted-foreground">Your courts are held until {heldUntil}.</p>
       <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3 text-sm">
         {settings?.gcash_qr_url && (
           // eslint-disable-next-line @next/next/no-img-element

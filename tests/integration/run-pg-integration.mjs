@@ -4019,6 +4019,10 @@ async function main() {
     assert.equal(q(`SELECT count(*) FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.basket_id = '${h.basket_id}' AND p.gcash_submitted_at IS NULL;`), "0");
     assert.ok(submit(h.basket_id, "1234567890", okPath).stderr.includes("ALREADY_SUBMITTED"));
     assert.equal(q(`WITH u AS (UPDATE public.payments SET payment_reference = 'X' WHERE booking_id = '${h.items[0].booking_id}' RETURNING 1) SELECT count(*) FROM u;`, as(danaUid, true)), "0");
+    // The owner cannot turn a submitted GCash hold back into a 40-minute Stripe hold
+    const cch = runPsqlCommand(`SELECT public.confirm_checkout_hold('${h.items[0].booking_id}', '${h.items[0].payment_id}', 'cs_gcash', now() + interval '30 minutes');`, as(danaUid));
+    assert.ok(cch.stderr.includes("INVALID_STATUS"), cch.stderr);
+    assert.equal(state(h.basket_id), "pending/infinity/1234567890123/true,pending/infinity/1234567890123/true");
 
     // Still held: others cannot take the slot, expiry sweeps skip it
     const bobHold = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '${lines(C1)}'::jsonb);`, as(bobUid));
@@ -4040,7 +4044,10 @@ async function main() {
 
     runPsqlFile(path.join(PROJECT_ROOT, "supabase/rollback_gcash_manual_payment.sql"));
     for (const f of ["hold_gcash_basket", "submit_gcash_proof", "approve_gcash_basket", "reject_gcash_basket"]) assert.equal(q(`SELECT to_regproc('public.${f}') IS NULL;`), "t");
+    assert.equal(q(`SELECT prosrc LIKE '%gcash%' FROM pg_proc WHERE proname = 'confirm_checkout_hold';`), "f");
     runPsqlFile(migrationPath);
+    assert.equal(q(`SELECT has_function_privilege('anon', 'public.confirm_checkout_hold(uuid,uuid,text,timestamptz)', 'EXECUTE')::text
+      || has_function_privilege('authenticated', 'public.confirm_checkout_hold(uuid,uuid,text,timestamptz)', 'EXECUTE')::text;`), "falsetrue");
     assert.equal(q(`SELECT has_function_privilege('anon', 'public.hold_gcash_basket(date,jsonb,timestamptz)', 'EXECUTE')::text
       || has_function_privilege('authenticated', 'public.hold_gcash_basket(date,jsonb,timestamptz)', 'EXECUTE')::text
       || has_function_privilege('anon', 'public.submit_gcash_proof(uuid,text,text)', 'EXECUTE')::text

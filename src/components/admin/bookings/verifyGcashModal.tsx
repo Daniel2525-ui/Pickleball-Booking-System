@@ -18,19 +18,19 @@ import { Booking } from "@/lib/services/bookings/bookingsTypes";
 
 interface VerifyGcashModalProps {
   booking: Booking | null;
-  /** Every court of the submitted basket and their total */
-  due: { ids: string[]; total: number } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onVerified: (bookingIds: string[], action: "approve" | "reject") => void;
 }
 
-export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified }: VerifyGcashModalProps) => {
+export const VerifyGcashModal = ({ booking, open, onOpenChange, onVerified }: VerifyGcashModalProps) => {
   const [loading, setLoading] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState(false);
   const [proofFailed, setProofFailed] = useState(false);
+  // The whole submitted basket, not just the rows the table happens to have loaded
+  const [basket, setBasket] = useState<{ id: string; total_amount: number | null; courts: { name?: string } | null }[] | null>(null);
 
   const payment = booking ? (Array.isArray(booking.payments) ? booking.payments[0] : booking.payments) : null;
   const paymentId = payment?.id;
@@ -51,14 +51,28 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
           setProofFailed(!data?.signedUrl);
         });
     }
+    if (basketId) {
+      supabase
+        .from("bookings")
+        .select("id, total_amount, courts(name)")
+        .eq("basket_id", basketId)
+        .eq("status", "pending")
+        .eq("hold_expires_at", "infinity")
+        .then(({ data, error: loadErr }) => {
+          if (stale) return;
+          if (loadErr) setError("Couldn't load this booking's courts. Close and try again.");
+          else setBasket((data ?? []) as unknown as NonNullable<typeof basket>);
+        });
+    }
     // submit_gcash_proof copies the reference onto every court of the basket, so exclude the whole basket
+    // (walk-in and legacy rows have no basket_id, and a plain neq would drop them)
     if (reference && basketId) {
       supabase
         .from("payments")
         .select("id, bookings!inner(basket_id)", { count: "exact", head: true })
         .eq("payment_reference", reference)
         .eq("payment_method", "gcash")
-        .neq("bookings.basket_id", basketId)
+        .or(`basket_id.is.null,basket_id.neq.${basketId}`, { referencedTable: "bookings" })
         .then(({ count }) => !stale && setDuplicate((count ?? 0) > 0));
     }
     return () => {
@@ -66,9 +80,10 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
     };
   }, [open, paymentId, proofPath, reference, basketId]);
 
-  if (!booking || !due) return null;
+  if (!booking) return null;
 
-  const courts = due.ids.length;
+  const ids = basket?.map((b) => b.id) ?? [];
+  const total = basket?.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0) ?? 0;
   const submittedAt = payment?.gcash_submitted_at
     ? new Date(payment.gcash_submitted_at).toLocaleString("en-US", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })
     : "—";
@@ -84,7 +99,7 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
       return;
     }
     toast.success(action === "approve" ? "Payment approved and booking confirmed." : "Payment rejected. Slots released.");
-    onVerified(due.ids, action);
+    onVerified(ids, action);
     onOpenChange(false);
   };
 
@@ -123,7 +138,7 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Court:</span>
               <span className="font-semibold text-primary">
-                {courts > 1 ? `${courts} courts` : booking.courts?.name || `Court ${booking.court_id}`}
+                {!basket ? "—" : ids.length > 1 ? `${ids.length} courts` : basket[0]?.courts?.name || booking.courts?.name || `Court ${booking.court_id}`}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -136,7 +151,7 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
             </div>
             <div className="flex items-center justify-between border-t border-border/60 pt-1.5 mt-0.5">
               <span className="font-semibold text-muted-foreground">Expected total:</span>
-              <span className="font-extrabold text-sm text-foreground">₱{due.total.toLocaleString()}</span>
+              <span className="font-extrabold text-sm text-foreground">{basket ? `₱${total.toLocaleString()}` : "—"}</span>
             </div>
           </div>
 
@@ -151,10 +166,10 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
         </div>
 
         <DialogFooter className="pt-2 border-t">
-          <Button variant="destructive" disabled={!!loading} onClick={() => decide("reject")} className="font-bold text-xs sm:text-sm">
+          <Button variant="destructive" disabled={!!loading || !basket?.length} onClick={() => decide("reject")} className="font-bold text-xs sm:text-sm">
             {loading === "reject" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reject & release slots"}
           </Button>
-          <Button disabled={!!loading} onClick={() => decide("approve")} className="font-bold text-xs sm:text-sm">
+          <Button disabled={!!loading || !basket?.length} onClick={() => decide("approve")} className="font-bold text-xs sm:text-sm">
             {loading === "approve" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve — mark paid"}
           </Button>
         </DialogFooter>
