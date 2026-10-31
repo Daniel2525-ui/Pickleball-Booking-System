@@ -47,11 +47,13 @@ test("admin approves and rejects GCash payments", async ({ page }) => {
   await seedSubmitted(customer, BASKET_B, "E2E Gcash Approve", ["08:00", "09:00"], "5550002");
   // The same reference on another booking is flagged
   await seedSubmitted(customer, "33333333-3333-4333-8333-333333333333", "E2E Gcash Dup", ["11:00"], "5550002");
+  // A two-court basket whose reference nobody else used: its own sibling court must not trigger the warning
+  await seedSubmitted(customer, "44444444-4444-4444-8444-444444444444", "E2E Gcash Own", ["13:00", "14:00"], "5550003");
   try {
     await login(page, account("ADMIN"));
     await page.goto("/admin/bookings");
     await page.getByRole("combobox").first().click();
-    await expect(page.getByRole("option", { name: /Awaiting Verification \(4\)/ })).toBeVisible();
+    await expect(page.getByRole("option", { name: /Awaiting Verification \(6\)/ })).toBeVisible();
     await page.getByRole("option", { name: /Awaiting Verification/ }).click();
     await expect(rowFor(page, "E2E Gcash Reject")).toHaveCount(1);
     await expect(rowFor(page, "E2E Gcash Approve")).toHaveCount(2);
@@ -70,6 +72,12 @@ test("admin approves and rejects GCash payments", async ({ page }) => {
     await expect.poll(() => img.evaluate((i) => i.complete && i.naturalWidth > 0)).toBe(true);
     await dialog.getByRole("button", { name: "Approve — mark paid" }).click();
     await expect(rowFor(page, "E2E Gcash Approve").getByText("Confirmed")).toHaveCount(2);
+
+    await rowFor(page, "E2E Gcash Own").first().getByRole("button", { name: "Open menu" }).click();
+    await page.getByRole("menuitem", { name: "Verify" }).click();
+    await expect(dialog.getByText("5550003")).toBeVisible();
+    await expect(dialog.getByText("This reference was also used on another booking")).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
     // Reject the single court
     await rowFor(page, "E2E Gcash Reject").getByRole("button", { name: "Open menu" }).click();

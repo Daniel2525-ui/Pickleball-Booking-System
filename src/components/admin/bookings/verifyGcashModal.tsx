@@ -30,11 +30,13 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
   const [error, setError] = useState<string | null>(null);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState(false);
+  const [proofFailed, setProofFailed] = useState(false);
 
   const payment = booking ? (Array.isArray(booking.payments) ? booking.payments[0] : booking.payments) : null;
   const paymentId = payment?.id;
   const reference = payment?.payment_reference;
   const proofPath = payment?.gcash_proof_path;
+  const basketId = booking?.basket_id;
 
   useEffect(() => {
     if (!open || !paymentId) return;
@@ -43,21 +45,26 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
       supabase.storage
         .from("gcash-receipts")
         .createSignedUrl(proofPath, 300)
-        .then(({ data }) => !stale && setProofUrl(data?.signedUrl ?? null));
+        .then(({ data }) => {
+          if (stale) return;
+          setProofUrl(data?.signedUrl ?? null);
+          setProofFailed(!data?.signedUrl);
+        });
     }
-    if (reference) {
+    // submit_gcash_proof copies the reference onto every court of the basket, so exclude the whole basket
+    if (reference && basketId) {
       supabase
         .from("payments")
-        .select("id", { count: "exact", head: true })
+        .select("id, bookings!inner(basket_id)", { count: "exact", head: true })
         .eq("payment_reference", reference)
         .eq("payment_method", "gcash")
-        .neq("id", paymentId)
+        .neq("bookings.basket_id", basketId)
         .then(({ count }) => !stale && setDuplicate((count ?? 0) > 0));
     }
     return () => {
       stale = true;
     };
-  }, [open, paymentId, proofPath, reference]);
+  }, [open, paymentId, proofPath, reference, basketId]);
 
   if (!booking || !due) return null;
 
@@ -138,7 +145,7 @@ export const VerifyGcashModal = ({ booking, due, open, onOpenChange, onVerified 
             <img src={proofUrl} alt="GCash payment screenshot" className="max-h-80 w-full rounded-lg border border-border object-contain bg-muted/30" />
           ) : (
             <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">
-              {proofPath ? <Loader2 className="size-4 animate-spin" /> : "No screenshot"}
+              {!proofPath ? "No screenshot" : proofFailed ? "Couldn't load screenshot" : <Loader2 className="size-4 animate-spin" />}
             </div>
           )}
         </div>

@@ -72,7 +72,7 @@ const STATUS_LABELS: Record<string, string> = {
   completed: "Completed",
   no_show: "No-Show",
   expired: "Expired",
-  awaiting_verification: "Awaiting Verification",
+  awaiting_verification: "Awaiting verification",
   hold_expired: "Hold Expired",
 };
 const capitalize = (status: string) => STATUS_LABELS[status?.toLowerCase()] ?? (status ? status[0].toUpperCase() + status.slice(1) : "");
