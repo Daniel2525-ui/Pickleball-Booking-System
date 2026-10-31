@@ -27,6 +27,7 @@ import {
   Loader2,
   Banknote,
   Smartphone,
+  ReceiptText,
   Clock,
   CircleDollarSign,
   UserCheck,
@@ -42,8 +43,9 @@ import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { SettlePaymentModal } from "./settlePaymentModal";
+import { VerifyGcashModal } from "./verifyGcashModal";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
-import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
+import { getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
 const statusStyles: Record<string, string> = {
@@ -55,6 +57,7 @@ const statusStyles: Record<string, string> = {
   completed: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20 font-semibold",
   no_show: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20 font-semibold",
   expired: "bg-muted text-muted-foreground border-border font-semibold",
+  awaiting_verification: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-semibold",
   hold_expired: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-dashed border-orange-500/40 font-semibold",
 };
 
@@ -69,6 +72,7 @@ const STATUS_LABELS: Record<string, string> = {
   completed: "Completed",
   no_show: "No-Show",
   expired: "Expired",
+  awaiting_verification: "Awaiting Verification",
   hold_expired: "Hold Expired",
 };
 const capitalize = (status: string) => STATUS_LABELS[status?.toLowerCase()] ?? (status ? status[0].toUpperCase() + status.slice(1) : "");
@@ -110,6 +114,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
   // Settle payment modal state
   const [settleModalOpen, setSettleModalOpen] = useState(false);
   const [selectedBookingForSettle, setSelectedBookingForSettle] = useState<Booking | null>(null);
+
+  const [verifyBooking, setVerifyBooking] = useState<Booking | null>(null);
 
   useEffect(() => {
     const loadBookingsData = async () => {
@@ -205,6 +211,22 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
           ...b,
           status: "confirmed",
           payments: payment ? [{ ...payment, status: "paid", payment_method: paymentMethod } as BookingPayment] : b.payments,
+        };
+      })
+    );
+  };
+
+  const handleGcashVerified = (bookingIds: string[], action: "approve" | "reject") => {
+    if (action === "approve") return handlePaymentSettled(bookingIds, "gcash");
+    setBookingsData((prev) =>
+      prev.map((b) => {
+        if (!bookingIds.includes(b.id)) return b;
+        const payment = Array.isArray(b.payments) ? b.payments[0] : b.payments;
+        return {
+          ...b,
+          status: "cancelled",
+          cancel_reason: "gcash_rejected",
+          payments: payment ? [{ ...payment, status: "failed" } as BookingPayment] : b.payments,
         };
       })
     );
@@ -309,7 +331,9 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                   const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments ?? null);
                   const displayStatus = getBookingDisplayStatus(booking);
                   // An expired online hold cannot be revived at the counter (settle_counter_payment refuses it)
-                  const canCollect = payment?.status === "pending" && displayStatus !== "hold_expired" && booking.status !== "cancelled";
+                  // Verify replaces counter collection for a submitted GCash basket, which must stay one unit
+                  const awaiting = isAwaitingVerification(booking);
+                  const canCollect = payment?.status === "pending" && displayStatus !== "hold_expired" && booking.status !== "cancelled" && !awaiting;
 
                   return (
                     <TableRow key={booking.id} className="group transition-colors hover:bg-muted/30">
@@ -378,6 +402,16 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                               <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                                 Actions
                               </DropdownMenuLabel>
+
+                              {awaiting && (
+                                <DropdownMenuItem
+                                  onClick={() => setVerifyBooking(booking)}
+                                  className="cursor-pointer text-blue-600 focus:text-blue-600 text-xs font-semibold"
+                                >
+                                  <ReceiptText className="mr-2 h-4 w-4" />
+                                  Verify
+                                </DropdownMenuItem>
+                              )}
 
                               {/* Collect Payment Action if Unpaid */}
                               {canCollect && (
@@ -488,6 +522,15 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
         open={settleModalOpen}
         onOpenChange={setSettleModalOpen}
         onSettled={handlePaymentSettled}
+      />
+
+      <VerifyGcashModal
+        key={verifyBooking?.id}
+        booking={verifyBooking}
+        due={verifyBooking ? counterSettlementDue(verifyBooking, bookingsData) : null}
+        open={!!verifyBooking}
+        onOpenChange={(open) => !open && setVerifyBooking(null)}
+        onVerified={handleGcashVerified}
       />
     </>
   );

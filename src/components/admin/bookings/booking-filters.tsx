@@ -11,6 +11,7 @@ import {
 import { Search, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
+import { supabase } from "@/lib/supabase";
 import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 
 interface BookingFiltersProps {
@@ -28,6 +29,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
   const [courtId, setCourtId] = useState("All Courts");
   const [dateTime, setDateTime] = useState("");
   const [courts, setCourts] = useState<CourtOption[]>([]);
+  const [awaiting, setAwaiting] = useState(0);
 
   useEffect(() => {
     const loadCourts = async () => {
@@ -36,6 +38,12 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
     };
 
     loadCourts();
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .eq("hold_expires_at", "infinity")
+      .then(({ count }) => setAwaiting(count ?? 0));
   }, []);
 
   const updateFilters = (
@@ -88,6 +96,9 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
             <SelectItem value="All Statuses">All Statuses</SelectItem>
             <SelectItem value="Confirmed">Confirmed</SelectItem>
             <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Awaiting Verification">
+              Awaiting Verification{awaiting > 0 ? ` (${awaiting})` : ""}
+            </SelectItem>
             <SelectItem value="Checked In">Checked In</SelectItem>
             <SelectItem value="In Progress">In Progress</SelectItem>
             <SelectItem value="Completed">Completed</SelectItem>
