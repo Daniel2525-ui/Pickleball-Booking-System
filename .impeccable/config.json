@@ -1,1 +1,15 @@
-{"buildPath": "code"}
+{
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-10-31T03:56:31.312Z",
+        "reason": "email templates need email-client-safe fonts; user approved the plain-built-in-fonts call in the email design playback"
+      }
+    ]
+  }
+}
