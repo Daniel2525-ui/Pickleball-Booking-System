@@ -6,6 +6,7 @@ import {
   Clock,
   ReceiptText,
   DollarSign,
+  Undo2,
 } from "lucide-react";
 import {
   Table,
@@ -114,6 +115,9 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
   const pendingCount = validPayments.filter((payment) => payment.status === "pending").length;
 
+  const refunded = validPayments.filter((payment) => payment.status === "refunded");
+  const refundedTotal = refunded.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase() || "";
     const key = s === "paid" ? "succeeded" : s;
@@ -159,7 +163,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   return (
     <div className="flex flex-col gap-6">
       {/* Financial Summary Metrics Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card className="shadow-2xs border border-border bg-card">
           <CardHeader className="p-4 pb-2">
             <div className="flex items-center justify-between">
@@ -249,6 +253,32 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-0.5">Awaiting settlement</p>
+          </CardContent>
+        </Card>
+
+        {/* Spans both columns on phones so the fifth card doesn't sit alone at half width */}
+        <Card className="col-span-2 lg:col-span-1 shadow-2xs border border-border bg-card">
+          <CardHeader className="p-4 pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Refunded
+              </CardTitle>
+              <div className="size-8 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                <Undo2 className="size-4" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            {loading ? (
+              <Skeleton className="h-7 w-24 mt-1" />
+            ) : (
+              <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
+                {formatCurrency(refundedTotal)}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {refunded.length} {refunded.length === 1 ? "payment" : "payments"} returned to customers
+            </p>
           </CardContent>
         </Card>
       </div>
