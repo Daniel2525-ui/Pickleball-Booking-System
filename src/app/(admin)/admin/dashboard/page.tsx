@@ -3,7 +3,7 @@ import TodaysSchedule from "@/components/admin/dashboard/todays-schedule";
 import CourtStatus from "@/components/admin/dashboard/court-status";
 import BookingOverview from "@/components/admin/dashboard/booking-overview";
 import RecentBookings from "@/components/admin/dashboard/recent-bookings";
-import RefundsOwedAlert from "@/components/admin/dashboard/refunds-owed-alert";
+import AttentionAlert from "@/components/admin/dashboard/attention-alert";
 import { Clock } from "lucide-react";
 import { connection } from "next/server";
 
@@ -42,7 +42,8 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <RefundsOwedAlert />
+      <AttentionAlert kind="gcash" />
+      <AttentionAlert kind="refunds" />
 
       {/* KPI Cards Strip */}
       <DashboardStats />

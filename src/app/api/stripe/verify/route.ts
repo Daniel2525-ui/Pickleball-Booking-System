@@ -29,10 +29,8 @@ export async function POST(req: NextRequest) {
         }
 
         const basketId = session.metadata?.basket_id;
-        const bookingId = session.metadata?.booking_id;
-        const paymentId = session.metadata?.payment_id;
 
-        if (!basketId && (!bookingId || !paymentId)) {
+        if (!basketId) {
             return Response.json({ error: "Missing metadata" }, { status: 400 });
         }
 
@@ -50,7 +48,7 @@ export async function POST(req: NextRequest) {
             const { data, error } = await supabaseAdmin
                 .from("bookings")
                 .select("id, user_id, status, courts(name)")
-                .eq(basketId ? "basket_id" : "id", basketId ?? bookingId);
+                .eq("basket_id", basketId);
             return error ? null : (data as unknown as { id: string; user_id: string; status: string; courts: { name: string } | null }[]);
         };
 

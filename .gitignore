@@ -54,3 +54,6 @@ next-env.d.ts
 /.agents/
 /.agent/
 /.gemini/
+
+# design tool binaries (installed locally by the impeccable skill)
+/.claude/skills/impeccable/scripts/bin/

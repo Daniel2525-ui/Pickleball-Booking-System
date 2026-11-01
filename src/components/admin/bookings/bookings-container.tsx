@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import BookingFilters from "./booking-filters";
 import BookingsTable from "./bookings-table";
 import { AddBookingModal } from "./addBookingModal";
@@ -13,9 +14,11 @@ export interface BookingFiltersState {
 }
 
 export default function BookingsContainer() {
+  // ?status= lets the dashboard GCash alert open this page pre-filtered
+  const initialStatus = useSearchParams().get("status") || "All Statuses";
   const [filters, setFilters] = useState<BookingFiltersState>({
     search: "",
-    status: "All Statuses",
+    status: initialStatus,
     courtId: "All Courts",
     dateTime: "",
   });
@@ -37,7 +40,7 @@ export default function BookingsContainer() {
       </header>
 
       <div className="flex flex-col gap-4">
-        <BookingFilters onFilterChange={setFilters} />
+        <BookingFilters initialStatus={initialStatus} onFilterChange={setFilters} />
         <BookingsTable filters={filters} />
       </div>
     </div>

@@ -8,6 +8,7 @@ export interface RefundStripeClient {
             params: { payment_intent: string; amount: number },
             options?: { idempotencyKey?: string }
         ) => Promise<{ id: string; status?: string | null }>;
+        list: (params: { payment_intent: string; limit: number }) => Promise<{ data: { id: string; status?: string | null }[] }>;
     };
 }
 
@@ -38,7 +39,16 @@ export async function createStripeRefund(
     } catch (err: unknown) {
         const stripeErr = err as { code?: string; type?: string; raw?: { refund?: { id?: string; status?: string } } };
         console.error(`Stripe refund error (${idempotencyKey}):`, err);
-        if (stripeErr?.code === "charge_already_refunded") return { id: null, status: "succeeded" };
+        if (stripeErr?.code === "charge_already_refunded") {
+            // Refunded outside the app (e.g. Stripe dashboard): settle_stripe_refund needs that refund's id
+            try {
+                const { data } = await stripeClient.refunds.list({ payment_intent: paymentIntent, limit: 1 });
+                return data[0] ? { id: data[0].id, status: data[0].status || "succeeded" } : { id: null, status: "uncertain" };
+            } catch (listErr) {
+                console.error(`Stripe refund lookup error (${idempotencyKey}):`, listErr);
+                return { id: null, status: "uncertain" };
+            }
+        }
         if (stripeErr?.raw?.refund) return { id: stripeErr.raw.refund.id || null, status: stripeErr.raw.refund.status || "failed" };
         if (stripeErr?.type === "StripeInvalidRequestError") return { id: null, status: "failed" };
         return { id: null, status: "uncertain" };

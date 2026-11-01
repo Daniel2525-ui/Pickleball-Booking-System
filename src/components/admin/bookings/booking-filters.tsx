@@ -11,10 +11,11 @@ import {
 import { Search, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
-import { supabase } from "@/lib/supabase";
+import { countAwaitingGcash } from "@/lib/services/bookings/filterBookingsData.service";
 import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 
 interface BookingFiltersProps {
+  initialStatus?: string;
   onFilterChange?: (filters: {
     search: string;
     status: string;
@@ -23,9 +24,9 @@ interface BookingFiltersProps {
   }) => void;
 }
 
-export default function BookingFilters({ onFilterChange }: BookingFiltersProps = {}) {
+export default function BookingFilters({ initialStatus = "All Statuses", onFilterChange }: BookingFiltersProps = {}) {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("All Statuses");
+  const [status, setStatus] = useState(initialStatus);
   const [courtId, setCourtId] = useState("All Courts");
   const [dateTime, setDateTime] = useState("");
   const [courts, setCourts] = useState<CourtOption[]>([]);
@@ -38,12 +39,7 @@ export default function BookingFilters({ onFilterChange }: BookingFiltersProps =
     };
 
     loadCourts();
-    supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending")
-      .eq("hold_expires_at", "infinity")
-      .then(({ count }) => setAwaiting(count ?? 0));
+    countAwaitingGcash().then(setAwaiting);
   }, []);
 
   const updateFilters = (

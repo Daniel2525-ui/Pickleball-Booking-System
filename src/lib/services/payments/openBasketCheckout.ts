@@ -27,8 +27,7 @@ export async function openBasketCheckout({
 }: {
     supabase: SupabaseClient;
     lines: CheckoutLine[];
-    /** null for a legacy (pre-basket) single booking */
-    basketId: string | null;
+    basketId: string;
     customerEmail?: string;
     baseUrl: string;
 }): Promise<{ url: string | null; confirmError: { message?: string } | null }> {
@@ -48,9 +47,7 @@ export async function openBasketCheckout({
         success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/book`,
         // Reconciliation confirms exactly these payments, never other rows of the basket
-        metadata: basketId
-            ? { basket_id: basketId, payment_ids: lines.map((l) => l.paymentId).join(",") }
-            : { booking_id: lines[0].bookingId, payment_id: lines[0].paymentId },
+        metadata: { basket_id: basketId, payment_ids: lines.map((l) => l.paymentId).join(",") },
         customer_email: customerEmail,
         // Stripe needs expires_at at least 30 minutes out; 33 leaves 3 minutes for latency and clock skew
         expires_at: Math.floor(Date.now() / 1000) + 33 * 60,

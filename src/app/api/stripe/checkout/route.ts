@@ -39,15 +39,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 2. Parse the basket. A legacy single-court body (old bundle mid-deploy) becomes a one-line basket.
+        // 2. Parse the basket
         const body = await request.json().catch(() => null);
         const booking_date = body?.booking_date;
         const isGcash = body?.payment_method === "gcash";
-        const lines: unknown =
-            body?.lines ??
-            (body?.court_id && body?.start_time && body?.end_time
-                ? [{ court_id: body.court_id, start_time: body.start_time, end_time: body.end_time }]
-                : undefined);
+        const lines: unknown = body?.lines;
 
         if (typeof booking_date !== "string" || !booking_date) {
             return Response.json(

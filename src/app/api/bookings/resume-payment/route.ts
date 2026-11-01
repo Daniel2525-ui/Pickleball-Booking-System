@@ -175,7 +175,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 8. hold_court_basket always creates the payment row, and customers cannot insert one (RLS)
-        if (siblings.some((s) => !s.payments[0]?.id)) {
+        //    Online holds always have a basket; one without is not payable online
+        if (!booking.basket_id || siblings.some((s) => !s.payments[0]?.id)) {
             return Response.json(
                 { error: "This reservation can no longer be paid. Please book again." },
                 { status: 409 }

@@ -79,3 +79,14 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
         return { data: [], error };
     }
 };
+
+/** Bookings whose GCash screenshot was sent and still waits for staff (submit_gcash_proof sets an infinite hold). */
+export const countAwaitingGcash = async () => {
+    const { count, error } = await supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .eq("hold_expires_at", "infinity");
+    if (error) console.error("Failed to count GCash payments awaiting verification:", error);
+    return count ?? 0;
+};

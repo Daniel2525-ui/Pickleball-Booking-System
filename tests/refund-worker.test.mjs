@@ -165,6 +165,8 @@ test("RefundWorker: handles 'charge_already_refunded' gracefully without duplica
             if (fn === "settle_stripe_refund") {
                 settledRpcCalls++;
                 assert.equal(params.p_stripe_status, "succeeded");
+                // The real settle_stripe_refund rejects a succeeded settlement without a refund id
+                assert.equal(params.p_stripe_refund_id, "re_from_dashboard");
                 return { data: { success: true }, error: null };
             }
             throw new Error(`Unexpected RPC: ${fn}`);
@@ -178,6 +180,10 @@ test("RefundWorker: handles 'charge_already_refunded' gracefully without duplica
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 err.code = "charge_already_refunded";
                 throw err;
+            },
+            list: async ({ payment_intent }) => {
+                assert.equal(payment_intent, "pi_already_refunded");
+                return { data: [{ id: "re_from_dashboard", status: "succeeded" }] };
             },
         },
     };

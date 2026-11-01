@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase/service";
 import Stripe from "stripe";
-import { expireCheckoutSession, reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
+import { expireCheckoutSession, hasMetadata, reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -40,8 +40,7 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
-                const m = session.metadata ?? {};
-                if (!m.basket_id && !(m.booking_id && m.payment_id)) {
+                if (!hasMetadata(session.metadata ?? {})) {
                     console.error("Missing metadata in session:", session.id);
                     break;
                 }
@@ -77,9 +76,7 @@ export async function POST(req: NextRequest) {
             case "checkout.session.expired": {
                 const session = event.data.object as Stripe.Checkout.Session;
 
-                const m = session.metadata ?? {};
-
-                if (m.basket_id || (m.booking_id && m.payment_id)) {
+                if (hasMetadata(session.metadata ?? {})) {
                     const supabase = getServiceClient();
                     if (!supabase) {
                         console.error("Webhook configuration error: SUPABASE_SERVICE_ROLE_KEY is required for expired booking cleanup");

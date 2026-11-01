@@ -115,7 +115,7 @@ test("a court lost before a late payment is confirmed is refunded alone, and the
   expect(sql(`SELECT count(*) FROM public.refund_requests r JOIN public.bookings b ON b.id = r.booking_id WHERE b.start_time = '16:00' AND b.id <> '${lostId}'`)).toBe("0");
 });
 
-test("a court taken mid-basket reserves nothing and is dropped from the basket; the legacy single-court body still works", async ({ page, browser }) => {
+test("a court taken mid-basket reserves nothing and is dropped from the basket", async ({ page, browser }) => {
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   await slot(page, "COURT 3", "8:00 AM - 9:00 AM").click();
@@ -125,11 +125,11 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket; 
   // CUSTOMER2 takes COURT 4 first, with the old single-court request body
   const other = await browser.newPage();
   await login(other, account("CUSTOMER2"));
-  const legacy = await other.request.post("/api/stripe/checkout", {
-    data: { court_id: courtId("COURT 4"), booking_date: date, start_time: "08:00", end_time: "09:00" },
+  const first = await other.request.post("/api/stripe/checkout", {
+    data: { booking_date: date, lines: [{ court_id: courtId("COURT 4"), start_time: "08:00", end_time: "09:00" }] },
   });
-  expect(legacy.status()).toBe(200);
-  expect((await legacy.json()).url).toMatch(/^https:\/\/checkout\.stripe\.com\//);
+  expect(first.status()).toBe(200);
+  expect((await first.json()).url).toMatch(/^https:\/\/checkout\.stripe\.com\//);
 
   await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
@@ -139,7 +139,7 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket; 
   await expect(basket(page).getByText("Your basket · 1 court")).toBeVisible();
   expect(sql(`SELECT count(*) FROM public.bookings WHERE user_id = '${userId("CUSTOMER")}' AND start_time = '08:00'`)).toBe("0");
 
-  // Release CUSTOMER2's legacy hold so later tests start without an open basket
+  // Release CUSTOMER2's hold so later tests start without an open basket
   const cancel = await other.request.post("/api/bookings/cancel", { data: { bookingId: bookingId("COURT 4", "08:00") } });
   expect(cancel.status()).toBe(200);
   expect(courtRow("COURT 4", "08:00").split("|")[0]).toBe("cancelled");

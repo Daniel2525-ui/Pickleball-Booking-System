@@ -104,6 +104,13 @@ export async function POST(request: NextRequest) {
 
         if (reserveError) {
             console.error("Refund: reserve_payment_refund failed:", reserveError);
+            // An earlier refund (e.g. the customer's own cancel) is still pending or awaiting review
+            if (reserveError.message?.includes("REFUND_CAP_EXCEEDED")) {
+                return NextResponse.json(
+                    { error: "A card refund for this payment is already in progress. Check its status in the Stripe dashboard." },
+                    { status: 409 }
+                );
+            }
             return NextResponse.json({ error: "Could not queue the refund. Please try again." }, { status: 500 });
         }
 

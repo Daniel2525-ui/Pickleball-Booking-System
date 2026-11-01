@@ -69,7 +69,7 @@ test("a second customer cannot take a confirmed slot", async ({ page }) => {
   await expect(slot(page, "10:00 AM - 11:00 AM")).toHaveCount(0);
 
   const res = await page.request.post("/api/stripe/checkout", {
-    data: { court_id: court.id, booking_date: date, start_time: "10:00", end_time: "11:00" },
+    data: { booking_date: date, lines: [{ court_id: court.id, start_time: "10:00", end_time: "11:00" }] },
   });
   expect(res.status()).toBe(409);
   expect(sql(`SELECT count(*) FROM public.bookings WHERE booking_date = '${date}' AND start_time = '10:00'`)).toBe("1");
@@ -132,7 +132,7 @@ test("a paid but not yet confirmed booking cannot be paid a second time", async 
 
 test("a customer cannot cancel a confirmed booking around the cancel route", async ({ page }) => {
   await login(page, account("CUSTOMER2"));
-  const body = { court_id: court.id, booking_date: date, start_time: "20:00", end_time: "21:00" };
+  const body = { booking_date: date, lines: [{ court_id: court.id, start_time: "20:00", end_time: "21:00" }] };
   expect((await page.request.post("/api/stripe/checkout", { data: body })).status()).toBe(200);
   sql(`UPDATE public.bookings SET status = 'confirmed' WHERE booking_date = '${date}' AND start_time = '20:00'`);
   const bookingId = sql(`SELECT id FROM public.bookings WHERE booking_date = '${date}' AND start_time = '20:00'`);
@@ -160,7 +160,7 @@ test("an expired hold keeps its slot for the grace period, then releases it", as
   sql(`UPDATE public.bookings SET hold_expires_at = now() - interval '25 minutes' WHERE booking_date = '${date}' AND start_time = '17:00' AND status = 'pending'`);
   const holdA = await browser.newPage();
   await login(holdA, account("CUSTOMER"));
-  const body = { court_id: court.id, booking_date: date, start_time: "15:00", end_time: "16:00" };
+  const body = { booking_date: date, lines: [{ court_id: court.id, start_time: "15:00", end_time: "16:00" }] };
   expect((await holdA.request.post("/api/stripe/checkout", { data: body })).status()).toBe(200);
   await holdA.close();
 

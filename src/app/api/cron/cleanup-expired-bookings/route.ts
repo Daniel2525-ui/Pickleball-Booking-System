@@ -10,7 +10,7 @@ import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
  *
  * Concurrency & Safety Guarantees:
  * 1. Authenticates request via Authorization: Bearer <CRON_SECRET>.
- * 2. Processes in bounded batches (BATCH_SIZE = 25) with an execution time budget (MAX_EXECUTION_MS = 7500)
+ * 2. Processes in bounded batches (BATCH_SIZE = 25) within time budgets (6000 ms for cleanup, 8000 ms total)
  *    to comfortably finish before Vercel serverless limits while draining backlogs across multiple iterations.
  * 3. Inspects Stripe Checkout sessions before performing database cancellation.
  * 4. If Stripe session is paid or complete, reconciles via reconcileCheckoutSession
