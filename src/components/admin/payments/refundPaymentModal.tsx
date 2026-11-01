@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Undo2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabase";
 import { refundPayment } from "@/lib/services/payments/refundPayment.service";
 import { Payment } from "@/lib/services/payments/paymentsTypes";
 
@@ -28,6 +29,27 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receiptReference, setReceiptReference] = useState("");
+  const [proof, setProof] = useState<{ path: string; url: string | null } | null>(null);
+
+  // Staff read the customer's GCash number off their payment screenshot to send the refund
+  const proofPath = payment?.payment_method?.toLowerCase() === "gcash" ? payment.gcash_proof_path : null;
+  // Keyed by path so a previous payment's screenshot never shows on this one
+  const loaded = proof && proof.path === proofPath ? proof : null;
+  const proofUrl = loaded?.url ?? null;
+  const proofFailed = !!loaded && !loaded.url;
+  useEffect(() => {
+    if (!open || !proofPath) return;
+    let stale = false;
+    supabase.storage
+      .from("gcash-receipts")
+      .createSignedUrl(proofPath, 300)
+      .then(({ data }) => {
+        if (!stale) setProof({ path: proofPath, url: data?.signedUrl ?? null });
+      });
+    return () => {
+      stale = true;
+    };
+  }, [open, proofPath]);
 
   if (!payment) return null;
 
@@ -69,8 +91,10 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
             Refund Payment
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
-            {isManual
-              ? `Hand the ${method === "gcash" ? "GCash transfer" : "cash"} back to the customer, then record the reference here.`
+            {method === "gcash"
+              ? `Send ₱${amount.toLocaleString()} back to the number on the customer's GCash screenshot, then enter the reference of your transfer.`
+              : isManual
+              ? "Hand the cash back to the customer, then record the receipt number here."
               : "The full amount is returned to the customer's card through Stripe."}
           </DialogDescription>
         </DialogHeader>
@@ -92,16 +116,40 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
               <span className="text-muted-foreground">Paid via:</span>
               <span className="font-semibold uppercase">{method}</span>
             </div>
+            {method === "gcash" && payment.payment_reference && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Original GCash ref:</span>
+                <span className="font-mono text-foreground">{payment.payment_reference}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between border-t border-border/60 pt-1.5 mt-0.5">
               <span className="font-semibold text-muted-foreground">Refund Amount:</span>
               <span className="font-extrabold text-sm text-foreground">₱{amount.toLocaleString()}</span>
             </div>
           </div>
 
+          {method === "gcash" && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Customer&apos;s GCash screenshot: send the refund to the number under &quot;From&quot;
+              </span>
+              {proofUrl ? (
+                <a href={proofUrl} target="_blank" rel="noopener noreferrer" title="Open full size">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not optimisable */}
+                  <img src={proofUrl} alt="Customer's GCash payment screenshot" className="max-h-64 w-full rounded-lg border border-border object-contain bg-muted/30 cursor-zoom-in" />
+                </a>
+              ) : (
+                <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">
+                  {!proofPath ? "No screenshot" : proofFailed ? "Couldn't load screenshot" : <Loader2 className="size-4 animate-spin" />}
+                </div>
+              )}
+            </div>
+          )}
+
           {isManual && (
             <div className="flex flex-col gap-1">
               <Label htmlFor="refund-reference" className="text-[11px] font-medium text-muted-foreground">
-                {method === "gcash" ? "GCash Reference Code" : "Receipt / Voucher Number"}
+                {method === "gcash" ? "GCash reference of your refund transfer" : "Receipt / Voucher Number"}
               </Label>
               <Input
                 id="refund-reference"
