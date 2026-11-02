@@ -4498,6 +4498,38 @@ async function main() {
       assert.ok(late.refund_request_id);
       assert.equal(bookingOf(h.booking_id), "cancelled|admin");
     });
+
+    const opReadFile = fs.readdirSync(dir).find((f) => f.includes("open_play_read"));
+    if (opReadFile) runPsqlFile(path.join(dir, opReadFile));
+    const anon = { role: "anon", asRole: true };
+    const readDate = "2030-07-01";
+    const mkOn = (date, status, taken = 0) => {
+      const id = q(`SELECT gen_random_uuid();`);
+      q(`INSERT INTO public.open_play_sessions (id, schedule_id, session_date, start_time, end_time, court_ids, capacity, price_per_spot, status)
+         VALUES ('${id}', '${schedId}', '${date}', '10:00', '12:00', ARRAY['${activeCourtId}']::uuid[], 6, 150, '${status}');`);
+      if (taken) q(`INSERT INTO public.bookings (open_play_session_id, open_play_spots, user_id, booking_date, start_time, end_time, customer_name, status, total_amount)
+         VALUES ('${id}', ${taken}, '${aliceUid}', '${date}', '10:00', '12:00', 'Op', 'confirmed', 0);`);
+      return id;
+    };
+
+    await runTest("Open play: public sessions list shows spots left and hides cancelled and started sessions", () => {
+      const open = mkOn(readDate, "open", 4);
+      mkOn("2030-07-02", "cancelled");
+      mkOn("2020-01-01", "open");
+      const list = (as, from = readDate) => runPsqlCommand(`SELECT id || '|' || spots_left || '|' || my_spots || '|' || court_names::text FROM public.get_open_play_sessions('${from}', '2030-07-31');`, as).stdout.trim().split(String.fromCharCode(10)).filter((l) => l.includes("|"));
+      const rows = list(anon);
+      assert.equal(q(`SELECT count(*) FROM public.get_open_play_sessions('2020-01-01', '2020-01-01');`, anon), "0");
+      assert.equal(rows.length, 1, rows.join(","));
+      assert.ok(rows[0].startsWith(`${open}|2|0|`), rows[0]);
+      assert.ok(list({ role: "authenticated", uid: aliceUid, asRole: true })[0].startsWith(`${open}|2|4|`));
+    });
+
+    await runTest("Open play: slot availability marks block rows and omits spot rows", () => {
+      const open = q(`SELECT id FROM public.open_play_sessions WHERE session_date = '${readDate}';`);
+      q(`INSERT INTO public.bookings (court_id, open_play_session_id, booking_date, start_time, end_time, customer_name, status, total_amount)
+         VALUES ('${activeCourtId}', '${open}', '${readDate}', '10:00', '12:00', 'Open play', 'confirmed', 0);`);
+      assert.equal(q(`SELECT count(*) || '/' || count(*) FILTER (WHERE open_play AND court_id IS NOT NULL) FROM public.get_public_slot_availability('${readDate}');`, anon), "1/1");
+    });
   }
 
   console.log("\n================================================================================");
