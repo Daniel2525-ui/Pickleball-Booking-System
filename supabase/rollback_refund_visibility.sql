@@ -1,4 +1,4 @@
--- Rollback for 20261103000002_refund_visibility.sql
+-- Rollback for 20261102085422_refund_visibility.sql
 
 BEGIN;
 
