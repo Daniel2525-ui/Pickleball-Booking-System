@@ -111,6 +111,10 @@ BEGIN
       ORDER BY name LIMIT 1;
     END IF;
 
+    IF v_reason IS NULL AND (SELECT count(*) FROM public.courts WHERE id = ANY (r.court_ids)) < cardinality(r.court_ids) THEN
+      v_reason := 'A court no longer exists';
+    END IF;
+
     IF v_reason IS NULL THEN
       BEGIN
         INSERT INTO public.open_play_sessions (schedule_id, session_date, start_time, end_time, court_ids, capacity, price_per_spot, status)

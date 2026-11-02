@@ -4269,6 +4269,17 @@ async function main() {
       assert.equal(blocks(fresh[3]), "2/2");
     });
 
+    await runTest("Open play: a schedule with a deleted court is flagged and does not stop other schedules", () => {
+      const sid = q(`INSERT INTO public.open_play_schedules (day_of_week, start_time, end_time, court_ids, capacity, price_per_spot)
+        VALUES ('Saturday', '10:00', '12:00', ARRAY['${gA}','0b0000a0-0000-0000-0000-0000000000ff']::uuid[], 8, 150) RETURNING id;`).split("\n")[0];
+      const good = save(null, "Sunday", "10:00", "12:00", 150);
+      gen();
+      const [status, reason] = sessionOf(sid, nextDate(6));
+      assert.equal(status, "flagged");
+      assert.ok(reason.includes("no longer exists"), reason);
+      assert.equal(sessionOf(good, nextDate(0))[0], "open");
+    });
+
     await runTest("Open play: schedule functions reject non-admins", () => {
       const as = { role: "authenticated", uid: aliceUid };
       for (const sql of [
