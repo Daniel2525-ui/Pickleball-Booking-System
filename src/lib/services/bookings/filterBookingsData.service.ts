@@ -39,7 +39,9 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
             .order("start_time", { ascending: false })
             // A booking can have a later duplicate-charge payment row (20261102); keep the original first for payments[0]
             .order("created_at", { referencedTable: "payments", ascending: true })
-            .range(offset, offset + BOOKINGS_PAGE_SIZE - 1);
+            .range(offset, offset + BOOKINGS_PAGE_SIZE - 1)
+            // Open play court-reserving rows (session set, no spots) are not bookings; staff manage them on Open Play
+            .or("open_play_session_id.is.null,open_play_spots.not.is.null");
 
         if (hasStatusFilter && status.toLowerCase() === "expired") {
             query = query.eq("status", "cancelled").eq("cancel_reason", "expired");

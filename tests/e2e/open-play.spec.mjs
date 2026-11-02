@@ -85,6 +85,13 @@ test("a player books two spots with GCash and staff approve them", async ({ page
   await page.getByRole("dialog").getByRole("button", { name: "Approve — mark paid" }).click();
   await expect.poll(() => sql(`SELECT status FROM public.bookings WHERE open_play_session_id = '${sessionId()}' AND court_id IS NULL`)).toBe("confirmed");
 
+  // The Bookings table lists the player's spot booking, but not the ₱0 rows that reserve the courts
+  expect(Number(sql(`SELECT count(*) FROM public.bookings WHERE open_play_session_id = '${sessionId()}' AND court_id IS NOT NULL`))).toBeGreaterThan(0);
+  await page.goto("/admin/bookings");
+  await expect(page.getByRole("row").filter({ hasText: "Open play · 2 spots" })).toHaveCount(1);
+  await expect(page.getByText("Open play (court reserved)")).toHaveCount(0);
+  await expect(page.getByRole("row").filter({ hasText: "₱0" })).toHaveCount(0);
+
   await page.context().clearCookies();
   await login(page, account("CUSTOMER"));
   await page.goto("/my-bookings");
