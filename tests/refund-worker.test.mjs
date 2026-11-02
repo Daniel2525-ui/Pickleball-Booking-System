@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_dummy_for_tests";
-const { processPendingRefundJobs } = await import("../src/lib/services/payments/refundWorker.ts");
+const { processPendingRefundJobs, settleRefundFromStripe } = await import("../src/lib/services/payments/refundWorker.ts");
 
 test("RefundWorker: successfully claims and processes pending refund job with 'claimed: true'", async () => {
     let claimedRpcCalls = 0;
@@ -237,4 +237,43 @@ test("RefundWorker: a dashboard refund already recorded for another court goes t
     await processPendingRefundJobs({ workerId: "w", maxJobs: 1, supabase: mockSupabase, stripeClient: mockStripe });
     // Not "succeeded" (would reuse court A's refund id) and not "uncertain"-style silence: staff review it
     assert.equal(settledStatus, "already_refunded");
+});
+
+// Stripe refund.updated / refund.failed: the ledger row recorded with that refund id is settled
+const refundLedger = (row) => {
+    const calls = [];
+    return {
+        calls,
+        from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: row, error: null }) }) }) }),
+        rpc: async (fn, params) => { calls.push({ fn, params }); return { data: { success: true }, error: null }; },
+    };
+};
+const ledgerRow = { id: "req-1", amount: 200, currency: "php", status: "requires_admin_review", stripe_payment_intent: "pi_1" };
+
+test("settleRefundFromStripe: a refund that clears days later settles as succeeded with the ledger's amount", async () => {
+    const db = refundLedger(ledgerRow);
+    assert.equal(await settleRefundFromStripe({ id: "re_1", status: "succeeded", payment_intent: "pi_1" }, db), "settled");
+    assert.equal(db.calls.length, 1);
+    assert.deepEqual(db.calls[0], { fn: "settle_stripe_refund", params: {
+        p_refund_request_id: "req-1", p_stripe_refund_id: "re_1", p_stripe_status: "succeeded",
+        p_stripe_payment_intent: "pi_1", p_amount: 200, p_currency: "php",
+    } });
+});
+
+test("settleRefundFromStripe: failed and canceled refunds settle as failed so staff can retry", async () => {
+    for (const status of ["failed", "canceled"]) {
+        const db = refundLedger(ledgerRow);
+        assert.equal(await settleRefundFromStripe({ id: "re_1", status, payment_intent: "pi_1" }, db), "settled");
+        assert.equal(db.calls[0].params.p_stripe_status, "failed");
+    }
+});
+
+test("settleRefundFromStripe: ignores pending updates, unknown refunds and rows already refunded", async () => {
+    const pending = refundLedger(ledgerRow);
+    assert.equal(await settleRefundFromStripe({ id: "re_1", status: "pending" }, pending), "ignored");
+    const unknown = refundLedger(null); // e.g. a refund made by hand in the Stripe dashboard
+    assert.equal(await settleRefundFromStripe({ id: "re_x", status: "succeeded" }, unknown), "ignored");
+    const done = refundLedger({ ...ledgerRow, status: "succeeded" });
+    assert.equal(await settleRefundFromStripe({ id: "re_1", status: "succeeded" }, done), "ignored");
+    for (const db of [pending, unknown, done]) assert.equal(db.calls.length, 0);
 });

@@ -332,7 +332,7 @@ export const BookingHistoryContainer = () => {
                     </div>
 
                     {note && (
-                      <p className={`text-xs font-semibold ${note.text.startsWith("Cancelled by the venue") ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                      <p className={`text-xs font-semibold ${/Cancelled by the venue|Refund failed|Refund delayed/.test(note.text) ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
                         {note.text}
                       </p>
                     )}

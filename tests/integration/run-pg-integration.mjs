@@ -4544,6 +4544,43 @@ async function main() {
     });
   }
 
+  // --- Refund visibility (staff read the ledger; players see only their own bookings' refund state) ---
+  {
+    const migDir = path.join(PROJECT_ROOT, "supabase/migrations");
+    const visFile = fs.readdirSync(migDir).find((f) => f.includes("refund_visibility"));
+    if (visFile) runPsqlFile(path.join(migDir, visFile));
+    const one = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim().split("\n")[0];
+    };
+    // A cancelled, paid card booking per player, each with a refund request; Alice's refund failed at Stripe
+    const cancelledCardBooking = (uid, date, pi) => {
+      const bId = one(`INSERT INTO public.bookings (court_id, user_id, booking_date, start_time, end_time, customer_name, status, total_amount)
+        VALUES ('${activeCourtId}', '${uid}', '${date}', '08:00', '09:00', 'Player', 'cancelled', 200) RETURNING id;`);
+      const pId = one(`INSERT INTO public.payments (booking_id, amount, currency, status, payment_method, stripe_payment_id, paid_at)
+        VALUES ('${bId}', 200, 'php', 'paid', 'stripe', '${pi}', now()) RETURNING id;`);
+      one(`SELECT public.reserve_payment_refund('${pId}', '${bId}', 200, 'php', 'stripe', 'TEST', 'vis_${pi}', '${pi}');`, { role: "service_role" });
+      return bId;
+    };
+    const aliceBooking = cancelledCardBooking(aliceUid, "2031-01-05", "pi_vis_alice");
+    const bobBooking = cancelledCardBooking(bobUid, "2031-01-06", "pi_vis_bob");
+    one(`UPDATE public.refund_requests SET status = 'failed' WHERE booking_id = '${aliceBooking}';`);
+    const states = `SELECT booking_id || '|' || status FROM public.get_my_refund_states(ARRAY['${aliceBooking}', '${bobBooking}']::uuid[]);`;
+
+    await runTest("Refund visibility: a player sees the refund state of their own bookings only", () => {
+      assert.equal(one(states, { role: "authenticated", uid: aliceUid, asRole: true }), `${aliceBooking}|failed`);
+      assert.equal(one(states, { role: "authenticated", uid: bobUid, asRole: true }), `${bobBooking}|pending`);
+      assert.notEqual(runPsqlCommand(states, { role: "anon", asRole: true }).status, 0);
+    });
+
+    await runTest("Refund visibility: staff can read refund requests, players cannot read the ledger directly", () => {
+      const count = `SELECT count(*) FROM public.refund_requests WHERE booking_id IN ('${aliceBooking}', '${bobBooking}');`;
+      assert.equal(one(count, { role: "authenticated", uid: adminUid, asRole: true }), "2");
+      assert.equal(one(count, { role: "authenticated", uid: aliceUid, asRole: true }), "0");
+    });
+  }
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");

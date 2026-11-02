@@ -56,3 +56,14 @@ test("cancellationNote: who cancelled and what happened to the money", () => {
     assert.deepEqual(cancellationNote(cancelled("customer", [pay("refunded"), pay("paid")])), { text: "Refund on its way to your card", charged: true });
     assert.deepEqual(cancellationNote(cancelled("gcash_rejected", [pay("failed", "gcash")])), { text: "GCash payment could not be verified", charged: false });
 });
+
+test("cancellationNote: a card refund that failed or stalled at Stripe says so", () => {
+    const paid = [{ status: "paid", payment_method: "stripe" }];
+    const note = (refund_status, cancel_reason = "customer") => cancellationNote({ status: "cancelled", cancel_reason, payments: paid, refund_status }).text;
+    assert.equal(note("failed"), "Refund failed · The venue will contact you");
+    assert.equal(note("requires_admin_review", "admin"), "Cancelled by the venue · Refund delayed · The venue is checking it");
+    assert.equal(note("processing"), "Refund on its way to your card");
+    assert.equal(note(null), "Refund on its way to your card");
+    // Once Stripe confirms, the payment is refunded whatever the old request said
+    assert.equal(cancellationNote({ status: "cancelled", cancel_reason: "customer", payments: [{ status: "refunded", payment_method: "stripe" }], refund_status: "failed" }).text, "Refunded");
+});

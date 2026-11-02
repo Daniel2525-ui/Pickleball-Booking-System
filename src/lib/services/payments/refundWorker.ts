@@ -156,3 +156,44 @@ export async function processPendingRefundJobs({
 
     return { processed, succeeded, failed };
 }
+
+/**
+ * Stripe refund.updated / refund.failed: settles the ledger row that recorded this refund id. Closes the gap where a
+ * refund stays pending at Stripe (e.g. a zero balance) longer than the worker re-checks it, then clears or fails.
+ * "ignored" for non-final updates, refunds the app never made, and rows already refunded; "error" means retry.
+ */
+export async function settleRefundFromStripe(
+    refund: { id: string; status?: string | null; payment_intent?: string | { id: string } | null },
+    supabase: SupabaseClient
+): Promise<"settled" | "ignored" | "error"> {
+    const outcome = refund.status === "succeeded" ? "succeeded" : refund.status === "failed" || refund.status === "canceled" ? "failed" : null;
+    if (!outcome) return "ignored";
+
+    const { data: row, error } = await supabase
+        .from("refund_requests")
+        .select("id, amount, currency, status, stripe_payment_intent")
+        .eq("stripe_refund_id", refund.id)
+        .maybeSingle();
+    if (error) {
+        console.error(`Refund ${refund.id}: ledger lookup failed:`, error);
+        return "error";
+    }
+    if (!row || row.status === "succeeded") return "ignored";
+
+    const paymentIntent = row.stripe_payment_intent ?? (typeof refund.payment_intent === "string" ? refund.payment_intent : refund.payment_intent?.id) ?? null;
+    const settleRes = await withDbRetry(() =>
+        supabase.rpc("settle_stripe_refund", {
+            p_refund_request_id: row.id,
+            p_stripe_refund_id: refund.id,
+            p_stripe_status: outcome,
+            p_stripe_payment_intent: paymentIntent,
+            p_amount: row.amount,
+            p_currency: String(row.currency).toLowerCase(),
+        })
+    );
+    if (settleRes.error) {
+        console.error(`Refund ${refund.id}: settle_stripe_refund failed:`, settleRes.error);
+        return "error";
+    }
+    return "settled";
+}

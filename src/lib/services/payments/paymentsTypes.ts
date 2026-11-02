@@ -11,6 +11,8 @@ export interface Payment {
     gcash_proof_path?: string | null;
     paid_at: string | null;
     created_at: string;
+    // Refund ledger rows for this payment (admins only, newest decides what Refund Owed says)
+    refund_requests?: { status: string; created_at: string }[] | null;
     // Joined fields
     bookings?: {
         status?: string;

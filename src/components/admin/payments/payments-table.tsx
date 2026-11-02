@@ -68,6 +68,22 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   // Paid payments on cancelled bookings are owed back to the customer
   const needsRefund = (payment: Payment) => payment.status === "paid" && payment.bookings?.status === "cancelled";
 
+  // Where the latest card refund for an owed payment stands, so staff know whether to wait, check Stripe or retry
+  const cardRefundState = (payment: Payment) => {
+    const latest = [...(payment.refund_requests ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    switch (latest?.status) {
+      case "pending":
+      case "processing":
+        return { label: "Card refund in progress", tone: "text-muted-foreground", retry: false };
+      case "requires_admin_review":
+        return { label: "Delayed at Stripe: check the Stripe dashboard", tone: "text-amber-700 dark:text-amber-400", retry: false };
+      case "failed":
+        return { label: "Card refund failed", tone: "text-destructive", retry: true };
+      default:
+        return null;
+    }
+  };
+
   useEffect(() => {
     const loadPayments = async () => {
       setLoading(true);
@@ -396,11 +412,19 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
                     {/* Action */}
                     <TableCell className="text-right">
-                      {needsRefund(payment) && (
-                        <Button size="sm" variant="outline" className="text-xs" onClick={() => setRefundTarget(payment)}>
-                          Refund
-                        </Button>
-                      )}
+                      {needsRefund(payment) && (() => {
+                        const refundState = cardRefundState(payment);
+                        return (
+                          <div className="flex flex-col items-end gap-1">
+                            <Button size="sm" variant="outline" className="text-xs" onClick={() => setRefundTarget(payment)}>
+                              {refundState?.retry ? "Retry refund" : "Refund"}
+                            </Button>
+                            {refundState && (
+                              <span className={`text-[11px] font-semibold ${refundState.tone}`}>{refundState.label}</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))

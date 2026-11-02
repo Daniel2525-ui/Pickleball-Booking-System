@@ -3,6 +3,7 @@ import { stripe } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase/service";
 import Stripe from "stripe";
 import { expireCheckoutSession, hasMetadata, reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
+import { settleRefundFromStripe } from "@/lib/services/payments/refundWorker";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -86,6 +87,23 @@ export async function POST(req: NextRequest) {
                     await expireCheckoutSession(session, supabase);
                 }
 
+                break;
+            }
+
+            // A refund that stayed pending at Stripe (e.g. a zero balance) and later cleared or failed
+            case "refund.updated":
+            case "refund.failed":
+            case "charge.refund.updated": {
+                const refund = event.data.object as Stripe.Refund;
+                const supabase = getServiceClient();
+                if (!supabase) {
+                    console.error("Webhook configuration error: SUPABASE_SERVICE_ROLE_KEY is required to settle refunds");
+                    return Response.json({ error: "Server configuration error: missing service role key" }, { status: 500 });
+                }
+                // "error" returns 500 so Stripe redelivers the event
+                if ((await settleRefundFromStripe(refund, supabase)) === "error") {
+                    return Response.json({ error: "Refund settlement failed" }, { status: 500 });
+                }
                 break;
             }
 

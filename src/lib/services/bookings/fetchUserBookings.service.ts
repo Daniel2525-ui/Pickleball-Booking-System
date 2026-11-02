@@ -14,7 +14,9 @@ export interface UserBooking {
     basket_id?: string | null,
     open_play_spots?: number | null,
     courts?: { name: string } | null,
-    payments?: { status: string, payment_method: string | null }[] | null
+    payments?: { status: string, payment_method: string | null }[] | null,
+    /** Latest refund request status for a cancelled booking (get_my_refund_states), when one exists */
+    refund_status?: string | null
 }
 
 export const fetchUserBookings = async (userId: string) => {
@@ -49,8 +51,18 @@ export const fetchUserBookings = async (userId: string) => {
             .limit(100);
 
         if (error) throw error;
+        const bookings = (data || []) as unknown as UserBooking[];
 
-        return { data: (data || []) as unknown as UserBooking[], error: null };
+        // Refund progress for cancelled bookings (pending at Stripe, failed, under review); best effort
+        const cancelledIds = bookings.filter((b) => b.status === "cancelled").map((b) => b.id);
+        if (cancelledIds.length) {
+            const { data: states, error: stateError } = await supabase.rpc("get_my_refund_states", { p_booking_ids: cancelledIds });
+            if (stateError) console.error("Failed to fetch refund states:", stateError);
+            const byBooking = new Map(((states ?? []) as { booking_id: string; status: string }[]).map((s) => [s.booking_id, s.status]));
+            for (const b of bookings) b.refund_status = byBooking.get(b.id) ?? null;
+        }
+
+        return { data: bookings, error: null };
     } catch (error) {
         console.error("Failed to fetch user bookings:", error)
         return { data: [], error }

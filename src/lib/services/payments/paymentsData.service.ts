@@ -13,6 +13,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
             .from("payments")
             .select(`
                 *,
+                refund_requests ( status, created_at ),
                 bookings${refundOwed ? "!inner" : ""} (
                     status,
                     booking_date,
