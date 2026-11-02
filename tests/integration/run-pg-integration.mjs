@@ -4128,6 +4128,70 @@ async function main() {
     }
   });
 
+  // --- Open play ---
+  {
+    const dir = path.join(PROJECT_ROOT, "supabase/migrations");
+    const opFile = fs.readdirSync(dir).find((f) => f.includes("open_play_schema"));
+    if (opFile) runPsqlFile(path.join(dir, opFile));
+    const q = (sql, opts) => {
+      const r = runPsqlCommand(sql, opts);
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const opDay = "2030-03-05"; // Tuesday, not used by other tests
+    const schedId = "0b000000-0000-0000-0000-000000000001";
+    const sessId = "0b000000-0000-0000-0000-000000000002";
+    // 10:00-12:00 session, so every fixture row below uses the session's date and times
+    const spot = (extra) => runPsqlCommand(
+      `INSERT INTO public.bookings (court_id, open_play_session_id, booking_date, start_time, end_time, customer_name, status, total_amount, ${extra.cols})
+       VALUES (${extra.court ?? "NULL"}, '${sessId}', '${opDay}', '10:00', '12:00', 'Op', '${extra.status ?? "confirmed"}', 0, ${extra.vals});`);
+    const spotRow = (spots, status, hold = "NULL") => q(
+      `INSERT INTO public.bookings (open_play_session_id, open_play_spots, user_id, booking_date, start_time, end_time, customer_name, status, total_amount, hold_expires_at)
+       VALUES ('${sessId}', ${spots}, '${aliceUid}', '${opDay}', '10:00', '12:00', 'Op', '${status}', 0, ${hold}) RETURNING id;`).split("\n")[0];
+
+    q(`INSERT INTO public.open_play_schedules (id, day_of_week, start_time, end_time, court_ids, capacity, price_per_spot)
+       VALUES ('${schedId}', 'Tuesday', '10:00', '12:00', ARRAY['${activeCourtId}']::uuid[], 6, 150);
+       INSERT INTO public.open_play_sessions (id, schedule_id, session_date, start_time, end_time, court_ids, capacity, price_per_spot, status)
+       VALUES ('${sessId}', '${schedId}', '${opDay}', '10:00', '12:00', ARRAY['${activeCourtId}']::uuid[], 6, 150, 'open');`);
+
+    await runTest("Open play: a spot row needs a session and 1-4 spots, and has no court", () => {
+      const withCourt = spot({ court: `'${activeCourtId}'`, cols: "open_play_spots, user_id", vals: `2, '${aliceUid}'` });
+      assert.ok(withCourt.stderr.includes("bookings_court_or_open_play"), withCourt.stderr);
+      const five = spot({ cols: "open_play_spots, user_id", vals: `5, '${aliceUid}'` });
+      assert.ok(five.stderr.includes("bookings_court_or_open_play"), five.stderr);
+      const ok = spot({ cols: "open_play_spots, user_id", vals: `2, '${aliceUid}'` });
+      assert.equal(ok.status, 0, ok.stderr);
+    });
+
+    await runTest("Open play: a block row may have no owner but a spot row may not", () => {
+      const block = spot({ court: `'${activeCourtId}'`, cols: "user_id, customer_id", vals: "NULL, NULL" });
+      assert.equal(block.status, 0, block.stderr);
+      const ownerless = spot({ cols: "open_play_spots", vals: "2" });
+      assert.ok(ownerless.stderr.includes("bookings_customer_identity_check"), ownerless.stderr);
+    });
+
+    await runTest("Open play: spots taken counts active and fresh pending rows only", () => {
+      q(`DELETE FROM public.bookings WHERE open_play_session_id = '${sessId}' AND court_id IS NULL;`);
+      const confirmed = spotRow(2, "confirmed");
+      spotRow(1, "pending", "now() + interval '10 minutes'");
+      spotRow(3, "pending", "now() - interval '1 hour'");
+      spotRow(4, "cancelled");
+      spotRow(1, "pending", "'infinity'");
+      assert.equal(q(`SELECT public.open_play_spots_taken('${sessId}');`), "4");
+      assert.equal(q(`SELECT public.open_play_spots_taken('${sessId}', '${confirmed}');`), "2");
+      assert.equal(q(`SELECT public.open_play_player_spots('${sessId}', '${aliceUid}', NULL);`), "4");
+      assert.equal(q(`SELECT public.open_play_player_spots('${sessId}', '${bobUid}', NULL);`), "0");
+    });
+
+    await runTest("Open play: a block row blocks a court hold on the same court and time", () => {
+      const r = runPsqlCommand(
+        `SELECT public.hold_court_booking('${activeCourtId}', '${opDay}', '10:00:00', '11:00:00', '${aliceUid}', 200);`,
+        { role: "authenticated", uid: aliceUid });
+      assert.notEqual(r.status, 0);
+      assert.ok(r.stderr.includes("SLOT_UNAVAILABLE"), r.stderr);
+    });
+  }
+
   console.log("\n================================================================================");
   console.log(`ALL INTEGRATION TESTS PASSED: ${passedTests} checks passed against real PostgreSQL.`);
   console.log("================================================================================");
