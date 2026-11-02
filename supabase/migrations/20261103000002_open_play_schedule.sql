@@ -31,18 +31,24 @@ BEGIN
     RAISE EXCEPTION 'NOT_FOUND: Schedule does not exist' USING ERRCODE = 'P0002';
   END IF;
 
-  -- Future sessions nobody has booked are dropped so the generator rebuilds them with the new values
+  -- Holds lock their session row FOR UPDATE; taking the same locks keeps a racing hold from landing on a session we delete
+  PERFORM 1 FROM public.open_play_sessions
+  WHERE schedule_id = p_id AND session_date >= (now() AT TIME ZONE 'Asia/Manila')::date FOR UPDATE;
+
+  -- Future sessions nobody has booked are dropped (cancelled dates stay cancelled: staff skip a date by cancelling it) so the generator rebuilds them with the new values
   -- Two statements: the bookings FK is RESTRICT, so blocks must go first
   DELETE FROM public.bookings WHERE open_play_session_id IN (
     SELECT s.id FROM public.open_play_sessions s
     WHERE s.schedule_id = p_id
       AND s.session_date >= (now() AT TIME ZONE 'Asia/Manila')::date
+      AND s.status <> 'cancelled'
       AND NOT EXISTS (SELECT 1 FROM public.bookings b WHERE b.open_play_session_id = s.id AND b.court_id IS NULL)
   );
   DELETE FROM public.open_play_sessions WHERE id IN (
     SELECT s.id FROM public.open_play_sessions s
     WHERE s.schedule_id = p_id
       AND s.session_date >= (now() AT TIME ZONE 'Asia/Manila')::date
+      AND s.status <> 'cancelled'
       AND NOT EXISTS (SELECT 1 FROM public.bookings b WHERE b.open_play_session_id = s.id AND b.court_id IS NULL)
   );
   RETURN v_id;

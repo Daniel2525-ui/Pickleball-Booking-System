@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatTime12h } from "@/lib/utils/formatTime";
-import type { OpenPlayAdminSession } from "./open-play-container";
+import { type OpenPlayAdminSession, hasEnded } from "./open-play-container";
 
 const formatDate = (d: string) =>
   new Date(`${d}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric" });
@@ -72,10 +72,10 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                       {flagged && (
                         <Link href="/admin/bookings" className="text-sm font-medium underline underline-offset-2">View booking</Link>
                       )}
-                      {s.status === "open" && (
+                      {s.status === "open" && !hasEnded(s) && (
                         <Button variant="ghost" size="sm" className="text-destructive" disabled={s.awaiting} aria-describedby={s.awaiting ? `await-${s.id}` : undefined} onClick={() => onCancel(s)}>Cancel this date</Button>
                       )}
-                      {s.status === "open" && s.awaiting && (
+                      {s.status === "open" && !hasEnded(s) && s.awaiting && (
                         <p id={`await-${s.id}`} className="text-[11px] text-amber-800 dark:text-amber-300">Approve or reject the GCash payments waiting for verification first.</p>
                       )}
                     </TableCell>

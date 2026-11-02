@@ -4253,18 +4253,20 @@ async function main() {
     await runTest("Open play: editing a schedule regenerates only unbooked sessions", () => {
       const sid = save(null, "Thursday", "10:00", "12:00", 150);
       gen();
-      const dates = q(`SELECT session_date FROM public.open_play_sessions WHERE schedule_id = '${sid}' ORDER BY session_date LIMIT 2;`).split("\n");
-      assert.equal(dates.length, 2);
+      const dates = q(`SELECT session_date FROM public.open_play_sessions WHERE schedule_id = '${sid}' ORDER BY session_date LIMIT 3;`).split("\n");
+      assert.equal(dates.length, 3);
       const [, , , bookedId] = sessionOf(sid, dates[0]);
       q(`INSERT INTO public.bookings (open_play_session_id, open_play_spots, user_id, booking_date, start_time, end_time, customer_name, status, total_amount)
         VALUES ('${bookedId}', 2, '${aliceUid}', '${dates[0]}', '10:00', '12:00', 'Op', 'confirmed', 300);`);
+      q(`UPDATE public.open_play_sessions SET status = 'cancelled' WHERE schedule_id = '${sid}' AND session_date = '${dates[1]}';`);
       assert.equal(save(sid, "Thursday", "10:00", "12:00", 200), sid);
       gen();
+      assert.equal(sessionOf(sid, dates[1])[0], "cancelled");
       const booked = sessionOf(sid, dates[0]);
       assert.equal(booked[2], "150.00");
       assert.equal(booked[3], bookedId);
       assert.equal(blocks(bookedId), "2/2");
-      const fresh = sessionOf(sid, dates[1]);
+      const fresh = sessionOf(sid, dates[2]);
       assert.equal(fresh[2], "200.00");
       assert.equal(blocks(fresh[3]), "2/2");
     });

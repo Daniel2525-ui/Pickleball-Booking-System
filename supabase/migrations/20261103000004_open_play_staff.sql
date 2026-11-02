@@ -77,6 +77,9 @@ BEGIN
     RAISE EXCEPTION 'NOT_FOUND: Session does not exist' USING ERRCODE = 'P0002';
   END IF;
 
+  -- Lock the spot rows so a concurrent GCash proof submit can't slip in between the check and the update
+  PERFORM 1 FROM public.bookings WHERE open_play_session_id = p_session_id AND court_id IS NULL FOR UPDATE;
+
   IF EXISTS (
     SELECT 1 FROM public.bookings
     WHERE open_play_session_id = p_session_id AND status = 'pending' AND hold_expires_at = 'infinity'
@@ -84,7 +87,6 @@ BEGIN
     RAISE EXCEPTION 'GCASH_PENDING_VERIFICATION: Verify or reject the waiting GCash payments first' USING ERRCODE = 'P0001';
   END IF;
 
-  -- shortcut: open Stripe sessions are not expired on session cancel; late payments auto-refund, expire them if refunds become noisy
   UPDATE public.open_play_sessions SET status = 'cancelled' WHERE id = p_session_id;
 
   WITH c AS (

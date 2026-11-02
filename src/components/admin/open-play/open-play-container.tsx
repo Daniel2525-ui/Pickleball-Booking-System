@@ -34,6 +34,10 @@ export interface OpenPlayAdminSession {
   awaiting: boolean;
 }
 
+/** Past its end time in Manila: cancelling would refund players for a session that already happened */
+export const hasEnded = (s: Pick<OpenPlayAdminSession, "session_date" | "end_time">) =>
+  new Date(`${s.session_date}T${s.end_time}+08:00`).getTime() < Date.now();
+
 const WINDOW_DAYS = 28;
 
 export function OpenPlayContainer() {

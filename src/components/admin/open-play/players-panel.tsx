@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/lib/supabase";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { AddWalkupModal } from "./add-walkup-modal";
-import type { OpenPlayAdminSession } from "./open-play-container";
+import { type OpenPlayAdminSession, hasEnded } from "./open-play-container";
 
 interface SpotRow {
   id: string;
@@ -80,14 +80,16 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
               <UserPlus className="h-4 w-4" />
               Add player
             </Button>
-            <Button variant="destructive" className="font-bold" disabled={awaiting} onClick={() => onCancel(session)}>
-              Cancel session &amp; refund everyone
-            </Button>
+            {!hasEnded(session) && (
+              <Button variant="destructive" className="font-bold" disabled={awaiting} onClick={() => onCancel(session)}>
+                Cancel session &amp; refund everyone
+              </Button>
+            )}
           </div>
         )}
       </CardHeader>
       <CardContent>
-        {awaiting && (
+        {awaiting && !hasEnded(session) && (
           <p role="alert" className="mb-3 text-xs text-amber-800 dark:text-amber-300">
             Approve or reject the GCash payments waiting for verification first (Bookings, filter &quot;Awaiting verification&quot;), then reopen this list to cancel the session.
           </p>

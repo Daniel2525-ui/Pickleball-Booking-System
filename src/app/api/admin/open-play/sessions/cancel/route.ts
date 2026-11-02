@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
+import { closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 import { refundPaidStripePayments } from "@/lib/services/payments/refundPaidStripePayments";
 
 export async function POST(request: NextRequest) {
@@ -30,7 +31,19 @@ export async function POST(request: NextRequest) {
         // The session is already cancelled; refunds never throw and anything left is retried by cron / staff
         const admin = getServiceClient();
         if (admin) {
-            for (const id of (data?.booking_ids ?? []) as string[]) {
+            const ids = (data?.booking_ids ?? []) as string[];
+            // Expire open Checkouts of the cancelled holds so nobody pays for a cancelled session (late payments still auto-refund)
+            const { data: pays, error: payErr } = await admin.from("payments").select("stripe_session_id").in("booking_id", ids).not("stripe_session_id", "is", null);
+            if (payErr) console.error("Open play cancel: could not load Stripe sessions:", payErr);
+            // One call per session: a paid one ("paid") must not stop the others from being expired
+            for (const stripe_session_id of new Set((pays ?? []).map((p) => p.stripe_session_id))) {
+                try {
+                    await closeSiblingSessions([{ payments: [{ stripe_session_id }] } as never]);
+                } catch (stripeError) {
+                    console.error("Open play cancel: failed to expire Stripe session:", stripeError);
+                }
+            }
+            for (const id of ids) {
                 await refundPaidStripePayments(admin, id, { reason: "VENUE_CANCELLED_OPEN_PLAY", keyPrefix: "ref_open_play_cancel_" });
             }
         } else {

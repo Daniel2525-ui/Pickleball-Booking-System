@@ -81,6 +81,6 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.open_play_spots_taken(uuid, uuid), public.open_play_player_spots(uuid, uuid, uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.open_play_spots_taken(uuid, uuid), public.open_play_player_spots(uuid, uuid, uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.open_play_spots_taken(uuid, uuid), public.open_play_player_spots(uuid, uuid, uuid) TO service_role;
 
 COMMIT;
