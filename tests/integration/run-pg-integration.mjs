@@ -4133,6 +4133,8 @@ async function main() {
     const dir = path.join(PROJECT_ROOT, "supabase/migrations");
     const opFile = fs.readdirSync(dir).find((f) => f.includes("open_play_schema"));
     if (opFile) runPsqlFile(path.join(dir, opFile));
+    const opSchedFile = fs.readdirSync(dir).find((f) => f.includes("open_play_schedule"));
+    if (opSchedFile) runPsqlFile(path.join(dir, opSchedFile));
     const q = (sql, opts) => {
       const r = runPsqlCommand(sql, opts);
       assert.equal(r.status, 0, r.stderr);
@@ -4189,6 +4191,95 @@ async function main() {
         { role: "authenticated", uid: aliceUid });
       assert.notEqual(r.status, 0);
       assert.ok(r.stderr.includes("SLOT_UNAVAILABLE"), r.stderr);
+    });
+
+    // Generator tests use their own two courts and one weekday each, so they do not touch other rows
+    const gA = "0b0000a0-0000-0000-0000-00000000000a";
+    const gB = "0b0000a0-0000-0000-0000-00000000000b";
+    q(`INSERT INTO public.courts (id, name, status) VALUES ('${gA}', 'OP Court A', 'active'), ('${gB}', 'OP Court B', 'active');`);
+    const gen = () => JSON.parse(q(`SELECT public.generate_open_play_sessions(28);`, { role: "service_role" }));
+    const save = (id, dow, start, end, price) => q(
+      `SELECT public.save_open_play_schedule(${id ? `'${id}'` : "NULL"}, '${dow}', '${start}', '${end}', ARRAY['${gA}','${gB}']::uuid[], 8, ${price});`,
+      { role: "authenticated", uid: adminUid });
+    const nextDate = (dow) => q(`SELECT (d)::date FROM generate_series((now() AT TIME ZONE 'Asia/Manila')::date, (now() AT TIME ZONE 'Asia/Manila')::date + 6, interval '1 day') d WHERE date_part('dow', d) = ${dow};`);
+    const sessionOf = (sched, date) => q(`SELECT status || '|' || coalesce(flag_reason, '') || '|' || price_per_spot || '|' || id FROM public.open_play_sessions WHERE schedule_id = '${sched}' AND session_date = '${date}';`).split("|");
+    const blocks = (sessId2) => q(`SELECT count(*) || '/' || count(*) FILTER (WHERE status = 'confirmed' AND total_amount = 0) FROM public.bookings WHERE open_play_session_id = '${sessId2}' AND court_id IS NOT NULL;`);
+
+    await runTest("Open play: generator creates sessions and one block row per court", () => {
+      const sid = save(null, "Tuesday", "18:00", "21:00", 150);
+      const r = gen();
+      assert.ok(r.created >= 1, JSON.stringify(r));
+      const [status, , , id] = sessionOf(sid, nextDate(2));
+      assert.equal(status, "open");
+      assert.equal(blocks(id), "2/2");
+    });
+
+    await runTest("Open play: generator flags a date whose court is already booked and creates it once cleared", () => {
+      const sid = save(null, "Wednesday", "18:00", "21:00", 150);
+      const date = nextDate(3);
+      const bk = q(`INSERT INTO public.bookings (court_id, user_id, booking_date, start_time, end_time, status, total_amount, customer_name)
+        VALUES ('${gA}', '${aliceUid}', '${date}', '19:00', '20:00', 'confirmed', 200, 'Alice') RETURNING id;`).split("\n")[0];
+      gen();
+      const [status, reason, , id] = sessionOf(sid, date);
+      assert.equal(status, "flagged");
+      assert.ok(reason.includes("already booked"), reason);
+      assert.equal(blocks(id), "0/0");
+      q(`UPDATE public.bookings SET status = 'cancelled' WHERE id = '${bk}';`);
+      gen();
+      const [status2, reason2] = sessionOf(sid, date);
+      assert.equal(status2, "open");
+      assert.equal(reason2, "");
+      assert.equal(blocks(id), "2/2");
+    });
+
+    await runTest("Open play: generator flags closed days and is idempotent", () => {
+      const saved = q(`SELECT is_open || '|' || coalesce(open_time::text, '') || '|' || coalesce(close_time::text, '') FROM public.operating_hours WHERE day_of_week = 'Friday';`).split("|");
+      q(`UPDATE public.operating_hours SET is_open = false WHERE day_of_week = 'Friday';`);
+      try {
+        const sid = save(null, "Friday", "18:00", "21:00", 150);
+        gen();
+        const [status, reason] = sessionOf(sid, nextDate(5));
+        assert.equal(status, "flagged");
+        assert.ok(reason.includes("Venue closed"), reason);
+        const count = () => q(`SELECT (SELECT count(*) FROM public.open_play_sessions) || '/' || (SELECT count(*) FROM public.bookings WHERE open_play_session_id IS NOT NULL);`);
+        const before = count();
+        gen();
+        assert.equal(count(), before);
+      } finally {
+        q(`UPDATE public.operating_hours SET is_open = ${saved[0] === "t"} WHERE day_of_week = 'Friday';`);
+      }
+    });
+
+    await runTest("Open play: editing a schedule regenerates only unbooked sessions", () => {
+      const sid = save(null, "Thursday", "10:00", "12:00", 150);
+      gen();
+      const dates = q(`SELECT session_date FROM public.open_play_sessions WHERE schedule_id = '${sid}' ORDER BY session_date LIMIT 2;`).split("\n");
+      assert.equal(dates.length, 2);
+      const [, , , bookedId] = sessionOf(sid, dates[0]);
+      q(`INSERT INTO public.bookings (open_play_session_id, open_play_spots, user_id, booking_date, start_time, end_time, customer_name, status, total_amount)
+        VALUES ('${bookedId}', 2, '${aliceUid}', '${dates[0]}', '10:00', '12:00', 'Op', 'confirmed', 300);`);
+      assert.equal(save(sid, "Thursday", "10:00", "12:00", 200), sid);
+      gen();
+      const booked = sessionOf(sid, dates[0]);
+      assert.equal(booked[2], "150.00");
+      assert.equal(booked[3], bookedId);
+      assert.equal(blocks(bookedId), "2/2");
+      const fresh = sessionOf(sid, dates[1]);
+      assert.equal(fresh[2], "200.00");
+      assert.equal(blocks(fresh[3]), "2/2");
+    });
+
+    await runTest("Open play: schedule functions reject non-admins", () => {
+      const as = { role: "authenticated", uid: aliceUid };
+      for (const sql of [
+        `SELECT public.save_open_play_schedule(NULL, 'Tuesday', '18:00', '21:00', ARRAY['${gA}']::uuid[], 8, 150);`,
+        `SELECT public.set_open_play_schedule_active('${schedId}', false);`,
+        `SELECT public.generate_open_play_sessions(28);`,
+      ]) {
+        const r = runPsqlCommand(sql, as);
+        assert.notEqual(r.status, 0);
+        assert.ok(r.stderr.includes("FORBIDDEN"), r.stderr);
+      }
     });
   }
 
