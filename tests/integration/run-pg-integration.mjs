@@ -4300,6 +4300,8 @@ async function main() {
     if (opBookFile) runPsqlFile(path.join(dir, opBookFile));
     const opStaffFile = fs.readdirSync(dir).find((f) => f.includes("open_play_staff"));
     if (opStaffFile) runPsqlFile(path.join(dir, opStaffFile));
+    const opOneHoldFile = fs.readdirSync(dir).find((f) => f.includes("open_play_one_hold_per_player"));
+    if (opOneHoldFile) runPsqlFile(path.join(dir, opOneHoldFile));
     let dayN = 0;
     const mkSession = (capacity, status = "open", price = 150) => {
       const id = q(`SELECT gen_random_uuid();`);
@@ -4335,8 +4337,16 @@ async function main() {
          SELECT '${sid}', n, '${bobUid}', session_date, '10:00', '12:00', 'Bob', 'confirmed', 150 * n FROM public.open_play_sessions, unnest(ARRAY[4, 1]) n WHERE id = '${sid}';`);
       assert.ok(hold(sid, aliceUid, 2).stderr.includes("SESSION_FULL"));
       const sid2 = mkSession(20);
-      holdOk(sid2, aliceUid, 3);
-      assert.ok(hold(sid2, aliceUid, 2).stderr.includes("PLAYER_LIMIT"));
+      // (No extra mkSession here: later tests depend on the session dates staying where they are)
+      const first = holdOk(sid2, aliceUid, 3);
+      // An unpaid card hold blocks a second one (e.g. back from Stripe); the player resumes or cancels it
+      assert.ok(hold(sid2, aliceUid, 1).stderr.includes("OPEN_HOLD_EXISTS"));
+      // A GCash proof awaiting staff is paid money, so it does not block another hold
+      q(`UPDATE public.bookings SET hold_expires_at = 'infinity' WHERE id = '${first.booking_id}';`);
+      const second = holdOk(sid2, aliceUid, 1);
+      // Paid spots still count toward the 4-spot limit: 3 + 1 held, so 1 more is over
+      q(`UPDATE public.bookings SET status = 'confirmed', hold_expires_at = NULL WHERE id = '${second.booking_id}';`);
+      assert.ok(hold(sid2, aliceUid, 1).stderr.includes("PLAYER_LIMIT"));
       for (const n of [0, 5]) assert.ok(hold(sid2, aliceUid, n).stderr.includes("INVALID_ARGUMENT"), `spots ${n}`);
       assert.ok(hold(sid2, aliceUid, 1, "cash").stderr.includes("INVALID_ARGUMENT"));
       const sid3 = mkSession(6, "cancelled");

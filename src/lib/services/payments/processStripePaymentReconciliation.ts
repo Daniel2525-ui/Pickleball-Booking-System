@@ -105,7 +105,8 @@ export async function processStripePaymentReconciliation(
                 stripeClient || stripe,
                 stripePaymentIntent,
                 amount,
-                data.idempotency_key
+                data.idempotency_key,
+                data.refund_request_id ? { supabase, refundRequestId: data.refund_request_id } : undefined
             ));
         }
 

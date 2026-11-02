@@ -145,6 +145,11 @@ test("RefundWorker: retries failed or interrupted processing safely", async () =
     assert.equal(settleAttempts, 1);
 });
 
+// refund_requests rows already holding one of the listed Stripe refund ids (other requests only)
+const ledgerWith = (rows) => ({
+    from: () => ({ select: () => ({ in: () => ({ neq: async () => ({ data: rows, error: null }) }) }) }),
+});
+
 test("RefundWorker: handles 'charge_already_refunded' gracefully without duplicating refunds", async () => {
     let settledRpcCalls = 0;
 
@@ -158,6 +163,7 @@ test("RefundWorker: handles 'charge_already_refunded' gracefully without duplica
     };
 
     const mockSupabase = {
+        ...ledgerWith([]),
         rpc: async (fn, params) => {
             if (fn === "claim_pending_refund_request") {
                 return { data: { claimed: true, refund_request: mockJob }, error: null };
@@ -198,4 +204,37 @@ test("RefundWorker: handles 'charge_already_refunded' gracefully without duplica
 
     assert.equal(res.processed, 1);
     assert.equal(settledRpcCalls, 1);
+});
+
+test("RefundWorker: a dashboard refund already recorded for another court goes to admin review, not retried forever", async () => {
+    // One Stripe dashboard refund covered a two-court basket; court A's request already recorded it
+    let settledStatus = null;
+    const mockSupabase = {
+        ...ledgerWith([{ stripe_refund_id: "re_whole_basket" }]),
+        rpc: async (fn, params) => {
+            if (fn === "claim_pending_refund_request") {
+                return { data: { claimed: true, refund_request: { id: "req-court-b", payment_id: "pay-b", amount: 200, currency: "PHP", stripe_payment_intent: "pi_basket", idempotency_key: "k-b" } }, error: null };
+            }
+            if (fn === "settle_stripe_refund") {
+                settledStatus = params.p_stripe_status;
+                assert.equal(params.p_stripe_refund_id, null);
+                return { data: { success: true }, error: null };
+            }
+            throw new Error(`Unexpected RPC: ${fn}`);
+        },
+    };
+    const mockStripe = {
+        refunds: {
+            create: async () => {
+                const err = new Error("Charge already refunded");
+                err.code = "charge_already_refunded";
+                throw err;
+            },
+            list: async () => ({ data: [{ id: "re_whole_basket", status: "succeeded" }] }),
+        },
+    };
+
+    await processPendingRefundJobs({ workerId: "w", maxJobs: 1, supabase: mockSupabase, stripeClient: mockStripe });
+    // Not "succeeded" (would reuse court A's refund id) and not "uncertain"-style silence: staff review it
+    assert.equal(settledStatus, "already_refunded");
 });

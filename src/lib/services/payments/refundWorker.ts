@@ -23,12 +23,15 @@ export interface ProcessRefundJobsOptions {
 /**
  * Full refund of `amount` PHP, never throws. Status is Stripe's, or "succeeded" when the charge was
  * already refunded, "failed" for a terminal request error, "uncertain" for network errors (retried later).
+ * `ledger` lets an already-refunded charge skip refund ids other requests recorded: one dashboard refund
+ * can cover a whole basket, and it can settle only one court's request.
  */
 export async function createStripeRefund(
     stripeClient: RefundStripeClient,
     paymentIntent: string,
     amount: number,
-    idempotencyKey: string
+    idempotencyKey: string,
+    ledger?: { supabase: SupabaseClient; refundRequestId: string }
 ): Promise<{ id: string | null; status: string }> {
     try {
         const refund = await stripeClient.refunds.create(
@@ -42,8 +45,21 @@ export async function createStripeRefund(
         if (stripeErr?.code === "charge_already_refunded") {
             // Refunded outside the app (e.g. Stripe dashboard): settle_stripe_refund needs that refund's id
             try {
-                const { data } = await stripeClient.refunds.list({ payment_intent: paymentIntent, limit: 1 });
-                return data[0] ? { id: data[0].id, status: data[0].status || "succeeded" } : { id: null, status: "uncertain" };
+                const { data } = await stripeClient.refunds.list({ payment_intent: paymentIntent, limit: 100 });
+                let used = new Set<string>();
+                if (ledger && data.length) {
+                    const { data: rows, error } = await ledger.supabase
+                        .from("refund_requests")
+                        .select("stripe_refund_id")
+                        .in("stripe_refund_id", data.map((r) => r.id))
+                        .neq("id", ledger.refundRequestId);
+                    if (error) throw error;
+                    used = new Set((rows ?? []).map((r: { stripe_refund_id: string }) => r.stripe_refund_id));
+                }
+                const free = data.find((r) => !used.has(r.id));
+                if (free) return { id: free.id, status: free.status || "succeeded" };
+                // Every refund on the charge is already recorded: settle_stripe_refund sends this to admin review
+                return { id: null, status: data.length ? "already_refunded" : "uncertain" };
             } catch (listErr) {
                 console.error(`Stripe refund lookup error (${idempotencyKey}):`, listErr);
                 return { id: null, status: "uncertain" };
@@ -113,7 +129,8 @@ export async function processPendingRefundJobs({
             stripeClient || stripe,
             job.stripe_payment_intent,
             job.amount,
-            job.idempotency_key
+            job.idempotency_key,
+            { supabase, refundRequestId: job.id }
         );
 
         const settleRes = await withDbRetry(() =>

@@ -62,20 +62,21 @@ export function OpenPlayContainer() {
         .order("start_time"),
       fetchCourtsData(),
     ]);
-    if (sched.error || sess.error) toast.error("Failed to load open play.");
     setSchedules((sched.data ?? []) as OpenPlaySchedule[]);
     setCourts(courtRes.data);
 
     // Same rule as open_play_spots_taken: confirmed-type rows, plus pending rows whose hold is still running
     const ids = (sess.data ?? []).map((s) => s.id);
-    const { data: spotRows } = ids.length
+    const { data: spotRows, error: spotError } = ids.length
       ? await supabase
           .from("bookings")
           .select("open_play_session_id, open_play_spots, status, hold_expires_at")
           .in("open_play_session_id", ids)
           .is("court_id", null)
           .in("status", ["confirmed", "checked_in", "in_progress", "completed", "pending"])
-      : { data: [] };
+      : { data: [], error: null };
+    // Without spot rows the counts read 0 and the GCash-awaiting guard on Cancel is off: say so
+    if (sched.error || sess.error || courtRes.error || spotError) toast.error("Failed to load open play. Refresh before changing anything.");
     const booked = new Map<string, number>();
     const awaiting = new Set<string>();
     for (const r of spotRows ?? []) {

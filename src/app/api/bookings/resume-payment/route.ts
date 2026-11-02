@@ -7,6 +7,7 @@ import { loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 import { openBasketCheckout } from "@/lib/services/payments/openBasketCheckout";
 import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
+import { sessionErrorResponse } from "@/lib/services/openPlay/openPlayTypes";
 
 const toDbTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
 
@@ -133,7 +134,9 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            // 6. Check for double booking conflicts with confirmed bookings
+            // 6. Check for double booking conflicts with confirmed bookings (spot rows have no court;
+            //    confirm_checkout_hold checks their session capacity instead)
+            if (!line.court_id) continue;
             const { data: conflicts } = await supabase
                 .from("bookings")
                 .select("id")
@@ -203,6 +206,9 @@ export async function POST(request: NextRequest) {
         });
 
         if (confirmError) {
+            // Open play: the session filled up or was cancelled since the hold was made
+            const sessionError = siblings.some((s) => !s.court_id) ? sessionErrorResponse(confirmError.message) : null;
+            if (sessionError) return Response.json(sessionError, { status: 409 });
             // INVALID_STATUS: the expired hold was released when another player claimed the slot (20261102)
             const isConflict =
                 confirmError.message?.includes("SLOT_UNAVAILABLE") || confirmError.message?.includes("INVALID_STATUS");

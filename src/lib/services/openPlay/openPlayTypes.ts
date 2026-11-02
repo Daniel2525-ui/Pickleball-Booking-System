@@ -16,5 +16,6 @@ export function sessionErrorResponse(message: string | undefined): { error: stri
     if (msg.includes("SESSION_FULL")) return { error: "This session is full." };
     if (msg.includes("PLAYER_LIMIT")) return { error: "You can book at most 4 spots in one session." };
     if (msg.includes("SESSION_UNAVAILABLE") || msg.includes("NOT_FOUND")) return { error: "This session is no longer available." };
+    if (msg.includes("OPEN_HOLD_EXISTS")) return { error: "You already have spots awaiting payment in this session. Resume or cancel them in My Bookings." };
     return null;
 }

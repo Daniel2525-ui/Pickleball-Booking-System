@@ -26,6 +26,7 @@ export const OpenPlayContainer = () => {
   const [method, setMethod] = useState<"stripe" | "gcash">("stripe");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -34,12 +35,16 @@ export const OpenPlayContainer = () => {
       fetchOpenPlaySessions(formatManilaDate(today), formatManilaDate(new Date(today.getTime() + WINDOW_DAYS * 86_400_000))),
       supabase.auth.getUser(),
       supabase.from("booking_settings").select("gcash_number").maybeSingle(),
-    ]).then(([res, auth, settings]) => {
-      setSessions(res.data);
-      setSignedIn(Boolean(auth.data.user));
-      setGcashEnabled(Boolean(settings.data?.gcash_number));
-      setLoading(false);
-    });
+    ])
+      .then(([res, auth, settings]) => {
+        // A failed load must not read as "no sessions scheduled"
+        if (res.error) setLoadFailed(true);
+        setSessions(res.data);
+        setSignedIn(Boolean(auth.data.user));
+        setGcashEnabled(Boolean(settings.data?.gcash_number));
+      })
+      .catch(() => setLoadFailed(true))
+      .finally(() => setLoading(false));
   }, []);
 
   const maxSpots = active ? Math.min(4 - active.my_spots, active.spots_left) : 0;
@@ -71,6 +76,8 @@ export const OpenPlayContainer = () => {
 
       {loading ? (
         <LoaderCircle className="size-8 animate-spin text-primary mt-8 mx-auto" aria-label="Loading" />
+      ) : loadFailed ? (
+        <p role="alert" className="rounded-2xl border border-destructive/40 bg-destructive/5 p-6 text-sm">Couldn&apos;t load open play sessions. Please refresh the page.</p>
       ) : sessions.length === 0 ? (
         <p className="rounded-2xl border bg-card p-6 text-sm text-muted-foreground">No open play sessions are scheduled in the next four weeks. Check back soon.</p>
       ) : (

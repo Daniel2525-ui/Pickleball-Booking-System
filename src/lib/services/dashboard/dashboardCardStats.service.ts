@@ -116,10 +116,3 @@ export const availableCourts = async (activeBookingsOverride?: ActiveBookingSnip
         throw error;
     }
 };
-
-/* Individual helpers preserved for backwards compatibility */
-export const bookingsToday = async () => (await fetchDashboardCardStats()).todayBookingsCount;
-export const bookingsYesterday = async () => (await fetchDashboardCardStats()).yesterdayBookingsCount;
-export const upcomingBookings = async () => (await fetchDashboardCardStats()).upcomingBookingsCount;
-export const revenueToday = async () => (await fetchDashboardCardStats()).revToday;
-export const revenueYesterday = async () => (await fetchDashboardCardStats()).revYesterday;
