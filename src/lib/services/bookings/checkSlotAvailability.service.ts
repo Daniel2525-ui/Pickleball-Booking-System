@@ -19,6 +19,7 @@ export const to24h = (time12h: string): string => {
 export type SlotStatus =
     | "available"
     | "booked"
+    | "open_play"
     | "pending"
     | "user_pending"
     | "maintenance"
@@ -146,7 +147,7 @@ export const checkSlotAvailability = (
         (booking) => (booking.status || "").toLowerCase() !== "pending"
     );
 
-    if (hasConfirmed) return "booked";
+    if (hasConfirmed) return activeBookings.some((b) => b.open_play) ? "open_play" : "booked";
 
     const belongsToUser = activeBookings.some(
         (booking) => Boolean(currentUserId) && Boolean(booking.user_id) && booking.user_id === currentUserId

@@ -12,6 +12,7 @@ export interface BookingSlot {
     status?: string;
     hold_expires_at?: string | null;
     created_at?: string;
+    open_play?: boolean;
 }
 
 export const fetchBookingsForDate = async (date: Date | string) => {

@@ -56,6 +56,9 @@ export function PublicHeader() {
         <Link href="/#booking" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-foreground hover:bg-muted transition-colors">
           Book
         </Link>
+        <Link href="/open-play" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-foreground hover:bg-muted transition-colors">
+          Open Play
+        </Link>
         {user && isAdmin && (
           <Link href="/admin/dashboard" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-primary hover:bg-muted transition-colors">
             Admin panel
@@ -78,6 +81,7 @@ export function PublicHeader() {
             signOutTo="/"
             links={[
               ...(isAdmin ? [{ label: "Admin panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
+              { label: "Open Play", href: "/open-play", icon: "bookings" },
               { label: "My bookings", href: "/my-bookings", icon: "bookings" },
               { label: "Profile and password", href: "/profile", icon: "profile" },
             ]}

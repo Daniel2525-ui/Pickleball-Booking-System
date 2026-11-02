@@ -12,7 +12,8 @@ export interface UserBooking {
     hold_expires_at?: string | null,
     cancel_reason?: string | null,
     basket_id?: string | null,
-    courts?: { name: string }
+    open_play_spots?: number | null,
+    courts?: { name: string } | null
 }
 
 export const fetchUserBookings = async (userId: string) => {
@@ -32,6 +33,7 @@ export const fetchUserBookings = async (userId: string) => {
                 hold_expires_at,
                 cancel_reason,
                 basket_id,
+                open_play_spots,
                     courts (
                         name
                     )

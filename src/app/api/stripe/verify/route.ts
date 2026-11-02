@@ -3,6 +3,7 @@ import { stripe } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase/service";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
+import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
 
 export async function POST(req: NextRequest) {
     try {
@@ -47,9 +48,9 @@ export async function POST(req: NextRequest) {
         const loadBookings = async () => {
             const { data, error } = await supabaseAdmin
                 .from("bookings")
-                .select("id, user_id, status, courts(name)")
+                .select("id, user_id, status, open_play_spots, courts(name)")
                 .eq("basket_id", basketId);
-            return error ? null : (data as unknown as { id: string; user_id: string; status: string; courts: { name: string } | null }[]);
+            return error ? null : (data as unknown as { id: string; user_id: string; status: string; open_play_spots: number | null; courts: { name: string } | null }[]);
         };
 
         // 3. Verify user ownership of every booking in the checkout
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
         }
         const lostCourts = finalBookings
             .filter((b) => b.status === "cancelled")
-            .map((b) => b.courts?.name ?? "Court");
+            .map(bookingTitle);
 
         if (lostCourts.length === finalBookings.length) {
             return Response.json({

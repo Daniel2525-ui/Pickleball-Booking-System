@@ -46,6 +46,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { BookingCardSkeleton } from "@/components/skeletons/booking-card-skeleton";
+import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
 
 const formatBookingDate = (date: string) => {
   const d = date.includes("T") ? new Date(date) : new Date(`${date}T12:00:00+08:00`);
@@ -260,7 +261,7 @@ export const BookingHistoryContainer = () => {
                         variant="outline"
                         className="bg-primary/10 text-primary border-primary/25 font-bold text-xs px-2.5 py-0.5"
                       >
-                        {booking.courts?.name || `Court ${booking.court_id}`}
+                        {bookingTitle(booking)}
                       </Badge>
 
                       {booking.status === "confirmed" || booking.status === "paid" ? (
@@ -430,7 +431,7 @@ export const BookingHistoryContainer = () => {
           {bookingToCancel && (
             <div className="bg-muted/50 border border-border p-4 rounded-xl space-y-2 text-sm">
               <p className="font-bold text-foreground">
-                {bookingToCancel.courts?.name || `Court ${bookingToCancel.court_id}`}
+                {bookingTitle(bookingToCancel)}
               </p>
               <div className="flex items-center text-muted-foreground gap-2">
                 <Calendar className="size-3.5 text-primary" />

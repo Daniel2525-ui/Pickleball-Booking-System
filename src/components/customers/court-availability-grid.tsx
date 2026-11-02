@@ -172,10 +172,10 @@ export const CourtAvailabilityGrid = ({
                           </div>
                         ) : (
                           <div
-                            aria-label={`${court} at ${time} is ${status}`}
+                            aria-label={`${court} at ${time} is ${status === "open_play" ? "open play" : status}`}
                             className="w-full h-full min-h-[48px] bg-muted/60 text-muted-foreground/80 dark:text-muted-foreground/60 rounded-lg flex items-center justify-center text-[10px] sm:text-xs md:text-sm cursor-not-allowed uppercase font-semibold tracking-normal sm:tracking-wider"
                           >
-                            {status === "maintenance" ? "Maintenance" : status === "closed" ? "Closed" : status === "passed" ? "Passed" : "Booked"}
+                            {status === "maintenance" ? "Maintenance" : status === "closed" ? "Closed" : status === "passed" ? "Passed" : status === "open_play" ? "Open play" : "Booked"}
                           </div>
                         )}
                       </div>

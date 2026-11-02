@@ -6,6 +6,7 @@ import { getServiceClient } from "@/lib/supabase/service";
 import { loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 import { openBasketCheckout } from "@/lib/services/payments/openBasketCheckout";
+import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
 
 const toDbTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
 
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
             lines: siblings.map((s) => ({
                 bookingId: s.id,
                 paymentId: s.payments[0].id,
-                courtName: s.courts?.name || "Crosshair Dinkers Court",
+                courtName: s.open_play_spots ? bookingTitle(s) : s.courts?.name || "Crosshair Dinkers Court",
                 bookingDate: s.booking_date,
                 startTime: s.start_time,
                 endTime: s.end_time,
