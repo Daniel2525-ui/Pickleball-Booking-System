@@ -4292,6 +4292,128 @@ async function main() {
         assert.ok(r.stderr.includes("FORBIDDEN"), r.stderr);
       }
     });
+
+    // Booking tests make their own future session per test (one schedule, one date each)
+    const opBookFile = fs.readdirSync(dir).find((f) => f.includes("open_play_booking"));
+    if (opBookFile) runPsqlFile(path.join(dir, opBookFile));
+    let dayN = 0;
+    const mkSession = (capacity, status = "open", price = 150) => {
+      const id = q(`SELECT gen_random_uuid();`);
+      const date = `2030-05-${String(++dayN).padStart(2, "0")}`;
+      q(`INSERT INTO public.open_play_sessions (id, schedule_id, session_date, start_time, end_time, court_ids, capacity, price_per_spot, status)
+         VALUES ('${id}', '${schedId}', '${date}', '10:00', '12:00', ARRAY['${activeCourtId}']::uuid[], ${capacity}, ${price}, '${status}');`);
+      return id;
+    };
+    const holdSql = (sid, spots, method = "stripe") => `SELECT public.hold_open_play_spots('${sid}', ${spots}, '${method}');`;
+    const hold = (sid, uid, spots, method) => runPsqlCommand(holdSql(sid, spots, method), { role: "authenticated", uid });
+    const holdOk = (sid, uid, spots) => {
+      const r = hold(sid, uid, spots);
+      assert.equal(r.status, 0, r.stderr);
+      return JSON.parse(r.stdout.trim().split("\n")[0]);
+    };
+    const bookingOf = (id) => q(`SELECT status || '|' || coalesce(cancel_reason, '') FROM public.bookings WHERE id = '${id}';`);
+    const reconcile = (h, pi) => JSON.parse(q(
+      `SELECT public.reconcile_booking_payment('${h.booking_id}', '${h.payment_id}', 'cs_${pi}', 'pi_${pi}', ${h.amount}, 'php');`,
+      { role: "service_role" }));
+
+    await runTest("Open play: hold prices spots and creates a pending payment", () => {
+      const sid = mkSession(6);
+      const h = holdOk(sid, aliceUid, 2);
+      assert.equal(Number(h.amount), 300);
+      assert.equal(q(`SELECT status || '|' || (court_id IS NULL) || '|' || open_play_spots || '|' || customer_name || '|' || booking_date || '|' || start_time FROM public.bookings WHERE id = '${h.booking_id}';`),
+        `pending|true|2|${q(`SELECT coalesce(nullif(trim(full_name), ''), 'Online Player') FROM public.profiles WHERE id = '${aliceUid}';`)}|${q(`SELECT session_date FROM public.open_play_sessions WHERE id = '${sid}';`)}|10:00:00`);
+      assert.equal(q(`SELECT status || '|' || payment_method || '|' || amount FROM public.payments WHERE id = '${h.payment_id}';`), "pending|stripe|300.00");
+    });
+
+    await runTest("Open play: hold refuses over capacity, over the player limit, bad spot counts and cancelled sessions", () => {
+      const sid = mkSession(6);
+      q(`INSERT INTO public.bookings (open_play_session_id, open_play_spots, user_id, booking_date, start_time, end_time, customer_name, status, total_amount)
+         SELECT '${sid}', n, '${bobUid}', session_date, '10:00', '12:00', 'Bob', 'confirmed', 150 * n FROM public.open_play_sessions, unnest(ARRAY[4, 1]) n WHERE id = '${sid}';`);
+      assert.ok(hold(sid, aliceUid, 2).stderr.includes("SESSION_FULL"));
+      const sid2 = mkSession(20);
+      holdOk(sid2, aliceUid, 3);
+      assert.ok(hold(sid2, aliceUid, 2).stderr.includes("PLAYER_LIMIT"));
+      for (const n of [0, 5]) assert.ok(hold(sid2, aliceUid, n).stderr.includes("INVALID_ARGUMENT"), `spots ${n}`);
+      assert.ok(hold(sid2, aliceUid, 1, "cash").stderr.includes("INVALID_ARGUMENT"));
+      const sid3 = mkSession(6, "cancelled");
+      assert.ok(hold(sid3, aliceUid, 1).stderr.includes("SESSION_UNAVAILABLE"));
+      assert.ok(hold("0b000000-0000-0000-0000-0000000000ee", aliceUid, 1).stderr.includes("NOT_FOUND"));
+    });
+
+    await runTest("Open play: concurrent holds for the last spot serialize, and exactly one succeeds", async () => {
+      const sid = mkSession(1);
+      const worker = (uid, pre) => new Promise((resolve) => {
+        const child = spawn("docker", ["exec", "-i", CONTAINER_NAME, "psql", "-U", POSTGRES_USER, "-d", TEST_DB, "-v", "ON_ERROR_STOP=1", "-q"]);
+        let stdout = "", stderr = "";
+        child.stdout.on("data", (d) => (stdout += d));
+        child.stderr.on("data", (d) => (stderr += d));
+        child.on("close", (code) => resolve({ code, stdout, stderr }));
+        child.stdin.end(`BEGIN;\n${pre}SET LOCAL request.jwt.claim.role = 'authenticated';\nSET LOCAL request.jwt.claim.sub = '${uid}';\n${holdSql(sid, 1)}\nCOMMIT;\n`);
+      });
+      // Worker 1 takes the session lock and sits on it, so worker 2 must wait and then see the spot gone
+      const p1 = worker(aliceUid, `SELECT 1 FROM public.open_play_sessions WHERE id = '${sid}' FOR UPDATE;\nSELECT pg_sleep(1.2);\n`);
+      await new Promise((r) => setTimeout(r, 300));
+      const p2 = worker(bobUid, "");
+      const [r1, r2] = await Promise.all([p1, p2]);
+      assert.equal(r1.code, 0, r1.stderr);
+      assert.notEqual(r2.code, 0);
+      assert.ok(r2.stderr.includes("SESSION_FULL"), r2.stderr);
+      assert.equal(q(`SELECT count(*) FROM public.bookings WHERE open_play_session_id = '${sid}' AND court_id IS NULL;`), "1");
+    });
+
+    await runTest("Open play: an expired hold is released and its spot sold again", () => {
+      const sid = mkSession(2);
+      const a = holdOk(sid, aliceUid, 2);
+      assert.ok(hold(sid, bobUid, 1).stderr.includes("SESSION_FULL"));
+      q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 hour' WHERE id = '${a.booking_id}';`);
+      holdOk(sid, bobUid, 2);
+      assert.equal(bookingOf(a.booking_id), "cancelled|expired");
+      assert.equal(q(`SELECT status FROM public.payments WHERE id = '${a.payment_id}';`), "failed");
+    });
+
+    await runTest("Open play: confirm_checkout_hold rechecks capacity for spot rows", () => {
+      const sid = mkSession(2);
+      const a = holdOk(sid, aliceUid, 2);
+      q(`UPDATE public.bookings SET hold_expires_at = now() - interval '1 hour' WHERE id = '${a.booking_id}';`);
+      holdOk(sid, bobUid, 2); // releases Alice's row and fills the session
+      q(`UPDATE public.bookings SET status = 'pending', cancel_reason = NULL, hold_expires_at = now() + interval '30 minutes' WHERE id = '${a.booking_id}';`);
+      const r = runPsqlCommand(`SELECT public.confirm_checkout_hold('${a.booking_id}', '${a.payment_id}', 'cs_full', now() + interval '30 minutes');`, { role: "authenticated", uid: aliceUid });
+      assert.notEqual(r.status, 0);
+      assert.ok(r.stderr.includes("SESSION_FULL"), r.stderr);
+      const sid2 = mkSession(4);
+      const b = holdOk(sid2, aliceUid, 2);
+      const ok = runPsqlCommand(`SELECT public.confirm_checkout_hold('${b.booking_id}', '${b.payment_id}', 'cs_ok', now() + interval '30 minutes');`, { role: "authenticated", uid: aliceUid });
+      assert.equal(ok.status, 0, ok.stderr);
+      q(`UPDATE public.open_play_sessions SET status = 'cancelled' WHERE id = '${sid2}';`);
+      const gone = runPsqlCommand(`SELECT public.confirm_checkout_hold('${b.booking_id}', '${b.payment_id}', 'cs_ok2', now() + interval '30 minutes');`, { role: "authenticated", uid: aliceUid });
+      assert.ok(gone.stderr.includes("SESSION_UNAVAILABLE"), gone.stderr);
+    });
+
+    await runTest("Open play: reconcile confirms a spot hold, and refunds when the session filled meanwhile or was cancelled", () => {
+      const sid = mkSession(4);
+      const h = holdOk(sid, aliceUid, 2);
+      assert.equal(reconcile(h, "op1").action, "CONFIRMED");
+      assert.equal(q(`SELECT status FROM public.payments WHERE id = '${h.payment_id}';`), "paid");
+      assert.equal(bookingOf(h.booking_id), "confirmed|");
+
+      const sid2 = mkSession(2);
+      const full = holdOk(sid2, aliceUid, 2);
+      // Others fill the session while Alice's hold is still pending (e.g. a walk-in sold the spots)
+      q(`INSERT INTO public.bookings (open_play_session_id, open_play_spots, user_id, booking_date, start_time, end_time, customer_name, status, total_amount)
+         SELECT '${sid2}', 2, '${bobUid}', session_date, '10:00', '12:00', 'Bob', 'confirmed', 300 FROM public.open_play_sessions WHERE id = '${sid2}';`);
+      const conflict = reconcile(full, "op2");
+      assert.equal(conflict.action, "REFUND_SCHEDULED");
+      assert.equal(conflict.reason, "SLOT_CONFLICT");
+      assert.equal(bookingOf(full.booking_id), "cancelled|slot_conflict");
+
+      const sid3 = mkSession(4);
+      const c = holdOk(sid3, aliceUid, 1);
+      q(`UPDATE public.open_play_sessions SET status = 'cancelled' WHERE id = '${sid3}';`);
+      const gone = reconcile(c, "op3");
+      assert.equal(gone.action, "REFUND_SCHEDULED");
+      assert.equal(gone.reason, "COURT_UNAVAILABLE");
+      assert.equal(bookingOf(c.booking_id), "cancelled|court_unavailable");
+    });
   }
 
   console.log("\n================================================================================");
