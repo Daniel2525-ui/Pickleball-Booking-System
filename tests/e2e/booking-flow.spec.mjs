@@ -94,9 +94,8 @@ test("cancelled checkout leaves a pending hold the customer can cancel", async (
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
   await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
 
-  // Stripe's back link goes to cancel_url (/book), which redirects to the grid
-  await page.goto("/book");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  // Stripe's back link goes to cancel_url (/book), which redirects to /#booking; the grid sits behind "full board"
+  await openTomorrow(page);
   await expect(page.locator("#booking").getByLabel(`Resume your pending booking for ${court.name} at 1:00 PM - 2:00 PM`)).toBeVisible();
   expect(bookingRow("13:00")).toBe("pending|pending|200.00");
 
