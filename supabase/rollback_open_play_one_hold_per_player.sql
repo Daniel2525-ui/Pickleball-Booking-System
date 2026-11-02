@@ -1,4 +1,4 @@
--- Rollback for 20261103000001_open_play_one_hold_per_player.sql: restores hold_open_play_spots without the OPEN_HOLD_EXISTS check.
+-- Rollback for 20261102073758_open_play_one_hold_per_player.sql: restores hold_open_play_spots without the OPEN_HOLD_EXISTS check.
 
 BEGIN;
 
