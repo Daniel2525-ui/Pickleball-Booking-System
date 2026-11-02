@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         // 3. Load current booking
         const { data: booking, error: fetchError } = await supabase
             .from("bookings")
-            .select("id, status, booking_date, start_time, hold_expires_at, created_at, basket_id")
+            .select("id, status, booking_date, start_time, hold_expires_at, created_at, basket_id, court_id, open_play_session_id")
             .eq("id", bookingId)
             .maybeSingle();
 
@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
         }
         if (!booking) {
             return Response.json({ error: "Booking not found." }, { status: 404 });
+        }
+
+        if (booking.open_play_session_id && booking.court_id) {
+            return Response.json(
+                { error: "This court is reserved for open play. Cancel the session from Open Play." },
+                { status: 409 }
+            );
         }
 
         const currentStatus = booking.status.toLowerCase();

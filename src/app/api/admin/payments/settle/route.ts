@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         //    and be charged twice for a booking settled at the counter.
         const { data: payment, error: paymentError } = await supabase
             .from("payments")
-            .select("stripe_session_id, bookings(basket_id, status)")
+            .select("stripe_session_id, bookings(basket_id, status, court_id, open_play_session_id)")
             .eq("id", paymentId)
             .eq("booking_id", bookingId)
             .maybeSingle();
@@ -44,7 +44,13 @@ export async function POST(request: NextRequest) {
         }
 
         // An unpaid basket is settled as one unit; the basket id comes from the DB row, never the client
-        const owner = payment?.bookings as { basket_id?: string | null; status?: string } | null | undefined;
+        const owner = payment?.bookings as
+            | { basket_id?: string | null; status?: string; court_id?: string | null; open_play_session_id?: string | null }
+            | null
+            | undefined;
+        if (owner && !owner.court_id && owner.open_play_session_id) {
+            return NextResponse.json({ error: "Open play spots are paid online or added as walk-ups." }, { status: 409 });
+        }
         const basketId = owner?.basket_id && owner.status === "pending" ? owner.basket_id : null;
 
         // Staff must collect exactly what the basket RPC records: refuse when the total they saw differs

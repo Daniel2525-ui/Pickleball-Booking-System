@@ -137,6 +137,10 @@ export async function GET(request: Request) {
       .lt("window_start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     if (limiterCleanupError) console.error("Rate limiter cleanup failed:", limiterCleanupError);
 
+    // Keep the open-play calendar filled ahead; a failure must not fail the run
+    const { error: generateError } = await supabase.rpc("generate_open_play_sessions");
+    if (generateError) console.error("Open play session generation failed:", generateError);
+
     return NextResponse.json({
       success: true,
       message: `Cleanup completed. Cancelled: ${cancelledCount}, Reconciled: ${reconciledCount}, Total examined: ${totalProcessed}, Refunds processed: ${refundResult.processed}.`,
