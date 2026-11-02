@@ -65,7 +65,7 @@ export const OpenPlayContainer = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 space-y-4">
       <div>
-        <h1 className="font-display font-black text-3xl uppercase tracking-wide">Open play</h1>
+        <h1 className="font-display font-black text-3xl uppercase tracking-wide">Open Play</h1>
         <p className="text-sm text-muted-foreground mt-1">Join a scheduled session. Book 1 to 4 spots, no court needed.</p>
       </div>
 

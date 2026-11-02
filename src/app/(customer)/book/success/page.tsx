@@ -28,6 +28,7 @@ function BookingSuccessContent() {
     conflict?: boolean;
     error?: string;
     lostCourts?: string[];
+    openPlay?: boolean;
   }>({ success: true });
 
   useEffect(() => {
@@ -49,6 +50,7 @@ function BookingSuccessContent() {
             success: Boolean(data.success),
             conflict: Boolean(data.conflict),
             error: data.error,
+            openPlay: Boolean(data.openPlay),
             lostCourts: Array.isArray(data.lostCourts) ? data.lostCourts : [],
           });
         }
@@ -99,7 +101,7 @@ function BookingSuccessContent() {
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-                {verifyResult.conflict ? "Court Slot Conflict" : "Payment Verification Failed"}
+                {verifyResult.conflict ? (verifyResult.openPlay ? "Session Unavailable" : "Court Slot Conflict") : "Payment Verification Failed"}
               </h1>
               <p className="text-sm sm:text-base text-muted-foreground mt-2 leading-relaxed">
                 {verifyResult.error || "This time slot was claimed by another player. A full refund has been initiated to your original payment method."}
@@ -156,10 +158,12 @@ function BookingSuccessContent() {
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-              Court Reserved Successfully!
+              {verifyResult.openPlay ? "Spot booked!" : "Court Reserved Successfully!"}
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-2 leading-relaxed">
-              {sessionId
+              {verifyResult.openPlay
+                ? "Your open play spot is confirmed and paid. We've sent a receipt to your email and added your pass to My Bookings."
+                : sessionId
                 ? "Your court reservation is locked in and paid. We've sent a receipt to your email and added your digital pass to My Bookings."
                 : "Your court reservation has been successfully confirmed."}
             </p>
@@ -168,7 +172,7 @@ function BookingSuccessContent() {
           {verifyResult.lostCourts && verifyResult.lostCourts.length > 0 && (
             <div role="alert" className="flex items-start gap-2.5 text-xs sm:text-sm text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg leading-relaxed">
               <Info className="size-4 shrink-0 mt-0.5" />
-              <p>These courts could not be secured and were refunded: {verifyResult.lostCourts.join(", ")}.</p>
+              <p>{verifyResult.openPlay ? "This session could not be secured and was refunded" : "These courts could not be secured and were refunded"}: {verifyResult.lostCourts.join(", ")}.</p>
             </div>
           )}
 
@@ -195,7 +199,7 @@ function BookingSuccessContent() {
               <div className="flex items-start gap-2.5">
                 <CalendarDays className="size-4 text-primary shrink-0 mt-0.5" />
                 <span>
-                  <strong>Check-in:</strong> Please check in at reception 10 minutes prior to your slot.
+                  <strong>Check-in:</strong> Please check in at reception 10 minutes prior to {verifyResult.openPlay ? "the session" : "your slot"}.
                 </span>
               </div>
             </div>

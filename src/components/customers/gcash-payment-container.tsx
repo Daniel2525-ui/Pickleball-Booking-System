@@ -14,7 +14,7 @@ import { VENUE_CONTACT } from "@/lib/venue";
 const MAX_BYTES = 5 * 1024 * 1024;
 const REFERENCE_ERROR = "Enter the reference number from your GCash receipt (6 to 20 letters or digits).";
 
-type Row = { total_amount: number | null; booking_date: string; start_time: string; created_at: string; hold_expires_at: string | null };
+type Row = { open_play_spots: number | null; total_amount: number | null; booking_date: string; start_time: string; created_at: string; hold_expires_at: string | null };
 type Settings = { gcash_account_name: string | null; gcash_number: string | null; gcash_qr_url: string | null };
 type View = "loading" | "form" | "submitted" | "expired";
 
@@ -39,7 +39,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
       const [rowsRes, settingsRes] = await Promise.all([
         supabase
           .from("bookings")
-          .select("total_amount, booking_date, start_time, created_at, hold_expires_at")
+          .select("open_play_spots, total_amount, booking_date, start_time, created_at, hold_expires_at")
           .eq("basket_id", basketId)
           .eq("status", "pending"),
         supabase.from("booking_settings").select("gcash_account_name, gcash_number, gcash_qr_url").maybeSingle(),
@@ -60,6 +60,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
     load();
   }, [basketId]);
 
+  const spotBuyer = rows.some((r) => r.open_play_spots);
   const total = rows.reduce((sum, r) => sum + Number(r.total_amount ?? 0), 0);
   const referenceValid = /^[A-Za-z0-9]{6,20}$/.test(normaliseReference(reference));
   const canSubmit = referenceValid && file !== null && !fileError && !submitting;
@@ -116,7 +117,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
       <div className="max-w-lg w-full bg-card border border-destructive/20 rounded-2xl shadow-md p-6 sm:p-8 text-center space-y-4">
         <Info className="size-10 text-destructive mx-auto" />
         <h1 className="text-2xl font-extrabold tracking-tight">This reservation has expired</h1>
-        <p className="text-sm text-muted-foreground">The hold on your courts has ended. Pick a new time to book again.</p>
+        <p className="text-sm text-muted-foreground">{spotBuyer ? "The hold on your spots has ended. Pick a session to book again." : "The hold on your courts has ended. Pick a new time to book again."}</p>
         <p className="text-sm text-muted-foreground">Already sent the money? Contact the club at <a href={VENUE_CONTACT.phoneHref} className="font-semibold text-foreground">{VENUE_CONTACT.phone}</a> with your GCash reference.</p>
         <Link href="/book" className="block"><Button className="w-full h-11 font-bold">Book again</Button></Link>
       </div>
@@ -128,7 +129,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
       <div className="max-w-lg w-full bg-card border border-border rounded-2xl shadow-md p-6 sm:p-8 text-center space-y-4">
         <CheckCircle2 className="size-10 text-emerald-600 dark:text-emerald-400 mx-auto" />
         <h1 className="text-2xl font-extrabold tracking-tight">Payment submitted</h1>
-        <p className="text-sm text-muted-foreground">The club will check your GCash payment and confirm your booking. Your courts stay held until then.</p>
+        <p className="text-sm text-muted-foreground">The club will check your GCash payment and confirm your booking. Your {spotBuyer ? "spots stay" : "courts stay"} held until then.</p>
         <Link href="/my-bookings" className="block"><Button className="w-full h-11 font-bold">View My Bookings</Button></Link>
       </div>
     );
@@ -149,7 +150,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
   return (
     <form onSubmit={submit} className="max-w-lg w-full bg-card border border-border rounded-2xl shadow-md p-6 sm:p-8 space-y-5">
       <h1 className="text-2xl font-extrabold tracking-tight">Send exactly ₱{total.toLocaleString()}</h1>
-      <p className="text-sm text-muted-foreground">Your courts are held until {heldUntil}.</p>
+      <p className="text-sm text-muted-foreground">Your {spotBuyer ? "spots are" : "courts are"} held until {heldUntil}.</p>
       <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3 text-sm">
         {settings?.gcash_qr_url && (
           // eslint-disable-next-line @next/next/no-img-element

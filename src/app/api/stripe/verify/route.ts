@@ -114,16 +114,18 @@ export async function POST(req: NextRequest) {
             .filter((b) => b.status === "cancelled")
             .map(bookingTitle);
 
+        const openPlay = finalBookings.some((b) => b.open_play_spots);
         if (lostCourts.length === finalBookings.length) {
             return Response.json({
                 success: false,
                 conflict: true,
                 lostCourts,
-                error: "This slot is no longer available. A full refund has been initiated.",
+                openPlay,
+                error: openPlay ? "This session is no longer available. A full refund has been initiated." : "This slot is no longer available. A full refund has been initiated.",
             });
         }
 
-        return Response.json({ success: true, status: session.payment_status, lostCourts });
+        return Response.json({ success: true, status: session.payment_status, lostCourts, openPlay });
     } catch (err: unknown) {
         console.error("Verification error:", err);
         return Response.json({ error: "Verification failed" }, { status: 500 });
