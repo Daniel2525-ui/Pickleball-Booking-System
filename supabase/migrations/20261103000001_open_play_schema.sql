@@ -80,7 +80,7 @@ AS $$
       OR (status = 'pending' AND public.hold_release_after(hold_expires_at, created_at) > clock_timestamp()));
 $$;
 
-REVOKE ALL ON FUNCTION public.open_play_spots_taken(uuid, uuid), public.open_play_player_spots(uuid, uuid, uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.open_play_spots_taken(uuid, uuid), public.open_play_player_spots(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.open_play_spots_taken(uuid, uuid), public.open_play_player_spots(uuid, uuid, uuid) TO service_role;
 
 COMMIT;
