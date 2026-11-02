@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,8 +68,15 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                       {!flagged && (
                         <Button variant="ghost" size="sm" onClick={() => onPlayers(s)}>Players</Button>
                       )}
+                      {/* The bookings page has no date filter, so this opens the full list */}
+                      {flagged && (
+                        <Link href="/admin/bookings" className="text-sm font-medium underline underline-offset-2">View booking</Link>
+                      )}
                       {s.status === "open" && (
-                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => onCancel(s)}>Cancel this date</Button>
+                        <Button variant="ghost" size="sm" className="text-destructive" disabled={s.awaiting} aria-describedby={s.awaiting ? `await-${s.id}` : undefined} onClick={() => onCancel(s)}>Cancel this date</Button>
+                      )}
+                      {s.status === "open" && s.awaiting && (
+                        <p id={`await-${s.id}`} className="text-[11px] text-amber-800 dark:text-amber-300">Approve or reject the GCash payments waiting for verification first.</p>
                       )}
                     </TableCell>
                   </TableRow>

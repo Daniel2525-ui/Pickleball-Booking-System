@@ -25,6 +25,7 @@ export function AddWalkupModal({ session, onClose, onAdded }: Props) {
   const [results, setResults] = useState<UnifiedCustomerResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [player, setPlayer] = useState<UnifiedCustomerResult | null>(null);
+  const [phone, setPhone] = useState("");
   const [spots, setSpots] = useState("1");
   const [method, setMethod] = useState<"cash" | "gcash">("cash");
   const [reference, setReference] = useState("");
@@ -47,7 +48,7 @@ export function AddWalkupModal({ session, onClose, onAdded }: Props) {
   const createFromQuery = async () => {
     setError(null);
     setSaving(true);
-    const { data, error: err } = await createWalkInCustomer({ fullName: query });
+    const { data, error: err } = await createWalkInCustomer({ fullName: query, phone: phone.trim() || undefined });
     setSaving(false);
     if (err || !data) return setError(err?.message || "Failed to create customer record.");
     setPlayer({ ...data, full_name: data.full_name, type: "walk_in" });
@@ -128,6 +129,12 @@ export function AddWalkupModal({ session, onClose, onAdded }: Props) {
                   ))
                 )}
               </div>
+              {query.trim() && (
+                <Label htmlFor="walkup-phone" className="text-[11px] font-medium text-muted-foreground">Phone for a new walk-in (Optional)</Label>
+              )}
+              {query.trim() && (
+                <Input id="walkup-phone" type="tel" placeholder="e.g. 09171234567" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-8 text-xs" />
+              )}
               {query.trim() && (
                 <Button type="button" variant="outline" size="sm" className="gap-2 self-start" disabled={saving} onClick={createFromQuery}>
                   <UserPlus className="size-3.5" />

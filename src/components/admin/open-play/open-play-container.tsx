@@ -30,6 +30,8 @@ export interface OpenPlayAdminSession {
   status: "open" | "cancelled" | "flagged";
   flag_reason: string | null;
   booked: number;
+  /** GCash payments waiting for staff; the session cannot be cancelled until they are resolved */
+  awaiting: boolean;
 }
 
 const WINDOW_DAYS = 28;
@@ -71,12 +73,14 @@ export function OpenPlayContainer() {
           .in("status", ["confirmed", "checked_in", "in_progress", "completed", "pending"])
       : { data: [] };
     const booked = new Map<string, number>();
+    const awaiting = new Set<string>();
     for (const r of spotRows ?? []) {
+      if (r.status === "pending" && r.hold_expires_at === "infinity") awaiting.add(r.open_play_session_id);
       // shortcut: a pending hold counts until hold_expires_at, ignoring the short release grace period; fine for a staff overview
       if (r.status === "pending" && r.hold_expires_at && r.hold_expires_at !== "infinity" && new Date(r.hold_expires_at) < new Date()) continue;
       booked.set(r.open_play_session_id, (booked.get(r.open_play_session_id) ?? 0) + (r.open_play_spots ?? 0));
     }
-    const rows = (sess.data ?? []).map((s) => ({ ...s, booked: booked.get(s.id) ?? 0 })) as OpenPlayAdminSession[];
+    const rows = (sess.data ?? []).map((s) => ({ ...s, booked: booked.get(s.id) ?? 0, awaiting: awaiting.has(s.id) })) as OpenPlayAdminSession[];
     setSessions(rows);
     setSelected((cur) => rows.find((s) => s.id === cur?.id) ?? null);
     setLoading(false);
