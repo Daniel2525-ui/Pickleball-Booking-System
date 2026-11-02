@@ -19,6 +19,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
                     start_time,
                     end_time,
                     customer_name,
+                    open_play_spots,
                     profiles (
                         full_name
                     ),

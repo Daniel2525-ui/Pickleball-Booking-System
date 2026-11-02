@@ -24,6 +24,7 @@ import { fetchPayments, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/payme
 import { toast } from "sonner";
 import { Payment } from "@/lib/services/payments/paymentsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
 import { RefundPaymentModal } from "./refundPaymentModal";
 
 interface PaymentsTableProps {
@@ -363,7 +364,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                     <TableCell>
                       <div className="flex flex-col text-sm">
                         <span className="font-medium text-foreground">
-                          {payment.bookings?.courts?.name || "Court"}
+                          {bookingTitle(payment.bookings ?? {})}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {formatDate(payment.bookings?.booking_date)}

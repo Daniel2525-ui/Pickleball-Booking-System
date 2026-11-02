@@ -22,6 +22,7 @@ import {
     CreditCard,
     Crosshair,
     Settings,
+    UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -53,6 +54,11 @@ const operationsNav: NavItem[] = [
         title: "Operating Hours",
         url: "/admin/schedules",
         icon: Clock,
+    },
+    {
+        title: "Open Play",
+        url: "/admin/open-play",
+        icon: UsersRound,
     },
     {
         title: "Pricing",

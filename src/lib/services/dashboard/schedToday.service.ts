@@ -15,6 +15,8 @@ export const todaysSchedule = async () => {
                 end_time,
                 status,
                 court_id,
+                open_play_session_id,
+                open_play_spots,
                 customer_name,
                 courts (
                     name
@@ -27,6 +29,8 @@ export const todaysSchedule = async () => {
                 )
             `)
             .eq("booking_date", today)
+            // Spot rows have no court; the block rows are what show a court busy with open play
+            .not("court_id", "is", null)
             .in("status", ["confirmed", "checked_in", "in_progress", "completed", "no_show"])
             .order("start_time", { ascending: true });
 

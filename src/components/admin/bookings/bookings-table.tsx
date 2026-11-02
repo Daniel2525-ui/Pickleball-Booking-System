@@ -46,6 +46,7 @@ import { SettlePaymentModal } from "./settlePaymentModal";
 import { VerifyGcashModal } from "./verifyGcashModal";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
+import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
 const statusStyles: Record<string, string> = {
@@ -333,7 +334,10 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                   // An expired online hold cannot be revived at the counter (settle_counter_payment refuses it)
                   // Verify replaces counter collection for a submitted GCash basket, which must stay one unit
                   const awaiting = isAwaitingVerification(booking);
-                  const canCollect = payment?.status === "pending" && displayStatus !== "hold_expired" && booking.status !== "cancelled" && !awaiting;
+                  // Block rows only reserve a court for a session; spot rows are settled through the session's players
+                  const isBlock = !!booking.open_play_session_id && !booking.open_play_spots;
+                  const isSpot = !!booking.open_play_spots;
+                  const canCollect = !isSpot && payment?.status === "pending" && displayStatus !== "hold_expired" && booking.status !== "cancelled" && !awaiting;
 
                   return (
                     <TableRow key={booking.id} className="group transition-colors hover:bg-muted/30">
@@ -341,7 +345,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-semibold text-foreground text-sm">
-                            {booking.customer_name || booking.profiles?.full_name || "Guest Player"}
+                            {isBlock ? "Open play" : booking.customer_name || booking.profiles?.full_name || "Guest Player"}
                           </span>
                           <span className="text-[11px] text-muted-foreground">
                             {booking.customer_id ? "Walk-In Guest" : "Registered Member"}
@@ -352,7 +356,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                       {/* Court */}
                       <TableCell>
                         <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-bold text-xs">
-                          {booking.courts?.name || `Court ${booking.court_id}`}
+                          {isBlock ? "Open play (court reserved)" : isSpot ? bookingTitle(booking) : booking.courts?.name || `Court ${booking.court_id}`}
                         </span>
                       </TableCell>
 
@@ -385,7 +389,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
 
                       {/* Action Dropdown Menu */}
                       <TableCell className="text-right">
-                        <DropdownMenu>
+                        {!isBlock && <DropdownMenu>
                           <DropdownMenuTrigger
                             render={
                               <button
@@ -495,7 +499,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                               )}
                             </DropdownMenuGroup>
                           </DropdownMenuContent>
-                        </DropdownMenu>
+                        </DropdownMenu>}
                       </TableCell>
                     </TableRow>
                   );

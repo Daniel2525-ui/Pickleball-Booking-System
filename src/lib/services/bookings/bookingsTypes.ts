@@ -13,7 +13,11 @@ export interface Booking {
     user_id?: string | null;
     customer_id?: string | null;
     customer_name: string;
-    court_id: string;
+    /** null on an open play spot row */
+    court_id: string | null;
+    open_play_session_id?: string | null;
+    /** Spots bought on a spot row; null on court bookings and on the court-reserving block rows */
+    open_play_spots?: number | null;
     booking_date: string;
     start_time: string;
     end_time: string;

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
 import { RecentBooking } from "./dashboardTypes";
 
 export const fetchRecentBookings = async () => {
@@ -16,6 +17,7 @@ export const fetchRecentBookings = async () => {
                 total_amount,
                 status,
                 court_id,
+                open_play_spots,
                 customer_name,
                 courts ( name ),
                 profiles:user_id ( full_name )       
@@ -23,6 +25,8 @@ export const fetchRecentBookings = async () => {
             .in("status", ["confirmed", "completed", "cancelled", "checked_in", "in_progress", "pending"])
             // Timed-out holds are noise here; they stay listed under Bookings > Expired Holds
             .or("cancel_reason.is.null,cancel_reason.neq.expired")
+            // Court-reserving block rows of an open play session are not bookings
+            .or("open_play_session_id.is.null,open_play_spots.not.is.null")
             .order("created_at", {
                 ascending: false,
             })
@@ -39,13 +43,14 @@ export const fetchRecentBookings = async () => {
             total_amount?: number;
             status?: string;
             customer_name?: string;
+            open_play_spots?: number | null;
             courts?: { name?: string };
             profiles?: { full_name?: string };
         }
 
         const formattedBookings: RecentBooking[] = ((data || []) as unknown as RawRecentBooking[]).map((booking) => {
             const customerName = booking.profiles?.full_name || booking.customer_name || "Guest User";
-            const courtName = booking.courts?.name || "Court";
+            const courtName = bookingTitle(booking);
 
             const datePart = booking.booking_date
                 ? new Date(booking.booking_date + "T00:00:00").toLocaleDateString("en-US", {

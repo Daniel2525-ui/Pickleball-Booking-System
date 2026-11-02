@@ -46,6 +46,7 @@ interface ScheduleItem {
   end_time: string;
   status: string;
   court_id: string;
+  open_play_session_id?: string | null;
   customer_name?: string | null;
   courts?: { name: string } | null;
   profiles?: { full_name: string } | null;
@@ -150,7 +151,7 @@ export default function TodaysSchedule({
                     </td>
 
                     <td className="py-3 pr-4 font-medium text-foreground text-xs sm:text-sm">
-                      {booking.customer_name || booking.customers?.full_name || booking.profiles?.full_name || "Guest Player"}
+                      {booking.open_play_session_id ? "Open play" : booking.customer_name || booking.customers?.full_name || booking.profiles?.full_name || "Guest Player"}
                     </td>
 
                     <td className="py-3 pr-4 text-xs sm:text-sm text-muted-foreground whitespace-nowrap">

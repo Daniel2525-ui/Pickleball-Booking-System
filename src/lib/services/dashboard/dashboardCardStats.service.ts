@@ -35,7 +35,7 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
 
     const { data: bookings, error } = await supabase
         .from("bookings")
-        .select("court_id, start_time, end_time, status, booking_date, total_amount, payments(status, amount)")
+        .select("court_id, open_play_session_id, open_play_spots, start_time, end_time, status, booking_date, total_amount, payments(status, amount)")
         .gte("booking_date", yesterdayStr)
         .lte("booking_date", endDateStr)
         .in("status", ACTIVE_STATUSES);
@@ -44,9 +44,10 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
 
     const allBookings = bookings || [];
     const todayActive = allBookings
-        .filter((b) => b.booking_date === todayStr && (b.status === "confirmed" || b.status === "checked_in" || b.status === "in_progress"))
+        // Spot rows have no court; the block rows already occupy the courts
+        .filter((b) => b.court_id && b.booking_date === todayStr && (b.status === "confirmed" || b.status === "checked_in" || b.status === "in_progress"))
         .map((b) => ({
-            court_id: b.court_id,
+            court_id: b.court_id as string,
             status: b.status,
             start_time: b.start_time,
             end_time: b.end_time,
@@ -61,6 +62,8 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
     let revYesterday = 0;
 
     for (const b of allBookings) {
+        // Block rows reserve courts but are not bookings; spot rows count (their revenue is in total_amount)
+        if (b.open_play_session_id && !b.open_play_spots) continue;
         const payments = Array.isArray(b.payments) ? b.payments : (b.payments ? [b.payments] : []);
         const isPaid = payments.some((p: { status?: string }) => p.status === "paid" || p.status === "succeeded");
         const amt = isPaid ? (Number(b.total_amount) || 0) : 0;

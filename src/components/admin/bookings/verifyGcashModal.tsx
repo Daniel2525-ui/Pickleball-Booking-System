@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { verifyGcashPayment } from "@/lib/services/payments/verifyGcashPayment.service";
 import { Booking } from "@/lib/services/bookings/bookingsTypes";
+import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
 
 interface VerifyGcashModalProps {
   booking: Booking | null;
@@ -30,7 +31,7 @@ export const VerifyGcashModal = ({ booking, open, onOpenChange, onVerified }: Ve
   const [duplicate, setDuplicate] = useState(false);
   const [proofFailed, setProofFailed] = useState(false);
   // The whole submitted basket, not just the rows the table happens to have loaded
-  const [basket, setBasket] = useState<{ id: string; total_amount: number | null; courts: { name?: string } | null }[] | null>(null);
+  const [basket, setBasket] = useState<{ id: string; total_amount: number | null; courts: { name?: string } | null; open_play_spots: number | null }[] | null>(null);
 
   const payment = booking ? (Array.isArray(booking.payments) ? booking.payments[0] : booking.payments) : null;
   const paymentId = payment?.id;
@@ -54,7 +55,7 @@ export const VerifyGcashModal = ({ booking, open, onOpenChange, onVerified }: Ve
     if (basketId) {
       supabase
         .from("bookings")
-        .select("id, total_amount, courts(name)")
+        .select("id, total_amount, open_play_spots, courts(name)")
         .eq("basket_id", basketId)
         .eq("status", "pending")
         .eq("hold_expires_at", "infinity")
@@ -138,7 +139,7 @@ export const VerifyGcashModal = ({ booking, open, onOpenChange, onVerified }: Ve
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Court:</span>
               <span className="font-semibold text-primary">
-                {!basket ? "—" : ids.length > 1 ? `${ids.length} courts` : basket[0]?.courts?.name || booking.courts?.name || `Court ${booking.court_id}`}
+                {!basket ? "—" : ids.length > 1 ? `${ids.length} courts` : bookingTitle(basket[0] ?? booking)}
               </span>
             </div>
             <div className="flex items-center justify-between">

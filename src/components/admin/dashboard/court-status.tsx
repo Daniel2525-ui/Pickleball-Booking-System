@@ -1,12 +1,12 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CircleCheck, Clock, Layers, Wrench, XCircle } from "lucide-react";
+import { CircleCheck, Clock, Layers, Users, Wrench, XCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCourtStatus } from "@/lib/services/dashboard/courtStatus.service";
 import { useEffect, useState } from "react";
 
-type CourtStatusType = "Available" | "In Use" | "Maintenance" | "Closed";
+type CourtStatusType = "Available" | "In Use" | "Open play" | "Maintenance" | "Closed";
 interface Court {
   name: string;
   status: CourtStatusType;
@@ -36,6 +36,12 @@ export default function CourtStatus({ className }: { className?: string }) {
       icon: Clock,
       dotColor: "bg-amber-500",
       badgeStyle: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20",
+    },
+    "Open play": {
+      label: "Open play",
+      icon: Users,
+      dotColor: "bg-violet-500",
+      badgeStyle: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20",
     },
     Maintenance: {
       label: "Maintenance",

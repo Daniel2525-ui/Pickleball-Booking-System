@@ -18,6 +18,7 @@ export interface Payment {
         start_time: string;
         end_time: string;
         customer_name?: string;
+        open_play_spots?: number | null;
         profiles?: {
             full_name: string;
         };
