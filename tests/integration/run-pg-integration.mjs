@@ -4296,6 +4296,8 @@ async function main() {
     // Booking tests make their own future session per test (one schedule, one date each)
     const opBookFile = fs.readdirSync(dir).find((f) => f.includes("open_play_booking"));
     if (opBookFile) runPsqlFile(path.join(dir, opBookFile));
+    const opStaffFile = fs.readdirSync(dir).find((f) => f.includes("open_play_staff"));
+    if (opStaffFile) runPsqlFile(path.join(dir, opStaffFile));
     let dayN = 0;
     const mkSession = (capacity, status = "open", price = 150) => {
       const id = q(`SELECT gen_random_uuid();`);
@@ -4413,6 +4415,88 @@ async function main() {
       assert.equal(gone.action, "REFUND_SCHEDULED");
       assert.equal(gone.reason, "COURT_UNAVAILABLE");
       assert.equal(bookingOf(c.booking_id), "cancelled|court_unavailable");
+    });
+
+    // Staff walk-ups and session cancellation
+    const adminAs = { role: "authenticated", uid: adminUid };
+    const walkCust = q(`INSERT INTO public.customers (full_name) VALUES ('Walk Up') RETURNING id;`).split("\n")[0];
+    const walkup = (sid, spots, method = "cash", ref = "NULL", as = adminAs) => runPsqlCommand(
+      `SELECT public.add_open_play_walkup('${sid}', '${walkCust}', 'Walk Up', ${spots}, '${method}', ${ref});`, as);
+    const dateOf = (sid) => q(`SELECT session_date FROM public.open_play_sessions WHERE id = '${sid}';`);
+
+    await runTest("Open play: walk-up records a confirmed spot with a paid cash payment", () => {
+      const sid = mkSession(6);
+      const r = walkup(sid, 2);
+      assert.equal(r.status, 0, r.stderr);
+      const w = JSON.parse(r.stdout.trim().split("\n")[0]);
+      assert.equal(Number(w.amount), 300);
+      assert.equal(q(`SELECT b.status || '|' || p.status || '|' || p.payment_method || '|' || p.amount || '|' || b.booking_date || '|' || (b.user_id IS NULL) FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.id = '${w.booking_id}';`),
+        `confirmed|paid|cash|300.00|${dateOf(sid)}|true`);
+      assert.ok(walkup(sid, 1, "cash", "NULL", { role: "authenticated", uid: aliceUid }).stderr.includes("FORBIDDEN"));
+    });
+
+    await runTest("Open play: walk-up respects capacity and needs a GCash reference", () => {
+      const sid = mkSession(3);
+      assert.equal(walkup(sid, 2).status, 0);
+      assert.ok(walkup(sid, 2).stderr.includes("SESSION_FULL"));
+      assert.ok(walkup(sid, 1, "gcash").stderr.includes("INVALID_ARGUMENT"));
+      assert.ok(walkup(sid, 1, "gcash", "'  '").stderr.includes("INVALID_ARGUMENT"));
+      assert.ok(walkup(sid, 1, "card").stderr.includes("INVALID_ARGUMENT"));
+      assert.equal(walkup(sid, 1, "gcash", "'REF123'").status, 0);
+      assert.equal(q(`SELECT payment_reference FROM public.payments WHERE payment_method = 'gcash' AND booking_id IN (SELECT id FROM public.bookings WHERE open_play_session_id = '${sid}');`), "REF123");
+      const sid2 = mkSession(20);
+      assert.equal(walkup(sid2, 3).status, 0);
+      assert.ok(walkup(sid2, 2).stderr.includes("PLAYER_LIMIT"));
+      assert.ok(walkup(mkSession(6, "cancelled"), 1).stderr.includes("SESSION_UNAVAILABLE"));
+    });
+
+    // Block row (court set, no spots, no owner) plus a confirmed walk-up, a stripe hold and an optional GCash row
+    const cancelFixture = (gcash = false) => {
+      const sid = mkSession(8);
+      q(`INSERT INTO public.bookings (court_id, open_play_session_id, booking_date, start_time, end_time, customer_name, status, total_amount)
+         VALUES ('${activeCourtId}', '${sid}', '${dateOf(sid)}', '10:00', '12:00', 'Open play', 'confirmed', 0);`);
+      const w = JSON.parse(walkup(sid, 1).stdout.trim().split("\n")[0]);
+      const h = holdOk(sid, aliceUid, 2);
+      if (gcash) q(`INSERT INTO public.bookings (open_play_session_id, open_play_spots, user_id, booking_date, start_time, end_time, customer_name, status, total_amount, hold_expires_at)
+         VALUES ('${sid}', 1, '${bobUid}', '${dateOf(sid)}', '10:00', '12:00', 'Bob', 'pending', 150, 'infinity');`);
+      return { sid, w, h };
+    };
+    const cancelSql = (sid) => `SELECT public.cancel_open_play_session('${sid}');`;
+
+    await runTest("Open play: cancelling a session cancels block and spot rows and frees the courts", () => {
+      const { sid, w, h } = cancelFixture();
+      assert.notEqual(runPsqlCommand(cancelSql(sid), { role: "authenticated", uid: aliceUid }).status, 0);
+      const r = runPsqlCommand(cancelSql(sid), adminAs);
+      assert.equal(r.status, 0, r.stderr);
+      const out = JSON.parse(r.stdout.trim().split("\n")[0]);
+      assert.equal(out.cancelled, 2);
+      assert.deepEqual([...out.booking_ids].sort(), [w.booking_id, h.booking_id].sort());
+      assert.equal(q(`SELECT status FROM public.open_play_sessions WHERE id = '${sid}';`), "cancelled");
+      assert.equal(q(`SELECT count(*) FROM public.bookings WHERE open_play_session_id = '${sid}' AND (status, cancel_reason) IS DISTINCT FROM ('cancelled', 'admin') OR open_play_session_id = '${sid}' AND hold_expires_at IS NOT NULL;`), "0");
+      assert.equal(q(`SELECT status FROM public.payments WHERE booking_id = '${w.booking_id}';`), "paid");
+      assert.equal(q(`SELECT status FROM public.payments WHERE id = '${h.payment_id}';`), "failed");
+      const court = runPsqlCommand(`SELECT public.hold_court_booking('${activeCourtId}', '${dateOf(sid)}', '10:00:00', '12:00:00', '${danaUid}', 400);`, { role: "authenticated", uid: danaUid });
+      assert.equal(court.status, 0, court.stderr);
+    });
+
+    await runTest("Open play: cancel is refused while a GCash payment awaits verification", () => {
+      const { sid } = cancelFixture(true);
+      const r = runPsqlCommand(cancelSql(sid), adminAs);
+      assert.notEqual(r.status, 0);
+      assert.ok(r.stderr.includes("GCASH_PENDING_VERIFICATION"), r.stderr);
+      assert.equal(q(`SELECT status FROM public.open_play_sessions WHERE id = '${sid}';`), "open");
+      assert.equal(q(`SELECT count(*) FROM public.bookings WHERE open_play_session_id = '${sid}' AND status = 'cancelled';`), "0");
+    });
+
+    await runTest("Open play: a card payment arriving after session cancel is refunded", () => {
+      const { sid, h } = cancelFixture();
+      assert.equal(runPsqlCommand(cancelSql(sid), adminAs).status, 0);
+      const late = reconcile(h, "op4");
+      assert.equal(late.action, "REFUND_SCHEDULED");
+      // The cancel failed the pending payment, so reconcile takes its duplicate-payment path; money is refunded either way
+      assert.equal(late.reason, "DUPLICATE_PAYMENT");
+      assert.ok(late.refund_request_id);
+      assert.equal(bookingOf(h.booking_id), "cancelled|admin");
     });
   }
 
