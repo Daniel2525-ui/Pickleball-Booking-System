@@ -6,7 +6,7 @@ import { UserBooking, fetchUserBookings } from "@/lib/services/bookings/fetchUse
 import { VENUE_CONTACT } from "@/lib/venue";
 import { cancelBooking, isBookingCancellable, CANCELLATION_CUTOFF_HOURS } from "@/lib/services/bookings/cancelBooking.service";
 import { getBookingStart } from "@/lib/utils/bookingTime";
-import { getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
+import { cancellationNote, getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
 import { pendingBasketSize } from "@/lib/services/bookings/basket";
 
 // Badges for bookings that are no longer awaiting payment or confirmed (EXPIRED = checkout timed out, nothing charged)
@@ -32,7 +32,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
 import {
@@ -59,21 +59,26 @@ const formatBookingDate = (date: string) => {
   });
 };
 
-/** Loads the current user's bookings and authentication state. */
-const fetchCurrentUserBookings = async (): Promise<{ bookings: UserBooking[]; isAuthenticated: boolean }> => {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { bookings: [], isAuthenticated: false };
-  const { data, error } = await fetchUserBookings(user.id);
-  return { bookings: error ? [] : (data || []), isAuthenticated: true };
+/** Loads the current user's bookings and authentication state; `failed` when the bookings could not be read. */
+const fetchCurrentUserBookings = async (): Promise<{ bookings: UserBooking[]; isAuthenticated: boolean; failed: boolean }> => {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { bookings: [], isAuthenticated: false, failed: false };
+    const { data, error } = await fetchUserBookings(user.id);
+    return { bookings: data || [], isAuthenticated: true, failed: Boolean(error) };
+  } catch {
+    return { bookings: [], isAuthenticated: true, failed: true };
+  }
 };
 
 export const BookingHistoryContainer = () => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [bookings, setBookings] = useState<UserBooking[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [bookingToCancel, setBookingToCancel] = useState<UserBooking | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -93,9 +98,9 @@ export const BookingHistoryContainer = () => {
         id: "resume-payment-toast",
       });
       setResumingId(null);
-      // Re-sync with the database to reflect any status changes
+      // Re-sync with the database to reflect any status changes (a failed read keeps what is shown)
       const latest = await fetchCurrentUserBookings();
-      if (latest) setBookings(latest.bookings);
+      if (!latest.failed) setBookings(latest.bookings);
     } else {
       toast.success("Redirecting to payment...", { id: "resume-payment-toast" });
       window.location.assign(url);
@@ -108,6 +113,7 @@ export const BookingHistoryContainer = () => {
       if (!active) return;
       setIsAuthenticated(res.isAuthenticated);
       setBookings(res.bookings);
+      setLoadFailed(res.failed);
       setLoading(false);
     });
     return () => {
@@ -126,9 +132,9 @@ export const BookingHistoryContainer = () => {
 
     if (error || !data) {
       toast.error(error?.message || "Failed to cancel reservation. Please try again.");
-      // Re-sync with the database so the UI reflects the booking's real status.
+      // Re-sync with the database so the UI reflects the booking's real status (a failed read keeps what is shown).
       const latest = await fetchCurrentUserBookings();
-      if (latest) setBookings(latest.bookings);
+      if (!latest.failed) setBookings(latest.bookings);
     } else {
       // Apply the status confirmed by the backend; the server also cancels every pending court of the same basket.
       setBookings((prev) =>
@@ -157,10 +163,13 @@ export const BookingHistoryContainer = () => {
   // Split bookings into upcoming and past
   const now = new Date();
 
-  const upcomingBookings = bookings.filter((booking) => {
-    const isCancelledOrNoShow = booking.status === "cancelled" || booking.status === "no_show";
-    return !isCancelledOrNoShow && getBookingStart(booking) >= now;
-  });
+  // Upcoming reads soonest first (the next game on top); past keeps the newest-first order the query returns
+  const upcomingBookings = bookings
+    .filter((booking) => {
+      const isCancelledOrNoShow = booking.status === "cancelled" || booking.status === "no_show";
+      return !isCancelledOrNoShow && getBookingStart(booking) >= now;
+    })
+    .sort((a, b) => getBookingStart(a).getTime() - getBookingStart(b).getTime());
 
   const pastBookings = bookings.filter((booking) => {
     const isCancelledOrNoShow = booking.status === "cancelled" || booking.status === "no_show";
@@ -185,6 +194,7 @@ export const BookingHistoryContainer = () => {
       <div className="flex items-center gap-2 sm:gap-3 border-b pb-4 overflow-x-auto whitespace-nowrap">
         <Button
           variant={activeTab === "upcoming" ? "default" : "ghost"}
+          aria-pressed={activeTab === "upcoming"}
           onClick={() => setActiveTab("upcoming")}
           className="rounded-full px-5 min-h-[44px] text-xs sm:text-sm font-semibold transition-all shrink-0"
         >
@@ -192,6 +202,7 @@ export const BookingHistoryContainer = () => {
         </Button>
         <Button
           variant={activeTab === "past" ? "default" : "ghost"}
+          aria-pressed={activeTab === "past"}
           onClick={() => setActiveTab("past")}
           className="rounded-full px-5 min-h-[44px] text-xs sm:text-sm font-semibold transition-all shrink-0"
         >
@@ -212,35 +223,42 @@ export const BookingHistoryContainer = () => {
             <div className="size-14 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
               <Calendar className="size-6" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">Sign In Required</h3>
+            <h2 className="text-lg font-bold text-foreground">Sign In Required</h2>
             <p className="text-sm text-muted-foreground mt-1 max-w-sm leading-relaxed">
               Please sign in to your account to view your court reservations and match passes.
             </p>
-            <Link href="/login" className="mt-6">
-              <Button className="rounded-xl shadow-md hover:shadow-lg font-bold gap-2">
-                Sign In to View Reservations
-              </Button>
+            <Link href="/login" className={buttonVariants({ className: "mt-6 rounded-xl shadow-md hover:shadow-lg font-bold gap-2" })}>
+              Sign In to View Reservations
             </Link>
+          </div>
+        ) : loadFailed ? (
+          <div role="alert" className="flex flex-col items-center justify-center py-16 text-center border rounded-2xl border-destructive/40 bg-destructive/5 p-6">
+            <AlertTriangle className="size-6 text-destructive mb-3" />
+            <h2 className="text-lg font-bold text-foreground">Couldn&apos;t load your bookings</h2>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm leading-relaxed">
+              Your reservations are safe. Refresh the page to try again, or call {VENUE_CONTACT.phone}.
+            </p>
+            <Button variant="outline" onClick={() => window.location.reload()} className="mt-6 min-h-[44px] font-bold">
+              Refresh
+            </Button>
           </div>
         ) : displayedBookings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center border rounded-2xl bg-muted/20 border-dashed p-6">
             <div className="size-14 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
               <Calendar className="size-6" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">
+            <h2 className="text-lg font-bold text-foreground">
               {activeTab === "upcoming" ? "No Upcoming Reservations" : "No Past Match History"}
-            </h3>
+            </h2>
             <p className="text-sm text-muted-foreground mt-1 max-w-sm leading-relaxed">
               {activeTab === "upcoming"
                 ? "You don't have any courts booked right now. Ready to play some pickleball?"
                 : "Completed matches and past session records will be archived here."}
             </p>
             {activeTab === "upcoming" && (
-              <Link href="/#booking" className="mt-6">
-                <Button className="rounded-xl shadow-md hover:shadow-lg font-bold gap-2">
-                  <CalendarDays className="size-4" />
-                  Reserve a Court Now
-                </Button>
+              <Link href="/#booking" className={buttonVariants({ className: "mt-6 rounded-xl shadow-md hover:shadow-lg font-bold gap-2" })}>
+                <CalendarDays className="size-4" />
+                Reserve a Court Now
               </Link>
             )}
           </div>
@@ -248,11 +266,13 @@ export const BookingHistoryContainer = () => {
           <div className="grid grid-cols-1 gap-4">
             {displayedBookings.map((booking) => {
               const cancellable = isBookingCancellable(booking);
+              const note = cancellationNote(booking);
 
               return (
                 <div
                   key={booking.id}
-                  className={`grid grid-cols-[minmax(0,1fr)_76px] sm:grid-cols-[minmax(0,1fr)_96px] rounded-2xl border bg-card overflow-hidden ${booking.status === "pending" ? "border-amber-500/60" : ""} ${booking.status === "cancelled" ? "opacity-60" : ""}`}
+                  // Cancelled cards sit back through the surface, not opacity, so their text keeps full contrast
+                  className={`grid grid-cols-[minmax(0,1fr)_76px] sm:grid-cols-[minmax(0,1fr)_96px] rounded-2xl border overflow-hidden ${booking.status === "pending" ? "border-amber-500/60" : ""} ${note ? "bg-muted/30 border-dashed" : "bg-card"}`}
                 >
                 <div className="flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center p-5 sm:p-6 min-w-0">
                   <div className="space-y-3.5">
@@ -310,8 +330,10 @@ export const BookingHistoryContainer = () => {
                       )}
                     </div>
 
-                    {booking.status === "cancelled" && booking.cancel_reason === "gcash_rejected" && (
-                      <p className="text-xs font-semibold text-muted-foreground">GCash payment could not be verified</p>
+                    {note && (
+                      <p className={`text-xs font-semibold ${note.text.startsWith("Cancelled by the venue") ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                        {note.text}
+                      </p>
                     )}
 
                     {booking.status === "pending" && pendingBasketSize(bookings, booking) > 1 && (
@@ -341,9 +363,10 @@ export const BookingHistoryContainer = () => {
 
                   <div className="flex flex-col items-start sm:items-end w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-border/60">
                     <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">
-                      Court Rate
+                      Total
                     </span>
-                    <span className="text-2xl font-black text-foreground">
+                    {/* Never charged (expired or abandoned hold): the price stays visible but reads as not paid */}
+                    <span className={`text-2xl font-black ${note && !note.charged ? "text-muted-foreground line-through decoration-2" : "text-foreground"}`}>
                       {booking.total_amount ? `₱${booking.total_amount.toLocaleString()}` : "₱---"}
                     </span>
 

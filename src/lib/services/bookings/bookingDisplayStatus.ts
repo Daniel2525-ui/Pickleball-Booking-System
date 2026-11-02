@@ -26,6 +26,27 @@ export const cancelReasonFor = (booking: HoldFields, cancelledBy: "admin" | "cus
     isHoldExpired(booking, now) ? "expired" : cancelledBy;
 
 /**
+ * What a cancelled booking's card tells the customer: who cancelled it (when the venue did) and where the money is.
+ * `charged` is false when nothing was ever paid. Null for bookings that are not cancelled.
+ */
+export const cancellationNote = (booking: {
+    status: string;
+    cancel_reason?: string | null;
+    payments?: { status: string; payment_method: string | null }[] | null;
+}): { text: string; charged: boolean } | null => {
+    if (booking.status !== "cancelled") return null;
+    if (booking.cancel_reason === "gcash_rejected") return { text: "GCash payment could not be verified", charged: false };
+    const payments = booking.payments ?? [];
+    const outstanding = payments.find((p) => p.status === "paid");
+    // A paid row on a cancelled booking is money still owed back: card refunds run automatically, cash/GCash at the counter
+    const money = outstanding
+        ? (outstanding.payment_method ?? "stripe") === "stripe" ? "Refund on its way to your card" : "The venue will refund you at the counter"
+        : payments.some((p) => p.status === "refunded") ? "Refunded" : "Not charged";
+    const text = booking.cancel_reason === "admin" ? `Cancelled by the venue · ${money}` : money;
+    return { text, charged: money !== "Not charged" };
+};
+
+/**
  * Status shown to staff and customers: "expired" for holds cleanup cancelled, "hold_expired" for pending holds whose
  * timer ran out but are not cleaned up yet; otherwise the stored status.
  */

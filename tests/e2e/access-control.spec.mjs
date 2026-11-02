@@ -12,7 +12,7 @@ test.describe("unauthenticated page access", () => {
   test("/my-bookings asks the visitor to sign in", async ({ page }) => {
     await page.goto("/my-bookings");
     await expect(page.getByRole("heading", { name: "Sign In Required" })).toBeVisible();
-    await page.getByRole("button", { name: "Sign In to View Reservations" }).click();
+    await page.getByRole("link", { name: "Sign In to View Reservations" }).click();
     await expect(page).toHaveURL(/\/login$/);
   });
 

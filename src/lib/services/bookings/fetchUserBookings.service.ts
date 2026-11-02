@@ -13,7 +13,8 @@ export interface UserBooking {
     cancel_reason?: string | null,
     basket_id?: string | null,
     open_play_spots?: number | null,
-    courts?: { name: string } | null
+    courts?: { name: string } | null,
+    payments?: { status: string, payment_method: string | null }[] | null
 }
 
 export const fetchUserBookings = async (userId: string) => {
@@ -36,6 +37,10 @@ export const fetchUserBookings = async (userId: string) => {
                 open_play_spots,
                     courts (
                         name
+                    ),
+                    payments (
+                        status,
+                        payment_method
                     )
                 `)
             .eq("user_id", userId)

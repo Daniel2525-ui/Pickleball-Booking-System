@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getBookingDisplayStatus, isHoldExpired, cancelReasonFor } from "../src/lib/services/bookings/bookingDisplayStatus.ts";
+import { getBookingDisplayStatus, isHoldExpired, cancelReasonFor, cancellationNote } from "../src/lib/services/bookings/bookingDisplayStatus.ts";
 
 const now = new Date("2026-10-29T10:00:00Z");
 const booking = (fields) => ({ status: "pending", created_at: "2026-10-29T09:50:00Z", hold_expires_at: null, cancel_reason: null, ...fields });
@@ -39,4 +39,20 @@ test("awaiting verification: infinite hold is never expired and shows its own st
     const awaiting = booking({ hold_expires_at: "infinity" });
     assert.equal(getBookingDisplayStatus(awaiting, now), "awaiting_verification");
     assert.equal(isHoldExpired(awaiting, now), false);
+});
+
+test("cancellationNote: who cancelled and what happened to the money", () => {
+    const pay = (status, payment_method = "stripe") => ({ status, payment_method });
+    const cancelled = (cancel_reason, payments) => ({ status: "cancelled", cancel_reason, payments });
+    assert.equal(cancellationNote({ status: "confirmed", payments: [pay("paid")] }), null);
+    assert.deepEqual(cancellationNote(cancelled("customer", [pay("refunded")])), { text: "Refunded", charged: true });
+    assert.deepEqual(cancellationNote(cancelled("admin", [pay("paid")])), { text: "Cancelled by the venue · Refund on its way to your card", charged: true });
+    assert.deepEqual(cancellationNote(cancelled("admin", [pay("paid", "cash")])), { text: "Cancelled by the venue · The venue will refund you at the counter", charged: true });
+    assert.deepEqual(cancellationNote(cancelled("admin", [pay("paid", "gcash")])), { text: "Cancelled by the venue · The venue will refund you at the counter", charged: true });
+    // An expired or abandoned hold was never paid
+    assert.deepEqual(cancellationNote(cancelled("expired", [pay("failed")])), { text: "Not charged", charged: false });
+    assert.deepEqual(cancellationNote(cancelled("customer", [])), { text: "Not charged", charged: false });
+    // Money still out beats an earlier refund (a duplicate charge being refunded)
+    assert.deepEqual(cancellationNote(cancelled("customer", [pay("refunded"), pay("paid")])), { text: "Refund on its way to your card", charged: true });
+    assert.deepEqual(cancellationNote(cancelled("gcash_rejected", [pay("failed", "gcash")])), { text: "GCash payment could not be verified", charged: false });
 });
