@@ -1,21 +1,21 @@
 import { ArrowLeft, Crosshair } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-background selection:bg-primary/20 selection:text-primary">
-      {/* Back to Home Button */}
-      <Link href="/" className="absolute top-[max(1rem,env(safe-area-inset-top))] left-4 sm:top-8 sm:left-8">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-2 text-muted-foreground hover:text-foreground text-xs sm:text-sm font-medium min-h-[44px] px-3"
+    <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-12 bg-background selection:bg-primary/20 selection:text-primary">
+      {/* Phones: in the flow, card-wide, so it never sits on the logo and lines up with the card edge.
+          Wider screens have room for it in the corner. */}
+      <div className="w-full max-w-sm mb-4 pt-[env(safe-area-inset-top)] sm:pt-0 sm:mb-0 sm:w-auto sm:absolute sm:top-8 sm:left-8">
+        <Link
+          href="/"
+          className={buttonVariants({ variant: "ghost", size: "sm", className: "-ml-3 gap-2 min-h-[44px] px-3 text-muted-foreground hover:text-foreground" })}
         >
           <ArrowLeft className="size-4" />
-          Back to Courts
-        </Button>
-      </Link>
+          Back to courts
+        </Link>
+      </div>
 
       {/* Brand Identity */}
       <Link href="/" className="flex items-center gap-2.5 mb-8 group">

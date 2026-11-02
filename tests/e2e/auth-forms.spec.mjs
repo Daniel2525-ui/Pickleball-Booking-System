@@ -40,7 +40,7 @@ test("auth pages have a heading, their own title and the way back home", async (
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
     await expect(page).toHaveTitle(title);
-    await expect(page.getByRole("link", { name: "Back to Courts" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back to courts" })).toBeVisible();
   }
 });
 

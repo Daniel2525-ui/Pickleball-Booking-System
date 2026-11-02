@@ -198,7 +198,8 @@ export const BookingHistoryContainer = () => {
           onClick={() => setActiveTab("upcoming")}
           className="rounded-full px-5 min-h-[44px] text-xs sm:text-sm font-semibold transition-all shrink-0"
         >
-          Upcoming Matches ({upcomingBookings.length})
+          {/* Short labels on phones so both tabs fit a 320px screen */}
+          Upcoming<span className="hidden sm:inline"> Matches</span> ({upcomingBookings.length})
         </Button>
         <Button
           variant={activeTab === "past" ? "default" : "ghost"}
@@ -206,7 +207,7 @@ export const BookingHistoryContainer = () => {
           onClick={() => setActiveTab("past")}
           className="rounded-full px-5 min-h-[44px] text-xs sm:text-sm font-semibold transition-all shrink-0"
         >
-          Past Sessions ({pastBookings.length})
+          Past<span className="hidden sm:inline"> Sessions</span> ({pastBookings.length})
         </Button>
       </div>
 
