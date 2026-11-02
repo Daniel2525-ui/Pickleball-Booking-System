@@ -1,4 +1,4 @@
--- Rollback for the open play migrations (20261103000001..5), reverse order.
+-- Rollback for the open play migrations (20261102030952..20261102031219), reverse order.
 -- Restoring bookings.court_id NOT NULL only works once no spot rows (court_id NULL) exist:
 -- delete or cancel-and-delete them (and their open play block rows) first.
 -- Function bodies are the pre-branch definitions: confirm_checkout_hold from gcash_manual_payment,
@@ -6,7 +6,7 @@
 
 BEGIN;
 
--- 20261103000005: public reads
+-- 20261102031219: public reads
 DROP FUNCTION IF EXISTS public.get_open_play_sessions(date, date);
 DROP FUNCTION IF EXISTS public.get_public_slot_availability(date);
 -- 6. get_public_slot_availability (grid shows grace-period holds as taken) -----
@@ -48,7 +48,7 @@ ALTER FUNCTION public.get_public_slot_availability(date) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.get_public_slot_availability(date) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_public_slot_availability(date) TO anon, authenticated, service_role;
 
--- 20261103000004 / 3 / 2: open play functions
+-- 20261102031217 / 031138 / 031021: open play functions
 DROP FUNCTION IF EXISTS public.cancel_open_play_session(uuid);
 DROP FUNCTION IF EXISTS public.add_open_play_walkup(uuid, uuid, text, int, text, text);
 DROP FUNCTION IF EXISTS public.hold_open_play_spots(uuid, int, text);
@@ -56,7 +56,7 @@ DROP FUNCTION IF EXISTS public.generate_open_play_sessions(int);
 DROP FUNCTION IF EXISTS public.set_open_play_schedule_active(uuid, boolean);
 DROP FUNCTION IF EXISTS public.save_open_play_schedule(uuid, text, time, time, uuid[], int, numeric);
 
--- 20261103000003: pre-branch payment functions
+-- 20261102031138: pre-branch payment functions
 CREATE OR REPLACE FUNCTION public.confirm_checkout_hold(
   p_booking_id uuid,
   p_payment_id uuid,
@@ -495,7 +495,7 @@ REVOKE ALL ON FUNCTION public.reconcile_booking_payment(uuid, uuid, text, text, 
 REVOKE ALL ON FUNCTION public.reconcile_booking_payment(uuid, uuid, text, text, numeric, text) FROM anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.reconcile_booking_payment(uuid, uuid, text, text, numeric, text) TO service_role;
 
--- 20261103000001: schema (open play functions, constraints, index, columns, tables)
+-- 20261102030952: schema (open play functions, constraints, index, columns, tables)
 DROP FUNCTION IF EXISTS public.open_play_player_spots(uuid, uuid, uuid);
 DROP FUNCTION IF EXISTS public.open_play_spots_taken(uuid, uuid);
 
