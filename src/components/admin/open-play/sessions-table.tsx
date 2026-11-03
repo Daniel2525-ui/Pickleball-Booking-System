@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, MoreHorizontal, Users, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -66,17 +66,42 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                     </TableCell>
                     <TableCell className="text-right">
                       {!flagged && (
-                        <Button variant="ghost" size="sm" onClick={() => onPlayers(s)}>Players</Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                          render={
+                            <button
+                              type="button"
+                              aria-label="Actions"
+                              className="inline-flex items-center justify-center rounded-lg h-8 w-8 p-0 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                          }
+                        >
+                          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                        </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuItem onClick={() => onPlayers(s)} className="cursor-pointer text-xs font-semibold">
+                              <Users className="mr-2 h-4 w-4" />
+                              Players
+                            </DropdownMenuItem>
+                            {s.status === "open" && !hasEnded(s) && (
+                              <DropdownMenuItem
+                                onClick={() => onCancel(s)}
+                                disabled={s.awaiting}
+                                className="cursor-pointer text-destructive focus:text-destructive text-xs font-semibold"
+                              >
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Cancel this date
+                              </DropdownMenuItem>
+                            )}
+                            {s.status === "open" && !hasEnded(s) && s.awaiting && (
+                              <p className="px-2 py-1.5 text-[11px] text-amber-800 dark:text-amber-300">Approve or reject the GCash payments waiting for verification first.</p>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                       {/* The bookings page has no date filter, so this opens the full list */}
                       {flagged && (
                         <Link href="/admin/bookings" className="text-sm font-medium underline underline-offset-2">View booking</Link>
-                      )}
-                      {s.status === "open" && !hasEnded(s) && (
-                        <Button variant="ghost" size="sm" className="text-destructive" disabled={s.awaiting} aria-describedby={s.awaiting ? `await-${s.id}` : undefined} onClick={() => onCancel(s)}>Cancel this date</Button>
-                      )}
-                      {s.status === "open" && !hasEnded(s) && s.awaiting && (
-                        <p id={`await-${s.id}`} className="text-[11px] text-amber-800 dark:text-amber-300">Approve or reject the GCash payments waiting for verification first.</p>
                       )}
                     </TableCell>
                   </TableRow>

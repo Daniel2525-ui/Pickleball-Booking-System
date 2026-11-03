@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, AlertCircle } from "lucide-react";
+import { Loader2, Plus, AlertCircle, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,8 +78,29 @@ export function ScheduleTable({ schedules, courts, loading, onChanged }: Props) 
                     <TableCell>{s.capacity}</TableCell>
                     <TableCell>₱{Number(s.price_per_spot).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setEditing(s)}>Edit</Button>
-                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(s)}>Remove</Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                        render={
+                          <button
+                            type="button"
+                            aria-label="Actions"
+                            className="inline-flex items-center justify-center rounded-lg h-8 w-8 p-0 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        }
+                        >
+                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onClick={() => setEditing(s)} className="cursor-pointer text-xs font-semibold">
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => remove(s)} className="cursor-pointer text-destructive focus:text-destructive text-xs font-semibold">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
