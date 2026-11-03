@@ -46,7 +46,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { BookingCardSkeleton } from "@/components/skeletons/booking-card-skeleton";
-import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
+import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
 
 const formatBookingDate = (date: string) => {
   const d = date.includes("T") ? new Date(date) : new Date(`${date}T12:00:00+08:00`);
@@ -284,6 +284,7 @@ export const BookingHistoryContainer = () => {
                       >
                         {bookingTitle(booking)}
                       </Badge>
+                      <span className="font-mono text-xs text-muted-foreground">Ref {bookingRef(booking.id)}</span>
 
                       {booking.status === "confirmed" || booking.status === "paid" ? (
                         <Badge

@@ -16,6 +16,7 @@ import { todaysSchedule } from "@/lib/services/dashboard/schedToday.service";
 import { useState, useEffect } from "react";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { calculateDuration } from "@/lib/helpers/totalDuration";
+import { bookingRef } from "@/lib/services/openPlay/bookingTitle";
 
 const statusStyles: Record<string, string> = {
   confirmed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
@@ -152,6 +153,9 @@ export default function TodaysSchedule({
 
                     <td className="py-3 pr-4 font-medium text-foreground text-xs sm:text-sm">
                       {booking.open_play_session_id ? "Open play" : booking.customer_name || booking.customers?.full_name || booking.profiles?.full_name || "Guest Player"}
+                      {!booking.open_play_session_id && (
+                        <span className="block font-mono text-[11px] font-normal text-muted-foreground">Ref {bookingRef(booking.id)}</span>
+                      )}
                     </td>
 
                     <td className="py-3 pr-4 text-xs sm:text-sm text-muted-foreground whitespace-nowrap">

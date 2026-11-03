@@ -69,7 +69,7 @@ export default function BookingFilters({ initialStatus = "All Statuses", onFilte
               setSearch(value);
               updateFilters(value, status, courtId, dateTime);
             }}
-            placeholder="Search by player name..."
+            placeholder="Name, mobile or ref..."
             className="w-full pl-9 bg-background h-9 text-xs sm:text-sm"
           />
         </div>

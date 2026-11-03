@@ -46,7 +46,7 @@ import { SettlePaymentModal } from "./settlePaymentModal";
 import { VerifyGcashModal } from "./verifyGcashModal";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
-import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
+import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
 const statusStyles: Record<string, string> = {
@@ -347,7 +347,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                             {booking.customer_name || booking.profiles?.full_name || "Guest Player"}
                           </span>
                           <span className="text-[11px] text-muted-foreground">
-                            {booking.customer_id ? "Walk-In Guest" : "Registered Member"}
+                            {booking.customer_id ? "Walk-In Guest" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(booking.id)}</span>
                           </span>
                         </div>
                       </TableCell>

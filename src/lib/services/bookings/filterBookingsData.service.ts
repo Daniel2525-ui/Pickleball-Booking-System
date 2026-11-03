@@ -64,7 +64,27 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
         }
 
         if (search) {
-            query = query.ilike("customer_name", `%${search}%`);
+            const term = search.replace(/[(),%]/g, " ").trim(); // characters that break the or() filter syntax
+            const ors = [`customer_name.ilike.%${term}%`];
+            // Booking ref (bookingRef): uuid columns can't ilike, so match the id prefix as a range
+            if (/^[0-9a-f]{6}$/i.test(term)) {
+                const p = term.toLowerCase();
+                ors.push(`and(id.gte.${p}00-0000-0000-0000-000000000000,id.lte.${p}ff-ffff-ffff-ffff-ffffffffffff)`);
+            }
+            // Mobile number: phones live on profiles (online) and customers (walk-ins), stored as 09xxxxxxxxx.
+            // Matched as an ending (full number or last digits), so a network prefix like 0917 can't flood the id list.
+            const digits = term.replace(/\D/g, "").replace(/^63(?=\d{10}$)/, "0"); // +63 917... → 0917...
+            if (digits.length >= 4 && digits.length <= 11 && /^[\d\s+-]+$/.test(term)) {
+                const [profiles, customers] = await Promise.all([
+                    supabase.from("profiles").select("id").ilike("phone", `%${digits}`).limit(100),
+                    supabase.from("customers").select("id").ilike("phone", `%${digits}`).limit(100),
+                ]);
+                if (profiles.error) throw profiles.error;
+                if (customers.error) throw customers.error;
+                if (profiles.data.length) ors.push(`user_id.in.(${profiles.data.map((r) => r.id).join(",")})`);
+                if (customers.data.length) ors.push(`customer_id.in.(${customers.data.map((r) => r.id).join(",")})`);
+            }
+            query = query.or(ors.join(","));
         }
 
         if (dateTime) {
