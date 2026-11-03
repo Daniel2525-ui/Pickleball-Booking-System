@@ -3,6 +3,8 @@ import { getServiceClient } from "@/lib/supabase/service";
 import { cleanupExpiredBooking } from "@/lib/services/payments/cleanupExpiredBooking";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
+import { autoCloseStatus, buildStatusUpdate } from "@/lib/services/bookings/adminStatusRules";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 /**
  * Cleanup cron job for expired reservation holds.
@@ -137,6 +139,32 @@ export async function GET(request: Request) {
       .lt("window_start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     if (limiterCleanupError) console.error("Rate limiter cleanup failed:", limiterCleanupError);
 
+    // Close court bookings whose slot has ended: checked in -> completed, never checked in -> no-show.
+    // Open play rows are skipped: their players are not checked in one by one.
+    let autoClosed = 0;
+    const { data: openGames, error: openGamesError } = await supabase
+      .from("bookings")
+      .select("id, status, booking_date, start_time, end_time")
+      .in("status", ["confirmed", "checked_in", "in_progress"])
+      .is("open_play_session_id", null)
+      // Yesterday and today only: older untouched bookings predate this rule and may well have been played
+      .gte("booking_date", formatManilaDate(new Date(Date.now() - 24 * 60 * 60_000)))
+      .lte("booking_date", formatManilaDate())
+      .limit(500); // shortcut: 500 per 15-minute run, raise if a venue ever has more open bookings across two days
+    if (openGamesError) console.error("Auto-close fetch failed:", openGamesError);
+    for (const target of ["completed", "no_show"] as const) {
+      const rows = (openGames ?? []).filter((b) => autoCloseStatus(b) === target);
+      if (rows.length === 0) continue;
+      const { data: closed, error: closeError } = await supabase
+        .from("bookings")
+        .update(buildStatusUpdate(target))
+        .in("id", rows.map((b) => b.id))
+        .in("status", [...new Set(rows.map((b) => b.status))]) // staff may have changed it since the fetch
+        .select("id");
+      if (closeError) console.error(`Auto-close to ${target} failed:`, closeError);
+      autoClosed += closed?.length ?? 0;
+    }
+
     // Keep the open-play calendar filled ahead; a failure must not fail the run
     const { error: generateError } = await supabase.rpc("generate_open_play_sessions");
     if (generateError) console.error("Open play session generation failed:", generateError);
@@ -148,6 +176,7 @@ export async function GET(request: Request) {
       reconciledCount,
       totalProcessed,
       refunds: refundResult,
+      autoClosed,
     });
   } catch (error: unknown) {
     console.error("Cron job error:", error);

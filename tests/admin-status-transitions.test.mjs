@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason } from "../src/lib/services/bookings/adminStatusRules.ts";
+import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason, autoCloseStatus } from "../src/lib/services/bookings/adminStatusRules.ts";
 
 test("admin status transitions: game-day statuses respect the booking's date in venue time", () => {
     const booking = { booking_date: "2026-10-25" };
@@ -19,8 +19,13 @@ test("admin status transitions: game-day statuses respect the booking's date in 
 });
 
 test("admin status transitions: validates allowed and disallowed state machine paths", () => {
-    for (const next of ["checked_in", "completed", "no_show", "cancelled"]) assert.equal(canTransition("confirmed", next), true);
-    for (const next of ["in_progress", "completed", "cancelled"]) assert.equal(canTransition("checked_in", next), true);
+    for (const next of ["checked_in", "no_show", "cancelled"]) assert.equal(canTransition("confirmed", next), true);
+    assert.equal(canTransition("checked_in", "cancelled"), true);
+    assert.equal(canTransition("no_show", "completed"), true); // Mark as Played
+    // Start and complete are automatic now: staff only check in
+    for (const [from, to] of [["confirmed", "completed"], ["checked_in", "in_progress"], ["checked_in", "completed"]]) {
+        assert.equal(canTransition(from, to), false, `${from} -> ${to}`);
+    }
     for (const next of ["completed", "cancelled"]) assert.equal(canTransition("in_progress", next), true);
     assert.equal(canTransition("pending", "cancelled"), true);
 
@@ -55,4 +60,21 @@ test("admin status transitions: cancelling a hold that already timed out records
     assert.equal(buildStatusUpdate("cancelled", hold("2026-10-25T08:14:59.000Z"), now).cancel_reason, "expired");
     assert.equal(buildStatusUpdate("cancelled", hold("2026-10-25T08:30:00.000Z"), now).cancel_reason, "admin");
     assert.equal(buildStatusUpdate("cancelled", { status: "confirmed", created_at: "2026-10-24T00:00:00Z", hold_expires_at: null }, now).cancel_reason, "admin");
+});
+
+test("autoCloseStatus: closes court bookings once the slot ends, checked in or not", () => {
+    const slot = { booking_date: "2026-10-25", start_time: "08:00:00", end_time: "10:00:00" };
+    const at = (iso) => new Date(iso);
+    assert.equal(autoCloseStatus({ ...slot, status: "checked_in" }, at("2026-10-25T09:59:00+08:00")), null);
+    assert.equal(autoCloseStatus({ ...slot, status: "checked_in" }, at("2026-10-25T10:00:00+08:00")), "completed");
+    assert.equal(autoCloseStatus({ ...slot, status: "in_progress" }, at("2026-10-25T10:00:00+08:00")), "completed");
+    assert.equal(autoCloseStatus({ ...slot, status: "confirmed" }, at("2026-10-25T09:59:00+08:00")), null);
+    assert.equal(autoCloseStatus({ ...slot, status: "confirmed" }, at("2026-10-25T10:00:00+08:00")), "no_show");
+    for (const status of ["pending", "cancelled", "completed", "no_show"]) {
+        assert.equal(autoCloseStatus({ ...slot, status }, at("2026-10-26T10:00:00+08:00")), null, status);
+    }
+    // A slot ending at midnight ends on the next day, not at the start of its own day
+    const late = { booking_date: "2026-10-25", start_time: "23:00:00", end_time: "00:00:00", status: "confirmed" };
+    assert.equal(autoCloseStatus(late, at("2026-10-25T23:30:00+08:00")), null);
+    assert.equal(autoCloseStatus(late, at("2026-10-26T00:00:00+08:00")), "no_show");
 });

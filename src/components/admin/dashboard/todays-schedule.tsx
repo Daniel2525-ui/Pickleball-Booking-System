@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { calculateDuration } from "@/lib/helpers/totalDuration";
 import { bookingRef } from "@/lib/services/openPlay/bookingTitle";
+import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 
 const statusStyles: Record<string, string> = {
   confirmed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
@@ -43,6 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 interface ScheduleItem {
   id: string;
+  booking_date: string;
   start_time: string;
   end_time: string;
   status: string;
@@ -165,9 +167,9 @@ export default function TodaysSchedule({
                     <td className="py-3 pr-2 whitespace-nowrap">
                       <Badge
                         variant="outline"
-                        className={`text-xs capitalize font-semibold ${getStatusColor(booking.status)}`}
+                        className={`text-xs capitalize font-semibold ${getStatusColor(getBookingDisplayStatus(booking))}`}
                       >
-                        {STATUS_LABELS[booking.status] ?? booking.status}
+                        {STATUS_LABELS[getBookingDisplayStatus(booking)] ?? booking.status}
                       </Badge>
                     </td>
                   </tr>

@@ -96,7 +96,6 @@ export default function BookingFilters({ initialStatus = "All Statuses", onFilte
               Awaiting Verification{awaiting > 0 ? ` (${awaiting})` : ""}
             </SelectItem>
             <SelectItem value="Checked In">Checked In</SelectItem>
-            <SelectItem value="In Progress">In Progress</SelectItem>
             <SelectItem value="Completed">Completed</SelectItem>
             <SelectItem value="No-Show">No-Show</SelectItem>
             <SelectItem value="Cancelled">Cancelled</SelectItem>

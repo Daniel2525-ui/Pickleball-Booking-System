@@ -1,6 +1,9 @@
+import { getBookingStart, getBookingEnd } from "../../utils/bookingTime.ts";
+
 interface HoldFields {
     status: string;
-    created_at: string;
+    /** Only read for pending holds */
+    created_at?: string;
     hold_expires_at?: string | null;
     cancel_reason?: string | null;
 }
@@ -17,7 +20,7 @@ export const isHoldExpired = (booking: HoldFields, now: Date = new Date()) => {
     if (booking.status !== "pending") return false;
     const expiry = booking.hold_expires_at
         ? new Date(booking.hold_expires_at).getTime()
-        : new Date(booking.created_at).getTime() + HOLD_FALLBACK_MS;
+        : new Date(booking.created_at ?? NaN).getTime() + HOLD_FALLBACK_MS;
     return !Number.isNaN(expiry) && expiry <= now.getTime();
 };
 
@@ -55,9 +58,17 @@ export const cancellationNote = (booking: {
  * Status shown to staff and customers: "expired" for holds cleanup cancelled, "hold_expired" for pending holds whose
  * timer ran out but are not cleaned up yet; otherwise the stored status.
  */
-export const getBookingDisplayStatus = (booking: HoldFields, now: Date = new Date()) => {
+export const getBookingDisplayStatus = (
+    booking: HoldFields & { booking_date?: string; start_time?: string; end_time?: string },
+    now: Date = new Date()
+) => {
     if (booking.status === "cancelled" && booking.cancel_reason === "expired") return "expired";
     if (isAwaitingVerification(booking)) return "awaiting_verification";
     if (isHoldExpired(booking, now)) return "hold_expired";
+    // A checked-in booking is in progress while its slot runs; nobody presses "start"
+    if (booking.status === "checked_in" && booking.booking_date && booking.start_time && booking.end_time) {
+        const slot = { booking_date: booking.booking_date, start_time: booking.start_time, end_time: booking.end_time };
+        if (getBookingStart(slot) <= now && now < getBookingEnd(slot)) return "in_progress";
+    }
     return booking.status;
 };

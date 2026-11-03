@@ -2,7 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { fetchCourtsData, ActiveBookingSnippet } from "../courts/courtsData.service";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
 
-const ACTIVE_STATUSES = ["confirmed", "completed", "checked_in", "in_progress"];
+// no_show is a sold booking (prepaid money is kept), so it counts toward bookings and paid revenue
+const ACTIVE_STATUSES = ["confirmed", "completed", "checked_in", "in_progress", "no_show"];
 
 export interface DashboardCardStatsData {
     todayBookingsCount: number;

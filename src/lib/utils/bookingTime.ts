@@ -24,6 +24,13 @@ export const getBookingStart = (
     return new Date(`${booking.booking_date}T${time}${VENUE_UTC_OFFSET}`);
 };
 
+/** The booking's end instant in venue time; an end at or before the start (e.g. 00:00) is the next day. */
+export const getBookingEnd = (booking: { booking_date: string; start_time: string; end_time: string }): Date => {
+    const start = getBookingStart(booking);
+    const end = getBookingStart({ booking_date: booking.booking_date, start_time: booking.end_time });
+    return end > start ? end : new Date(end.getTime() + 24 * 60 * 60_000);
+};
+
 const manilaDateFormatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: VENUE_TIMEZONE,
 });

@@ -1,13 +1,29 @@
 // Relative import so node:test can load this module without the @/ alias
-import { getBookingStart, formatManilaDate } from "../../utils/bookingTime.ts";
+import { getBookingStart, getBookingEnd, formatManilaDate } from "../../utils/bookingTime.ts";
 import { cancelReasonFor } from "./bookingDisplayStatus.ts";
 
-/** Valid transitions staff may trigger from /api/admin/bookings/status. */
+/**
+ * Valid transitions staff may trigger from /api/admin/bookings/status.
+ * Staff only check in; "in progress" is shown from the clock and the cron closes bookings at their end (autoCloseStatus).
+ * in_progress stays as a source for rows written before that change.
+ */
 export const ALLOWED_TRANSITIONS: Record<string, string[]> = {
     pending: ["cancelled"],
-    confirmed: ["checked_in", "no_show", "completed", "cancelled"],
-    checked_in: ["in_progress", "completed", "cancelled"],
+    confirmed: ["checked_in", "no_show", "cancelled"],
+    checked_in: ["cancelled"],
     in_progress: ["completed", "cancelled"],
+    no_show: ["completed"], // "Mark as Played": staff forgot to check the group in
+};
+
+/** Status the cron moves a court booking to once its slot has ended, or null to leave it alone. */
+export const autoCloseStatus = (
+    booking: { status: string; booking_date: string; start_time: string; end_time: string },
+    now: Date = new Date()
+) => {
+    if (getBookingEnd(booking) > now) return null;
+    if (booking.status === "checked_in" || booking.status === "in_progress") return "completed";
+    if (booking.status === "confirmed") return "no_show";
+    return null;
 };
 
 export const NO_SHOW_GRACE_MINUTES = 15;

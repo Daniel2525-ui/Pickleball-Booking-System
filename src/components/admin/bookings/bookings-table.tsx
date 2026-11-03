@@ -31,8 +31,6 @@ import {
   Clock,
   CircleDollarSign,
   UserCheck,
-  Play,
-  Trophy,
   AlertTriangle,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -190,7 +188,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
       const label: Record<GameDayStatus, string> = {
         checked_in: "Player checked in.",
         in_progress: "Match started.",
-        completed: "Match completed.",
+        completed: "Booking marked as played.",
         no_show: "Booking marked as no-show. Court slot released.",
         cancelled: "Booking cancelled. Court slot released.",
       };
@@ -444,15 +442,6 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                     Check In Player
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
-                                    onClick={() => handleStatusChange(booking, "completed")}
-                                    disabled={actionLoadingId === booking.id || !!gameDayBlockReason("completed", booking)}
-                                    title={gameDayBlockReason("completed", booking) ?? undefined}
-                                    className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
-                                  >
-                                    <Trophy className="mr-2 h-4 w-4" />
-                                    Complete Match
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
                                     onClick={() => handleStatusChange(booking, "no_show")}
                                     disabled={actionLoadingId === booking.id}
                                     className="cursor-pointer text-orange-600 focus:text-orange-600 text-xs font-semibold"
@@ -463,27 +452,16 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                 </>
                               )}
 
-                              {booking.status?.toLowerCase() === "checked_in" && (
-                                <DropdownMenuItem
-                                  onClick={() => handleStatusChange(booking, "in_progress")}
-                                  disabled={actionLoadingId === booking.id || !!gameDayBlockReason("in_progress", booking)}
-                                  title={gameDayBlockReason("in_progress", booking) ?? undefined}
-                                  className="cursor-pointer text-violet-600 focus:text-violet-600 text-xs font-semibold"
-                                >
-                                  {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-                                  Start Match
-                                </DropdownMenuItem>
-                              )}
-
-                              {booking.status?.toLowerCase() === "in_progress" && (
+                              {/* Contingency: staff forgot to check in a group that played */}
+                              {booking.status?.toLowerCase() === "no_show" && (
                                 <DropdownMenuItem
                                   onClick={() => handleStatusChange(booking, "completed")}
                                   disabled={actionLoadingId === booking.id || !!gameDayBlockReason("completed", booking)}
                                   title={gameDayBlockReason("completed", booking) ?? undefined}
                                   className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
                                 >
-                                  {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trophy className="mr-2 h-4 w-4" />}
-                                  Complete Match
+                                  {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                                  Mark as Played
                                 </DropdownMenuItem>
                               )}
 

@@ -67,3 +67,11 @@ test("cancellationNote: a card refund that failed or stalled at Stripe says so",
     // Once Stripe confirms, the payment is refunded whatever the old request said
     assert.equal(cancellationNote({ status: "cancelled", cancel_reason: "customer", payments: [{ status: "refunded", payment_method: "stripe" }], refund_status: "failed" }).text, "Refunded");
 });
+
+test("checked in: shown as in progress only while the slot runs", () => {
+    const b = { status: "checked_in", booking_date: "2026-10-25", start_time: "08:00:00", end_time: "09:00:00" };
+    assert.equal(getBookingDisplayStatus(b, new Date("2026-10-25T07:50:00+08:00")), "checked_in"); // arrived early
+    assert.equal(getBookingDisplayStatus(b, new Date("2026-10-25T08:00:00+08:00")), "in_progress");
+    assert.equal(getBookingDisplayStatus(b, new Date("2026-10-25T09:00:00+08:00")), "checked_in"); // until the cron completes it
+    assert.equal(getBookingDisplayStatus({ ...b, status: "confirmed" }, new Date("2026-10-25T08:30:00+08:00")), "confirmed");
+});

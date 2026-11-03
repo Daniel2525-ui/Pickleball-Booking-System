@@ -25,7 +25,7 @@ export const fetchBookingOverview = async () => {
             .select("booking_date")
             .gte("booking_date", mondayStr)
             .lte("booking_date", sundayStr)
-            .in("status", ["confirmed", "completed", "checked_in", "in_progress"])
+            .in("status", ["confirmed", "completed", "checked_in", "in_progress", "no_show"])
             .or("open_play_session_id.is.null,open_play_spots.not.is.null");
 
         if (error) throw error;
