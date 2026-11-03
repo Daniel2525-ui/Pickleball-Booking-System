@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
-import { canTransition, noShowMinutesLeft, buildStatusUpdate } from "@/lib/services/bookings/adminStatusRules";
+import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason } from "@/lib/services/bookings/adminStatusRules";
 import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { cancelRestOfBasket, closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 
@@ -48,6 +48,11 @@ export async function POST(request: NextRequest) {
                 { error: `Cannot transition from "${currentStatus}" to "${newStatus}".` },
                 { status: 409 }
             );
+        }
+
+        const blocked = gameDayBlockReason(newStatus, booking);
+        if (blocked) {
+            return Response.json({ error: `This booking is for ${booking.booking_date}. ${blocked}` }, { status: 409 });
         }
 
         // 5. No-show grace period guard

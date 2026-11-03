@@ -1,5 +1,5 @@
 // Relative import so node:test can load this module without the @/ alias
-import { getBookingStart } from "../../utils/bookingTime.ts";
+import { getBookingStart, formatManilaDate } from "../../utils/bookingTime.ts";
 import { cancelReasonFor } from "./bookingDisplayStatus.ts";
 
 /** Valid transitions staff may trigger from /api/admin/bookings/status. */
@@ -14,6 +14,19 @@ export const NO_SHOW_GRACE_MINUTES = 15;
 
 export const canTransition = (currentStatus: string, newStatus: string) =>
     (ALLOWED_TRANSITIONS[currentStatus.toLowerCase()] ?? []).includes(newStatus.toLowerCase());
+
+/**
+ * Why a game-day status can't be set yet (venue time), or null when it can.
+ * Check-in and start only on the booking's day; completed also allowed later, to close a missed booking.
+ */
+export const gameDayBlockReason = (newStatus: string, booking: { booking_date: string }, now: Date = new Date()) => {
+    const today = formatManilaDate(now); // YYYY-MM-DD, so string comparison orders dates
+    if ((newStatus === "checked_in" || newStatus === "in_progress") && booking.booking_date !== today)
+        return "Players can only be checked in or started on the day of their booking.";
+    if (newStatus === "completed" && booking.booking_date > today)
+        return "A booking can't be completed before its date.";
+    return null;
+};
 
 /** Minutes left before a no-show may be recorded (0 once the grace period after start has passed). */
 export const noShowMinutesLeft = (booking: { booking_date: string; start_time: string }, now: Date = new Date()) => {

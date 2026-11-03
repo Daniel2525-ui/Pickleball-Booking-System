@@ -47,6 +47,7 @@ import { VerifyGcashModal } from "./verifyGcashModal";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
+import { gameDayBlockReason } from "@/lib/services/bookings/adminStatusRules";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
 const statusStyles: Record<string, string> = {
@@ -435,7 +436,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleStatusChange(booking, "checked_in")}
-                                    disabled={actionLoadingId === booking.id}
+                                    disabled={actionLoadingId === booking.id || !!gameDayBlockReason("checked_in", booking)}
+                                    title={gameDayBlockReason("checked_in", booking) ?? undefined}
                                     className="cursor-pointer text-blue-600 focus:text-blue-600 text-xs font-semibold"
                                   >
                                     {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCheck className="mr-2 h-4 w-4" />}
@@ -443,7 +445,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => handleStatusChange(booking, "completed")}
-                                    disabled={actionLoadingId === booking.id}
+                                    disabled={actionLoadingId === booking.id || !!gameDayBlockReason("completed", booking)}
+                                    title={gameDayBlockReason("completed", booking) ?? undefined}
                                     className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
                                   >
                                     <Trophy className="mr-2 h-4 w-4" />
@@ -463,7 +466,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                               {booking.status?.toLowerCase() === "checked_in" && (
                                 <DropdownMenuItem
                                   onClick={() => handleStatusChange(booking, "in_progress")}
-                                  disabled={actionLoadingId === booking.id}
+                                  disabled={actionLoadingId === booking.id || !!gameDayBlockReason("in_progress", booking)}
+                                  title={gameDayBlockReason("in_progress", booking) ?? undefined}
                                   className="cursor-pointer text-violet-600 focus:text-violet-600 text-xs font-semibold"
                                 >
                                   {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
@@ -474,7 +478,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                               {booking.status?.toLowerCase() === "in_progress" && (
                                 <DropdownMenuItem
                                   onClick={() => handleStatusChange(booking, "completed")}
-                                  disabled={actionLoadingId === booking.id}
+                                  disabled={actionLoadingId === booking.id || !!gameDayBlockReason("completed", booking)}
+                                  title={gameDayBlockReason("completed", booking) ?? undefined}
                                   className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
                                 >
                                   {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trophy className="mr-2 h-4 w-4" />}

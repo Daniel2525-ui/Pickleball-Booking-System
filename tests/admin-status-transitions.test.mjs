@@ -1,6 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canTransition, noShowMinutesLeft, buildStatusUpdate } from "../src/lib/services/bookings/adminStatusRules.ts";
+import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason } from "../src/lib/services/bookings/adminStatusRules.ts";
+
+test("admin status transitions: game-day statuses respect the booking's date in venue time", () => {
+    const booking = { booking_date: "2026-10-25" };
+    const ok = (status, at) => gameDayBlockReason(status, booking, new Date(at)) === null;
+    for (const s of ["checked_in", "in_progress"]) {
+        assert.equal(ok(s, "2026-10-25T00:00:00+08:00"), true, s);
+        assert.equal(ok(s, "2026-10-25T23:59:00+08:00"), true, s);
+        assert.equal(ok(s, "2026-10-24T16:30:00Z"), true, s); // 00:30 on the 25th in Manila
+        assert.equal(ok(s, "2026-10-24T23:59:00+08:00"), false, s);
+        assert.equal(ok(s, "2026-10-26T00:00:00+08:00"), false, s);
+    }
+    assert.equal(ok("completed", "2026-10-24T23:59:00+08:00"), false); // future booking
+    assert.equal(ok("completed", "2026-10-25T10:00:00+08:00"), true);
+    assert.equal(ok("completed", "2026-10-27T10:00:00+08:00"), true); // closing a missed booking later
+    assert.equal(ok("cancelled", "2026-10-01T10:00:00+08:00"), true);
+});
 
 test("admin status transitions: validates allowed and disallowed state machine paths", () => {
     for (const next of ["checked_in", "completed", "no_show", "cancelled"]) assert.equal(canTransition("confirmed", next), true);
