@@ -69,7 +69,7 @@ export default function BookingFilters({ initialStatus = "All Statuses", onFilte
               setSearch(value);
               updateFilters(value, status, courtId, dateTime);
             }}
-            placeholder="Name, mobile or ref..."
+            placeholder="Name or reference number"
             className="w-full pl-9 bg-background h-9 text-xs sm:text-sm"
           />
         </div>
