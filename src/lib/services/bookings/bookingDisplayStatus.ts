@@ -59,12 +59,22 @@ export const cancellationNote = (booking: {
  * timer ran out but are not cleaned up yet; otherwise the stored status.
  */
 export const getBookingDisplayStatus = (
-    booking: HoldFields & { booking_date?: string; start_time?: string; end_time?: string },
+    booking: HoldFields & {
+        booking_date?: string; start_time?: string; end_time?: string;
+        court_id?: string | null; open_play_session_id?: string | null; open_play_spots?: number | null;
+    },
     now: Date = new Date()
 ) => {
     if (booking.status === "cancelled" && booking.cancel_reason === "expired") return "expired";
     if (isAwaitingVerification(booking)) return "awaiting_verification";
     if (isHoldExpired(booking, now)) return "hold_expired";
+    // An open play court block is never checked in (players are) and the cron skips it, so it follows the clock
+    if (booking.status === "confirmed" && booking.open_play_session_id && booking.court_id && !booking.open_play_spots
+        && booking.booking_date && booking.start_time && booking.end_time) {
+        const slot = { booking_date: booking.booking_date, start_time: booking.start_time, end_time: booking.end_time };
+        if (getBookingEnd(slot) <= now) return "completed";
+        if (getBookingStart(slot) <= now) return "in_progress";
+    }
     // A checked-in booking is in progress while its slot runs; nobody presses "start"
     if (booking.status === "checked_in" && booking.booking_date && booking.start_time && booking.end_time) {
         const slot = { booking_date: booking.booking_date, start_time: booking.start_time, end_time: booking.end_time };
