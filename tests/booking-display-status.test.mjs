@@ -75,3 +75,14 @@ test("checked in: shown as in progress only while the slot runs", () => {
     assert.equal(getBookingDisplayStatus(b, new Date("2026-10-25T09:00:00+08:00")), "checked_in"); // until the cron completes it
     assert.equal(getBookingDisplayStatus({ ...b, status: "confirmed" }, new Date("2026-10-25T08:30:00+08:00")), "confirmed");
 });
+
+test("open play court block follows the clock; spot rows and cancelled blocks do not", () => {
+    const block = { status: "confirmed", court_id: "c1", open_play_session_id: "s1", open_play_spots: null, booking_date: "2026-10-25", start_time: "08:00:00", end_time: "10:00:00" };
+    const at = (t) => new Date(`2026-10-25T${t}+08:00`);
+    assert.equal(getBookingDisplayStatus(block, at("07:59:59")), "confirmed");
+    assert.equal(getBookingDisplayStatus(block, at("08:00:00")), "in_progress");
+    assert.equal(getBookingDisplayStatus(block, at("10:00:00")), "completed");
+    // A player's spot row has no court and must stay as stored (check-in / no-show are real for players)
+    assert.equal(getBookingDisplayStatus({ ...block, court_id: null, open_play_spots: 2 }, at("10:00:00")), "confirmed");
+    assert.equal(getBookingDisplayStatus({ ...block, status: "cancelled" }, at("09:00:00")), "cancelled");
+});
