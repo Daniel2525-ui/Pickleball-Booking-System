@@ -133,15 +133,16 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
           </div>
         )}
       </CardHeader>
-      <CardContent>
+      {/* Edge-to-edge table: its cell padding lines the text up with the card title */}
+      <CardContent className="px-0">
         {session.closedReason != null && session.status === "open" && (
-          <p role="alert" className="mb-3 text-xs text-amber-800 dark:text-amber-300">
+          <p role="alert" className="mb-3 px-(--card-spacing) text-xs text-amber-800 dark:text-amber-300">
             The venue is closed on this date{session.closedReason ? ` (${session.closedReason})` : ""}. Players can no longer book it.
             {(rows ?? []).some((r) => r.status === "confirmed") ? " Cancel the session to refund the players already booked, or reopen the date." : ""}
           </p>
         )}
         {awaiting && !hasEnded(session) && (
-          <p role="alert" className="mb-3 text-xs text-amber-800 dark:text-amber-300">
+          <p role="alert" className="mb-3 px-(--card-spacing) text-xs text-amber-800 dark:text-amber-300">
             Approve or reject the GCash payments waiting for verification first (Bookings, filter &quot;Awaiting verification&quot;), then reopen this list to cancel the session.
           </p>
         )}

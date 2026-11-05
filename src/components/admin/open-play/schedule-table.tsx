@@ -50,15 +50,16 @@ export function ScheduleTable({ schedules, courts, loading, onChanged }: Props) 
           Add weekly session
         </Button>
       </CardHeader>
-      <CardContent>
+      {/* Edge-to-edge table: its cell padding lines the text up with the card title */}
+      <CardContent className="px-0">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Day</TableHead>
               <TableHead>Time</TableHead>
               <TableHead>Courts</TableHead>
-              <TableHead>Spots</TableHead>
-              <TableHead>Price</TableHead>
+              <TableHead className="text-right">Spots</TableHead>
+              <TableHead className="text-right">Price</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -75,8 +76,8 @@ export function ScheduleTable({ schedules, courts, loading, onChanged }: Props) 
                     <TableCell className="font-semibold">Every {s.day_of_week}</TableCell>
                     <TableCell>{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</TableCell>
                     <TableCell>{s.court_ids.map(courtName).join(", ")}</TableCell>
-                    <TableCell>{s.capacity}</TableCell>
-                    <TableCell>₱{Number(s.price_per_spot).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{s.capacity}</TableCell>
+                    <TableCell className="text-right">₱{Number(s.price_per_spot).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger
@@ -107,7 +108,7 @@ export function ScheduleTable({ schedules, courts, loading, onChanged }: Props) 
             )}
           </TableBody>
         </Table>
-        <p className="mt-3 text-xs text-muted-foreground">Changes apply to future sessions nobody has booked yet.</p>
+        <p className="mt-3 px-(--card-spacing) text-xs text-muted-foreground">Changes apply to future sessions nobody has booked yet.</p>
       </CardContent>
       {editing && (
         <ScheduleModal key={editing.id ?? "new"} initial={editing} courts={courts} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onChanged(); }} />

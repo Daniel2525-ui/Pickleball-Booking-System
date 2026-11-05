@@ -110,11 +110,11 @@ export default function TodaysSchedule({
           <table className="w-full text-sm min-w-[540px]">
             <thead className="sticky top-0 bg-card z-10 shadow-[0_1px_0_0_var(--color-border)]">
               <tr className="text-left text-xs text-muted-foreground">
-                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Time Slot</th>
-                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Court</th>
-                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Booked By</th>
-                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-[11px] bg-card">Duration</th>
-                <th className="py-2.5 pr-2 font-semibold uppercase tracking-wider text-[11px] bg-card">Status</th>
+                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-xs bg-card">Time Slot</th>
+                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-xs bg-card">Court</th>
+                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-xs bg-card">Booked By</th>
+                <th className="py-2.5 pr-4 font-semibold uppercase tracking-wider text-xs bg-card">Duration</th>
+                <th className="py-2.5 pr-2 font-semibold uppercase tracking-wider text-xs bg-card">Status</th>
               </tr>
             </thead>
 

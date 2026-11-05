@@ -24,14 +24,15 @@ export function PastSessionsTable({ sessions, loading, onPlayers }: { sessions: 
           Money held counts payments still in hand: kept payments, and refunds owed until they are refunded.
         </p>
       </CardHeader>
-      <CardContent>
+      {/* Edge-to-edge table: its cell padding lines the text up with the card title */}
+      <CardContent className="px-0">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Time</TableHead>
-              <TableHead>Booked</TableHead>
-              <TableHead>Played</TableHead>
+              <TableHead className="text-right">Booked</TableHead>
+              <TableHead className="text-right">Played</TableHead>
               <TableHead className="text-right">Money held</TableHead>
               <TableHead><span className="sr-only">Actions</span></TableHead>
             </TableRow>
@@ -46,9 +47,9 @@ export function PastSessionsTable({ sessions, loading, onPlayers }: { sessions: 
                 <TableRow key={s.id} className={s.status === "cancelled" ? "opacity-60" : ""}>
                   <TableCell className="font-semibold">{formatShortDate(s.session_date)}</TableCell>
                   <TableCell>{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</TableCell>
-                  <TableCell>{s.status === "cancelled" ? "Cancelled" : `${s.booked} / ${s.capacity}`}</TableCell>
-                  <TableCell>{s.status === "cancelled" ? "—" : s.played}</TableCell>
-                  <TableCell className="text-right tabular-nums">₱{s.collected.toLocaleString("en-PH")}</TableCell>
+                  <TableCell className="text-right">{s.status === "cancelled" ? "Cancelled" : `${s.booked} / ${s.capacity}`}</TableCell>
+                  <TableCell className="text-right">{s.status === "cancelled" ? "—" : s.played}</TableCell>
+                  <TableCell className="text-right">₱{s.collected.toLocaleString("en-PH")}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => onPlayers(s)} aria-label={`Players for ${formatShortDate(s.session_date)}`}>
                       <Users className="h-4 w-4" />

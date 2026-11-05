@@ -25,13 +25,14 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
       <CardHeader>
         <CardTitle className="text-base font-bold">Upcoming sessions</CardTitle>
       </CardHeader>
-      <CardContent>
+      {/* Edge-to-edge table: its cell padding lines the text up with the card title */}
+      <CardContent className="px-0">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Time</TableHead>
-              <TableHead>Booked</TableHead>
+              <TableHead className="text-right">Booked</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -49,7 +50,7 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                   <TableRow key={s.id} className={cancelled ? "opacity-60" : flagged ? "bg-amber-500/10" : s.id === selectedId ? "bg-primary/5" : ""}>
                     <TableCell className="font-semibold">{formatShortDate(s.session_date)}</TableCell>
                     <TableCell>{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</TableCell>
-                    <TableCell>{flagged ? "—" : `${s.booked} / ${s.capacity}`}</TableCell>
+                    <TableCell className="text-right">{flagged ? "—" : `${s.booked} / ${s.capacity}`}</TableCell>
                     <TableCell>
                       {flagged ? (
                         <span className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">

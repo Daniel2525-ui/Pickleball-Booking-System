@@ -57,7 +57,7 @@ export const CustomersTable = ({
               <TableHead className="bg-card">Last visit</TableHead>
               <TableHead className="text-right bg-card">No-shows</TableHead>
               <TableHead className="text-right bg-card">Spent</TableHead>
-              <TableHead className="text-right bg-card">Added</TableHead>
+              <TableHead className="bg-card">Added</TableHead>
               <TableHead className="bg-card"><span className="sr-only">Actions</span></TableHead>
             </TableRow>
           </TableHeader>
@@ -107,7 +107,7 @@ export const CustomersTable = ({
               </TableRow>
             ) : (
               customers.map((customer) => (
-                <TableRow key={customer.id} className="transition-colors hover:bg-muted/50">
+                <TableRow key={customer.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary select-none">
@@ -143,19 +143,19 @@ export const CustomersTable = ({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">{customer.bookings_count}</TableCell>
+                  <TableCell className="text-right font-semibold">{customer.bookings_count}</TableCell>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                     {formatDate(customer.last_visit)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right">
                     {customer.no_shows >= 2 ? (
                       <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-800 dark:text-amber-300">{customer.no_shows}</span>
                     ) : (
                       customer.no_shows
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums whitespace-nowrap">{peso(customer.total_spent)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground whitespace-nowrap text-sm font-medium">
+                  <TableCell className="text-right whitespace-nowrap">{peso(customer.total_spent)}</TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap text-sm font-medium">
                     {formatDate(customer.created_at)}
                   </TableCell>
                   <TableCell className="text-right">

@@ -224,7 +224,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                 <TableHead>Customer</TableHead>
                 <TableHead>Court & Slot</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Processed At</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -241,7 +241,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                       </div>
                     </TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                    <TableCell className="text-center"><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                     <TableCell />
                   </TableRow>
@@ -266,7 +266,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                 </TableRow>
               ) : (
                 filtered.map((payment) => (
-                  <TableRow key={payment.id} className="group transition-colors hover:bg-muted/40">
+                  <TableRow key={payment.id} className="group">
                     {/* Customer */}
                     <TableCell>
                       {(() => {
@@ -309,7 +309,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                     </TableCell>
 
                     {/* Status */}
-                    <TableCell className="text-center">
+                    <TableCell>
                       {getStatusBadge(payment.status)}
                     </TableCell>
 

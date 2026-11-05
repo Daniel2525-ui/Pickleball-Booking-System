@@ -301,12 +301,12 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
           <Table>
             <TableHeader className="sticky top-0 bg-card z-10 border-b border-border shadow-2xs">
               <TableRow>
-                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Player / Booker</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Court</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Match Schedule</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Total Fee</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Status & Payment</TableHead>
-                <TableHead className="text-right font-bold text-xs uppercase tracking-wider text-muted-foreground">Actions</TableHead>
+                <TableHead>Player / Booker</TableHead>
+                <TableHead>Court</TableHead>
+                <TableHead>Match Schedule</TableHead>
+                <TableHead className="text-right">Total Fee</TableHead>
+                <TableHead>Status & Payment</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-border/50">
@@ -321,7 +321,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                         <Skeleton className="h-3 w-32" />
                       </div>
                     </TableCell>
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
                     <TableCell className="text-right">
                       <Skeleton className="h-8 w-8 ml-auto rounded-md" />
@@ -354,7 +354,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                   const canCollect = !isSpot && payment?.status === "pending" && displayStatus !== "hold_expired" && booking.status !== "cancelled" && !awaiting;
 
                   return (
-                    <TableRow key={booking.id} className="group transition-colors hover:bg-muted/30">
+                    <TableRow key={booking.id} className="group">
                       {/* Player info */}
                       <TableCell>
                         <div className="flex flex-col">
@@ -398,7 +398,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                       </TableCell>
 
                       {/* Total Fee */}
-                      <TableCell className="font-black text-foreground text-sm">
+                      <TableCell className="text-right font-black text-foreground text-sm">
                         ₱{booking.total_amount ? booking.total_amount.toLocaleString() : "0"}
                       </TableCell>
 
