@@ -4,6 +4,7 @@ import { Crosshair, MapPin, Phone, Mail } from "lucide-react";
 import { BookingContainer } from "@/components/customers/booking-container";
 import { PublicHeader } from "@/components/customers/public-header";
 import { FAQSection } from "@/components/customers/faq-section";
+import { SpotlightGroup } from "@/components/ui/spotlight-group";
 import { getPublicClient } from "@/lib/supabase/public";
 import { summarizeVenueHours } from "@/lib/utils/venueHours";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
@@ -37,24 +38,29 @@ export default async function Home() {
       <PublicHeader />
 
       <main className="flex-1 flex flex-col">
-        <section id="booking" className="scroll-mt-20 w-full pt-8 md:pt-12 pb-10">
+        <section id="booking" className="relative isolate scroll-mt-20 w-full pt-8 md:pt-12 pb-10">
+          {/* Decorative: grid, slow spotlight and two light beams behind the hero (styles in globals.css) */}
+          <div aria-hidden className="hero-backdrop">
+            <div className="hero-spotlight" />
+            <div className="hero-beam" style={{ left: "22%" }} />
+            <div className="hero-beam" style={{ left: "64%", animationDelay: "2s" }} />
+          </div>
           <div className="container mx-auto px-4 max-w-6xl w-full">
             <BookingContainer />
           </div>
         </section>
 
         <section aria-label="The venue" className="w-full border-t py-12 md:py-16">
-          <div className="container mx-auto px-4 max-w-6xl grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-10 lg:items-center">
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-8">
-              {stats.map((s) => (
-                <div key={s.label}>
-                  <p className="font-display text-6xl font-black leading-none text-primary">{s.value}</p>
-                  <p className="mt-2 text-sm font-semibold text-muted-foreground max-w-[26ch]">{s.label}</p>
-                </div>
-              ))}
-            </div>
+          {/* Bento: each number in its own tile, the map in a tall tile beside them */}
+          <SpotlightGroup className="container mx-auto px-4 max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] gap-4">
+            {stats.map((s, i) => (
+              <div key={s.label} className={`spotlight-card rounded-2xl border bg-card p-5 ${i === 2 ? "sm:col-span-2 lg:col-start-1 lg:row-start-2" : ""}`}>
+                <p className="font-display text-6xl font-black leading-none text-primary">{s.value}</p>
+                <p className="mt-2 text-sm font-semibold text-muted-foreground max-w-[26ch]">{s.label}</p>
+              </div>
+            ))}
 
-            <div id="location" className="scroll-mt-24">
+            <div id="location" className="spotlight-card rounded-2xl border bg-card p-5 scroll-mt-24 sm:col-span-2 lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:row-span-2">
               {/* Keyless Google embed of the Settings address at city zoom.
                   shortcut: no exact pin until the venue has coordinates or a Google listing; switch the query then */}
               <iframe
@@ -79,7 +85,7 @@ export default async function Home() {
                 </a>
               </div>
             </div>
-          </div>
+          </SpotlightGroup>
         </section>
 
         <FAQSection />

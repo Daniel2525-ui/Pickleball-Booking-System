@@ -274,3 +274,69 @@
     transform-origin: center;
     animation: cd-hop 4.8s ease-in-out infinite;
 }
+
+/* Landing hero backdrop: a faint grid, a slow spotlight and two light beams, all in the theme's primary colour.
+   Decorative only (aria-hidden); the global reduced-motion rule stills them. */
+.hero-backdrop {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 640px;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+}
+.hero-backdrop::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(color-mix(in oklch, var(--primary) 7%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in oklch, var(--primary) 7%, transparent) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+}
+.hero-spotlight {
+    position: absolute;
+    top: -240px;
+    left: 0;
+    width: 720px;
+    height: 500px;
+    background: radial-gradient(ellipse at center, color-mix(in oklch, var(--primary) 14%, transparent), transparent 62%);
+    animation: hero-spot 8s ease-in-out infinite alternate;
+}
+@keyframes hero-spot {
+    to { transform: translateX(min(40vw, 420px)); }
+}
+.hero-beam {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    overflow: hidden;
+}
+.hero-beam::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 140px;
+    background: linear-gradient(transparent, color-mix(in oklch, var(--primary) 70%, transparent), transparent);
+    animation: hero-beam 5s linear infinite;
+}
+@keyframes hero-beam {
+    from { top: -140px; }
+    to { top: 100%; }
+}
+
+/* Card spotlight: a soft light follows the pointer (--spot-x/--spot-y set by the parent's pointermove) */
+.spotlight-card {
+    position: relative;
+}
+.spotlight-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(260px circle at var(--spot-x, -400px) var(--spot-y, -400px), color-mix(in oklch, var(--primary) 9%, transparent), transparent 60%);
+    pointer-events: none;
+}

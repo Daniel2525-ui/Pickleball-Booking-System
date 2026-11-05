@@ -66,7 +66,7 @@ export function FAQSection() {
             return (
               <div
                 key={idx}
-                className="rounded-xl border bg-card shadow-xs transition-colors overflow-hidden"
+                className={`rounded-xl border bg-card shadow-xs transition-colors overflow-hidden ${isOpen ? "border-primary/40 bg-linear-to-b from-primary/[0.06] to-card" : ""}`}
               >
                 <button
                   type="button"
