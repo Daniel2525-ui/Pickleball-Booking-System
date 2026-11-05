@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         // Right password, unconfirmed email: say so, and don't count it as a failed guess
         if (error?.code === "email_not_confirmed") {
             return NextResponse.json(
-                { error: "Please confirm your email first. Check your inbox (and spam) for the email from Crosshair Dinkers." },
+                { error: "Please confirm your email first. Check your inbox (and spam) for the email from Crosshair Dinkers.", code: "email_not_confirmed" },
                 { status: 403 }
             );
         }

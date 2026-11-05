@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/client"
 
 type LoginResult =
     | { success: true; role: string }
-    | { success: false; error: string }
+    | { success: false; error: string; unconfirmed?: boolean }
 
 export type RegisterResult =
     | { success: true }
@@ -47,7 +47,11 @@ export async function login(
     try {
         const { ok, data } = await postAuth("/api/auth/login", { email, password })
         if (!ok || !data?.role) {
-            return { success: false, error: data?.error || "Invalid email or password. Please try again." }
+            return {
+                success: false,
+                error: data?.error || "Invalid email or password. Please try again.",
+                unconfirmed: data?.code === "email_not_confirmed",
+            }
         }
         return { success: true, role: data.role }
     } catch {
@@ -55,6 +59,17 @@ export async function login(
             success: false,
             error: "Something went wrong. Please try again.",
         }
+    }
+}
+
+/* Sign-up confirmation email, sent again */
+
+export async function resendConfirmation(email: string): Promise<RegisterResult> {
+    try {
+        const { ok, data } = await postAuth("/api/auth/resend-confirmation", { email })
+        return ok ? { success: true } : { success: false, error: data?.error || "Unable to send the confirmation email. Please try again." }
+    } catch {
+        return { success: false, error: "Unable to send the confirmation email. Please try again." }
     }
 }
 

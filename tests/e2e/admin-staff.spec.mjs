@@ -35,12 +35,12 @@ test("the owner gives an account front-desk access", async ({ page }) => {
 
   await page.getByLabel("Give staff access").fill("nobody-here@example.com");
   await page.getByRole("button", { name: "Give access" }).click();
-  await expect(page.getByText("No player account uses that email. Ask them to sign up on the booking site first.")).toBeVisible();
+  await expect(page.getByText("No player account uses that email. Ask them to sign up on the booking site and confirm their email first.")).toBeVisible();
 
   // "_" is not a wildcard: a look-alike email never matches someone else's account
   await page.getByLabel("Give staff access").fill(email.replace("-", "_"));
   await page.getByRole("button", { name: "Give access" }).click();
-  await expect(page.getByText("No player account uses that email. Ask them to sign up on the booking site first.")).toBeVisible();
+  await expect(page.getByText("No player account uses that email. Ask them to sign up on the booking site and confirm their email first.")).toBeVisible();
   expect(access("CUSTOMER2")).toBe("customer|false");
 
   await page.getByLabel("Give staff access").fill(email);

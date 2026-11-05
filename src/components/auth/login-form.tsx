@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { login } from "@/lib/services/auth.service";
+import { login, resendConfirmation } from "@/lib/services/auth.service";
 
 export function LoginForm() {
   const router = useRouter();
@@ -23,17 +23,23 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Right password but the sign-up email was never confirmed: offer to send it again
+  const [unconfirmed, setUnconfirmed] = useState(false);
+  const [resend, setResend] = useState<{ sending: boolean; message: string | null }>({ sending: false, message: null });
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
 
     setError(null);
+    setUnconfirmed(false);
+    setResend({ sending: false, message: null });
     setLoading(true);
 
     const result = await login(email.trim(), password);
 
     if (!result.success) {
       setError(result.error);
+      setUnconfirmed(!!result.unconfirmed);
       setLoading(false);
       return;
     }
@@ -73,6 +79,23 @@ export function LoginForm() {
               <div>
                 <p className="font-semibold">Sign In Failed</p>
                 <p className="text-xs opacity-90 mt-0.5">{error}</p>
+                {unconfirmed && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      disabled={resend.sending}
+                      onClick={async () => {
+                        setResend({ sending: true, message: null });
+                        const r = await resendConfirmation(email.trim());
+                        setResend({ sending: false, message: r.success ? `We sent a new confirmation email to ${email.trim()}.` : r.error });
+                      }}
+                      className="text-xs font-bold underline underline-offset-4 disabled:opacity-60"
+                    >
+                      {resend.sending ? "Sending..." : "Resend confirmation email"}
+                    </button>
+                    {resend.message && <p role="status" className="text-xs mt-1">{resend.message}</p>}
+                  </div>
+                )}
               </div>
             </div>
           )}

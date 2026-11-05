@@ -13,7 +13,7 @@ q() { docker exec -e PGOPTIONS='-c search_path=' "$db" psql -U postgres -At -c "
   echo "-- App schema snapshot, made by scripts/dump-schema.sh. Do not edit by hand."
   echo "-- Includes every migration up to and including: $latest"
   echo "-- Rebuild: load this into a new Supabase stack, then apply only migrations newer than that file."
-  echo "-- Not included: the pg_cron job (see *_supabase_cron_cleanup.sql; it needs Vault secrets set by hand)."
+  echo "-- Not included: the pg_cron jobs. Re-run the cron.schedule calls in *_supabase_cron_cleanup.sql (needs Vault secrets set by hand) and *_profile_on_confirm.sql."
   echo
   # The booking overlap constraints need btree_gist before the tables are created
   echo 'create schema if not exists public;'

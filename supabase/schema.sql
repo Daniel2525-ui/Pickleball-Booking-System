@@ -1,7 +1,7 @@
 -- App schema snapshot, made by scripts/dump-schema.sh. Do not edit by hand.
--- Includes every migration up to and including: 20261105082104_owner_and_front_desk.sql
+-- Includes every migration up to and including: 20261105131718_profile_on_confirm.sql
 -- Rebuild: load this into a new Supabase stack, then apply only migrations newer than that file.
--- Not included: the pg_cron job (see *_supabase_cron_cleanup.sql; it needs Vault secrets set by hand).
+-- Not included: the pg_cron jobs. Re-run the cron.schedule calls in *_supabase_cron_cleanup.sql (needs Vault secrets set by hand) and *_profile_on_confirm.sql.
 
 create schema if not exists public;
 create extension if not exists btree_gist with schema public;
@@ -885,6 +885,27 @@ BEGIN
   );
 
   RETURN jsonb_build_object('booking_id', v_booking_id, 'amount', p_amount);
+END;
+$$;
+
+
+--
+-- Name: delete_stale_unconfirmed_users(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.delete_stale_unconfirmed_users() RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  DELETE FROM auth.users u
+  WHERE u.email_confirmed_at IS NULL
+    AND u.created_at < now() - interval '7 days'
+    AND NOT EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = u.id);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
 END;
 $$;
 
@@ -4442,6 +4463,14 @@ GRANT ALL ON FUNCTION public.create_walk_in_booking(p_court_id uuid, p_customer_
 
 
 --
+-- Name: FUNCTION delete_stale_unconfirmed_users(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.delete_stale_unconfirmed_users() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.delete_stale_unconfirmed_users() TO service_role;
+
+
+--
 -- Name: FUNCTION generate_open_play_sessions(p_days integer); Type: ACL; Schema: public; Owner: -
 --
 
@@ -4983,7 +5012,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES 
 
 
 -- Outside the public schema: new-user trigger, storage buckets and their access rules
-CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW WHEN ((new.email_confirmed_at IS NOT NULL)) EXECUTE FUNCTION public.handle_new_user();
+CREATE TRIGGER on_auth_user_confirmed AFTER UPDATE OF email_confirmed_at ON auth.users FOR EACH ROW WHEN (((old.email_confirmed_at IS NULL) AND (new.email_confirmed_at IS NOT NULL))) EXECUTE FUNCTION public.handle_new_user();
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('club-assets', 'club-assets', 't', 5242880, '{image/jpeg,image/png,image/webp,image/heic}') on conflict (id) do nothing;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('gcash-receipts', 'gcash-receipts', 'f', 5242880, '{image/jpeg,image/png,image/webp,image/heic}') on conflict (id) do nothing;
 create policy club_assets_delete_admin on storage.objects as PERMISSIVE for DELETE to authenticated using (((bucket_id = 'club-assets'::text) AND public.is_owner()));

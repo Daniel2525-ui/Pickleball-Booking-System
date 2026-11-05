@@ -43,7 +43,15 @@ test("the right password on an unconfirmed email says to confirm, and is not cou
     await tryLogin(page, email, password);
     await expect(page.getByText("Please confirm your email first. Check your inbox (and spam) for the email from Crosshair Dinkers.")).toBeVisible();
     expect(sql(`SELECT count(*) FROM public.auth_rate_limits WHERE key = 'login:fail:${email}'`)).toBe("0");
+
+    // A player whose first email never arrived can ask for another
+    sql(`DELETE FROM public.auth_rate_limits WHERE key = 'confirm:email:${email}'`);
+    sql(`UPDATE auth.users SET confirmation_sent_at = now() - interval '1 hour' WHERE email = '${email}'`);
+    await page.getByRole("button", { name: "Resend confirmation email" }).click();
+    await expect(page.getByRole("status").filter({ hasText: `We sent a new confirmation email to ${email}.` })).toBeVisible();
+    expect(sql(`SELECT confirmation_sent_at > now() - interval '1 minute' FROM auth.users WHERE email = '${email}'`)).toBe("t");
   } finally {
+    sql(`DELETE FROM public.auth_rate_limits WHERE key = 'confirm:email:${email}'`);
     sql(`UPDATE auth.users SET email_confirmed_at = '${confirmedAt}' WHERE email = '${email}'`);
   }
 });

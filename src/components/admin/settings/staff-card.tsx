@@ -79,7 +79,7 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
     // Exact match: a pattern match would read "_" in an email as "any character" and could pick someone else
     const { data } = await supabase.from("profiles").select("id, email, role").eq("email", wanted).limit(1);
     const account = data?.[0];
-    if (!account) return setError("No player account uses that email. Ask them to sign up on the booking site first.");
+    if (!account) return setError("No player account uses that email. Ask them to sign up on the booking site and confirm their email first.");
     if (account.role === "admin") return setError("That account already has staff access. Change its access in the list above.");
     if (await setAccess(account.id, newAccess, account.email ?? wanted)) setEmail("");
   };

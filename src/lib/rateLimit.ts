@@ -12,6 +12,8 @@ export const AUTH_LIMITS = {
     signupsPerIp: { limit: 10, windowSeconds: 60 * 60 },
     resetsPerEmail: { limit: 3, windowSeconds: 60 * 60 },
     resetsPerIp: { limit: 10, windowSeconds: 60 * 60 },
+    confirmResendsPerEmail: { limit: 3, windowSeconds: 60 * 60 },
+    confirmResendsPerIp: { limit: 10, windowSeconds: 60 * 60 },
 } as const;
 
 export interface RateLimitResult {
