@@ -1,4 +1,17 @@
 import { supabase } from "@/lib/supabase";
+import { SpotRow } from "./openPlayTypes";
+
+/** Spot rows that can hold a place in these sessions: confirmed-type rows and pending holds (tallySpots drops expired ones). */
+export const fetchSpotRows = async (sessionIds: string[]) => {
+    if (!sessionIds.length) return { data: [] as SpotRow[], error: null };
+    const { data, error } = await supabase
+        .from("bookings")
+        .select("open_play_session_id, open_play_spots, status, hold_expires_at")
+        .in("open_play_session_id", sessionIds)
+        .is("court_id", null)
+        .in("status", ["confirmed", "checked_in", "in_progress", "completed", "pending"]);
+    return { data: (data ?? []) as SpotRow[], error };
+};
 
 export interface OpenPlaySession {
     id: string;

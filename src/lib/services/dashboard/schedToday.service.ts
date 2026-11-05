@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { fetchSpotRows } from "@/lib/services/openPlay/openPlayData.service";
+import { tallySpots } from "@/lib/services/openPlay/openPlayTypes";
 
 export const todaysSchedule = async () => {
     const today = new Intl.DateTimeFormat("en-CA", {
@@ -26,6 +28,9 @@ export const todaysSchedule = async () => {
                 ),
                 customers (
                     full_name
+                ),
+                open_play_sessions (
+                    capacity
                 )
             `)
             .eq("booking_date", today)
@@ -36,7 +41,12 @@ export const todaysSchedule = async () => {
 
         if (error) throw error;
 
-        return data ?? [];
+        // Open play court blocks show how full their session is
+        const sessionIds = [...new Set((data ?? []).flatMap((b) => (b.open_play_session_id ? [b.open_play_session_id] : [])))];
+        const spots = await fetchSpotRows(sessionIds);
+        if (spots.error) console.error("Failed to count open play spots:", spots.error);
+        const { booked } = tallySpots(spots.data);
+        return (data ?? []).map((b) => ({ ...b, spots_booked: b.open_play_session_id ? booked.get(b.open_play_session_id) ?? 0 : null }));
     } catch (error) {
         console.error(error);
         throw error;

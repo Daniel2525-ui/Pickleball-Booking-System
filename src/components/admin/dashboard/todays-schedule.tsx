@@ -54,6 +54,8 @@ interface ScheduleItem {
   courts?: { name: string } | null;
   profiles?: { full_name: string } | null;
   customers?: { full_name: string } | null;
+  open_play_sessions?: { capacity: number } | null;
+  spots_booked?: number | null;
 }
 
 export default function TodaysSchedule({
@@ -155,6 +157,11 @@ export default function TodaysSchedule({
 
                     <td className="py-3 pr-4 font-medium text-foreground text-xs sm:text-sm">
                       {booking.open_play_session_id ? "Open play" : booking.customer_name || booking.customers?.full_name || booking.profiles?.full_name || "Guest Player"}
+                      {booking.open_play_session_id && booking.open_play_sessions && (
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          {booking.spots_booked} / {booking.open_play_sessions.capacity} spots booked
+                        </span>
+                      )}
                       {!booking.open_play_session_id && (
                         <span className="block font-mono text-[11px] font-normal text-muted-foreground">Ref {bookingRef(booking.id)}</span>
                       )}

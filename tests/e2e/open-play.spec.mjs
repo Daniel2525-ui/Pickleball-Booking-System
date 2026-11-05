@@ -101,10 +101,27 @@ test("a player books two spots with GCash and staff approve them", async ({ page
   await expect(page.getByRole("listitem").filter({ hasText: shortDate }).getByText("4 of 6")).toBeVisible();
 });
 
+test("the dashboard schedule shows how full today's open play session is", async ({ page }) => {
+  // Move the approved session (2 of 6 spots) to today for this check only, then put it back
+  const id = sessionId();
+  const today = sql("SELECT (now() AT TIME ZONE 'Asia/Manila')::date::text");
+  const move = (day) => sql(`UPDATE public.open_play_sessions SET session_date = '${day}' WHERE id = '${id}';
+                             UPDATE public.bookings SET booking_date = '${day}' WHERE open_play_session_id = '${id}'`);
+  move(today);
+  try {
+    await login(page, account("ADMIN"));
+    await page.goto("/admin/dashboard");
+    await expect(page.getByText("2 / 6 spots booked").first()).toBeVisible();
+  } finally {
+    move(date);
+  }
+});
+
 test("staff add a walk-up and cancel the session, and payments land in Refund Owed", async ({ page }) => {
   await login(page, account("ADMIN"));
   await page.goto("/admin/open-play");
-  await page.getByRole("row").filter({ hasText: shortDate }).getByRole("button", { name: "Players" }).click();
+  await page.getByRole("row").filter({ hasText: shortDate }).getByRole("button", { name: "Actions" }).click();
+  await page.getByRole("menuitem", { name: "Players" }).click();
   await page.getByRole("button", { name: "Add player" }).first().click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Player").fill("E2E Walkup Wendy");

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { fetchSpotRows } from "@/lib/services/openPlay/openPlayData.service";
+import { tallySpots } from "@/lib/services/openPlay/openPlayTypes";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
@@ -65,26 +67,10 @@ export function OpenPlayContainer() {
     setSchedules((sched.data ?? []) as OpenPlaySchedule[]);
     setCourts(courtRes.data);
 
-    // Same rule as open_play_spots_taken: confirmed-type rows, plus pending rows whose hold is still running
-    const ids = (sess.data ?? []).map((s) => s.id);
-    const { data: spotRows, error: spotError } = ids.length
-      ? await supabase
-          .from("bookings")
-          .select("open_play_session_id, open_play_spots, status, hold_expires_at")
-          .in("open_play_session_id", ids)
-          .is("court_id", null)
-          .in("status", ["confirmed", "checked_in", "in_progress", "completed", "pending"])
-      : { data: [], error: null };
+    const { data: spotRows, error: spotError } = await fetchSpotRows((sess.data ?? []).map((s) => s.id));
     // Without spot rows the counts read 0 and the GCash-awaiting guard on Cancel is off: say so
     if (sched.error || sess.error || courtRes.error || spotError) toast.error("Failed to load open play. Refresh before changing anything.");
-    const booked = new Map<string, number>();
-    const awaiting = new Set<string>();
-    for (const r of spotRows ?? []) {
-      if (r.status === "pending" && r.hold_expires_at === "infinity") awaiting.add(r.open_play_session_id);
-      // shortcut: a pending hold counts until hold_expires_at, ignoring the short release grace period; fine for a staff overview
-      if (r.status === "pending" && r.hold_expires_at && r.hold_expires_at !== "infinity" && new Date(r.hold_expires_at) < new Date()) continue;
-      booked.set(r.open_play_session_id, (booked.get(r.open_play_session_id) ?? 0) + (r.open_play_spots ?? 0));
-    }
+    const { booked, awaiting } = tallySpots(spotRows);
     const rows = (sess.data ?? []).map((s) => ({ ...s, booked: booked.get(s.id) ?? 0, awaiting: awaiting.has(s.id) })) as OpenPlayAdminSession[];
     setSessions(rows);
     setSelected((cur) => rows.find((s) => s.id === cur?.id) ?? null);
