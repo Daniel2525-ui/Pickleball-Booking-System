@@ -83,7 +83,16 @@ test("a custom range the wrong way round is refused", async ({ page }) => {
   await login(page, account("ADMIN"));
   await page.goto("/admin/reports");
   await page.getByRole("button", { name: "Custom", exact: true }).click();
-  await page.getByLabel("To", { exact: true }).fill("2026-09-01");
-  await page.getByLabel("From", { exact: true }).fill("2026-09-30");
+  // A valid month first, so there is a report on screen
+  await page.getByLabel("From", { exact: true }).fill("2026-09-01");
+  await page.getByLabel("To", { exact: true }).fill("2026-09-30");
+  await expect(page.getByText("₱1,050").first()).toBeVisible();
+  // Then, in one step, an end before the start: the old figures go away and there is nothing to download
+  await page.getByLabel("To", { exact: true }).fill("2026-08-01");
   await expect(page.getByText("Pick a start date on or before the end date.")).toBeVisible();
+  await expect(page.getByText("₱1,050")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Download CSV" })).toBeDisabled();
+  // Fixing the range brings a report back (the page isn't left loading)
+  await page.getByLabel("To", { exact: true }).fill("2026-09-30");
+  await expect(page.getByText("₱1,050").first()).toBeVisible();
 });

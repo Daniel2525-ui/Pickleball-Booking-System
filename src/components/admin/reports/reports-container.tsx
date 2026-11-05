@@ -29,7 +29,8 @@ const change = (pct: number | null, against: string) => (pct === null ? null : `
 
 /** Admin-only overview of the venue for a period: money, bookings, busy hours and best customers. */
 export function ReportsContainer() {
-  const [today] = useState(todayManila);
+  // Read each render, so a tab left open past midnight picks up the new day for This week / This month
+  const today = todayManila();
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [custom, setCustom] = useState({ from: `${today.slice(0, 8)}01`, to: today });
   const [report, setReport] = useState<VenueReport | null>(null);
@@ -62,7 +63,8 @@ export function ReportsContainer() {
     const url = URL.createObjectURL(new Blob([reportCsv(report)], { type: "text/csv" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `reports-${range.from ?? "all-time"}-to-${range.to}.csv`;
+    // Named from the report itself, so the file always matches the figures inside it
+    link.download = `reports-${period === "all" ? "all-time" : report.period.from}-to-${report.period.to}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -82,7 +84,7 @@ export function ReportsContainer() {
               </Button>
             ))}
           </div>
-          <Button variant="outline" size="sm" className="gap-2" onClick={downloadCsv} disabled={!report || loading}>
+          <Button variant="outline" size="sm" className="gap-2" onClick={downloadCsv} disabled={!report || loading || customInvalid}>
             <Download className="size-4" /> Download CSV
           </Button>
         </div>
@@ -104,7 +106,7 @@ export function ReportsContainer() {
         </div>
       )}
 
-      {error ? (
+      {customInvalid ? null : error ? (
         <Card className="shadow-sm">
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
             <p role="alert" className="text-sm text-destructive">{error}</p>

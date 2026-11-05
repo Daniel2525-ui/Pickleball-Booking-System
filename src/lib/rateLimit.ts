@@ -9,7 +9,8 @@ import { getServiceClient } from "@/lib/supabase/service";
 export const AUTH_LIMITS = {
     loginFailuresPerEmail: { limit: 5, windowSeconds: 15 * 60 },
     loginAttemptsPerIp: { limit: 50, windowSeconds: 15 * 60 },
-    signupsPerIp: { limit: 10, windowSeconds: 60 * 60 },
+    // Players often sign up together on the venue's Wi-Fi (one shared address); 30 an hour still stops bots
+    signupsPerIp: { limit: 30, windowSeconds: 60 * 60 },
     resetsPerEmail: { limit: 3, windowSeconds: 60 * 60 },
     resetsPerIp: { limit: 10, windowSeconds: 60 * 60 },
     confirmResendsPerEmail: { limit: 3, windowSeconds: 60 * 60 },

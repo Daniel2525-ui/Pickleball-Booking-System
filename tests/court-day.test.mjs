@@ -24,3 +24,12 @@ test("courtNowNext finds the current and the next booking on one court", () => {
     assert.equal(next.name, "later");
     assert.deepEqual(courtNowNext(slots, "c1", at("19:00:00")), { current: null, next: null });
 });
+
+test("a booking waiting for GCash approval holds its court; an unpaid hold that ran out does not", () => {
+    const gcash = slot("15:00:00", "16:00:00", { name: "gcash", status: "pending", hold_expires_at: "infinity" });
+    const lapsed = slot("15:00:00", "16:00:00", { name: "lapsed", status: "pending", hold_expires_at: "2026-11-05T14:00:00+08:00", court_id: "c2" });
+    const checkout = slot("17:00:00", "18:00:00", { name: "checkout", status: "pending", hold_expires_at: "2026-11-05T15:50:00+08:00" });
+    assert.equal(courtNowNext([gcash, checkout], "c1", at("15:30:00")).current.name, "gcash");
+    assert.equal(courtNowNext([gcash, checkout], "c1", at("15:30:00")).next.name, "checkout");
+    assert.deepEqual(courtNowNext([lapsed], "c2", at("15:30:00")), { current: null, next: null });
+});

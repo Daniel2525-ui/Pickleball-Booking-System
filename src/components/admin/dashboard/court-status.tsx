@@ -26,13 +26,17 @@ const clock = (d: Date) => d.toLocaleTimeString("en-US", { timeZone: "Asia/Manil
 export default function CourtStatus({ className }: { className?: string }) {
   const [tiles, setTiles] = useState<LiveCourtTile[] | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       const now = new Date();
       const { data } = await fetchLiveCourts(now);
-      if (!active || !data) return;
+      if (!active) return;
+      // A failed refresh keeps the last tiles (their time stays visible); only a first load with nothing to show says so
+      setFailed(!data);
+      if (!data) return;
       setTiles(data);
       setUpdatedAt(now);
     };
@@ -57,7 +61,9 @@ export default function CourtStatus({ className }: { className?: string }) {
       </CardHeader>
 
       <CardContent className="@container">
-        {tiles === null ? (
+        {tiles === null && failed ? (
+          <p role="alert" className="py-8 text-center text-sm text-muted-foreground">Couldn&apos;t load the courts. Trying again every minute.</p>
+        ) : tiles === null ? (
           <div className="grid gap-3 @lg:grid-cols-2">
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
           </div>

@@ -9,19 +9,22 @@ import { LiveCourtTile, LiveSlot, liveCourtTile } from "./liveCourts";
 export const fetchLiveCourts = async (now: Date = new Date()): Promise<{ data: LiveCourtTile[] | null; error: Error | null }> => {
     try {
         const today = formatManilaDate(now);
-        const [{ data: courts, error: courtsError }, { data: slots, error: slotsError }, { data: sessions, error: sessionsError }] = await Promise.all([
-            fetchCourtsData(),
+        const [{ data: slots, error: slotsError }, { data: sessions, error: sessionsError }] = await Promise.all([
             supabase
                 .from("bookings")
-                .select("id, court_id, booking_date, start_time, end_time, status, total_amount, open_play_session_id, customer_name, profiles(full_name), customers(full_name), payments(status, amount, payment_method)")
+                .select("id, court_id, booking_date, start_time, end_time, status, hold_expires_at, total_amount, open_play_session_id, customer_name, profiles(full_name), customers(full_name), payments(status, amount, payment_method)")
                 .eq("booking_date", today)
                 .not("court_id", "is", null)
-                .in("status", ["confirmed", "checked_in", "in_progress"]),
+                // Pending included: liveCourtTile keeps those whose hold hasn't run out (e.g. GCash waiting for staff)
+                .in("status", ["pending", "confirmed", "checked_in", "in_progress"]),
             supabase.from("open_play_sessions").select("id, capacity").eq("session_date", today).neq("status", "cancelled"),
         ]);
-        if (courtsError || !courts) throw courtsError || new Error("Failed to fetch courts");
         if (slotsError) throw slotsError;
         if (sessionsError) throw sessionsError;
+
+        // Today's bookings are already loaded, so the courts query needn't fetch them again
+        const { data: courts, error: courtsError } = await fetchCourtsData((slots ?? []) as unknown as LiveSlot[]);
+        if (courtsError || !courts) throw courtsError || new Error("Failed to fetch courts");
 
         const { data: spotRows, error: spotsError } = await fetchSpotRows((sessions ?? []).map((s) => s.id));
         if (spotsError) throw spotsError;

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { fetchCourtsData, ActiveBookingSnippet } from "../courts/courtsData.service";
+import { fetchCourtsData } from "../courts/courtsData.service";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 // no_show is a sold booking (prepaid money is kept), so it counts toward bookings and paid revenue
@@ -44,18 +44,8 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
     if (error) throw error;
 
     const allBookings = bookings || [];
-    const todayActive = allBookings
-        // Spot rows have no court; the block rows already occupy the courts
-        .filter((b) => b.court_id && b.booking_date === todayStr && (b.status === "confirmed" || b.status === "checked_in" || b.status === "in_progress"))
-        .map((b) => ({
-            court_id: b.court_id as string,
-            booking_date: b.booking_date,
-            status: b.status,
-            start_time: b.start_time,
-            end_time: b.end_time,
-        }));
-
-    const courtStats = await availableCourts(todayActive);
+    // fetchCourtsData loads today's court holds itself, including GCash bookings waiting for staff
+    const courtStats = await availableCourts();
 
     let todayBookingsCount = 0;
     let yesterdayBookingsCount = 0;
@@ -94,9 +84,9 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
 };
 
 /* Available Courts */
-export const availableCourts = async (activeBookingsOverride?: ActiveBookingSnippet[]) => {
+export const availableCourts = async () => {
     try {
-        const { data: courts, error } = await fetchCourtsData(activeBookingsOverride);
+        const { data: courts, error } = await fetchCourtsData();
         if (error || !courts) throw (error || new Error("Failed to load court status"));
 
         const occupied = courts.filter((c) => c.status === "occupied").length;

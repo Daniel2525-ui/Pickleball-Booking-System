@@ -182,3 +182,24 @@ test("a period still under way is compared with the same days before it, not the
   expect(r.so_far).toEqual({ net: 300, count: 1, cancelled_and_no_shows: 0 });
   expect(r.previous.count).toBe(1);
 });
+
+test("courts full only counts booked time inside the hours the venue was open", async () => {
+  // Booked before the closure was added (staff can still book a closed day), and an early slot before opening
+  book("2026-09-15", "10:00", "11:00");
+  book("2026-09-16", "05:00", "07:00");
+  sql("INSERT INTO public.venue_closures (closed_on, reason) VALUES ('2026-09-15', 'E2E closure')");
+  const r = await report("2026-09-15", "2026-09-16");
+  // The closed day adds nothing; of 5:00-7:00 only 6:00-7:00 is inside opening hours (6 AM - 10 PM)
+  expect(r.occupancy.booked_hours).toBe(1);
+  const courts = Number(sql("SELECT count(*) FROM public.courts"));
+  expect(r.occupancy.open_hours).toBe(courts * 16);
+});
+
+test("a court under maintenance isn't counted as available time", async () => {
+  const courts = Number(sql("SELECT count(*) FROM public.courts"));
+  const last = sql("SELECT id FROM public.courts ORDER BY name DESC LIMIT 1");
+  sql(`UPDATE public.courts SET status = 'maintenance', maintenance_note = 'E2E net repair' WHERE id = '${last}'`);
+  const r = await report("2026-09-16", "2026-09-16");
+  expect(r.occupancy.open_hours).toBe((courts - 1) * 16);
+  expect(r.courts.find((c) => c.id === last).pct).toBeNull();
+});

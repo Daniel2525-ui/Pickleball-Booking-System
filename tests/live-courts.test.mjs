@@ -62,3 +62,10 @@ test("maintenance and closed courts ignore bookings", () => {
 test("a court with bookings for other courts is free", () => {
     assert.equal(liveCourtTile(court, [slot("19:00", "20:00", { court_id: "c2" })], now).state, "free");
 });
+
+test("a player whose GCash payment staff haven't checked yet is shown as waiting, not unpaid", () => {
+    const waiting = slot("19:00", "20:00", { status: "pending", hold_expires_at: "infinity", payments: [{ status: "pending", amount: 400, payment_method: "gcash" }] });
+    const tile = liveCourtTile(court, [waiting], now);
+    assert.equal(tile.state, "in_play");
+    assert.deepEqual(tile.payment, { paid: false, label: "GCash · waiting for your check" });
+});

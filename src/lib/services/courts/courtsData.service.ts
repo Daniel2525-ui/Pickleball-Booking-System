@@ -1,14 +1,15 @@
 import { supabase } from "@/lib/supabase";
 import { Court } from "./courtsTypes";
-import { isPlayingNow } from "./courtDay";
+import { holdsCourt, isPlayingNow } from "./courtDay";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 export interface ActiveBookingSnippet {
-    court_id: string;
+    court_id: string | null;
     booking_date: string;
     status: string;
     start_time: string;
     end_time: string;
+    hold_expires_at?: string | null;
 }
 
 export const fetchCourtsData = async (activeBookingsOverride?: ActiveBookingSnippet[]) => {
@@ -30,9 +31,9 @@ export const fetchCourtsData = async (activeBookingsOverride?: ActiveBookingSnip
 
             const { data, error: bookingsError } = await supabase
                 .from("bookings")
-                .select("court_id, booking_date, status, start_time, end_time")
+                .select("court_id, booking_date, status, start_time, end_time, hold_expires_at")
                 .eq("booking_date", currentDate)
-                .in("status", ["confirmed", "checked_in", "in_progress"]);
+                .in("status", ["pending", "confirmed", "checked_in", "in_progress"]);
 
             if (bookingsError) throw bookingsError;
             activeBookings = data || [];
@@ -40,7 +41,7 @@ export const fetchCourtsData = async (activeBookingsOverride?: ActiveBookingSnip
 
         const now = new Date();
         const occupiedCourtIds = new Set(
-            (activeBookings || []).filter((b) => isPlayingNow(b, now)).map((b) => b.court_id)
+            (activeBookings || []).filter((b) => holdsCourt(b, now) && isPlayingNow(b, now)).map((b) => b.court_id)
         );
 
         const updatedCourts = (courts || []).map(court => {
@@ -89,7 +90,8 @@ export const fetchTodayCourtBookings = async () => {
         .select(COURT_BOOKING_COLUMNS)
         .eq("booking_date", formatManilaDate())
         .not("court_id", "is", null)
-        .in("status", ["confirmed", "checked_in", "in_progress"]);
+        // Pending included: courtNowNext keeps those whose hold hasn't run out (e.g. GCash waiting for staff)
+        .in("status", ["pending", "confirmed", "checked_in", "in_progress"]);
     if (error) console.error("Failed to fetch today's court bookings:", error);
     return { data: (data ?? []) as unknown as CourtBooking[], error };
 };

@@ -61,13 +61,18 @@ test("the sign-up email's link lands on sign-in with a confirmed notice", async 
   await expect(page.getByText("Email confirmed!")).toBeVisible();
 });
 
-test("sign-ups from one network are capped at 10 per hour", async ({ request }) => {
+test("sign-ups from one network are capped at 30 per hour (enough for a busy night on the venue's Wi-Fi)", async ({ request }) => {
   const signUp = (n) => request.post("/api/auth/register", {
     data: { email: `e2e-limit-${Date.now()}-${n}@example.com`, password: "secret123", fullName: "Limit Tester", phone: "09170000099" },
   });
-  for (let n = 1; n <= 10; n++) expect((await signUp(n)).status(), `sign-up ${n}`).toBe(200);
-  const blocked = await signUp(11);
+  sql("DELETE FROM public.auth_rate_limits WHERE key LIKE 'signup:ip:%'");
+  expect((await signUp(1)).status()).toBe(200);
+  // Stand in for 28 more sign-ups from the same network this hour
+  sql("UPDATE public.auth_rate_limits SET count = 29 WHERE key LIKE 'signup:ip:%'");
+  expect((await signUp(30)).status(), "the 30th sign-up").toBe(200);
+  const blocked = await signUp(31);
   expect(blocked.status()).toBe(429);
   expect(Number(blocked.headers()["retry-after"])).toBeGreaterThan(0);
   expect((await blocked.json()).error).toMatch(/Too many sign-ups from this network/);
+  sql("DELETE FROM public.auth_rate_limits WHERE key LIKE 'signup:ip:%'");
 });

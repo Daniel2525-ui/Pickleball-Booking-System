@@ -1,5 +1,5 @@
 -- App schema snapshot, made by scripts/dump-schema.sh. Do not edit by hand.
--- Includes every migration up to and including: 20261105141356_admin_reports.sql
+-- Includes every migration up to and including: 20261105160740_reports_occupancy_fixes.sql
 -- Rebuild: load this into a new Supabase stack, then apply only migrations newer than that file.
 -- Not included: the pg_cron jobs. Re-run the cron.schedule calls in *_supabase_cron_cleanup.sql (needs Vault secrets set by hand) and *_profile_on_confirm.sql.
 
@@ -1112,7 +1112,7 @@ BEGIN
   v_through := least(v_to, v_today);
   v_len := v_to - v_from + 1;
   v_bucket := CASE WHEN v_len <= 62 THEN 'day' ELSE 'month' END;
-  SELECT count(*) INTO v_courts FROM public.courts;
+  SELECT count(*) INTO v_courts FROM public.courts WHERE coalesce(status, '') NOT IN ('maintenance', 'closed');
 
   SELECT jsonb_build_object(
     'net', coalesce(sum(p.amount) FILTER (WHERE p.status = 'paid'), 0),
@@ -1156,11 +1156,14 @@ BEGIN
     WHERE h.open_time IS NOT NULL AND h.close_time IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM public.venue_closures c WHERE c.closed_on = d::date)
   ), booked AS (
-    SELECT b.court_id, b.booking_date,
-           b.start_time - time '00:00' AS s, b.end_time - time '00:00' AS e,
-           extract(epoch FROM (b.end_time - b.start_time)) / 3600 AS hours
-    FROM public.bookings b
-    WHERE b.court_id IS NOT NULL AND b.status NOT IN ('cancelled', 'pending') AND b.booking_date BETWEEN v_from AND v_through
+    SELECT k.court_id, k.booking_date, k.s, k.e,
+           greatest(0, extract(epoch FROM (least(k.e, make_interval(hours => k.close_h)) - greatest(k.s, make_interval(hours => k.open_h)))) / 3600) AS hours
+    FROM (SELECT b.court_id, b.booking_date, d.open_h, d.close_h,
+                 b.start_time - time '00:00' AS s,
+                 CASE WHEN b.end_time = '00:00' THEN interval '24 hours' ELSE b.end_time - time '00:00' END AS e
+          FROM public.bookings b JOIN days d ON d.d = b.booking_date
+          JOIN public.courts ct ON ct.id = b.court_id AND coalesce(ct.status, '') NOT IN ('maintenance', 'closed')
+          WHERE b.court_id IS NOT NULL AND b.status NOT IN ('cancelled', 'pending') AND b.booking_date BETWEEN v_from AND v_through) k
   ), per_court AS (
     SELECT coalesce(sum(close_h - open_h), 0) AS open_h FROM days
   ), slots AS (
@@ -1171,7 +1174,6 @@ BEGIN
     SELECT extract(isodow FROM k.booking_date)::int - 1 AS dow, hr,
            sum(extract(epoch FROM (least(k.e, make_interval(hours => hr + 1)) - greatest(k.s, make_interval(hours => hr)))) / 3600) AS hours
     FROM booked k JOIN generate_series(0, 23) hr ON k.s < make_interval(hours => hr + 1) AND k.e > make_interval(hours => hr)
-    WHERE EXISTS (SELECT 1 FROM days WHERE days.d = k.booking_date)
     GROUP BY 1, 2
   )
   SELECT
@@ -1181,7 +1183,7 @@ BEGIN
       'open_hours', pc.open_h * v_courts),
     coalesce((SELECT jsonb_agg(jsonb_build_object(
         'id', c.id, 'name', c.name,
-        'pct', CASE WHEN pc.open_h = 0 THEN NULL
+        'pct', CASE WHEN pc.open_h = 0 OR coalesce(c.status, '') IN ('maintenance', 'closed') THEN NULL
                ELSE round(100 * coalesce((SELECT sum(hours) FROM booked k WHERE k.court_id = c.id), 0) / pc.open_h) END)
       ORDER BY c.name) FROM public.courts c), '[]'::jsonb),
     coalesce((SELECT jsonb_agg(jsonb_build_object('dow', sl.dow, 'hour', sl.hr, 'pct', least(100, round(100 * coalesce(u.hours, 0) / sl.available)))
