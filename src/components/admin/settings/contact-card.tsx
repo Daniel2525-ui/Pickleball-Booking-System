@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FormCardSkeleton } from "@/components/skeletons/form-card-skeleton";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ export function ContactCard({ onChanged }: { onChanged: () => void }) {
     };
   }, []);
 
-  if (!fields || !saved) return <Loader2 className="size-5 animate-spin text-primary" />;
+  if (!fields || !saved) return <FormCardSkeleton fields={3} />;
   const dirty = fields.phone !== saved.phone || fields.email !== saved.email || fields.address !== saved.address;
 
   // Same rules as booking_settings_venue_contact_check

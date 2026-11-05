@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FormCardSkeleton } from "@/components/skeletons/form-card-skeleton";
 import { Loader2, Save, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -126,7 +127,15 @@ export function SettingsContainer() {
     toast.success("GCash details saved.");
   };
 
-  if (loading) return <Loader2 className="size-6 animate-spin text-primary" />;
+  if (loading)
+    return (
+      <div className="flex flex-col gap-6" role="status" aria-label="Loading settings">
+        <FormCardSkeleton fields={3} />
+        <FormCardSkeleton fields={3} />
+        <FormCardSkeleton fields={2} />
+        <FormCardSkeleton fields={2} />
+      </div>
+    );
   if (loadFailed) return <p role="alert" className="text-sm text-destructive">Could not load settings. Reload the page to try again.</p>;
 
   const qrShown = pendingQr?.preview ?? (removeQr ? null : saved.qrUrl);

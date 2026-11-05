@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FormCardSkeleton } from "@/components/skeletons/form-card-skeleton";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Loader2, Plus, Save, Trash2, Zap } from "lucide-react";
 import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
@@ -128,7 +129,13 @@ export function PricingContainer() {
     else toast.error(body?.error || "Could not save pricing.");
   };
 
-  if (loading) return <Loader2 className="size-6 animate-spin text-primary" />;
+  if (loading)
+    return (
+      <div className="flex flex-col gap-6" role="status" aria-label="Loading pricing">
+        <FormCardSkeleton fields={3} columns={3} button={false} />
+        <FormCardSkeleton fields={2} />
+      </div>
+    );
 
   return (
     <div className="flex flex-col gap-6">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FormCardSkeleton } from "@/components/skeletons/form-card-skeleton";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,7 @@ export function PolicyCard({ onChanged }: { onChanged: () => void }) {
     toast.success("Booking rules saved.");
   };
 
-  if (!saved) return <Loader2 className="size-5 animate-spin text-primary" />;
+  if (!saved) return <FormCardSkeleton fields={2} />;
   const dirty = Number(cutoff) !== saved.cutoff || Number(grace) !== saved.grace;
 
   return (

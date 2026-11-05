@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, UserMinus, UserPlus } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { UserMinus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,7 +94,17 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4 max-w-xl">
         {staff === null ? (
-          <Loader2 className="size-5 animate-spin text-primary" />
+          <div className="divide-y divide-border rounded-xl border" aria-hidden="true">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-44" />
+                </div>
+                <Skeleton className="h-9 w-28" />
+              </div>
+            ))}
+          </div>
         ) : (
           <ul className="divide-y divide-border rounded-xl border">
             {staff.map((s) => {
