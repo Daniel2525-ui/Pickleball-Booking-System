@@ -33,6 +33,7 @@ export function parseSpotRequest(body: unknown): { sessionId: string; spots: num
 /** Maps the shared session-capacity SQL errors to a 409 body; null when the message is not one of them. */
 export function sessionErrorResponse(message: string | undefined): { error: string } | null {
     const msg = message ?? "";
+    if (msg.includes("VENUE_CLOSED")) return { error: "The venue is closed on this date." };
     if (msg.includes("SESSION_FULL")) return { error: "This session is full." };
     if (msg.includes("PLAYER_LIMIT")) return { error: "You can book at most 4 spots in one session." };
     if (msg.includes("SESSION_UNAVAILABLE") || msg.includes("NOT_FOUND")) return { error: "This session is no longer available." };

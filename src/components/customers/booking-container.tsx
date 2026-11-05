@@ -32,6 +32,8 @@ import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
+import { fetchUpcomingClosures, VenueClosure } from "@/lib/services/schedule/venueClosures.service";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
 import { checkSlotAvailability, getSlotBooking, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
@@ -55,6 +57,7 @@ export const BookingContainer = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [operatingHours, setOperatingHours] = useState<OperatingHour[]>([]);
+  const [closures, setClosures] = useState<VenueClosure[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [pricing, setPricing] = useState<Pricing | null>(null);
   const [gcashEnabled, setGcashEnabled] = useState(false);
@@ -106,12 +109,14 @@ export const BookingContainer = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
-      const [hoursRes, courtsRes, pricingRes, gcashRes] = await Promise.all([
+      const [hoursRes, courtsRes, pricingRes, gcashRes, closuresRes] = await Promise.all([
         fetchOperatingHours(),
         fetchCourtsData(),
         fetchPricing(browserSupabase),
         browserSupabase.from("booking_settings").select("gcash_account_name, gcash_number").maybeSingle(),
+        fetchUpcomingClosures(),
       ]);
+      setClosures(closuresRes.data);
       setGcashEnabled(Boolean(gcashRes.data?.gcash_number));
       if (hoursRes.data) setOperatingHours(hoursRes.data);
       if (pricingRes.data) setPricing(pricingRes.data);
@@ -166,9 +171,11 @@ export const BookingContainer = () => {
 
   const courtNames = useMemo(() => courts.map((c) => c.name), [courts]);
 
+  // A closed date (venue_closures) offers no slots; the database refuses customer bookings on it too
+  const closure = closures.find((c) => c.closed_on === formatManilaDate(selectedDate));
   const timeSlots = useMemo(
-    () => generateTimeSlots(selectedDate, operatingHours),
-    [operatingHours, selectedDate]
+    () => (closure ? [] : generateTimeSlots(selectedDate, operatingHours)),
+    [operatingHours, selectedDate, closure]
   );
 
   // Check if a slot is booked by comparing against real bookings
@@ -611,7 +618,9 @@ export const BookingContainer = () => {
             </div>
           ) : (
             <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed text-muted-foreground text-sm">
-              The venue is closed on this date. Please select another date.
+              {closure?.reason
+                ? `The venue is closed on this date (${closure.reason}). Please select another date.`
+                : "The venue is closed on this date. Please select another date."}
             </div>
           )}
         </div>

@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Save, LoaderCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { OperatingHoursCard } from "./operating-hours-card"
+import { ClosedDatesCard } from "./closed-dates-card"
 import { OperatingHour } from "./types"
 import { ScheduleSkeleton } from "@/components/skeletons/schedule-skeleton"
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service"
@@ -142,6 +143,8 @@ export const SchedulesContainer = () => {
             onToggle={handleToggle}
             onTimeChange={handleTimeChange}
           />
+
+          <ClosedDatesCard />
         </>
       )}
     </div>
