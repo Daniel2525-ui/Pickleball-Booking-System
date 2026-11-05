@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Loader2, Plus, Save, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, ArrowRight, Loader2, Plus, Save, Trash2, Zap } from "lucide-react";
 import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service";
 import { pricingChanges } from "@/lib/services/pricing/pricingChanges";
@@ -231,9 +231,16 @@ export function PricingContainer() {
 
       <PricePreview pricing={form} hours={hours} />
 
-      <p className="text-xs text-muted-foreground">
-        Open play is priced per spot on each schedule, on the{" "}
-        <Link href="/admin/open-play" className="font-semibold underline underline-offset-2">Open Play</Link> page.
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+        Open play is priced per spot on each schedule, on the
+        <Link
+          href="/admin/open-play"
+          className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-0.5 font-bold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Open Play
+          <ArrowRight className="size-3" aria-hidden />
+        </Link>
+        page.
       </p>
 
       <div className="flex items-center justify-between gap-3">
