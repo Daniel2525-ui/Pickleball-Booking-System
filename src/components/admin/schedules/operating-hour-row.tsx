@@ -58,6 +58,7 @@ export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: Operat
               <span className="sr-only">Opening Time</span>
               <Input
                 type="time"
+                step={3600}
                 value={hour.open_time}
                 onChange={(e) => onTimeChange(index, "open_time", e.target.value)}
                 aria-label={`${hour.day_of_week} opening time`}
@@ -71,6 +72,7 @@ export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: Operat
               <span className="sr-only">Closing Time</span>
               <Input
                 type="time"
+                step={3600}
                 value={hour.close_time}
                 onChange={(e) => onTimeChange(index, "close_time", e.target.value)}
                 aria-label={`${hour.day_of_week} closing time`}

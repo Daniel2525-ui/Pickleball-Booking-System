@@ -10,6 +10,9 @@ import { OperatingHour } from "./types"
 import { ScheduleSkeleton } from "@/components/skeletons/schedule-skeleton"
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service"
 import { updateOperatingHours } from "@/lib/services/schedule/updateOperatingHours.service"
+import { checkWeeklyHours } from "@/lib/services/schedule/hoursRules"
+import { findHoursConflicts } from "@/lib/services/schedule/hoursConflicts.service"
+import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog"
 
 const defaultHours: OperatingHour[] = [
   { day_of_week: "Monday", is_open: true, open_time: "08:00", close_time: "22:00" },
@@ -28,6 +31,19 @@ export const SchedulesContainer = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // What was last loaded or saved, to tell whether there are unsaved edits
+  const [savedHours, setSavedHours] = useState(JSON.stringify(defaultHours))
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null)
+  const dirty = JSON.stringify(hours) !== savedHours
+
+  // Reloading or closing the tab with unsaved edits asks first
+  // shortcut: in-app links (sidebar) still leave without asking; intercept router navigation if staff lose edits that way
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [dirty])
 
   useEffect(() => {
     const loadHours = async () => {
@@ -48,6 +64,10 @@ export const SchedulesContainer = () => {
           .sort((a, b) => dayOrder.indexOf(a.day_of_week) - dayOrder.indexOf(b.day_of_week))
 
         setHours(merged)
+        setSavedHours(JSON.stringify(merged))
+        // Flag saved times the slots can't use, like 8:30
+        const checked = checkWeeklyHours(merged)
+        if ("error" in checked) setErrorMsg(checked.error)
       }
       // If data is empty, we keep the DEFAULT_HOURS already in state
 
@@ -71,7 +91,7 @@ export const SchedulesContainer = () => {
 
     updateDay(dayIndex, {
       is_open: isOpen,
-      ...(needsDefaultTimes && { open_time: "08:00", close_time: "10:00" }),
+      ...(needsDefaultTimes && { open_time: "08:00", close_time: "22:00" }),
     })
   }
 
@@ -79,15 +99,11 @@ export const SchedulesContainer = () => {
     updateDay(dayIndex, { [field]: value }) /* openTime , 09:00*/
   }
 
+  // Same checks the save route applies
   const validateHours = (currentHours: OperatingHour[]) => {
-    for (const hour of currentHours) {
-      if (hour.is_open && hour.open_time && hour.close_time && hour.close_time <= hour.open_time) {
-        setErrorMsg(`${hour.day_of_week}: Closing time must be later than opening time.`)
-        return false
-      }
-    }
-    setErrorMsg(null)
-    return true
+    const checked = checkWeeklyHours(currentHours)
+    setErrorMsg("error" in checked ? checked.error : null)
+    return !("error" in checked)
   }
 
   const handleSave = async () => {
@@ -96,16 +112,33 @@ export const SchedulesContainer = () => {
       return
     }
 
+    // New hours leave existing bookings in place: list the ones that would fall outside before saving
     setSaving(true)
+    const { data: conflicts } = await findHoursConflicts(hours)
+    setSaving(false)
+    if (conflicts.length > 0) {
+      const shown = conflicts.slice(0, 8).join("\n")
+      const more = conflicts.length > 8 ? `\n…and ${conflicts.length - 8} more` : ""
+      setConfirmRequest({
+        title: `${conflicts.length} ${conflicts.length === 1 ? "booking falls" : "bookings fall"} outside the new hours`,
+        description: `Saving does not cancel them. Contact these players, or cancel from Bookings or Open Play.\n\n${shown}${more}`,
+        confirmLabel: "Save anyway",
+        onConfirm: save,
+      })
+      return
+    }
+    save()
+  }
 
+  const save = async () => {
+    setSaving(true)
     const { error } = await updateOperatingHours(hours)
-
     if (error) {
-      toast.error("Failed to save operating hours. Please try again.")
+      toast.error(error.message || "Failed to save operating hours. Please try again.")
     } else {
+      setSavedHours(JSON.stringify(hours))
       toast.success("Operating hours updated successfully.")
     }
-
     setSaving(false)
   }
 
@@ -145,6 +178,8 @@ export const SchedulesContainer = () => {
           />
 
           <ClosedDatesCard />
+
+          <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
         </>
       )}
     </div>
