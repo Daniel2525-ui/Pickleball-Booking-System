@@ -44,13 +44,41 @@ export default async function Home() {
         </section>
 
         <section aria-label="The venue" className="w-full border-t py-12 md:py-16">
-          <div className="container mx-auto px-4 max-w-6xl grid grid-cols-1 sm:grid-cols-3 gap-8">
-            {stats.map((s) => (
-              <div key={s.label}>
-                <p className="font-display text-6xl font-black leading-none text-primary">{s.value}</p>
-                <p className="mt-2 text-sm font-semibold text-muted-foreground max-w-[26ch]">{s.label}</p>
+          <div className="container mx-auto px-4 max-w-6xl grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-10 lg:items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-8">
+              {stats.map((s) => (
+                <div key={s.label}>
+                  <p className="font-display text-6xl font-black leading-none text-primary">{s.value}</p>
+                  <p className="mt-2 text-sm font-semibold text-muted-foreground max-w-[26ch]">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              {/* Keyless Google embed of the Settings address at city zoom.
+                  shortcut: no exact pin until the venue has coordinates or a Google listing; switch the query then */}
+              <iframe
+                title={`Map of ${venue.address}`}
+                src={`https://www.google.com/maps?q=${encodeURIComponent(venue.address)}&z=13&output=embed`}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="block w-full aspect-[4/3] sm:aspect-[16/9] rounded-xl border bg-muted"
+              />
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <p className="flex items-start gap-2 text-muted-foreground">
+                  <MapPin className="size-4 text-primary shrink-0 mt-0.5" />
+                  <span>{venue.address}</span>
+                </p>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-primary hover:underline underline-offset-4"
+                >
+                  Get directions<span className="sr-only"> (opens Google Maps)</span>
+                </a>
               </div>
-            ))}
+            </div>
           </div>
         </section>
 
@@ -102,14 +130,6 @@ export default async function Home() {
                   <Mail className="size-3.5 text-primary" />
                   <a href={`mailto:${venue.email}`} className="hover:text-foreground transition-colors">{venue.email}</a>
                 </p>
-                <a
-                  href="https://www.google.com/maps/search/?api=1&query=Crosshair+Dinkers+Butuan+City"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block pt-1 font-bold text-primary hover:underline underline-offset-4"
-                >
-                  Get directions
-                </a>
               </div>
             </div>
           </div>
