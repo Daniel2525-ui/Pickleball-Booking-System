@@ -20,7 +20,12 @@ test("describeSettingsChange lists any other area field by field", () => {
 
 test("describeSettingsChange words staff access changes", () => {
     const change = (from, to) => describeSettingsChange({ area: "staff", before: { account: "ana@x.ph", access: from }, after: { account: "ana@x.ph", access: to } });
-    assert.deepEqual(change("customer", "admin"), ["ana@x.ph: given staff access"]);
+    assert.deepEqual(change("none", "staff"), ["ana@x.ph: given front desk access"]);
+    assert.deepEqual(change("none", "owner"), ["ana@x.ph: given owner access"]);
+    assert.deepEqual(change("staff", "owner"), ["ana@x.ph: front desk → owner"]);
+    assert.deepEqual(change("owner", "none"), ["ana@x.ph: staff access removed"]);
+    // Rows written before owners existed
+    assert.deepEqual(change("customer", "admin"), ["ana@x.ph: given front desk access"]);
     assert.deepEqual(change("admin", "customer"), ["ana@x.ph: staff access removed"]);
 });
 

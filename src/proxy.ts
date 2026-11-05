@@ -22,6 +22,10 @@ export async function proxy(request: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Pricing and Settings are the owner's; front-desk staff (role admin, not owner) use every other admin page
+    const path = request.nextUrl.pathname
+    const ownerOnly = /^\/admin\/(pricing|settings)(\/|$)/.test(path) || /^\/api\/admin\/pricing(\/|$)/.test(path)
+
     // Protect /api/admin API routes — must be logged in + admin role
     if (request.nextUrl.pathname.startsWith('/api/admin')) {
         if (!user) {
@@ -29,12 +33,15 @@ export async function proxy(request: NextRequest) {
         }
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, is_owner')
             .eq('id', user.id)
             .single()
 
         if (profile?.role !== 'admin') {
             return NextResponse.json({ error: "Admin access required." }, { status: 403 })
+        }
+        if (ownerOnly && !profile.is_owner) {
+            return NextResponse.json({ error: "Only the owner can do this." }, { status: 403 })
         }
     }
 
@@ -45,12 +52,15 @@ export async function proxy(request: NextRequest) {
         }
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, is_owner')
             .eq('id', user.id)
             .single()
 
         if (profile?.role !== 'admin') {
             return NextResponse.redirect(new URL('/', request.url))
+        }
+        if (ownerOnly && !profile.is_owner) {
+            return NextResponse.redirect(new URL('/admin/dashboard', request.url))
         }
     }
 

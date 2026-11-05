@@ -32,6 +32,8 @@ interface NavItem {
     title: string;
     url: string;
     icon: React.ComponentType<{ className?: string }>;
+    /** Owner only: hidden from front-desk staff (proxy.ts also redirects them) */
+    ownerOnly?: boolean;
 }
 
 const operationsNav: NavItem[] = [
@@ -63,6 +65,7 @@ const operationsNav: NavItem[] = [
     {
         title: "Pricing",
         url: "/admin/pricing",
+        ownerOnly: true,
         icon: Tag,
     },
 ];
@@ -81,11 +84,12 @@ const managementNav: NavItem[] = [
     {
         title: "Settings",
         url: "/admin/settings",
+        ownerOnly: true,
         icon: Settings,
     },
 ];
 
-export default function AppSidebar({ account }: { account: { name: string; email: string } | null }) {
+export default function AppSidebar({ account, isOwner }: { account: { name: string; email: string } | null; isOwner: boolean }) {
     const currentPath = usePathname();
 
     return (
@@ -124,7 +128,7 @@ export default function AppSidebar({ account }: { account: { name: string; email
                     </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu className="gap-1">
-                            {operationsNav.map((item) => {
+                            {operationsNav.filter((item) => isOwner || !item.ownerOnly).map((item) => {
                                 const isActive = currentPath === item.url || currentPath.startsWith(`${item.url}/`);
                                 const Icon = item.icon;
 
@@ -154,7 +158,7 @@ export default function AppSidebar({ account }: { account: { name: string; email
                     </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu className="gap-1">
-                            {managementNav.map((item) => {
+                            {managementNav.filter((item) => isOwner || !item.ownerOnly).map((item) => {
                                 const isActive = currentPath === item.url || currentPath.startsWith(`${item.url}/`);
                                 const Icon = item.icon;
 

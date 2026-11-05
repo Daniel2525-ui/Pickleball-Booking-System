@@ -8,12 +8,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = user
-    ? await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle()
+    ? await supabase.from("profiles").select("full_name, is_owner").eq("id", user.id).maybeSingle()
     : { data: null }
 
   return (
     <SidebarProvider>
-      <AppSidebar account={user ? { name: profile?.full_name ?? "", email: user.email ?? "" } : null} />
+      <AppSidebar account={user ? { name: profile?.full_name ?? "", email: user.email ?? "" } : null} isOwner={!!profile?.is_owner} />
       <main className="w-full min-h-screen flex flex-col bg-background text-foreground">
         {/* Responsive Admin App Header */}
         <header className="sticky top-0 z-30 h-14 flex items-center bg-background/90 backdrop-blur-md px-4 sm:px-6 pt-[env(safe-area-inset-top)]">

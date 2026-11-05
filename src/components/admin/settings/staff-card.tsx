@@ -10,30 +10,43 @@ import { Label } from "@/components/ui/label";
 import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { supabase } from "@/lib/supabase";
 
+type Access = "owner" | "staff" | "none";
+
 interface StaffMember {
   id: string;
   full_name: string | null;
   email: string | null;
+  is_owner: boolean;
 }
+
+const LABEL: Record<Access, string> = { owner: "Owner", staff: "Front desk", none: "No access" };
 
 // set_staff_access refusals in staff wording
 const staffError = (message: string) =>
-  message.includes("CANNOT_REMOVE_SELF") ? "You can't remove your own staff access. Ask another staff member to do it."
-  : message.includes("LAST_STAFF") ? "The venue must keep at least one staff account."
-  : message.includes("FORBIDDEN") ? "Only staff can change staff access."
+  message.includes("CANNOT_CHANGE_SELF") ? "You can't change your own access. Ask another owner to do it."
+  : message.includes("LAST_OWNER") ? "The venue must keep at least one owner."
+  : message.includes("FORBIDDEN") ? "Only the owner can change staff access."
   : "Could not change staff access. Please try again.";
 
-/** Who can open the admin pages: give a player account staff access, or take it away. */
+const selectClass = "h-9 rounded-md border border-input bg-background px-2 text-sm";
+
+/** Who can open the admin pages: owners see everything, front desk everything except Pricing and Settings. */
 export function StaffCard({ onChanged }: { onChanged: () => void }) {
   const [staff, setStaff] = useState<StaffMember[] | null>(null);
   const [me, setMe] = useState<string | null>(null);
   const [email, setEmail] = useState("");
+  const [newAccess, setNewAccess] = useState<Access>("staff");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "admin").order("full_name");
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, is_owner")
+      .eq("role", "admin")
+      .order("is_owner", { ascending: false })
+      .order("full_name");
     setStaff((data ?? []) as StaffMember[]);
   }, []);
 
@@ -43,15 +56,15 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
     supabase.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null));
   }, [load]);
 
-  const setAccess = async (id: string, isStaff: boolean, label: string) => {
+  const setAccess = async (id: string, access: Access, label: string) => {
     setBusy(true);
-    const { error: rpcError } = await supabase.rpc("set_staff_access", { p_user_id: id, p_is_staff: isStaff });
+    const { error: rpcError } = await supabase.rpc("set_staff_access", { p_user_id: id, p_access: access });
     setBusy(false);
     if (rpcError) {
       toast.error(staffError(rpcError.message));
       return false;
     }
-    toast.success(isStaff ? `${label} now has staff access.` : `${label} no longer has staff access.`);
+    toast.success(access === "none" ? `${label} no longer has staff access.` : `${label} now has ${LABEL[access].toLowerCase()} access.`);
     load();
     onChanged();
     return true;
@@ -65,8 +78,8 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
     const { data } = await supabase.from("profiles").select("id, email, role").ilike("email", wanted).limit(1);
     const account = data?.[0];
     if (!account) return setError("No player account uses that email. Ask them to sign up on the booking site first.");
-    if (account.role === "admin") return setError("That account already has staff access.");
-    if (await setAccess(account.id, true, account.email ?? wanted)) setEmail("");
+    if (account.role === "admin") return setError("That account already has staff access. Change its access in the list above.");
+    if (await setAccess(account.id, newAccess, account.email ?? wanted)) setEmail("");
   };
 
   return (
@@ -74,7 +87,8 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
       <CardHeader>
         <CardTitle className="text-xl font-bold">Staff</CardTitle>
         <CardDescription>
-          Staff can open every admin page. Remove access as soon as someone leaves; it takes effect on their next action.
+          Owners can use every admin page. Front desk can use everything except Pricing and Settings. Remove access as
+          soon as someone leaves; it takes effect on their next action.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 max-w-xl">
@@ -82,36 +96,54 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
           <Loader2 className="size-5 animate-spin text-primary" />
         ) : (
           <ul className="divide-y divide-border rounded-xl border">
-            {staff.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                <span className="min-w-0">
-                  <span className="block font-semibold truncate">
-                    {s.full_name || "Staff"}
-                    {s.id === me && <span className="font-normal text-muted-foreground"> (you)</span>}
+            {staff.map((s) => {
+              const access: Access = s.is_owner ? "owner" : "staff";
+              const label = s.full_name || s.email || "That account";
+              return (
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+                  <span className="min-w-0">
+                    <span className="block font-semibold truncate">
+                      {s.full_name || "Staff"}
+                      {s.id === me && <span className="font-normal text-muted-foreground"> (you)</span>}
+                    </span>
+                    <span className="block text-xs text-muted-foreground truncate">{s.email}</span>
                   </span>
-                  <span className="block text-xs text-muted-foreground truncate">{s.email}</span>
-                </span>
-                {s.id !== me && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    className="gap-1 text-destructive"
-                    aria-label={`Remove staff access for ${s.email ?? s.full_name}`}
-                    onClick={() =>
-                      setConfirmRequest({
-                        title: "Remove staff access?",
-                        description: `${s.full_name || s.email} will no longer be able to open the admin pages. Their player account stays.`,
-                        confirmLabel: "Remove Access",
-                        onConfirm: () => setAccess(s.id, false, s.full_name || s.email || "That account"),
-                      })
-                    }
-                  >
-                    <UserMinus className="size-4" /> Remove access
-                  </Button>
-                )}
-              </li>
-            ))}
+                  {s.id === me ? (
+                    <span className="text-xs font-semibold text-muted-foreground">{LABEL[access]}</span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <select
+                        className={selectClass}
+                        value={access}
+                        disabled={busy}
+                        aria-label={`Access for ${s.email ?? s.full_name}`}
+                        onChange={(e) => setAccess(s.id, e.target.value as Access, label)}
+                      >
+                        <option value="owner">Owner</option>
+                        <option value="staff">Front desk</option>
+                      </select>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        className="gap-1 text-destructive"
+                        aria-label={`Remove staff access for ${s.email ?? s.full_name}`}
+                        onClick={() =>
+                          setConfirmRequest({
+                            title: "Remove staff access?",
+                            description: `${label} will no longer be able to open the admin pages. Their player account stays.`,
+                            confirmLabel: "Remove Access",
+                            onConfirm: () => setAccess(s.id, "none", label),
+                          })
+                        }
+                      >
+                        <UserMinus className="size-4" /> Remove
+                      </Button>
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -129,8 +161,17 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
               }}
               aria-describedby={error ? "staff-email-error" : undefined}
             />
+            <select
+              className={selectClass}
+              value={newAccess}
+              onChange={(e) => setNewAccess(e.target.value as Access)}
+              aria-label="Access to give"
+            >
+              <option value="staff">Front desk</option>
+              <option value="owner">Owner</option>
+            </select>
             <Button type="submit" disabled={busy} className="gap-2 shrink-0">
-              <UserPlus className="size-4" /> Give staff access
+              <UserPlus className="size-4" /> Give access
             </Button>
           </div>
           {error && <p id="staff-email-error" role="alert" className="text-sm text-destructive">{error}</p>}

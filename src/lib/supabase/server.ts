@@ -32,3 +32,17 @@ export async function requireAdmin() {
 
     return { supabase, denied: null }
 }
+
+/** Like requireAdmin, for the owner only (Pricing and Settings); front-desk staff get a 403. */
+export async function requireOwner() {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { supabase: null, denied: Response.json({ error: "Unauthorized." }, { status: 401 }) }
+
+    const { data: profile } = await supabase.from('profiles').select('role, is_owner').eq('id', user.id).maybeSingle()
+    if (profile?.role !== 'admin' || !profile.is_owner) {
+        return { supabase: null, denied: Response.json({ error: "Only the owner can do this." }, { status: 403 }) }
+    }
+
+    return { supabase, denied: null }
+}

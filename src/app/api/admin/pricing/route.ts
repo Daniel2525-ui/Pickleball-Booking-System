@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/supabase/server";
+import { requireOwner } from "@/lib/supabase/server";
 import { validatePricingInput } from "@/lib/services/pricing/validatePricingInput";
 
 /** Saves the base rate, booking length limits and peak windows (replaces all windows). Admin only. */
 export async function POST(request: NextRequest) {
     try {
-        const { supabase, denied } = await requireAdmin();
+        const { supabase, denied } = await requireOwner();
         if (denied) return denied;
 
         const parsed = validatePricingInput(await request.json().catch(() => null));

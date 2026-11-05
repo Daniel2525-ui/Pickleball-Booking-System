@@ -138,6 +138,8 @@ test("a walk-in already played today is recorded as completed; earlier days are 
   const hour = Number(sql("SELECT extract(hour FROM now() AT TIME ZONE 'Asia/Manila')"));
   test.skip(hour < 7, "needs an hour inside opening hours (06:00) that has already ended today");
   const today = sql("SELECT (now() AT TIME ZONE 'Asia/Manila')::date::text");
+  // The "opens on today" test left a 3-4 PM booking on this court: clear it, or this slot clashes when run at 4 PM
+  sql("DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE customer_name = 'E2E Today Booking'); DELETE FROM public.bookings WHERE customer_name = 'E2E Today Booking'");
   const end = Math.min(hour, 22); // the venue closes at 22:00 in the test hours
   const pad = (h) => String(h).padStart(2, "0") + ":00";
 
