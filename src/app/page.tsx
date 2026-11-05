@@ -1,4 +1,4 @@
-import { VENUE_CONTACT } from "@/lib/venue";
+import { fetchVenueContact } from "@/lib/venue";
 import Link from "next/link";
 import { Crosshair, MapPin, Phone, Mail } from "lucide-react";
 import { BookingContainer } from "@/components/customers/booking-container";
@@ -8,7 +8,7 @@ import { getPublicClient } from "@/lib/supabase/public";
 import { summarizeVenueHours } from "@/lib/utils/venueHours";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { lowestHourlyRate } from "@/lib/services/pricing/quoteCourtPrice";
-import { CANCELLATION_CUTOFF_HOURS } from "@/lib/services/bookings/cancelBooking.service";
+import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 
 // Hours, courts and pricing are edited in the admin; refresh the static page at most every 5 minutes
 export const revalidate = 300;
@@ -21,13 +21,15 @@ export default async function Home() {
     supabase.from("courts").select("id", { count: "exact", head: true }),
     fetchPricing(supabase),
   ]);
+  const { cancelCutoffHours } = await fetchBookingPolicy(supabase);
+  const venue = await fetchVenueContact(supabase);
   const hours = summarizeVenueHours(operatingHours ?? []);
   const fromRate = pricing ? lowestHourlyRate(pricing) : null;
 
   const stats = [
     { value: courtCount ? String(courtCount) : "—", label: "regulation courts, 44 × 20 ft" },
     { value: fromRate ? `₱${fromRate.toLocaleString()}` : "—", label: "per court, per hour. Paddles and balls included" },
-    { value: `${CANCELLATION_CUTOFF_HOURS} hrs`, label: "before play: cancel online for a full refund" },
+    { value: `${cancelCutoffHours} hrs`, label: "before play: cancel online for a full refund" },
   ];
 
   return (
@@ -90,15 +92,15 @@ export default async function Home() {
               <div className="space-y-1.5 text-xs">
                 <p className="flex items-start gap-2">
                   <MapPin className="size-3.5 text-primary shrink-0 mt-0.5" />
-                  <span>{VENUE_CONTACT.address}</span>
+                  <span>{venue.address}</span>
                 </p>
                 <p className="flex items-center gap-2">
                   <Phone className="size-3.5 text-primary" />
-                  <a href={VENUE_CONTACT.phoneHref} className="hover:text-foreground transition-colors">{VENUE_CONTACT.phone}</a>
+                  <a href={venue.phoneHref} className="hover:text-foreground transition-colors">{venue.phone}</a>
                 </p>
                 <p className="flex items-center gap-2">
                   <Mail className="size-3.5 text-primary" />
-                  <a href={`mailto:${VENUE_CONTACT.email}`} className="hover:text-foreground transition-colors">{VENUE_CONTACT.email}</a>
+                  <a href={`mailto:${venue.email}`} className="hover:text-foreground transition-colors">{venue.email}</a>
                 </p>
                 <a
                   href="https://www.google.com/maps/search/?api=1&query=Crosshair+Dinkers+Butuan+City"

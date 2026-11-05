@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
+import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason } from "@/lib/services/bookings/adminStatusRules";
 import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { cancelRestOfBasket, closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
@@ -63,7 +64,8 @@ export async function POST(request: NextRequest) {
 
         // 5. No-show grace period guard
         if (newStatus === "no_show") {
-            const minutesLeft = noShowMinutesLeft(booking);
+            const { noShowGraceMinutes } = await fetchBookingPolicy(supabase);
+            const minutesLeft = noShowMinutesLeft(booking, new Date(), noShowGraceMinutes);
             if (minutesLeft > 0) {
                 return Response.json(
                     { error: `No-show grace period has not elapsed. ${minutesLeft} minute(s) remaining.` },

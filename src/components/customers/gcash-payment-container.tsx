@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
-import { VENUE_CONTACT } from "@/lib/venue";
+import { useVenueContact } from "@/hooks/use-venue-contact";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const REFERENCE_ERROR = "Enter the reference number from your GCash receipt (6 to 20 letters or digits).";
@@ -23,6 +23,7 @@ const normaliseReference = (ref: string) => ref.replace(/[\s-]/g, "");
 const holdEnd = (r: Row) => new Date(r.hold_expires_at ?? new Date(r.created_at).getTime() + 35 * 60_000).getTime();
 
 export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
+  const venue = useVenueContact();
   const [view, setView] = useState<View>("loading");
   const [rows, setRows] = useState<Row[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -118,7 +119,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
         <Info className="size-10 text-destructive mx-auto" />
         <h1 className="text-2xl font-extrabold tracking-tight">This reservation has expired</h1>
         <p className="text-sm text-muted-foreground">{spotBuyer ? "The hold on your spots has ended. Pick a session to book again." : "The hold on your courts has ended. Pick a new time to book again."}</p>
-        <p className="text-sm text-muted-foreground">Already sent the money? Contact the club at <a href={VENUE_CONTACT.phoneHref} className="font-semibold text-foreground">{VENUE_CONTACT.phone}</a> with your GCash reference.</p>
+        <p className="text-sm text-muted-foreground">Already sent the money? Contact the club at <a href={venue.phoneHref} className="font-semibold text-foreground">{venue.phone}</a> with your GCash reference.</p>
         <Link href="/book" className="block"><Button className="w-full h-11 font-bold">Book again</Button></Link>
       </div>
     );

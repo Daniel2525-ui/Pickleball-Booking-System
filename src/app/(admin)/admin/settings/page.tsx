@@ -12,7 +12,7 @@ export default function SettingsPage() {
       <header className="sticky top-14 z-20 bg-background/95 backdrop-blur-md pt-6 pb-4 sm:pt-7 border-b border-border/60 -mx-4 px-4 lg:-mx-8 lg:px-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose the GCash account players pay to when they book.
+          Payment details, venue contact, booking rules and staff access.
         </p>
       </header>
 

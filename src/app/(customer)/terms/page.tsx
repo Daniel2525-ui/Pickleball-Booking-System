@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { LegalPage } from "@/components/customers/legal-page";
-import { VENUE_CONTACT } from "@/lib/venue";
-import { CANCELLATION_CUTOFF_HOURS } from "@/lib/services/bookings/cancelBooking.service";
+import { fetchVenueContact } from "@/lib/venue";
+import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { getPublicClient } from "@/lib/supabase/public";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { formatTime12h } from "@/lib/utils/formatTime";
@@ -15,7 +15,11 @@ export const metadata: Metadata = {
 };
 
 export default async function TermsPage() {
-  const { data: pricing } = await fetchPricing(getPublicClient());
+  const [{ data: pricing }, { cancelCutoffHours }] = await Promise.all([
+    fetchPricing(getPublicClient()),
+    fetchBookingPolicy(getPublicClient()),
+  ]);
+  const venue = await fetchVenueContact(getPublicClient());
   const hoursText = pricing
     ? pricing.settings.min_hours === pricing.settings.max_hours
       ? `${pricing.settings.min_hours} consecutive hour${pricing.settings.min_hours === 1 ? "" : "s"}`
@@ -45,8 +49,8 @@ export default async function TermsPage() {
 
       <h2 id="cancellation">Cancellations &amp; refunds</h2>
       <ul>
-        <li>You can cancel a paid reservation in My Bookings up to {CANCELLATION_CUTOFF_HOURS} hours before its start time and receive a full refund. Card refunds go back to the original card; banks usually take 5–10 business days to show them. Counter payments are refunded by venue staff.</li>
-        <li>Within {CANCELLATION_CUTOFF_HOURS} hours of the start time, online cancellation is closed. Please contact the venue.</li>
+        <li>You can cancel a paid reservation in My Bookings up to {cancelCutoffHours} hours before its start time and receive a full refund. Card refunds go back to the original card; banks usually take 5–10 business days to show them. Counter payments are refunded by venue staff.</li>
+        <li>Within {cancelCutoffHours} hours of the start time, online cancellation is closed. Please contact the venue.</li>
         <li>Unpaid holds can be cancelled at any time before the slot starts.</li>
         <li>If the venue has to cancel your reservation, you receive a full refund.</li>
         <li>Online rescheduling isn&apos;t available; cancel within the window above and book a new slot.</li>
@@ -65,8 +69,8 @@ export default async function TermsPage() {
 
       <h2>Contact</h2>
       <p>
-        {VENUE_CONTACT.address} · <a className="text-primary hover:underline" href={`mailto:${VENUE_CONTACT.email}`}>{VENUE_CONTACT.email}</a> ·{" "}
-        <a className="text-primary hover:underline" href={VENUE_CONTACT.phoneHref}>{VENUE_CONTACT.phone}</a>
+        {venue.address} · <a className="text-primary hover:underline" href={`mailto:${venue.email}`}>{venue.email}</a> ·{" "}
+        <a className="text-primary hover:underline" href={venue.phoneHref}>{venue.phone}</a>
       </p>
     </LegalPage>
   );

@@ -1,13 +1,18 @@
 import { Metadata } from "next";
 import { LegalPage } from "@/components/customers/legal-page";
-import { VENUE_CONTACT } from "@/lib/venue";
+import { fetchVenueContact } from "@/lib/venue";
+import { getPublicClient } from "@/lib/supabase/public";
 
 export const metadata: Metadata = {
   title: "Privacy Policy | Crosshair Dinkers",
   description: "How Crosshair Dinkers collects and uses your personal information.",
 };
 
-export default function PrivacyPage() {
+// Contact details are edited in Settings; refresh at most every 5 minutes
+export const revalidate = 300;
+
+export default async function PrivacyPage() {
+  const venue = await fetchVenueContact(getPublicClient());
   return (
     <LegalPage title="Privacy Policy">
       <p>
@@ -47,8 +52,8 @@ export default function PrivacyPage() {
 
       <h2>Contact</h2>
       <p>
-        {VENUE_CONTACT.address} · <a className="text-primary hover:underline" href={`mailto:${VENUE_CONTACT.email}`}>{VENUE_CONTACT.email}</a> ·{" "}
-        <a className="text-primary hover:underline" href={VENUE_CONTACT.phoneHref}>{VENUE_CONTACT.phone}</a>
+        {venue.address} · <a className="text-primary hover:underline" href={`mailto:${venue.email}`}>{venue.email}</a> ·{" "}
+        <a className="text-primary hover:underline" href={venue.phoneHref}>{venue.phone}</a>
       </p>
     </LegalPage>
   );

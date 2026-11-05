@@ -52,8 +52,13 @@ export const gameDayBlockReason = (newStatus: string, booking: { booking_date: s
 };
 
 /** Minutes left before a no-show may be recorded (0 once the grace period after start has passed). */
-export const noShowMinutesLeft = (booking: { booking_date: string; start_time: string }, now: Date = new Date()) => {
-    const graceCutoff = getBookingStart(booking).getTime() + NO_SHOW_GRACE_MINUTES * 60_000;
+export const noShowMinutesLeft = (
+    booking: { booking_date: string; start_time: string },
+    now: Date = new Date(),
+    /** booking_settings.no_show_grace_minutes */
+    graceMinutes: number = NO_SHOW_GRACE_MINUTES
+) => {
+    const graceCutoff = getBookingStart(booking).getTime() + graceMinutes * 60_000;
     return Math.max(0, Math.ceil((graceCutoff - now.getTime()) / 60_000));
 };
 

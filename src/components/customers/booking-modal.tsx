@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { VENUE_CONTACT } from "@/lib/venue";
+import { useVenueContact } from "@/hooks/use-venue-contact";
 import { Clock, MapPin, Calendar, LoaderCircle, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +32,7 @@ export const BookingModal = ({
   gcashEnabled,
   onConfirm,
 }: BookingModalProps) => {
+  const venue = useVenueContact();
   const [method, setMethod] = useState<"card" | "gcash">("card");
   const { total, hasPeak } = basketTotal(lines);
   return (
@@ -77,7 +78,7 @@ export const BookingModal = ({
             </div>
             <div className="pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="size-4 shrink-0 text-primary" />
-              <span>Crosshair Dinkers, {VENUE_CONTACT.address}</span>
+              <span>Crosshair Dinkers, {venue.address}</span>
             </div>
           </div>
         )}

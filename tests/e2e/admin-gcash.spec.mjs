@@ -150,7 +150,7 @@ test("admin edits GCash details", async ({ page }) => {
     await page.unroute("**/rest/v1/booking_settings*");
     await page.reload();
     const name = page.getByLabel("Account name");
-    const number = page.getByLabel("GCash number");
+    const number = page.getByLabel("GCash number", { exact: true });
     const save = page.getByRole("button", { name: "Save GCash details" });
 
     // Invalid number: inline error, nothing saved
@@ -166,10 +166,18 @@ test("admin edits GCash details", async ({ page }) => {
     await expect(page.getByText("Enter both the account name and the GCash number, or clear both to turn GCash off.")).toBeVisible();
     expect(saved()).toBe("-|-|false");
 
+    // A new number must be typed twice: a mismatch saves nothing
+    const confirm = page.getByLabel("Confirm GCash number");
+    await number.fill("09171234567");
+    await confirm.fill("09171234576");
+    await save.click();
+    await expect(page.getByText("The two GCash numbers don't match. Type the new number again.")).toBeVisible();
+    expect(saved()).toBe("-|-|false");
+    await confirm.fill("09171234567");
+
     // A save that updates no row (e.g. RLS) is an error, not "saved"
     await page.route("**/rest/v1/booking_settings*", (route) =>
       route.request().method() === "PATCH" ? route.fulfill({ status: 200, contentType: "application/json", body: "[]" }) : route.continue());
-    await number.fill("09171234567");
     await save.click();
     await expect(page.getByText("GCash details were not saved. Reload the page and try again.")).toBeVisible();
     await page.unroute("**/rest/v1/booking_settings*");
@@ -182,14 +190,32 @@ test("admin edits GCash details", async ({ page }) => {
     await page.reload();
     await expect(name).toHaveValue("Pickle Club Co.");
     await expect(number).toHaveValue("09171234567");
+    await expect(page.getByLabel("Confirm GCash number")).toHaveCount(0); // unchanged number: nothing to confirm
 
-    // QR upload stores the public URL; Remove QR clears it
+    // A picked QR is a preview until Save; removing it waits for Save too, and can be undone
     await page.getByLabel("QR code image").setInputFiles({ name: "qr.png", mimeType: "image/png", buffer: PNG_1X1 });
     await expect(page.getByRole("img", { name: "GCash QR code" })).toBeVisible();
+    expect(saved()).toBe("Pickle Club Co.|09171234567|false");
+    await save.click();
+    await expect(page.getByText("GCash details saved.").first()).toBeVisible();
     expect(saved()).toBe("Pickle Club Co.|09171234567|true");
     await page.getByRole("button", { name: "Remove QR" }).click();
     await expect(page.getByRole("img", { name: "GCash QR code" })).toHaveCount(0);
-    expect(saved()).toBe("Pickle Club Co.|09171234567|false");
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.getByRole("img", { name: "GCash QR code" })).toBeVisible();
+    await page.getByRole("button", { name: "Remove QR" }).click();
+    expect(saved()).toBe("Pickle Club Co.|09171234567|true");
+    await save.click();
+    await expect.poll(saved).toBe("Pickle Club Co.|09171234567|false");
+    // The removed QR image file is deleted from storage too
+    const storage = (await signedIn("ADMIN")).storage.from("club-assets");
+    await expect.poll(async () => ((await storage.list()).data ?? []).filter((f) => f.name.startsWith("gcash-qr-")).length).toBe(0);
+
+    // Every change is recorded with who made it
+    const history = page.getByRole("listitem").filter({ hasText: "E2E Admin" });
+    await expect(history.filter({ hasText: "QR code removed" })).toHaveCount(1);
+    await expect(history.filter({ hasText: "QR code added" })).toHaveCount(1);
+    await expect(history.filter({ hasText: "GCash number: 09171234567" })).toHaveCount(1);
 
     // Clearing both turns GCash off, which hides it in the booking modal
     await name.fill("");

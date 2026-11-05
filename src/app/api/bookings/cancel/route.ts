@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import { refundPaidStripePayments } from "@/lib/services/payments/refundPaidStripePayments.ts";
@@ -56,7 +57,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 4. Enforce business rules (status + start time not yet passed)
-        const blockReason = getCancellationBlockReason(booking);
+        const { cancelCutoffHours } = await fetchBookingPolicy(supabase);
+        const blockReason = getCancellationBlockReason(booking, new Date(), cancelCutoffHours);
         if (blockReason) {
             return Response.json({ error: blockReason }, { status: 409 });
         }

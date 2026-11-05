@@ -32,7 +32,9 @@ interface CancellableBookingFields {
  */
 export const getCancellationBlockReason = (
     booking: CancellableBookingFields,
-    now: Date = new Date()
+    now: Date = new Date(),
+    /** booking_settings.cancel_cutoff_hours */
+    cutoffHours: number = CANCELLATION_CUTOFF_HOURS
 ): string | null => {
     const status = (booking.status || "").toLowerCase();
 
@@ -51,16 +53,16 @@ export const getCancellationBlockReason = (
     if (start <= now) return "This booking has already started and can no longer be cancelled.";
 
     // Unpaid holds can be released any time before start; paid ones follow the cutoff
-    const cutoff = start.getTime() - CANCELLATION_CUTOFF_HOURS * 60 * 60 * 1000;
+    const cutoff = start.getTime() - cutoffHours * 60 * 60 * 1000;
     if (status === "confirmed" && now.getTime() > cutoff) {
-        return `Confirmed reservations can only be cancelled up to ${CANCELLATION_CUTOFF_HOURS} hours before the start time. Please contact the venue for help.`;
+        return `Confirmed reservations can only be cancelled up to ${cutoffHours} hours before the start time. Please contact the venue for help.`;
     }
 
     return null;
 };
 
-export const isBookingCancellable = (booking: CancellableBookingFields, now: Date = new Date()) =>
-    getCancellationBlockReason(booking, now) === null;
+export const isBookingCancellable = (booking: CancellableBookingFields, now: Date = new Date(), cutoffHours: number = CANCELLATION_CUTOFF_HOURS) =>
+    getCancellationBlockReason(booking, now, cutoffHours) === null;
 
 export interface CancelledBooking {
     id: string;
