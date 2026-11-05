@@ -59,9 +59,18 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                           Not created: {s.flag_reason}
                         </span>
                       ) : (
-                        <Badge variant="outline" className="text-xs font-semibold">
-                          {cancelled ? "Cancelled" : s.booked >= s.capacity ? "Full" : "Open"}
-                        </Badge>
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge variant="outline" className="text-xs font-semibold">
+                            {cancelled ? "Cancelled" : s.booked >= s.capacity ? "Full" : "Open"}
+                          </Badge>
+                          {!cancelled && s.closedReason != null && (
+                            <span className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+                              <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
+                              Venue closed{s.closedReason ? ` (${s.closedReason})` : ""}
+                              {s.booked > 0 ? ": cancel to refund players" : ""}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -99,9 +108,9 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
-                      {/* The bookings page has no date filter, so this opens the full list */}
+                      {/* The booking that blocked the session is on this date */}
                       {flagged && (
-                        <Link href="/admin/bookings" className="text-sm font-medium underline underline-offset-2">View booking</Link>
+                        <Link href={`/admin/bookings?date=${s.session_date}`} className="text-sm font-medium underline underline-offset-2">View booking</Link>
                       )}
                     </TableCell>
                   </TableRow>

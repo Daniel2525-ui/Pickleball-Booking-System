@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { SpotRow } from "./openPlayTypes";
+import { PastSpotRow, SpotRow } from "./openPlayTypes";
 
 /** Spot rows that can hold a place in these sessions: confirmed-type rows and pending holds (tallySpots drops expired ones). */
 export const fetchSpotRows = async (sessionIds: string[]) => {
@@ -44,4 +44,15 @@ export const bookOpenPlay = async (sessionId: string, spots: number, method: "st
     } catch {
         return { error: "Could not reach the server. Check your connection and try again." };
     }
+};
+
+/** Spot rows of past sessions with their payments, for the Past view's played and collected figures. */
+export const fetchPastSpotRows = async (sessionIds: string[]) => {
+    if (!sessionIds.length) return { data: [] as PastSpotRow[], error: null };
+    const { data, error } = await supabase
+        .from("bookings")
+        .select("open_play_session_id, open_play_spots, status, payments(status, amount)")
+        .in("open_play_session_id", sessionIds)
+        .is("court_id", null);
+    return { data: (data ?? []) as unknown as PastSpotRow[], error };
 };

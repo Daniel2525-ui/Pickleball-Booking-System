@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { fetchSpotRows } from "@/lib/services/openPlay/openPlayData.service";
+import { fetchPastSpotRows, fetchSpotRows } from "@/lib/services/openPlay/openPlayData.service";
+import { summarizePastSessions } from "@/lib/services/openPlay/openPlayTypes";
+import { Button } from "@/components/ui/button";
+import { PastSessionsTable, type PastSession } from "./past-sessions-table";
 import { tallySpots } from "@/lib/services/openPlay/openPlayTypes";
+import { fetchUpcomingClosures } from "@/lib/services/schedule/venueClosures.service";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
@@ -34,6 +38,8 @@ export interface OpenPlayAdminSession {
   booked: number;
   /** GCash payments waiting for staff; the session cannot be cancelled until they are resolved */
   awaiting: boolean;
+  /** Set when the date is a closed date (venue_closures): the reason, or "" when none was given */
+  closedReason?: string | null;
 }
 
 /** Past its end time in Manila: cancelling would refund players for a session that already happened */
@@ -49,11 +55,41 @@ export function OpenPlayContainer() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<OpenPlayAdminSession | null>(null);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const [view, setView] = useState<"upcoming" | "past">("upcoming");
+  const [past, setPast] = useState<PastSession[] | null>(null);
+
+  // The last 28 days, loaded when staff open the Past view
+  const loadPast = useCallback(async () => {
+    const today = new Date();
+    const from = new Date(today.getTime() - WINDOW_DAYS * 86400000);
+    const { data: sess, error } = await supabase
+      .from("open_play_sessions")
+      .select("id, session_date, start_time, end_time, capacity, status, flag_reason")
+      .gte("session_date", formatManilaDate(from))
+      .lt("session_date", formatManilaDate(today))
+      .neq("status", "flagged")
+      .order("session_date", { ascending: false })
+      .order("start_time", { ascending: false });
+    const { data: rows, error: rowsError } = await fetchPastSpotRows((sess ?? []).map((s) => s.id));
+    if (error || rowsError) toast.error("Failed to load past sessions.");
+    const sums = summarizePastSessions(rows);
+    setPast(
+      (sess ?? []).map((s) => {
+        const sum = sums.get(s.id) ?? { booked: 0, played: 0, collected: 0 };
+        return { ...s, awaiting: false, ...sum } as PastSession;
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPast() sets state after its await
+    if (view === "past" && past === null) loadPast();
+  }, [view, past, loadPast]);
 
   const load = useCallback(async () => {
     const today = new Date();
     const end = new Date(today.getTime() + WINDOW_DAYS * 86400000);
-    const [sched, sess, courtRes] = await Promise.all([
+    const [sched, sess, courtRes, closures] = await Promise.all([
       supabase.from("open_play_schedules").select("*").eq("active", true),
       supabase
         .from("open_play_sessions")
@@ -63,7 +99,10 @@ export function OpenPlayContainer() {
         .order("session_date")
         .order("start_time"),
       fetchCourtsData(),
+      fetchUpcomingClosures(),
     ]);
+    // Players can no longer see a session on a closed date; staff still need to refund who already booked
+    const closedOn = new Map(closures.data.map((c) => [c.closed_on, c.reason ?? ""]));
     setSchedules((sched.data ?? []) as OpenPlaySchedule[]);
     setCourts(courtRes.data);
 
@@ -71,7 +110,7 @@ export function OpenPlayContainer() {
     // Without spot rows the counts read 0 and the GCash-awaiting guard on Cancel is off: say so
     if (sched.error || sess.error || courtRes.error || spotError) toast.error("Failed to load open play. Refresh before changing anything.");
     const { booked, awaiting } = tallySpots(spotRows);
-    const rows = (sess.data ?? []).map((s) => ({ ...s, booked: booked.get(s.id) ?? 0, awaiting: awaiting.has(s.id) })) as OpenPlayAdminSession[];
+    const rows = (sess.data ?? []).map((s) => ({ ...s, booked: booked.get(s.id) ?? 0, awaiting: awaiting.has(s.id), closedReason: closedOn.get(s.session_date) ?? null })) as OpenPlayAdminSession[];
     setSessions(rows);
     setSelected((cur) => rows.find((s) => s.id === cur?.id) ?? null);
     setLoading(false);
@@ -103,9 +142,21 @@ export function OpenPlayContainer() {
   return (
     <>
       <ScheduleTable schedules={schedules} courts={courts} loading={loading} onChanged={load} />
-      <SessionsTable sessions={sessions} loading={loading} selectedId={selected?.id} onPlayers={setSelected} onCancel={askCancel} />
+      <div className="flex gap-2" role="group" aria-label="Which sessions">
+        <Button variant={view === "upcoming" ? "default" : "outline"} size="sm" aria-pressed={view === "upcoming"} onClick={() => { setView("upcoming"); setSelected(null); }}>
+          Upcoming
+        </Button>
+        <Button variant={view === "past" ? "default" : "outline"} size="sm" aria-pressed={view === "past"} onClick={() => { setView("past"); setSelected(null); }}>
+          Past 28 days
+        </Button>
+      </div>
+      {view === "upcoming" ? (
+        <SessionsTable sessions={sessions} loading={loading} selectedId={selected?.id} onPlayers={setSelected} onCancel={askCancel} />
+      ) : (
+        <PastSessionsTable sessions={past ?? []} loading={past === null} onPlayers={setSelected} />
+      )}
       {selected && (
-        <PlayersPanel key={selected.id} session={selected} onCancel={askCancel} onChanged={load} />
+        <PlayersPanel key={selected.id} session={selected} onCancel={askCancel} onChanged={() => { load(); setPast(null); }} />
       )}
       <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
     </>

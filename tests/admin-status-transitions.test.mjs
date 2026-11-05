@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason, autoCloseStatus } from "../src/lib/services/bookings/adminStatusRules.ts";
+import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason, autoCloseStatus, openPlayCloseStatus } from "../src/lib/services/bookings/adminStatusRules.ts";
 
 test("admin status transitions: game-day statuses respect the booking's date in venue time", () => {
     const booking = { booking_date: "2026-10-25" };
@@ -77,4 +77,14 @@ test("autoCloseStatus: closes court bookings once the slot ends, checked in or n
     const late = { booking_date: "2026-10-25", start_time: "23:00:00", end_time: "00:00:00", status: "confirmed" };
     assert.equal(autoCloseStatus(late, at("2026-10-25T23:30:00+08:00")), null);
     assert.equal(autoCloseStatus(late, at("2026-10-26T00:00:00+08:00")), "no_show");
+});
+
+test("openPlayCloseStatus: open play players are recorded as played once the session ends", () => {
+    const spot = { booking_date: "2026-10-25", start_time: "18:00:00", end_time: "20:00:00" };
+    const at = (iso) => new Date(iso);
+    assert.equal(openPlayCloseStatus({ ...spot, status: "confirmed" }, at("2026-10-25T19:59:00+08:00")), null);
+    assert.equal(openPlayCloseStatus({ ...spot, status: "confirmed" }, at("2026-10-25T20:00:00+08:00")), "completed");
+    assert.equal(openPlayCloseStatus({ ...spot, status: "checked_in" }, at("2026-10-26T08:00:00+08:00")), "completed");
+    assert.equal(openPlayCloseStatus({ ...spot, status: "cancelled" }, at("2026-10-26T08:00:00+08:00")), null);
+    assert.equal(openPlayCloseStatus({ ...spot, status: "pending" }, at("2026-10-26T08:00:00+08:00")), null);
 });

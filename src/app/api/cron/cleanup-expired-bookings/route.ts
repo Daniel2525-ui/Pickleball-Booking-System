@@ -3,7 +3,7 @@ import { getServiceClient } from "@/lib/supabase/service";
 import { cleanupExpiredBooking } from "@/lib/services/payments/cleanupExpiredBooking";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
-import { autoCloseStatus, buildStatusUpdate } from "@/lib/services/bookings/adminStatusRules";
+import { autoCloseStatus, buildStatusUpdate, openPlayCloseStatus } from "@/lib/services/bookings/adminStatusRules";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 /**
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
     if (limiterCleanupError) console.error("Rate limiter cleanup failed:", limiterCleanupError);
 
     // Close court bookings whose slot has ended: checked in -> completed, never checked in -> no-show.
-    // Open play rows are skipped: their players are not checked in one by one.
+    // Open play players are handled below: they are not checked in one by one.
     let autoClosed = 0;
     const { data: openGames, error: openGamesError } = await supabase
       .from("bookings")
@@ -162,6 +162,28 @@ export async function GET(request: Request) {
         .in("status", [...new Set(rows.map((b) => b.status))]) // staff may have changed it since the fetch
         .select("id");
       if (closeError) console.error(`Auto-close to ${target} failed:`, closeError);
+      autoClosed += closed?.length ?? 0;
+    }
+
+    // Open play players just turn up: every spot booking of a session that has ended is recorded as played.
+    // No lower date bound, so spot bookings from before this rule are caught up too.
+    const { data: openSpots, error: openSpotsError } = await supabase
+      .from("bookings")
+      .select("id, status, booking_date, start_time, end_time")
+      .in("status", ["confirmed", "checked_in", "in_progress"])
+      .not("open_play_spots", "is", null)
+      .lte("booking_date", formatManilaDate())
+      .limit(500); // shortcut: 500 per 15-minute run; a backlog clears over a few runs
+    if (openSpotsError) console.error("Open play close fetch failed:", openSpotsError);
+    const playedSpots = (openSpots ?? []).filter((b) => openPlayCloseStatus(b) === "completed");
+    if (playedSpots.length > 0) {
+      const { data: closed, error: closeError } = await supabase
+        .from("bookings")
+        .update(buildStatusUpdate("completed"))
+        .in("id", playedSpots.map((b) => b.id))
+        .in("status", [...new Set(playedSpots.map((b) => b.status))]) // staff may have cancelled one since the fetch
+        .select("id");
+      if (closeError) console.error("Open play close failed:", closeError);
       autoClosed += closed?.length ?? 0;
     }
 

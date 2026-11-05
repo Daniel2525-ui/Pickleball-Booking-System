@@ -18,6 +18,27 @@ export function tallySpots(rows: SpotRow[], now: Date = new Date()) {
     return { booked, awaiting };
 }
 
+export interface PastSpotRow {
+    open_play_session_id: string;
+    open_play_spots: number | null;
+    status: string;
+    payments: { status: string; amount: number | string | null }[] | null;
+}
+
+/** Per past session: spots that went ahead, spots played, and money still held (a kept payment counts; refunds don't). */
+export function summarizePastSessions(rows: PastSpotRow[]) {
+    const out = new Map<string, { booked: number; played: number; collected: number }>();
+    for (const r of rows) {
+        const s = out.get(r.open_play_session_id) ?? { booked: 0, played: 0, collected: 0 };
+        const spots = r.open_play_spots ?? 0;
+        if (["confirmed", "checked_in", "in_progress", "completed", "no_show"].includes(r.status)) s.booked += spots;
+        if (r.status === "completed") s.played += spots;
+        s.collected += (r.payments ?? []).filter((p) => p.status === "paid").reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        out.set(r.open_play_session_id, s);
+    }
+    return out;
+}
+
 export function parseSpotRequest(body: unknown): { sessionId: string; spots: number; method: "stripe" | "gcash" } | { error: string } {
     const b = (body ?? {}) as Record<string, unknown>;
     const sessionId = typeof b.sessionId === "string" ? b.sessionId.trim() : "";

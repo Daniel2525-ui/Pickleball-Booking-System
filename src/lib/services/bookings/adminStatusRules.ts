@@ -26,6 +26,13 @@ export const autoCloseStatus = (
     return null;
 };
 
+/** Open play players just turn up and play: once the session has ended, their spot booking is recorded as played. */
+export const openPlayCloseStatus = (
+    booking: { status: string; booking_date: string; start_time: string; end_time: string },
+    now: Date = new Date()
+) =>
+    getBookingEnd(booking) <= now && ["confirmed", "checked_in", "in_progress"].includes(booking.status) ? "completed" : null;
+
 export const NO_SHOW_GRACE_MINUTES = 15;
 
 export const canTransition = (currentStatus: string, newStatus: string) =>
