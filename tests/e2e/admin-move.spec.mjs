@@ -95,3 +95,23 @@ test("customers can't move bookings", async ({ page }) => {
   expect([401, 403]).toContain(res.status());
   expect(where()).toBe(`COURT 2|${date}|14:00:00|15:00:00`);
 });
+
+test("after a price rise, a booking paid at the old price can still move to an equal slot", async ({ page }) => {
+  sql("UPDATE public.booking_settings SET base_hourly_rate = 250");
+  try {
+    await login(page, account("ADMIN"));
+    let dialog = await openMove(page);
+    await moveTo(dialog, page, { court: "COURT 4", start: "15:00" });
+    await expect(page.getByText(/Moved to COURT 4/)).toBeVisible();
+    expect(where()).toBe(`COURT 4|${date}|15:00:00|16:00:00`);
+    // It keeps what it was paid
+    expect(sql(`SELECT total_amount FROM public.bookings WHERE id = '${moverId}'`)).toBe("200.00");
+
+    // A move that itself changes the price is still refused, priced on today's list
+    dialog = await openMove(page);
+    await moveTo(dialog, page, { start: "18:00" });
+    await expect(dialog.getByRole("alert")).toHaveText("This move changes the price from ₱250 to ₱300. Cancel and rebook instead.");
+  } finally {
+    sql("UPDATE public.booking_settings SET base_hourly_rate = 200");
+  }
+});
