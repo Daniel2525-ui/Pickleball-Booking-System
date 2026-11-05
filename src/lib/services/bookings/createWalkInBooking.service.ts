@@ -13,6 +13,20 @@ export interface CreateWalkInBookingParams {
     paymentReference?: string;
 }
 
+/** Staff wording for the refusals create_walk_in_booking raises; null for anything else. */
+export const walkInErrorMessage = (message: string | undefined): string | null => {
+    const msg = message ?? "";
+    if (msg.includes("PAST_SLOT")) return "That slot ended on an earlier day. Walk-ins can only be recorded for today or later.";
+    if (msg.includes("INVALID_AMOUNT")) return "The fee no longer matches the price list. Close this form and open it again to refresh the price.";
+    if (msg.includes("OUTSIDE_OPERATING_HOURS")) return "That time is outside the venue's opening hours for this day.";
+    if (msg.includes("VENUE_CLOSED")) return "The venue is closed on that day.";
+    if (msg.includes("COURT_UNAVAILABLE")) return "That court is closed for maintenance.";
+    if (msg.includes("INVALID_DURATION")) return msg.replace(/^.*INVALID_DURATION:\s*/, "");
+    if (msg.includes("INVALID_TIME_INCREMENT")) return "Bookings start and end on the hour, like 6:00 PM to 7:00 PM.";
+    if (msg.includes("INVALID_TIME_RANGE")) return "The end time must be after the start time.";
+    return null;
+};
+
 export const createWalkInBooking = async (
     params: CreateWalkInBookingParams
 ): Promise<{ bookingId: string | null; error: Error | null }> => {
@@ -71,6 +85,8 @@ export const createWalkInBooking = async (
         if (rpcError?.message?.includes("SLOT_UNAVAILABLE")) {
             return { bookingId: null, error: new Error("This court slot is no longer available. Please choose another time or court.") };
         }
+        const plain = walkInErrorMessage(rpcError?.message);
+        if (plain) return { bookingId: null, error: new Error(plain) };
 
 
         // 3. If RPC is unavailable, fail safely rather than creating un-locked reservations

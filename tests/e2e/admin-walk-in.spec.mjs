@@ -14,7 +14,7 @@ test.beforeAll(() => {
 });
 test.beforeEach(() => requireLocalDb());
 
-async function recordWalkIn(page, name, start, end, payment = "Cash (Paid)") {
+async function recordWalkIn(page, name, start, end, payment = "Cash (Paid)", day = date) {
   await openAllBookings(page);
   await page.getByRole("button", { name: "New Reservation" }).click();
   const dialog = page.getByRole("dialog");
@@ -22,10 +22,9 @@ async function recordWalkIn(page, name, start, end, payment = "Cash (Paid)") {
   await dialog.getByLabel("Full Name").fill(name);
   await dialog.getByLabel("Assigned Court").click();
   await page.getByRole("option", { name: court.name }).click();
-  await dialog.getByLabel("Reservation Date").fill(date);
+  await dialog.getByLabel("Reservation Date").fill(day);
   await dialog.getByLabel("Start Time").fill(start);
   await dialog.getByLabel("End Time").fill(end);
-  await dialog.getByLabel("Court Fee (₱ PHP)").fill("200");
   await dialog.getByRole("button", { name: payment, exact: true }).click();
   await dialog.getByRole("button", { name: "Record Reservation" }).click();
   return dialog;
@@ -133,6 +132,39 @@ test("staff can collect payment for a Pay Later walk-in", async ({ page }) => {
   await page.goto("/admin/dashboard");
   await page.waitForLoadState("networkidle"); // let the banner's count load before asserting it is absent
   await expect(page.getByRole("link", { name: /to collect/ })).toHaveCount(0);
+});
+
+test("a walk-in already played today is recorded as completed; earlier days are refused in plain words", async ({ page }) => {
+  const hour = Number(sql("SELECT extract(hour FROM now() AT TIME ZONE 'Asia/Manila')"));
+  test.skip(hour < 7, "needs an hour inside opening hours (06:00) that has already ended today");
+  const today = sql("SELECT (now() AT TIME ZONE 'Asia/Manila')::date::text");
+  const end = Math.min(hour, 22); // the venue closes at 22:00 in the test hours
+  const pad = (h) => String(h).padStart(2, "0") + ":00";
+
+  await login(page, account("ADMIN"));
+  const dialog = await recordWalkIn(page, "E2E Played Earlier", pad(end - 1), pad(end), "Cash (Paid)", today);
+  await expect(page.getByText("Reservation recorded successfully!")).toBeVisible();
+  expect(sql(`SELECT b.status || '|' || (b.completed_at IS NOT NULL) || '|' || p.status FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id
+       WHERE b.customer_name = 'E2E Played Earlier'`)).toBe("completed|true|paid");
+  await expect(dialog).toHaveCount(0);
+
+  // The fee comes from the price list and can't be typed over
+  await page.getByRole("button", { name: "New Reservation" }).click();
+  const form = page.getByRole("dialog");
+  await form.getByRole("button", { name: "New Walk-In" }).click();
+  await expect(form.getByLabel("Court Fee (₱ PHP)")).toHaveAttribute("readonly", "");
+  await form.getByLabel("Reservation Date").fill(today);
+  await form.getByLabel("Start Time").fill(pad(end - 1));
+  await form.getByLabel("End Time").fill(pad(end));
+  await expect(form.getByText("This slot has already ended today. It will be recorded as played.")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  const yesterday = sql("SELECT ((now() AT TIME ZONE 'Asia/Manila')::date - 1)::text");
+  const refused = await recordWalkIn(page, "E2E Backdated", "10:00", "11:00", "Cash (Paid)", yesterday);
+  // The date box starts at today, so the browser refuses the form before it reaches the database (which refuses it too)
+  expect(await refused.getByLabel("Reservation Date").evaluate((el) => el.validity.rangeUnderflow)).toBe(true);
+  await expect(refused).toBeVisible();
+  expect(sql(`SELECT count(*) FROM public.bookings WHERE customer_name = 'E2E Backdated'`)).toBe("0");
 });
 
 test("cancelling a hold that already timed out records it as expired, not as a staff cancellation", async ({ page }) => {

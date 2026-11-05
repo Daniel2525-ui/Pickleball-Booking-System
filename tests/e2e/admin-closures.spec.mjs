@@ -72,7 +72,6 @@ test("staff can still record a walk-in on a closed date", async ({ page }) => {
   await dialog.getByLabel("Reservation Date").fill(date);
   await dialog.getByLabel("Start Time").fill("18:00");
   await dialog.getByLabel("End Time").fill("19:00");
-  await dialog.getByLabel("Court Fee (₱ PHP)").fill("200");
   await dialog.getByRole("button", { name: "Cash (Paid)", exact: true }).click();
   await dialog.getByRole("button", { name: "Record Reservation" }).click();
   await expect(page.getByText("Reservation recorded successfully!")).toBeVisible();

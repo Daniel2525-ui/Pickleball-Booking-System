@@ -30,6 +30,11 @@ import { createWalkInBooking } from "@/lib/services/bookings/createWalkInBooking
 import { supabase as browserSupabase } from "@/lib/supabase";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { quoteCourtPrice, type Pricing } from "@/lib/services/pricing/quoteCourtPrice";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
+
+/** "HH:MM" now in venue time, to compare with the time inputs. */
+const manilaClock = () =>
+  new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false });
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { UnifiedCustomerResult } from "@/lib/services/customers/customersTypes";
 
@@ -459,6 +464,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
             <Label htmlFor="walkin-date" className="text-xs font-semibold text-foreground">Reservation Date</Label>
             <Input id="walkin-date"
               type="date"
+              min={formatManilaDate()}
               value={date}
               onChange={(e) => {
                 setDate(e.target.value);
@@ -491,16 +497,26 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
             </div>
           </div>
 
+          {/* A slot that ended earlier today is saved as already played */}
+          {date === formatManilaDate() && endTime.length >= 5 && endTime !== "00:00" && endTime <= manilaClock() && (
+            <p className="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-[11px] text-blue-900 dark:text-blue-200">
+              This slot has already ended today. It will be recorded as played.
+            </p>
+          )}
+
           {/* Court Fee */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="walkin-fee" className="text-xs font-semibold text-foreground">Court Fee (₱ PHP)</Label>
             <Input id="walkin-fee"
               type="number"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="e.g. 200"
-              className="h-9 text-xs sm:text-sm"
+              readOnly
+              aria-describedby="walkin-fee-note"
+              className="h-9 text-xs sm:text-sm bg-muted/40 cursor-default"
             />
+            <p id="walkin-fee-note" className="text-[11px] text-muted-foreground">
+              From the price list for this date and time.
+            </p>
           </div>
 
           {/* Payment Method Selector */}
