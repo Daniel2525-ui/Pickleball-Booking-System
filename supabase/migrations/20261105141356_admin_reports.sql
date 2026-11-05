@@ -4,6 +4,7 @@
 -- Definitions: docs/superpowers/specs/2026-11-05-admin-reports-design.md. Money is dated by paid_at in Asia/Manila;
 -- net = paid amounts only (a refunded payment is already status 'refunded', so refunds are never subtracted twice).
 -- SECURITY INVOKER: it reads through the caller's RLS, and only Admins (is_owner) may call it.
+-- The function body carries no comments so its text matches production exactly; the spec explains every figure.
 -- ==============================================================================
 
 BEGIN;
@@ -56,7 +57,6 @@ BEGIN
     RAISE EXCEPTION 'FORBIDDEN: Admin privileges required' USING ERRCODE = '42501';
   END IF;
 
-  -- All time starts at the first booking or payment (LEAST skips NULLs)
   v_from := coalesce(p_from, least(
     (SELECT min(booking_date) FROM public.bookings),
     (SELECT min((paid_at AT TIME ZONE 'Asia/Manila')::date) FROM public.payments WHERE paid_at IS NOT NULL),
@@ -64,12 +64,11 @@ BEGIN
   IF v_to < v_from OR v_to - v_from > 3660 THEN
     RAISE EXCEPTION 'INVALID_ARGUMENT: The period must end on or after its start and span at most 10 years' USING ERRCODE = '22000';
   END IF;
-  v_through := least(v_to, v_today); -- occupancy only counts days that have happened
+  v_through := least(v_to, v_today);
   v_len := v_to - v_from + 1;
   v_bucket := CASE WHEN v_len <= 62 THEN 'day' ELSE 'month' END;
   SELECT count(*) INTO v_courts FROM public.courts;
 
-  -- Money, dated by when it was paid
   SELECT jsonb_build_object(
     'net', coalesce(sum(p.amount) FILTER (WHERE p.status = 'paid'), 0),
     'cash', coalesce(sum(p.amount) FILTER (WHERE p.status = 'paid' AND p.payment_method = 'cash'), 0),
@@ -83,7 +82,6 @@ BEGIN
   FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id
   WHERE (p.paid_at AT TIME ZONE 'Asia/Manila')::date BETWEEN v_from AND v_to;
 
-  -- Court bookings (not open-play blocks or spots), dated by their booking date
   WITH cb AS (
     SELECT b.*, extract(epoch FROM (b.end_time - b.start_time)) / 3600 AS hours
     FROM public.bookings b
@@ -99,16 +97,11 @@ BEGIN
   INTO v_bookings
   FROM cb;
 
-  -- Compare like with like: the days of this period that have happened (so_far) against the same number of days at the
-  -- start of the period just before. A month 5 days in is compared with the previous period's first 5 days, not all of it.
-  -- None for all time, or for a period that hasn't started yet.
   IF p_from IS NOT NULL AND v_through >= v_from THEN
     v_previous := public.venue_report_window(v_from - v_len, v_from - v_len + (v_through - v_from));
     v_so_far := public.venue_report_window(v_from, v_through);
   END IF;
 
-  -- Open hours per day up to today (closed weekdays and closure dates give none; a 00:00 close means midnight),
-  -- booked court-hours (every live booking on a court, open-play blocks included), and the weekday x hour grid
   WITH days AS (
     SELECT d::date AS d, extract(isodow FROM d)::int - 1 AS dow,
            extract(hour FROM h.open_time)::int AS open_h,
@@ -152,7 +145,6 @@ BEGIN
   INTO v_occupancy, v_court_rows, v_heatmap
   FROM per_court pc;
 
-  -- One row per day (or month for long periods), empty ones included
   WITH buckets AS (
     SELECT CASE WHEN v_bucket = 'day' THEN to_char(g, 'YYYY-MM-DD') ELSE to_char(g, 'YYYY-MM') END AS key
     FROM generate_series(CASE WHEN v_bucket = 'day' THEN v_from ELSE date_trunc('month', v_from)::date END,
@@ -182,7 +174,6 @@ BEGIN
   INTO v_series
   FROM buckets bk LEFT JOIN money m ON m.key = bk.key LEFT JOIN books k ON k.key = bk.key;
 
-  -- Best customers: an account, else a walk-in record, else the name on the booking
   WITH tagged AS (
     SELECT b.*, coalesce('u:' || b.user_id, 'c:' || b.customer_id, 'n:' || lower(b.customer_name)) AS who,
            coalesce(pr.full_name, cu.full_name, b.customer_name) AS who_name
@@ -206,9 +197,7 @@ BEGIN
            coalesce(s.spent, 0) AS spent, v.last_visit,
            n.name
     FROM visits v FULL JOIN spent s ON s.who = v.who
-    -- One name per customer, looked up once (max() also makes a walk-in's name stable)
     JOIN (SELECT who, max(who_name) AS name FROM tagged GROUP BY who) n ON n.who = coalesce(v.who, s.who)
-    -- Ties go by name so the list doesn't reshuffle between loads
     ORDER BY spent DESC, visits DESC, name
     LIMIT 5
   )
