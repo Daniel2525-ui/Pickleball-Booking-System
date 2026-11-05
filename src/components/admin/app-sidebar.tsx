@@ -23,6 +23,7 @@ import {
     Crosshair,
     Settings,
     UsersRound,
+    BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -80,6 +81,12 @@ const managementNav: NavItem[] = [
         title: "Payments & Revenue",
         url: "/admin/payments",
         icon: CreditCard,
+    },
+    {
+        title: "Reports",
+        url: "/admin/reports",
+        ownerOnly: true,
+        icon: BarChart3,
     },
     {
         title: "Settings",

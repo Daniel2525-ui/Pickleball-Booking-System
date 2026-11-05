@@ -186,15 +186,17 @@ BEGIN
     GROUP BY t.who
   ), ranked AS (
     SELECT coalesce(v.who, s.who) AS who, coalesce(v.visits, 0) AS visits, coalesce(v.hours, 0) AS hours,
-           coalesce(s.spent, 0) AS spent, v.last_visit
+           coalesce(s.spent, 0) AS spent, v.last_visit,
+           (SELECT t.who_name FROM tagged t WHERE t.who = coalesce(v.who, s.who) LIMIT 1) AS name
     FROM visits v FULL JOIN spent s ON s.who = v.who
-    ORDER BY coalesce(s.spent, 0) DESC, coalesce(v.visits, 0) DESC
+    -- Ties go by name so the list doesn't reshuffle between loads
+    ORDER BY spent DESC, visits DESC, name
     LIMIT 5
   )
   SELECT coalesce(jsonb_agg(jsonb_build_object(
-      'name', (SELECT t.who_name FROM tagged t WHERE t.who = r.who LIMIT 1),
+      'name', r.name,
       'visits', r.visits, 'hours', round(r.hours, 1), 'spent', r.spent, 'last_visit', r.last_visit)
-    ORDER BY r.spent DESC, r.visits DESC), '[]'::jsonb)
+    ORDER BY r.spent DESC, r.visits DESC, r.name), '[]'::jsonb)
   INTO v_top
   FROM ranked r;
 

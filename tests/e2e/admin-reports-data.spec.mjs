@@ -161,3 +161,12 @@ test("top customers group walk-ins", async () => {
   expect(r.top_customers[1].name).toBe(sql(`SELECT full_name FROM public.profiles WHERE email = '${account("CUSTOMER").email}'`));
   expect(r.top_customers[1].spent).toBe(200);
 });
+
+test("tied customers are listed by name", async () => {
+  for (const [name, start] of [["Zed Tie", "08:00"], ["Abe Tie", "09:00"], ["Mia Tie", "10:00"]]) {
+    const walkIn = first(sql(`INSERT INTO public.customers (full_name) VALUES ('${name}') RETURNING id`));
+    pay(book("2026-09-13", start, `${String(Number(start.slice(0, 2)) + 1).padStart(2, "0")}:00`, { user: null, customer: walkIn, name }), 200, "paid", "cash", "2026-09-13 12:00");
+  }
+  const r = await report("2026-09-01", "2026-09-30");
+  expect(r.top_customers.map((c) => c.name)).toEqual(["Abe Tie", "Mia Tie", "Zed Tie"]);
+});

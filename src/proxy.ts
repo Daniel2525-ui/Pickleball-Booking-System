@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
 
     // Pricing and Settings are the owner's; front-desk staff (role admin, not owner) use every other admin page
     const path = request.nextUrl.pathname
-    const ownerOnly = /^\/admin\/(pricing|settings)(\/|$)/.test(path) || /^\/api\/admin\/pricing(\/|$)/.test(path)
+    const ownerOnly = /^\/admin\/(pricing|settings|reports)(\/|$)/.test(path) || /^\/api\/admin\/pricing(\/|$)/.test(path)
 
     // Protect /api/admin API routes — must be logged in + admin role
     if (request.nextUrl.pathname.startsWith('/api/admin')) {
