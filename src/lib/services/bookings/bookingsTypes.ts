@@ -40,6 +40,7 @@ export interface Booking {
 
     profiles?: {
         full_name: string;
+        phone?: string | null;
     } | null;
     customers?: {
         full_name: string;
@@ -50,6 +51,8 @@ export interface Booking {
         name: string;
     } | null;
     payments?: BookingPayment | BookingPayment[] | null;
+    /** Courts booked in the same checkout (fetchBookings); 1 for a single-court booking */
+    basket_size?: number;
 }
 
 export interface FetchBookingsFilters {

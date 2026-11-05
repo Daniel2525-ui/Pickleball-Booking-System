@@ -80,3 +80,9 @@ export async function payOnStripe(page) {
   if (await postal.isVisible().catch(() => false)) await postal.fill("10001");
   await page.getByTestId("hosted-payment-submit-button").click();
 }
+
+/** Opens the admin bookings list across every date; it opens on today by default. */
+export async function openAllBookings(page) {
+  await page.goto("/admin/bookings");
+  await page.getByRole("button", { name: "Clear date filter" }).click();
+}

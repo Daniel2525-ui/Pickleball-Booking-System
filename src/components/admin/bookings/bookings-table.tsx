@@ -347,7 +347,18 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                           </span>
                           <span className="text-[11px] text-muted-foreground">
                             {booking.customer_id ? "Walk-In Guest" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(booking.id)}</span>
+                            {(booking.basket_size ?? 1) > 1 && (
+                              <span className="ml-1.5 rounded bg-muted px-1.5 py-px font-semibold text-foreground">Group · {booking.basket_size} courts</span>
+                            )}
                           </span>
+                          {(booking.customers?.phone || booking.profiles?.phone) && (
+                            <a
+                              href={`tel:${booking.customers?.phone || booking.profiles?.phone}`}
+                              className="w-fit text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                            >
+                              {booking.customers?.phone || booking.profiles?.phone}
+                            </a>
+                          )}
                         </div>
                       </TableCell>
 

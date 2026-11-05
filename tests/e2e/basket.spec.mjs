@@ -1,6 +1,6 @@
 // Multi-court basket: real holds, Stripe test-mode sessions, refunds and counter settlement. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, payOnStripe } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, payOnStripe, openAllBookings } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 // Phone width shows the quick-date strip ("Tmrw"), the simplest stable way to pick tomorrow
@@ -173,10 +173,13 @@ const rowFor = (page, court, time) => page.getByRole("row").filter({ hasText: co
 
 test("staff cannot settle a basket from a list filtered to one of its courts", async ({ page }) => {
   await login(page, account("ADMIN"));
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   await page.getByRole("combobox").filter({ hasText: "All Courts" }).click();
   await page.getByRole("option", { name: "COURT 3" }).click();
   await expect(rowFor(page, "COURT 4", "10:00 AM")).toHaveCount(0);
+  // The group tag counts the whole basket even with its other court filtered out; the member's phone is on the row
+  await expect(rowFor(page, "COURT 3", "10:00 AM").getByText("Group · 2 courts")).toBeVisible();
+  await expect(rowFor(page, "COURT 3", "10:00 AM").getByRole("link", { name: "09170000001" })).toHaveAttribute("href", "tel:09170000001");
 
   await rowFor(page, "COURT 3", "10:00 AM").getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("menuitem", { name: "Collect Payment" }).click();
@@ -190,7 +193,7 @@ test("staff cannot settle a basket from a list filtered to one of its courts", a
 
 test("staff collect cash for a whole unpaid basket from one court", async ({ page }) => {
   await login(page, account("ADMIN"));
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   await rowFor(page, "COURT 3", "10:00 AM").getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("menuitem", { name: "Collect Payment" }).click();
   const settle = page.getByRole("dialog");
@@ -215,7 +218,7 @@ test("staff cancelling one court of an unpaid basket cancels every court", async
   await customer.close();
 
   await login(page, account("ADMIN"));
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   await rowFor(page, "COURT 4", "2:00 PM").getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("menuitem", { name: "Cancel Reservation" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel Reservation" }).click();

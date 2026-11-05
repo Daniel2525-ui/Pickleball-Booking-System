@@ -31,7 +31,7 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
             .select(`
                 *,
                 ${courtsJoin},
-                profiles(full_name),
+                profiles(full_name, phone),
                 customers(full_name, phone, email),
                 payments(id, status, amount, payment_method, payment_reference, paid_at, gcash_proof_path, gcash_submitted_at)
             `)
@@ -95,7 +95,16 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
 
         if (error) throw error;
 
-        return { data: (data ?? []) as Booking[], error: null };
+        // Counted over every booking in the basket, so the court filter or paging can't shrink a group
+        const basketIds = [...new Set((data ?? []).flatMap((b) => (b.basket_id ? [b.basket_id] : [])))];
+        const sizes = new Map<string, number>();
+        if (basketIds.length) {
+            const { data: rows, error: basketError } = await supabase.from("bookings").select("basket_id").in("basket_id", basketIds);
+            if (basketError) throw basketError;
+            for (const r of rows ?? []) sizes.set(r.basket_id, (sizes.get(r.basket_id) ?? 0) + 1);
+        }
+
+        return { data: (data ?? []).map((b) => ({ ...b, basket_size: b.basket_id ? sizes.get(b.basket_id) ?? 1 : 1 })) as Booking[], error: null };
     } catch (error) {
         console.error("Failed to fetch bookings:", error);
         return { data: [], error };

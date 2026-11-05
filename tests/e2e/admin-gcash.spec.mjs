@@ -1,7 +1,7 @@
 // Staff verification of GCash payments: local Supabase stack only.
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase } from "./local-db.mjs";
+import { requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, openAllBookings } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -72,7 +72,7 @@ test("admin approves and rejects GCash payments", async ({ page }) => {
 
     await login(page, account("ADMIN"));
     // Filtered to one court of the two-court basket: Verify still shows the whole basket
-    await page.goto("/admin/bookings");
+    await openAllBookings(page);
     await page.getByRole("combobox").filter({ hasText: "All Courts" }).click();
     await page.getByRole("option", { name: court.name, exact: true }).click();
     await expect(rowFor(page, "E2E Gcash Approve")).toHaveCount(1);
@@ -82,7 +82,7 @@ test("admin approves and rejects GCash payments", async ({ page }) => {
     await expect(page.getByRole("dialog").getByText("₱400")).toBeVisible();
     await page.keyboard.press("Escape");
 
-    await page.goto("/admin/bookings");
+    await openAllBookings(page);
     await page.getByRole("combobox").first().click();
     await expect(page.getByRole("option", { name: /Awaiting Verification \(6\)/ })).toBeVisible();
     await page.getByRole("option", { name: /Awaiting Verification/ }).click();

@@ -1,6 +1,6 @@
 // Open play end to end: local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { requireLocalDb, writesAllowed, sql, account, login, tomorrowManila, resetBookings } from "./local-db.mjs";
+import { requireLocalDb, writesAllowed, sql, account, login, tomorrowManila, resetBookings, openAllBookings } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 test.use({ viewport: { width: 412, height: 915 } });
@@ -77,7 +77,7 @@ test("a player books two spots with GCash and staff approve them", async ({ page
 
   await page.context().clearCookies();
   await login(page, account("ADMIN"));
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   await page.getByRole("combobox").first().click();
   await page.getByRole("option", { name: /Awaiting Verification/ }).click();
   await page.getByRole("row").filter({ hasText: "Open play" }).first().getByRole("button", { name: "Open menu" }).click();
@@ -87,7 +87,7 @@ test("a player books two spots with GCash and staff approve them", async ({ page
 
   // The Bookings table lists the player's spot booking, but not the ₱0 rows that reserve the courts
   expect(Number(sql(`SELECT count(*) FROM public.bookings WHERE open_play_session_id = '${sessionId()}' AND court_id IS NOT NULL`))).toBeGreaterThan(0);
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   await expect(page.getByRole("row").filter({ hasText: "Open play · 2 spots" })).toHaveCount(1);
   await expect(page.getByText("Open play (court reserved)")).toHaveCount(0);
   await expect(page.getByRole("row").filter({ hasText: "₱0" })).toHaveCount(0);

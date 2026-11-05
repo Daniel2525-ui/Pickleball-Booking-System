@@ -16,6 +16,7 @@ import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 
 interface BookingFiltersProps {
   initialStatus?: string;
+  initialDate?: string;
   onFilterChange?: (filters: {
     search: string;
     status: string;
@@ -24,11 +25,11 @@ interface BookingFiltersProps {
   }) => void;
 }
 
-export default function BookingFilters({ initialStatus = "All Statuses", onFilterChange }: BookingFiltersProps = {}) {
+export default function BookingFilters({ initialStatus = "All Statuses", initialDate = "", onFilterChange }: BookingFiltersProps = {}) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(initialStatus);
   const [courtId, setCourtId] = useState("All Courts");
-  const [dateTime, setDateTime] = useState("");
+  const [dateTime, setDateTime] = useState(initialDate);
   const [courts, setCourts] = useState<CourtOption[]>([]);
   const [awaiting, setAwaiting] = useState(0);
 
@@ -69,7 +70,7 @@ export default function BookingFilters({ initialStatus = "All Statuses", onFilte
               setSearch(value);
               updateFilters(value, status, courtId, dateTime);
             }}
-            placeholder="Name or reference number"
+            placeholder="Search by name or reference number"
             className="w-full pl-9 bg-background h-9 text-xs sm:text-sm"
           />
         </div>

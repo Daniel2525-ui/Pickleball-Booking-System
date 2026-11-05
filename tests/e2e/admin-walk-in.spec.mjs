@@ -1,6 +1,6 @@
 // Records walk-in reservations: local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, openAllBookings } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -15,7 +15,7 @@ test.beforeAll(() => {
 test.beforeEach(() => requireLocalDb());
 
 async function recordWalkIn(page, name, start, end, payment = "Cash (Paid)") {
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   await page.getByRole("button", { name: "New Reservation" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "New Walk-In" }).click();
@@ -73,12 +73,25 @@ function seed(name, start, end, status, reason, expiresSql, paymentStatus, { rol
   return id;
 }
 
+test("the bookings list opens on today's date", async ({ page }) => {
+  const today = sql("SELECT (now() AT TIME ZONE 'Asia/Manila')::date::text");
+  seed("E2E Today Booking", "15:00", "16:00", "confirmed", "NULL", "NULL", "paid", { day: today });
+  seed("E2E Tomorrow Booking", "15:00", "16:00", "confirmed", "NULL", "NULL", "paid");
+  await login(page, account("ADMIN"));
+  await page.goto("/admin/bookings");
+  await expect(page.getByLabel("Filter by booking date")).toHaveValue(today);
+  await expect(rowFor(page, "E2E Today Booking")).toHaveCount(1);
+  await expect(rowFor(page, "E2E Tomorrow Booking")).toHaveCount(0);
+  await page.getByRole("button", { name: "Clear date filter" }).click();
+  await expect(rowFor(page, "E2E Tomorrow Booking")).toHaveCount(1);
+});
+
 test("expired holds are hidden by default, listed under Expired Holds, and cannot be paid at the counter", async ({ page }) => {
   seed("E2E Expired Hold", "06:00", "07:00", "cancelled", "'expired'", "now() - interval '2 hours'", "failed");
   seed("E2E Stale Hold", "07:00", "08:00", "pending", "NULL", "now() - interval '5 minutes'", "pending");
 
   await login(page, account("ADMIN"));
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   const stale = rowFor(page, "E2E Stale Hold");
   await expect(stale.getByText("Hold Expired")).toBeVisible();
   await expect(rowFor(page, "E2E Expired Hold")).toHaveCount(0);
@@ -106,7 +119,7 @@ test("staff can collect payment for a Pay Later walk-in", async ({ page }) => {
   await expect(page.getByRole("row").filter({ hasText: "E2E Pay Later" })).toHaveCount(1);
   await expect(page.getByRole("row").filter({ hasText: "E2E Stale Hold" })).toHaveCount(0);
 
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   const row = rowFor(page, "E2E Pay Later");
   await row.getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("menuitem", { name: "Collect Payment" }).click();
@@ -125,7 +138,7 @@ test("staff can collect payment for a Pay Later walk-in", async ({ page }) => {
 test("cancelling a hold that already timed out records it as expired, not as a staff cancellation", async ({ page }) => {
   const id = seed("E2E Timed Out", "09:00", "10:00", "pending", "NULL", "now() - interval '5 minutes'", "pending");
   await login(page, account("ADMIN"));
-  await page.goto("/admin/bookings");
+  await openAllBookings(page);
   await rowFor(page, "E2E Timed Out").getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("menuitem", { name: "Cancel Reservation" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel Reservation" }).click();

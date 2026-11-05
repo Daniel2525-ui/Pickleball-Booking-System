@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
 import BookingFilters from "./booking-filters";
 import BookingsTable from "./bookings-table";
 import { AddBookingModal } from "./addBookingModal";
@@ -15,12 +16,15 @@ export interface BookingFiltersState {
 
 export default function BookingsContainer() {
   // ?status= lets the dashboard GCash alert open this page pre-filtered
-  const initialStatus = useSearchParams().get("status") || "All Statuses";
+  const statusParam = useSearchParams().get("status");
+  const initialStatus = statusParam || "All Statuses";
+  // The desk works today's list; a dashboard alert link (?status=) looks across every date
+  const initialDate = statusParam ? "" : formatManilaDate();
   const [filters, setFilters] = useState<BookingFiltersState>({
     search: "",
     status: initialStatus,
     courtId: "All Courts",
-    dateTime: "",
+    dateTime: initialDate,
   });
 
   return (
@@ -40,7 +44,7 @@ export default function BookingsContainer() {
       </header>
 
       <div className="flex flex-col gap-4">
-        <BookingFilters initialStatus={initialStatus} onFilterChange={setFilters} />
+        <BookingFilters initialStatus={initialStatus} initialDate={initialDate} onFilterChange={setFilters} />
         <BookingsTable filters={filters} />
       </div>
     </div>
