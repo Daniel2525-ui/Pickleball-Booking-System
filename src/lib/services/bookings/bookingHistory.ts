@@ -16,6 +16,7 @@ const REASON: Record<string, string> = {
     slot_conflict: "slot was taken",
     court_unavailable: "court unavailable",
     start_passed: "start time passed",
+    payment_kept: "payment kept",
 };
 const CREATED: Record<string, string> = { pending: "Booked online, awaiting payment", completed: "Recorded as played" };
 const ACTION: Record<string, string> = {
@@ -43,7 +44,10 @@ export function describeEvent(e: BookingEvent, bookingUserId: string | null | un
     const who = !e.actor_id ? "System" : e.actor_id === bookingUserId ? "the player" : e.profiles?.full_name?.trim() || "Staff";
     const what = e.action === "created" ? CREATED[e.detail ?? ""] ?? "Booked" : ACTION[e.action] ?? "Status changed";
     let detail: string | null = null;
-    if (e.action === "cancelled") detail = e.detail ? REASON[e.detail] ?? null : null;
+    if (e.action === "cancelled" && e.detail) {
+        const [reason, note] = e.detail.split("|"); // "payment_kept|Late cancellation"
+        detail = [REASON[reason], note].filter(Boolean).join(": ") || null;
+    }
     else if (e.action === "moved") detail = e.detail;
     else if ((e.action === "paid" || e.action === "refunded") && e.detail) detail = money(e.detail);
     return { what, who, detail };

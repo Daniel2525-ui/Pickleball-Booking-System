@@ -86,3 +86,10 @@ test("open play court block follows the clock; spot rows and cancelled blocks do
     assert.equal(getBookingDisplayStatus({ ...block, court_id: null, open_play_spots: 2 }, at("10:00:00")), "confirmed");
     assert.equal(getBookingDisplayStatus({ ...block, status: "cancelled" }, at("09:00:00")), "cancelled");
 });
+
+test("a cancelled booking whose payment the venue kept says so and counts as charged", () => {
+    assert.deepEqual(
+        cancellationNote({ status: "cancelled", cancel_reason: "payment_kept", payments: [{ status: "paid", payment_method: "cash" }] }),
+        { text: "Cancelled by the venue · Payment kept under the venue's cancellation policy", charged: true }
+    );
+});

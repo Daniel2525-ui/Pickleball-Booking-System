@@ -16,6 +16,7 @@ export interface Payment {
     // Joined fields
     bookings?: {
         status?: string;
+        cancel_reason?: string | null;
         booking_date: string;
         start_time: string;
         end_time: string;

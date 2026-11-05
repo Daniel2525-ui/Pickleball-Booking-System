@@ -4,6 +4,9 @@ import { bookingSearchFilter } from "@/lib/services/bookings/filterBookingsData.
 
 export const PAYMENTS_PAGE_SIZE = 100;
 
+// A cancelled booking whose payment staff chose to keep owes nothing back
+const NOT_KEPT = "cancel_reason.is.null,cancel_reason.neq.payment_kept";
+
 // Pay-at-counter money: a pending payment on a booking that is going ahead. Online holds stay 'pending' bookings
 const COLLECTABLE_BOOKING_STATUSES = ["confirmed", "checked_in", "completed"];
 
@@ -21,6 +24,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
                 refund_requests ( status, created_at ),
                 bookings${refundOwed || toCollect ? "!inner" : ""} (
                     status,
+                    cancel_reason,
                     booking_date,
                     start_time,
                     end_time,
@@ -38,7 +42,10 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
             .range(offset, offset + PAYMENTS_PAGE_SIZE - 1);
 
         if (refundOwed) {
-            query = query.in("status", ["succeeded", "paid"]).eq("bookings.status", "cancelled");
+            query = query
+                .in("status", ["succeeded", "paid"])
+                .eq("bookings.status", "cancelled")
+                .or(NOT_KEPT, { referencedTable: "bookings" });
         } else if (toCollect) {
             query = query.eq("status", "pending").in("bookings.status", COLLECTABLE_BOOKING_STATUSES);
         } else if (status !== "" && status !== "all statuses" && status !== "all") {
@@ -108,9 +115,10 @@ export const countToCollect = async () => {
 export const countRefundsOwed = async () => {
     const { count, error } = await supabase
         .from("payments")
-        .select("id, bookings!inner(status)", { count: "exact", head: true })
+        .select("id, bookings!inner(status, cancel_reason)", { count: "exact", head: true })
         .in("status", ["succeeded", "paid"])
-        .eq("bookings.status", "cancelled");
+        .eq("bookings.status", "cancelled")
+        .or(NOT_KEPT, { referencedTable: "bookings" });
     if (error) console.error("Failed to count refunds owed:", error);
     return count ?? 0;
 };

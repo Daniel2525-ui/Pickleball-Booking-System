@@ -44,6 +44,7 @@ import { SettlePaymentModal } from "./settlePaymentModal";
 import { VerifyGcashModal } from "./verifyGcashModal";
 import { MoveBookingModal, MovedBooking } from "./moveBookingModal";
 import { BookingHistoryModal } from "./bookingHistoryModal";
+import { CancelPaidModal } from "./cancelPaidModal";
 import { getBookingStart } from "@/lib/utils/bookingTime";
 import { ArrowRightLeft, History } from "lucide-react";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
@@ -122,6 +123,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
   const [verifyBooking, setVerifyBooking] = useState<Booking | null>(null);
   const [moveBooking, setMoveBooking] = useState<Booking | null>(null);
   const [historyBooking, setHistoryBooking] = useState<Booking | null>(null);
+  const [cancelPaid, setCancelPaid] = useState<Booking | null>(null);
 
   const handleMoved = (bookingId: string, moved: MovedBooking, courtName: string) =>
     setBookingsData((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...moved, courts: { name: courtName } } : b)));
@@ -150,6 +152,9 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
 
   const handleCancelBooking = (booking: Booking) => {
     if (actionLoadingId) return;
+    // A paid booking: staff choose whether the payment is refunded or kept
+    const payment = Array.isArray(booking.payments) ? booking.payments[0] : booking.payments;
+    if (payment?.status === "paid") return setCancelPaid(booking);
     setConfirmRequest({
       title: "Cancel this reservation?",
       description: `${booking.customer_name || "This player"}'s reservation will be cancelled and the court slot released.`,
@@ -158,18 +163,21 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     });
   };
 
-  const cancelBooking = async (booking: Booking) => {
+  const cancelBooking = async (booking: Booking, keep?: { note: string }) => {
     setActionLoadingId(booking.id);
-    const { error } = await updateBookingStatus(booking.id, "cancelled");
+    const { error } = await updateBookingStatus(booking.id, "cancelled", keep);
     if (error) {
       toast.error(error);
     } else {
       setBookingsData((prev) =>
-        prev.map((b) => (cancelsWith(b, booking) ? { ...b, status: "cancelled" } : b))
+        prev.map((b) =>
+          cancelsWith(b, booking) ? { ...b, status: "cancelled", ...(keep && { cancel_reason: "payment_kept" }) } : b
+        )
       );
-      toast.success("Reservation cancelled successfully.");
+      toast.success(keep ? "Reservation cancelled. The payment was kept." : "Reservation cancelled successfully.");
     }
     setActionLoadingId(null);
+    return !error;
   };
 
   const handleStatusChange = (booking: Booking, newStatus: GameDayStatus) => {
@@ -546,6 +554,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
         onOpenChange={setSettleModalOpen}
         onSettled={handlePaymentSettled}
       />
+
+      <CancelPaidModal booking={cancelPaid} onClose={() => setCancelPaid(null)} onConfirm={cancelBooking} />
 
       <BookingHistoryModal booking={historyBooking} onClose={() => setHistoryBooking(null)} />
 

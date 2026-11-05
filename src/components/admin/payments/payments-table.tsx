@@ -74,7 +74,8 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const date = filters?.date ?? "";
 
   // Paid payments on cancelled bookings are owed back to the customer
-  const needsRefund = (payment: Payment) => payment.status === "paid" && payment.bookings?.status === "cancelled";
+  const needsRefund = (payment: Payment) =>
+    payment.status === "paid" && payment.bookings?.status === "cancelled" && payment.bookings?.cancel_reason !== "payment_kept";
 
   // Where the latest card refund for an owed payment stands, so staff know whether to wait, check Stripe or retry
   const cardRefundState = (payment: Payment) => {

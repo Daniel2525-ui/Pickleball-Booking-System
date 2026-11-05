@@ -40,6 +40,7 @@ export const cancellationNote = (booking: {
 }): { text: string; charged: boolean } | null => {
     if (booking.status !== "cancelled") return null;
     if (booking.cancel_reason === "gcash_rejected") return { text: "GCash payment could not be verified", charged: false };
+    if (booking.cancel_reason === "payment_kept") return { text: "Cancelled by the venue · Payment kept under the venue's cancellation policy", charged: true };
     const payments = booking.payments ?? [];
     const outstanding = payments.find((p) => p.status === "paid");
     // A paid row on a cancelled booking is money still owed back: card refunds run automatically, cash/GCash at the counter

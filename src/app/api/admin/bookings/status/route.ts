@@ -13,6 +13,12 @@ export async function POST(request: NextRequest) {
         const body = await request.json().catch(() => null);
         const bookingId = typeof body?.bookingId === "string" ? body.bookingId.trim() : "";
         const newStatus = typeof body?.status === "string" ? body.status.trim().toLowerCase() : "";
+        // Case by case: staff may cancel a paid booking and keep the payment (no refund owed), with a reason
+        const keepPayment = newStatus === "cancelled" && body?.keepPayment === true;
+        const cancelNote = typeof body?.note === "string" ? body.note.trim() : "";
+        if (keepPayment && (!cancelNote || cancelNote.length > 200)) {
+            return Response.json({ error: "Write a short reason for keeping the payment (up to 200 characters)." }, { status: 400 });
+        }
 
         if (!bookingId || !newStatus) {
             return Response.json({ error: "bookingId and status are required." }, { status: 400 });
@@ -93,8 +99,25 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        if (keepPayment) {
+            const { data: paid, error: paidError } = await supabase
+                .from("payments")
+                .select("id")
+                .eq("booking_id", bookingId)
+                .eq("status", "paid")
+                .limit(1);
+            if (paidError) {
+                console.error("Admin cancel: failed to check payment:", paidError);
+                return Response.json({ error: "Could not verify the payment for this booking." }, { status: 500 });
+            }
+            if (!paid?.length) {
+                return Response.json({ error: "This booking has no payment to keep. Cancel it without that option." }, { status: 409 });
+            }
+        }
+
         // 7. Conditional update (optimistic lock on current status) with Stage 2 audit timestamps
         const updatePayload = buildStatusUpdate(newStatus, booking);
+        if (keepPayment) Object.assign(updatePayload, { cancel_reason: "payment_kept", cancel_note: cancelNote });
 
         const { data: updated, error: updateError } = await supabase
             .from("bookings")

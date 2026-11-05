@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
         const { data: payment, error: paymentError } = await supabase
             .from("payments")
-            .select("id, booking_id, amount, currency, status, payment_method, stripe_payment_id, bookings ( status )")
+            .select("id, booking_id, amount, currency, status, payment_method, stripe_payment_id, bookings ( status, cancel_reason )")
             .eq("id", paymentId)
             .maybeSingle();
 
@@ -39,7 +39,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Payment not found." }, { status: 404 });
         }
 
-        const bookingStatus = ([] as { status: string }[]).concat(payment.bookings ?? [])[0]?.status;
+        const linked = ([] as { status: string; cancel_reason: string | null }[]).concat(payment.bookings ?? [])[0];
+        const bookingStatus = linked?.status;
+        if (linked?.cancel_reason === "payment_kept") {
+            return NextResponse.json({ error: "This payment was kept when the booking was cancelled, so it is not owed back." }, { status: 409 });
+        }
         if (payment.status !== "paid") {
             return NextResponse.json({ error: "Only paid payments can be refunded." }, { status: 409 });
         }
