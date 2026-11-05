@@ -170,3 +170,15 @@ test("tied customers are listed by name", async () => {
   const r = await report("2026-09-01", "2026-09-30");
   expect(r.top_customers.map((c) => c.name)).toEqual(["Abe Tie", "Mia Tie", "Zed Tie"]);
 });
+
+test("a period still under way is compared with the same days before it, not the whole previous period", async () => {
+  // A 7-day period that started 2 days ago: 3 days have happened (today included)
+  const day = (offset) => sql(`SELECT ((now() AT TIME ZONE 'Asia/Manila')::date + ${offset})::text`);
+  pay(book(day(-1), "08:00", "09:00"), 300, "paid", "cash", `${day(-1)} 09:00`);
+  pay(book(day(-9), "08:00", "09:00"), 300, "paid", "cash", `${day(-9)} 09:00`); // first day of the previous 7
+  pay(book(day(-5), "08:00", "09:00"), 500, "paid", "cash", `${day(-5)} 09:00`); // previous 7, but after its first 3 days
+  const r = await report(day(-2), day(4));
+  expect(r.previous.net).toBe(300);
+  expect(r.so_far).toEqual({ net: 300, count: 1, cancelled_and_no_shows: 0 });
+  expect(r.previous.count).toBe(1);
+});

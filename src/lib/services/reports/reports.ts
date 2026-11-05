@@ -16,7 +16,10 @@ export interface VenueReport {
     period: { from: string; to: string; through: string; bucket: "day" | "month" };
     money: { net: number; cash: number; gcash: number; card: number; refunded: number; refunded_count: number; court: number; open_play: number };
     bookings: { count: number; court_hours: number; cancelled: number; no_shows: number; money_kept: number };
+    /** The same number of days at the start of the period before; null for all time or a period not started yet */
     previous: { net: number; count: number; cancelled_and_no_shows: number } | null;
+    /** This period's days that have happened, to compare with `previous` */
+    so_far: { net: number; count: number; cancelled_and_no_shows: number } | null;
     occupancy: { pct: number | null; booked_hours: number; open_hours: number };
     courts: { id: string; name: string; pct: number | null }[];
     heatmap: { dow: number; hour: number; pct: number }[];

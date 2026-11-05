@@ -25,7 +25,7 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
 
 const trend = (pct: number | null, lowerIsBetter = false) =>
   pct === null || pct === 0 ? "neutral" : (pct > 0) !== lowerIsBetter ? "positive" : "negative";
-const change = (pct: number | null) => (pct === null ? null : `${pct > 0 ? "▲" : pct < 0 ? "▼" : ""} ${Math.abs(pct)}% vs previous period`.trim());
+const change = (pct: number | null, against: string) => (pct === null ? null : `${pct > 0 ? "▲" : pct < 0 ? "▼" : ""} ${Math.abs(pct)}% ${against}`.trim());
 
 /** Admin-only overview of the venue for a period: money, bookings, busy hours and best customers. */
 export function ReportsContainer() {
@@ -121,27 +121,31 @@ export function ReportsContainer() {
 }
 
 function ReportBody({ report }: { report: VenueReport }) {
-  const { money, bookings, previous, occupancy, period } = report;
-  const netPct = pctChange(money.net, previous?.net);
-  const countPct = pctChange(bookings.count, previous?.count);
+  const { money, bookings, previous, so_far: soFar, occupancy, period } = report;
+  const partial = period.through < period.to;
+  // A period still under way is compared with the same number of days before it
+  const against = partial ? "vs the same days before" : "vs previous period";
+  const netPct = soFar ? pctChange(soFar.net, previous?.net) : null;
+  const countPct = soFar ? pctChange(soFar.count, previous?.count) : null;
   const lost = bookings.cancelled + bookings.no_shows;
-  const lostDiff = previous ? lost - previous.cancelled_and_no_shows : null;
+  const lostDiff = soFar && previous ? soFar.cancelled_and_no_shows - previous.cancelled_and_no_shows : null;
+  // No comparison at all: either all time, or a period that hasn't started
+  const noComparison = period.through < period.from ? "Not started yet" : "All time";
   const best = report.series.reduce((a, b) => (b.net > a.net ? b : a), report.series[0]);
   const moneyMax = Math.max(money.cash, money.gcash, money.card, money.refunded);
-  const partial = period.through < period.to;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard title="Net revenue" value={peso(money.net)} icon={Wallet} trendType={trend(netPct)}
-          description={change(netPct) ?? (previous ? "Nothing to compare with" : "All time")} />
+          description={change(netPct, against) ?? (previous ? "Nothing to compare with" : noComparison)} />
         <StatCard title="Bookings" value={bookings.count} icon={CalendarCheck} trendType={trend(countPct)}
-          description={`${change(countPct) ? `${change(countPct)} · ` : ""}${bookings.court_hours} court-hours`} />
+          description={`${change(countPct, against) ? `${change(countPct, against)} · ` : ""}${bookings.court_hours} court-hours`} />
         <StatCard title="Courts full" value={occupancy.pct === null ? "—" : `${occupancy.pct}%`} icon={Gauge}
           description={occupancy.pct === null ? "The venue wasn't open" : `of open court-hours booked${partial ? " so far" : ""}`} />
         <StatCard title="Cancellations & no-shows" value={lost} icon={Ban}
           trendType={lostDiff === null || lostDiff === 0 ? "neutral" : lostDiff > 0 ? "negative" : "positive"}
-          description={lostDiff === null ? "All time" : lostDiff === 0 ? "Same as previous period" : `${lostDiff > 0 ? "▲" : "▼"} ${Math.abs(lostDiff)} vs previous period`} />
+          description={lostDiff === null ? noComparison : lostDiff === 0 ? `Same ${against.replace("vs ", "as ")}` : `${lostDiff > 0 ? "▲" : "▼"} ${Math.abs(lostDiff)} ${against}`} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">

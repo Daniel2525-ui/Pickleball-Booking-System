@@ -8,6 +8,26 @@
 
 BEGIN;
 
+-- Net money, counted bookings and cancellations + no-shows for one window of days; used to compare like with like
+CREATE OR REPLACE FUNCTION public.venue_report_window(p_from date, p_to date)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SET search_path TO ''
+AS $function$
+  SELECT jsonb_build_object(
+    'net', coalesce((SELECT sum(amount) FROM public.payments
+                     WHERE status = 'paid' AND (paid_at AT TIME ZONE 'Asia/Manila')::date BETWEEN p_from AND p_to), 0),
+    'count', count(*) FILTER (WHERE status IN ('confirmed', 'checked_in', 'in_progress', 'completed', 'no_show')),
+    'cancelled_and_no_shows', count(*) FILTER (WHERE status = 'no_show' OR (status = 'cancelled' AND cancel_reason IN ('customer', 'admin', 'payment_kept'))))
+  FROM public.bookings
+  WHERE court_id IS NOT NULL AND open_play_session_id IS NULL AND booking_date BETWEEN p_from AND p_to;
+$function$;
+
+-- Only get_venue_report (which checks is_owner) needs it; it runs with the caller's rights, so RLS still applies
+REVOKE ALL ON FUNCTION public.venue_report_window(date, date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.venue_report_window(date, date) TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.get_venue_report(p_from date, p_to date)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -25,6 +45,7 @@ DECLARE
   v_money jsonb;
   v_bookings jsonb;
   v_previous jsonb;
+  v_so_far jsonb;
   v_occupancy jsonb;
   v_court_rows jsonb;
   v_heatmap jsonb;
@@ -78,16 +99,12 @@ BEGIN
   INTO v_bookings
   FROM cb;
 
-  -- The same length of time just before (none for all time)
-  IF p_from IS NOT NULL THEN
-    SELECT jsonb_build_object(
-      'net', coalesce((SELECT sum(amount) FROM public.payments
-                       WHERE status = 'paid' AND (paid_at AT TIME ZONE 'Asia/Manila')::date BETWEEN v_from - v_len AND v_from - 1), 0),
-      'count', count(*) FILTER (WHERE status IN ('confirmed', 'checked_in', 'in_progress', 'completed', 'no_show')),
-      'cancelled_and_no_shows', count(*) FILTER (WHERE status = 'no_show' OR (status = 'cancelled' AND cancel_reason IN ('customer', 'admin', 'payment_kept'))))
-    INTO v_previous
-    FROM public.bookings
-    WHERE court_id IS NOT NULL AND open_play_session_id IS NULL AND booking_date BETWEEN v_from - v_len AND v_from - 1;
+  -- Compare like with like: the days of this period that have happened (so_far) against the same number of days at the
+  -- start of the period just before. A month 5 days in is compared with the previous period's first 5 days, not all of it.
+  -- None for all time, or for a period that hasn't started yet.
+  IF p_from IS NOT NULL AND v_through >= v_from THEN
+    v_previous := public.venue_report_window(v_from - v_len, v_from - v_len + (v_through - v_from));
+    v_so_far := public.venue_report_window(v_from, v_through);
   END IF;
 
   -- Open hours per day up to today (closed weekdays and closure dates give none; a 00:00 close means midnight),
@@ -187,8 +204,10 @@ BEGIN
   ), ranked AS (
     SELECT coalesce(v.who, s.who) AS who, coalesce(v.visits, 0) AS visits, coalesce(v.hours, 0) AS hours,
            coalesce(s.spent, 0) AS spent, v.last_visit,
-           (SELECT t.who_name FROM tagged t WHERE t.who = coalesce(v.who, s.who) LIMIT 1) AS name
+           n.name
     FROM visits v FULL JOIN spent s ON s.who = v.who
+    -- One name per customer, looked up once (max() also makes a walk-in's name stable)
+    JOIN (SELECT who, max(who_name) AS name FROM tagged GROUP BY who) n ON n.who = coalesce(v.who, s.who)
     -- Ties go by name so the list doesn't reshuffle between loads
     ORDER BY spent DESC, visits DESC, name
     LIMIT 5
@@ -202,7 +221,7 @@ BEGIN
 
   RETURN jsonb_build_object(
     'period', jsonb_build_object('from', v_from, 'to', v_to, 'through', v_through, 'bucket', v_bucket),
-    'money', v_money, 'bookings', v_bookings, 'previous', v_previous, 'occupancy', v_occupancy,
+    'money', v_money, 'bookings', v_bookings, 'previous', v_previous, 'so_far', v_so_far, 'occupancy', v_occupancy,
     'courts', v_court_rows, 'heatmap', v_heatmap, 'series', coalesce(v_series, '[]'::jsonb), 'top_customers', v_top);
 END;
 $function$;
