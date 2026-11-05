@@ -44,3 +44,13 @@ test("a failed load says so instead of showing an empty list", async ({ page }) 
   await page.goto("/admin/payments");
   await expect(page.getByText("Could not load payments. Refresh the page to try again.")).toBeVisible();
 });
+
+test("admin pages hydrate cleanly on a phone (the sidebar renders the same on server and client)", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, account("ADMIN"));
+  await page.goto("/admin/bookings");
+  await page.waitForLoadState("networkidle");
+  expect(errors.filter((m) => m.includes("Hydration"))).toEqual([]);
+});
