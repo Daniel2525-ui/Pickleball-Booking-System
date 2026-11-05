@@ -1,0 +1,137 @@
+<style>
+  .rp { --bg:#0f1524; --card:#161d30; --line:#26304a; --muted:#9aa3b8; --fg:#eef1f7; --lime:#c4f02a;
+        background:var(--bg); color:var(--fg); font-family:Poppins,system-ui,sans-serif; border-radius:12px; padding:24px; }
+  .rp h1 { font-size:26px; font-weight:800; margin:0; }
+  .rp .sub { font-size:13px; color:var(--muted); margin:4px 0 0; }
+  .rp .top { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+  .rp .seg { display:flex; gap:4px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:4px; }
+  .rp .seg span { font-size:12px; font-weight:600; padding:6px 11px; border-radius:7px; color:var(--muted); }
+  .rp .seg .on { background:var(--lime); color:#0f1524; }
+  .rp .btn { font-size:12px; font-weight:700; border:1px solid var(--line); border-radius:8px; padding:7px 12px; color:var(--fg); background:var(--card); }
+  .rp .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .rp .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .rp .k { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .rp .v { font-size:30px; font-weight:800; margin:8px 0 2px; font-variant-numeric:tabular-nums; }
+  .rp .d { font-size:12px; color:var(--muted); }
+  .rp .up { color:var(--lime); font-weight:700; }
+  .rp .dn { color:#ff8f8f; font-weight:700; }
+  .rp h3 { font-size:15px; margin:0 0 2px; }
+  .rp .row2 { display:grid; grid-template-columns:2fr 1fr; gap:14px; margin-top:14px; }
+  .rp .row3 { display:grid; grid-template-columns:1.6fr 1fr; gap:14px; margin-top:14px; }
+  .rp .bars { display:flex; align-items:flex-end; gap:2px; height:150px; margin-top:14px; border-bottom:1px solid var(--line); }
+  .rp .bars div { flex:1; background:var(--lime); border-radius:4px 4px 0 0; min-height:2px; opacity:.9; }
+  .rp .bars div:hover { opacity:1; outline:2px solid #fff; }
+  .rp .axis { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:6px; }
+  .rp .brk div.line { display:grid; grid-template-columns:70px 1fr 78px; gap:10px; align-items:center; margin-top:12px; font-size:13px; }
+  .rp .track { height:10px; background:#1f2840; border-radius:999px; overflow:hidden; }
+  .rp .fill { height:100%; background:var(--lime); border-radius:999px; }
+  .rp .num { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+  .rp .heat { display:grid; grid-template-columns:38px repeat(16,1fr); gap:2px; margin-top:14px; font-size:11px; color:var(--muted); }
+  .rp .heat .c { height:20px; border-radius:3px; }
+  .rp .legend { display:flex; gap:6px; align-items:center; font-size:11px; color:var(--muted); margin-top:10px; }
+  .rp .legend i { width:18px; height:10px; border-radius:2px; display:inline-block; }
+  .rp table { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; font-variant-numeric:tabular-nums; }
+  .rp th { text-align:left; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:8px 6px; border-bottom:1px solid var(--line); }
+  .rp td { padding:9px 6px; border-bottom:1px solid #1d2539; }
+  .rp .r { text-align:right; }
+  .rp .kept { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px; }
+  .rp .kept div { background:#121a2c; border-radius:10px; padding:10px; }
+  .rp .kept b { display:block; font-size:18px; margin-top:4px; }
+</style>
+
+<h2>Reports page: first look</h2>
+<p class="subtitle">Sample numbers for October. Admins only. Hover a bar or a grid square to see its value. Tell me in the terminal what's missing, what you'd drop, or what's in the wrong place.</p>
+
+<div class="rp">
+  <div class="top">
+    <div><h1>Reports</h1><p class="sub">How the venue is doing. Numbers include only money actually collected.</p></div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+      <div class="seg"><span>This week</span><span class="on">This month</span><span>Last month</span><span>Custom</span><span>All time</span></div>
+      <span class="btn">⤓ Download CSV</span>
+    </div>
+  </div>
+
+  <!-- 1. Money -->
+  <div class="grid4">
+    <div class="card"><div class="k">Net revenue</div><div class="v">₱184,600</div><div class="d"><span class="up">▲ 12%</span> vs September</div></div>
+    <div class="card"><div class="k">Bookings</div><div class="v">412</div><div class="d"><span class="up">▲ 8%</span> · 702 court-hours</div></div>
+    <div class="card"><div class="k">Courts full</div><div class="v">47%</div><div class="d">of open hours were booked</div></div>
+    <div class="card"><div class="k">Cancellations &amp; no-shows</div><div class="v">23</div><div class="d"><span class="dn">▲ 3</span> vs September</div></div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <h3>Revenue per day</h3><p class="sub">Net of refunds. Tallest day: Sat Oct 25, ₱11,800.</p>
+      <div class="bars" id="rp-bars"></div>
+      <div class="axis"><span>Oct 1</span><span>Oct 8</span><span>Oct 15</span><span>Oct 22</span><span>Oct 31</span></div>
+    </div>
+    <div class="card brk">
+      <h3>Where the money came from</h3><p class="sub">Check each against the drawer, GCash app and Stripe.</p>
+      <div class="line"><span>Cash</span><div class="track"><div class="fill" style="width:38%"></div></div><span class="num">₱72,400</span></div>
+      <div class="line"><span>GCash</span><div class="track"><div class="fill" style="width:44%"></div></div><span class="num">₱84,200</span></div>
+      <div class="line"><span>Card</span><div class="track"><div class="fill" style="width:18%"></div></div><span class="num">₱33,800</span></div>
+      <div class="line" style="margin-top:16px"><span>Refunded</span><div class="track"><div class="fill" style="width:3%;background:#9aa3b8"></div></div><span class="num">−₱5,800</span></div>
+      <div style="border-top:1px solid var(--line); margin-top:14px; padding-top:10px; font-size:13px; display:flex; justify-content:space-between"><span>Court bookings</span><b>₱161,300</b></div>
+      <div style="font-size:13px; display:flex; justify-content:space-between; margin-top:6px"><span>Open play</span><b>₱23,300</b></div>
+    </div>
+  </div>
+
+  <!-- 3. When it's busy -->
+  <div class="row3">
+    <div class="card">
+      <h3>When the courts are busy</h3><p class="sub">Share of courts booked, by weekday and hour. Dark = quiet, bright = full.</p>
+      <div class="heat" id="rp-heat"></div>
+      <div class="legend">Quiet <i style="background:#1f2840"></i><i style="background:#3d4d1c"></i><i style="background:#6b8a1f"></i><i style="background:#9cc424"></i><i style="background:#c4f02a"></i> Full</div>
+    </div>
+    <div class="card brk">
+      <h3>Each court</h3><p class="sub">How full it was this month.</p>
+      <div class="line"><span>Court 1</span><div class="track"><div class="fill" style="width:58%"></div></div><span class="num">58%</span></div>
+      <div class="line"><span>Court 2</span><div class="track"><div class="fill" style="width:51%"></div></div><span class="num">51%</span></div>
+      <div class="line"><span>Court 3</span><div class="track"><div class="fill" style="width:44%"></div></div><span class="num">44%</span></div>
+      <div class="line"><span>Court 4</span><div class="track"><div class="fill" style="width:35%"></div></div><span class="num">35%</span></div>
+      <h3 style="margin-top:18px">Cancellations &amp; no-shows</h3>
+      <div class="kept"><div class="d">Cancelled<b>17</b></div><div class="d">No-shows<b>6</b></div><div class="d">Money kept<b>₱2,400</b></div></div>
+    </div>
+  </div>
+
+  <!-- 4. Best customers -->
+  <div class="card" style="margin-top:14px">
+    <h3>Best customers</h3><p class="sub">Top players this month by money spent.</p>
+    <table>
+      <thead><tr><th>#</th><th>Player</th><th class="r">Visits</th><th class="r">Hours</th><th class="r">Spent</th><th>Last visit</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Maria Santos</td><td class="r">14</td><td class="r">21</td><td class="r">₱5,600</td><td>Oct 30</td></tr>
+        <tr><td>2</td><td>Jun Dela Cruz</td><td class="r">11</td><td class="r">18</td><td class="r">₱4,500</td><td>Oct 29</td></tr>
+        <tr><td>3</td><td>Paolo Reyes</td><td class="r">9</td><td class="r">15</td><td class="r">₱3,900</td><td>Oct 31</td></tr>
+        <tr><td>4</td><td>Ana Ramos</td><td class="r">8</td><td class="r">12</td><td class="r">₱3,000</td><td>Oct 27</td></tr>
+        <tr><td>5</td><td>Carlo Tan</td><td class="r">7</td><td class="r">10</td><td class="r">₱2,600</td><td>Oct 24</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(() => {
+  const bars = document.getElementById("rp-bars");
+  const vals = [3200,4100,3900,5600,9800,10400,4300,3600,4200,4600,5200,9100,10900,4800,3900,4400,4100,6000,9600,11200,5200,4200,4800,4500,6400,11800,10200,5100,4300,4700,5600];
+  const max = Math.max(...vals);
+  vals.forEach((v, i) => { const b = document.createElement("div"); b.style.height = (v / max * 100) + "%"; b.title = `Oct ${i + 1}: ₱${v.toLocaleString()}`; bars.appendChild(b); });
+
+  const heat = document.getElementById("rp-heat");
+  const steps = ["#1f2840", "#3d4d1c", "#6b8a1f", "#9cc424", "#c4f02a"];
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  heat.appendChild(document.createElement("span"));
+  for (let h = 6; h < 22; h++) { const s = document.createElement("span"); s.textContent = h % 3 === 0 ? (h > 12 ? h - 12 + "p" : h + (h === 12 ? "p" : "a")) : ""; heat.appendChild(s); }
+  days.forEach((d, di) => {
+    const l = document.createElement("span"); l.textContent = d; heat.appendChild(l);
+    for (let h = 6; h < 22; h++) {
+      const weekend = di >= 5, evening = h >= 17, morning = h <= 8;
+      let p = 0.15 + (evening ? 0.45 : 0) + (weekend ? 0.3 : 0) + (morning && weekend ? 0.2 : 0) - (h >= 12 && h <= 15 && !weekend ? 0.1 : 0);
+      p = Math.max(0, Math.min(1, p + ((di * 7 + h) % 5) * 0.03));
+      const c = document.createElement("div"); c.className = "c"; c.style.background = steps[Math.min(4, Math.floor(p * 5))];
+      const hr = h > 12 ? `${h - 12} PM` : h === 12 ? "12 PM" : `${h} AM`;
+      c.title = `${d} ${hr}: ${Math.round(p * 100)}% booked`; heat.appendChild(c);
+    }
+  });
+})();
+</script>
