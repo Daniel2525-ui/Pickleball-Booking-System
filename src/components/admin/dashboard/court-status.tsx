@@ -1,145 +1,130 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CircleCheck, Clock, Layers, Users, Wrench, XCircle } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { fetchCourtStatus } from "@/lib/services/dashboard/courtStatus.service";
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Layers } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { fetchLiveCourts } from "@/lib/services/dashboard/courtStatus.service";
+import type { LiveCourtTile, LiveState } from "@/lib/services/dashboard/liveCourts";
+import { formatTime12h } from "@/lib/utils/formatTime";
 
-type CourtStatusType = "Available" | "In Use" | "Open play" | "Maintenance" | "Closed";
-interface Court {
-  name: string;
-  status: CourtStatusType;
-}
+const TAGS: Record<LiveState, { label: string; style: string }> = {
+  in_play: { label: "In play", style: "bg-primary/15 text-primary" },
+  free: { label: "Free", style: "bg-muted text-muted-foreground" },
+  open_play: { label: "Open play", style: "bg-sky-500/15 text-sky-700 dark:text-sky-400" },
+  maintenance: { label: "Maintenance", style: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+  closed: { label: "Closed", style: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-400" },
+};
 
+const REFRESH_MS = 60_000;
+
+const timeLeft = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ""} left` : `${m} min left`);
+const clock = (d: Date) => d.toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+
+/** Who is on each court right now, how long they have, whether they paid, and who is next. Refreshes every minute. */
 export default function CourtStatus({ className }: { className?: string }) {
-  const [courts, setCourts] = useState<Court[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const statusConfig: Record<
-    CourtStatusType,
-    {
-      label: string;
-      icon: typeof CircleCheck;
-      dotColor: string;
-      badgeStyle: string;
-    }
-  > = {
-    Available: {
-      label: "Available",
-      icon: CircleCheck,
-      dotColor: "bg-emerald-500",
-      badgeStyle: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20",
-    },
-    "In Use": {
-      label: "In Play",
-      icon: Clock,
-      dotColor: "bg-amber-500",
-      badgeStyle: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20",
-    },
-    "Open play": {
-      label: "Open play",
-      icon: Users,
-      dotColor: "bg-violet-500",
-      badgeStyle: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20",
-    },
-    Maintenance: {
-      label: "Maintenance",
-      icon: Wrench,
-      dotColor: "bg-orange-500",
-      badgeStyle: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20",
-    },
-    Closed: {
-      label: "Closed",
-      icon: XCircle,
-      dotColor: "bg-zinc-500",
-      badgeStyle: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-400 border border-zinc-500/20",
-    },
-  };
+  const [tiles, setTiles] = useState<LiveCourtTile[] | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
-    const loadCourtStatus = async () => {
-      setLoading(true);
-      const { data } = await fetchCourtStatus();
-
-      if (data) {
-        setCourts(data.courts);
-      }
-
-      setLoading(false);
+    let active = true;
+    const load = async () => {
+      const now = new Date();
+      const { data } = await fetchLiveCourts(now);
+      if (!active || !data) return;
+      setTiles(data);
+      setUpdatedAt(now);
     };
-
-    loadCourtStatus();
+    load();
+    const timer = setInterval(load, REFRESH_MS);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   return (
-    <Card className={`border border-border shadow-2xs ${className || ""}`}>
+    <Card role="region" aria-label="Live Court Occupancy" className={`border border-border shadow-2xs ${className || ""}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-bold text-foreground">
-            Live Court Occupancy
-          </CardTitle>
-          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+          <CardTitle className="text-base font-bold text-foreground">Live Court Occupancy</CardTitle>
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
             <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            Live
+            {updatedAt ? `Live · ${clock(updatedAt)}` : "Live"}
           </span>
         </div>
       </CardHeader>
 
-      <CardContent>
-        {loading ? (
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-xl border p-3">
-                <Skeleton className="size-8 rounded-lg shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <Skeleton className="h-4 w-20 mb-1.5" />
-                  <Skeleton className="h-3 w-16" />
-                </div>
-              </div>
-            ))}
+      <CardContent className="@container">
+        {tiles === null ? (
+          <div className="grid gap-3 @lg:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
           </div>
-        ) : courts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+        ) : tiles.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
             <Layers className="size-8 text-muted-foreground/40" />
             <p className="text-sm font-semibold text-foreground">No courts found</p>
             <p className="text-xs text-muted-foreground">Add courts in the Courts &amp; Rates section.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {courts.map((court) => {
-              const config = statusConfig[court.status] || statusConfig.Available;
-              const Icon = config.icon;
-
-              return (
-                <div
-                  key={court.name}
-                  className="flex items-center gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-2xs hover:border-primary/30 transition-colors"
-                >
-                  <div
-                    className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${config.badgeStyle}`}
-                  >
-                    <Icon className="size-4" />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold leading-tight text-foreground truncate">
-                      {court.name}
-                    </p>
-
-                    <div className="mt-1 flex items-center gap-1.5">
-                      <span className={`inline-block size-1.5 rounded-full ${config.dotColor}`} />
-                      <span className="text-[11px] font-medium text-muted-foreground">
-                        {config.label}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid gap-3 @lg:grid-cols-2">
+            {tiles.map((t) => <CourtTile key={t.name} tile={t} />)}
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function CourtTile({ tile: t }: { tile: LiveCourtTile }) {
+  const tag = TAGS[t.state];
+  const busy = t.state === "in_play" || t.state === "open_play";
+  return (
+    <div
+      role="group"
+      aria-label={t.name}
+      className={`flex flex-col gap-1.5 rounded-xl border bg-card p-3 shadow-2xs ${t.state === "in_play" ? "border-primary/40" : "border-border/80"}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-sm font-bold text-foreground">{t.name}</span>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${tag.style}`}>{tag.label}</span>
+      </div>
+
+      {busy && t.slot ? (
+        <>
+          <p className="truncate text-sm font-semibold text-foreground">{t.who}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatTime12h(t.slot.start)} – {formatTime12h(t.slot.end)}
+            {t.spots && ` · ${t.spots.booked} of ${t.spots.capacity} spots`}
+          </p>
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+            <div className={`h-full rounded-full ${t.state === "open_play" ? "bg-sky-500" : "bg-primary"}`} style={{ width: `${Math.round((t.progress ?? 0) * 100)}%` }} />
+          </div>
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>{timeLeft(t.minutesLeft ?? 0)}</span>
+            {t.payment && (
+              <span className={t.payment.paid ? "" : "font-semibold text-amber-700 dark:text-amber-400"}>{t.payment.label}</span>
+            )}
+            {t.state === "open_play" && (
+              <Link href="/admin/open-play" className="font-semibold text-primary hover:underline underline-offset-4">View players</Link>
+            )}
+          </div>
+        </>
+      ) : t.state === "free" ? (
+        <>
+          <p className="text-sm font-semibold text-muted-foreground">Nobody right now</p>
+          <p className="text-xs text-muted-foreground">{t.freeUntil ? `Free until ${formatTime12h(t.freeUntil)}` : "No more bookings today"}</p>
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground">{t.note || (t.state === "maintenance" ? "Under maintenance" : "Not in use")}</p>
+      )}
+
+      {t.next && (
+        <p className="mt-1 border-t border-border/60 pt-1.5 text-xs text-muted-foreground">
+          Next: <span className="font-semibold text-foreground">{t.next.name}</span> at {formatTime12h(t.next.start)}
+        </p>
+      )}
+    </div>
   );
 }
