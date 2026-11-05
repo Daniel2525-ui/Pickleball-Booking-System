@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUnsavedChangesPrompt } from "@/hooks/use-unsaved-changes-prompt";
 import { FormCardSkeleton } from "@/components/skeletons/form-card-skeleton";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -34,8 +35,9 @@ export function ContactCard({ onChanged }: { onChanged: () => void }) {
     };
   }, []);
 
+  const dirty = !!fields && !!saved && (fields.phone !== saved.phone || fields.email !== saved.email || fields.address !== saved.address);
+  useUnsavedChangesPrompt(dirty);
   if (!fields || !saved) return <FormCardSkeleton fields={3} />;
-  const dirty = fields.phone !== saved.phone || fields.email !== saved.email || fields.address !== saved.address;
 
   // Same rules as booking_settings_venue_contact_check
   const save = async () => {

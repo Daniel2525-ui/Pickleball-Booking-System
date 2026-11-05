@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUnsavedChangesPrompt } from "@/hooks/use-unsaved-changes-prompt";
 import { FormCardSkeleton } from "@/components/skeletons/form-card-skeleton";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -53,8 +54,9 @@ export function PolicyCard({ onChanged }: { onChanged: () => void }) {
     toast.success("Booking rules saved.");
   };
 
+  const dirty = !!saved && (Number(cutoff) !== saved.cutoff || Number(grace) !== saved.grace);
+  useUnsavedChangesPrompt(dirty);
   if (!saved) return <FormCardSkeleton fields={2} />;
-  const dirty = Number(cutoff) !== saved.cutoff || Number(grace) !== saved.grace;
 
   return (
     <Card className="shadow-sm">

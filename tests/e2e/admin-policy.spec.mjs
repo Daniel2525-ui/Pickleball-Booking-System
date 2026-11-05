@@ -69,3 +69,14 @@ test("impossible values are refused on the page", async ({ page }) => {
   await page.getByRole("button", { name: "Save booking rules" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "between 0 and 120 whole minutes" })).toBeVisible();
 });
+
+test("leaving with unsaved booking rules asks first", async ({ page }) => {
+  await login(page, account("ADMIN"));
+  await page.goto("/admin/settings");
+  await page.getByLabel("Online cancellation closes (hours before start)").fill("5");
+  const dialog = page.waitForEvent("dialog");
+  await page.close({ runBeforeUnload: true });
+  const d = await dialog;
+  expect(d.type()).toBe("beforeunload");
+  await d.dismiss();
+});

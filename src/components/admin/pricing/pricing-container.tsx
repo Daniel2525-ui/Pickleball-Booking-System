@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUnsavedChangesPrompt } from "@/hooks/use-unsaved-changes-prompt";
 import { FormCardSkeleton } from "@/components/skeletons/form-card-skeleton";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Loader2, Plus, Save, Trash2, Zap } from "lucide-react";
@@ -80,14 +81,7 @@ export function PricingContainer() {
   const changes = saved ? pricingChanges(saved, form) : [];
   const dirty = changes.length > 0;
 
-  // Reloading or closing the tab with unsaved prices asks first
-  // shortcut: sidebar links still leave without asking; intercept router navigation if staff lose edits that way
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  useUnsavedChangesPrompt(dirty);
 
   const update = (key: number, patch: Partial<Window>) =>
     setWindows((prev) => prev.map((w) => (w.key === key ? { ...w, ...patch } : w)));

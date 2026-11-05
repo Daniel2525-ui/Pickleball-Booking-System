@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useUnsavedChangesPrompt } from "@/hooks/use-unsaved-changes-prompt"
 import { toast } from "sonner"
 import { Save, LoaderCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -36,14 +37,7 @@ export const SchedulesContainer = () => {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null)
   const dirty = JSON.stringify(hours) !== savedHours
 
-  // Reloading or closing the tab with unsaved edits asks first
-  // shortcut: in-app links (sidebar) still leave without asking; intercept router navigation if staff lose edits that way
-  useEffect(() => {
-    if (!dirty) return
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
-    window.addEventListener("beforeunload", warn)
-    return () => window.removeEventListener("beforeunload", warn)
-  }, [dirty])
+  useUnsavedChangesPrompt(dirty)
 
   useEffect(() => {
     const loadHours = async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUnsavedChangesPrompt } from "@/hooks/use-unsaved-changes-prompt";
 import { FormCardSkeleton } from "@/components/skeletons/form-card-skeleton";
 import { Loader2, Save, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -63,14 +64,7 @@ export function SettingsContainer() {
   const numberChanged = digits !== saved.number;
   const dirty = name.trim() !== saved.name || numberChanged || !!pendingQr || removeQr;
 
-  // Reloading or closing the tab with unsaved GCash details asks first
-  // shortcut: sidebar links still leave without asking; intercept router navigation if staff lose edits that way
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  useUnsavedChangesPrompt(dirty);
 
   const pickQr = (file: File) => {
     if (pendingQr) URL.revokeObjectURL(pendingQr.preview);

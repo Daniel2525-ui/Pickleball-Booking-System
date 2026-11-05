@@ -37,6 +37,12 @@ test("the owner gives an account front-desk access", async ({ page }) => {
   await page.getByRole("button", { name: "Give access" }).click();
   await expect(page.getByText("No player account uses that email. Ask them to sign up on the booking site first.")).toBeVisible();
 
+  // "_" is not a wildcard: a look-alike email never matches someone else's account
+  await page.getByLabel("Give staff access").fill(email.replace("-", "_"));
+  await page.getByRole("button", { name: "Give access" }).click();
+  await expect(page.getByText("No player account uses that email. Ask them to sign up on the booking site first.")).toBeVisible();
+  expect(access("CUSTOMER2")).toBe("customer|false");
+
   await page.getByLabel("Give staff access").fill(email);
   await page.getByRole("button", { name: "Give access" }).click(); // Front desk is the default
   await expect(page.getByText(/now has front desk access/)).toBeVisible();
