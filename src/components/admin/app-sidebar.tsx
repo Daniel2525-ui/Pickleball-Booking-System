@@ -111,7 +111,7 @@ export default function AppSidebar({ account, isOwner }: { account: { name: stri
                                         Crosshair Dinkers
                                     </span>
                                     <span className="truncate text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
-                                        Court Admin
+                                        {isOwner ? "Court Admin" : "Court Staff"}
                                     </span>
                                 </div>
                             </SidebarMenuButton>

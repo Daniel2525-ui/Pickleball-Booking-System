@@ -28,6 +28,9 @@ test.beforeEach(() => requireLocalDb());
 test("the owner gives an account front-desk access", async ({ page }) => {
   const email = account("CUSTOMER2").email;
   await login(page, account("ADMIN"));
+  // The admin's pages say Admin
+  await expect(page.getByRole("heading", { name: "Admin Dashboard" })).toBeVisible();
+  await expect(page.getByText("Court Admin")).toBeVisible();
   await page.goto("/admin/settings");
 
   await page.getByLabel("Give staff access").fill("nobody-here@example.com");
@@ -45,9 +48,15 @@ test("front desk runs the day but never sees Pricing or Settings", async ({ page
   makeFrontDesk();
   await login(page, account("CUSTOMER2"));
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  // Front desk pages say Staff
+  await expect(page.getByRole("heading", { name: "Staff Dashboard" })).toBeVisible();
+  await expect(page.getByText("Court Staff")).toBeVisible();
   await expect(page.getByRole("link", { name: "Bookings", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Pricing", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0);
+
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Staff panel" }).first()).toBeVisible();
 
   for (const path of ["/admin/pricing", "/admin/settings"]) {
     await page.goto(path);

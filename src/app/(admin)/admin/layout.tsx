@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <Crosshair className="size-3.5" />
               </div>
               <span className="font-extrabold text-sm tracking-tight text-foreground">
-                Crosshair Dinkers <span className="text-[10px] font-semibold text-muted-foreground uppercase ml-1">Admin</span>
+                Crosshair Dinkers <span className="text-[10px] font-semibold text-muted-foreground uppercase ml-1">{profile?.is_owner ? "Admin" : "Staff"}</span>
               </span>
             </div>
           </div>

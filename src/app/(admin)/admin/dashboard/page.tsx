@@ -6,15 +6,23 @@ import RecentBookings from "@/components/admin/dashboard/recent-bookings";
 import AttentionAlert from "@/components/admin/dashboard/attention-alert";
 import { Clock } from "lucide-react";
 import { connection } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
-  title: "Admin Dashboard | Crosshair Dinkers",
+  title: "Dashboard | Crosshair Dinkers",
   description: "Facility operations, court schedules, and real-time reservation metrics.",
 };
 
 export default async function DashboardPage() {
   // Render per request in venue time; a prerendered page would show the deploy day in UTC
   await connection();
+  // Admins (owners) and front-desk staff share this page; the heading says which one is signed in
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("is_owner").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const roleWord = profile?.is_owner ? "Admin" : "Staff";
   const currentDate = new Date().toLocaleDateString("en-US", {
     timeZone: "Asia/Manila",
     weekday: "long",
@@ -29,7 +37,7 @@ export default async function DashboardPage() {
       <header className="sticky top-14 z-20 bg-background/95 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-6 pb-4 sm:pt-7 sm:pb-4 border-b border-border/60 -mx-4 px-4 lg:-mx-8 lg:px-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Admin Dashboard
+            {roleWord} Dashboard
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
             Court availability, daily booking schedules, and facility activity at Crosshair Dinkers.

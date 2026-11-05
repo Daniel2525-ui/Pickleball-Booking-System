@@ -12,6 +12,8 @@ export function PublicHeader() {
   const [fullName, setFullName] = useState("");
   // Only shows a link; /admin itself is still gated by the proxy
   const [isAdmin, setIsAdmin] = useState(false);
+  // Front-desk staff see the staff panel link; admins (owners) the admin one
+  const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -23,11 +25,13 @@ export function PublicHeader() {
       if (!u) {
         setFullName("");
         setIsAdmin(false);
+        setIsOwner(false);
         return;
       }
-      const { data } = await supabase.from("profiles").select("full_name, role").eq("id", u.id).maybeSingle();
+      const { data } = await supabase.from("profiles").select("full_name, role, is_owner").eq("id", u.id).maybeSingle();
       setFullName(data?.full_name ?? "");
       setIsAdmin(data?.role === "admin");
+      setIsOwner(!!data?.is_owner);
     };
 
     supabase.auth.getUser().then(({ data: { user } }) => loadProfile(user));
@@ -61,7 +65,7 @@ export function PublicHeader() {
         </Link>
         {user && isAdmin && (
           <Link href="/admin/dashboard" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-primary hover:bg-muted transition-colors">
-            Admin panel
+            {isOwner ? "Admin panel" : "Staff panel"}
           </Link>
         )}
         {user && (
@@ -80,7 +84,7 @@ export function PublicHeader() {
             email={user.email ?? ""}
             signOutTo="/"
             links={[
-              ...(isAdmin ? [{ label: "Admin panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
+              ...(isAdmin ? [{ label: isOwner ? "Admin panel" : "Staff panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
               { label: "Open Play", href: "/open-play", icon: "bookings" },
               { label: "My bookings", href: "/my-bookings", icon: "bookings" },
               { label: "Profile and password", href: "/profile", icon: "profile" },
