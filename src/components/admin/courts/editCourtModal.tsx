@@ -25,10 +25,9 @@ import {
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { updateCourt } from "@/lib/services/courts/updateCourt.service";
 import { CourtBooking, courtBookingName, fetchUpcomingCourtBookings } from "@/lib/services/courts/courtsData.service";
-import { shortDate } from "@/lib/services/courts/courtDay";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 import { getBookingEnd } from "@/lib/utils/bookingTime";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatTime12h, formatShortDate } from "@/lib/utils/formatTime";
 
 interface EditCourtModalProps {
     court: Court | null;
@@ -166,7 +165,7 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
                                     const phone = b.customers?.phone || b.profiles?.phone;
                                     return (
                                         <li key={b.id}>
-                                            <span className="font-semibold">{courtBookingName(b)}</span> · {shortDate(b.booking_date)} · {formatTime12h(b.start_time)}
+                                            <span className="font-semibold">{courtBookingName(b)}</span> · {formatShortDate(b.booking_date)} · {formatTime12h(b.start_time)}
                                             {phone && (
                                                 <>
                                                     {" · "}

@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { fetchPayments, fetchPaymentTotals, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/paymentsData.service";
 import { toast } from "sonner";
 import { Payment, paymentMethodLabel, sumPayments } from "@/lib/services/payments/paymentsTypes";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatTime12h, formatDate } from "@/lib/utils/formatTime";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
 import { RefundPaymentModal } from "./refundPaymentModal";
 
@@ -38,21 +38,6 @@ interface PaymentsTableProps {
   };
 }
 
-const formatDate = (date: string | null | undefined, withTime = false) => {
-  if (!date) return "—";
-  try {
-    const day = new Date(date);
-    if (isNaN(day.getTime())) return "—";
-    return day.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      ...(withTime && { hour: "numeric", minute: "2-digit", hour12: true }),
-    });
-  } catch {
-    return "—";
-  }
-};
 
 const formatCurrency = (amount: number | null | undefined) => {
   const value = Number(amount) || 0;
@@ -94,14 +79,22 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   };
 
   useEffect(() => {
+    // A slower answer for an older filter must not replace the newer one
+    let ignore = false;
     const loadPayments = async () => {
       setLoading(true);
-      const { data } = await fetchPayments(filters);
-      if (data) setPayments(data);
+      const { data, error } = await fetchPayments(filters);
+      if (ignore) return;
+      // A failed load is not an empty day: say so instead of showing "No payment records found"
+      if (error) toast.error("Could not load payments. Refresh the page to try again.");
+      setPayments(data);
       setHasMore(data.length === PAYMENTS_PAGE_SIZE);
       setLoading(false);
     };
     loadPayments();
+    return () => {
+      ignore = true;
+    };
   }, [filters]);
 
   useEffect(() => {

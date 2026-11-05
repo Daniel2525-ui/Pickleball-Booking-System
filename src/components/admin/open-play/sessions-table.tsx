@@ -7,11 +7,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatTime12h, formatShortDate } from "@/lib/utils/formatTime";
 import { type OpenPlayAdminSession, hasEnded } from "./open-play-container";
 
-const formatDate = (d: string) =>
-  new Date(`${d}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric" });
 
 interface Props {
   sessions: OpenPlayAdminSession[];
@@ -49,7 +47,7 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                 const cancelled = s.status === "cancelled";
                 return (
                   <TableRow key={s.id} className={cancelled ? "opacity-60" : flagged ? "bg-amber-500/10" : s.id === selectedId ? "bg-primary/5" : ""}>
-                    <TableCell className="font-semibold">{formatDate(s.session_date)}</TableCell>
+                    <TableCell className="font-semibold">{formatShortDate(s.session_date)}</TableCell>
                     <TableCell>{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</TableCell>
                     <TableCell>{flagged ? "—" : `${s.booked} / ${s.capacity}`}</TableCell>
                     <TableCell>

@@ -11,9 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Booking } from "@/lib/services/bookings/bookingsTypes";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
-import { shortDate } from "@/lib/services/courts/courtDay";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatTime12h, formatShortDate } from "@/lib/utils/formatTime";
 
 export interface MovedBooking {
   court_id: string;
@@ -75,7 +74,7 @@ export const MoveBookingModal = ({
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) return setError(body?.error ?? "Could not move the booking. Please try again.");
-      toast.success(`Moved to ${courtName} · ${shortDate(date)} · ${formatTime12h(start)}–${formatTime12h(end)}`);
+      toast.success(`Moved to ${courtName} · ${formatShortDate(date)} · ${formatTime12h(start)}–${formatTime12h(end)}`);
       onMoved(booking.id, { court_id: courtId, booking_date: date, start_time: `${start}:00`, end_time: `${end}:00` }, courtName);
       onClose();
     } catch {
@@ -91,7 +90,7 @@ export const MoveBookingModal = ({
         <DialogHeader>
           <DialogTitle>Move Booking</DialogTitle>
           <DialogDescription>
-            {booking?.customer_name} · {booking?.courts?.name} · {booking && shortDate(booking.booking_date)},{" "}
+            {booking?.customer_name} · {booking?.courts?.name} · {booking && formatShortDate(booking.booking_date)},{" "}
             {booking && `${formatTime12h(booking.start_time)}–${formatTime12h(booking.end_time)}`}. The payment stays as it is, so
             the new slot must cost the same.
           </DialogDescription>

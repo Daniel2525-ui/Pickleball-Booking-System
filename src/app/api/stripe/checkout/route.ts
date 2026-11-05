@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { HOLD_MS } from "@/lib/services/bookings/bookingDisplayStatus";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
         // Grant an initial 35-minute safety buffer (2100s) to guarantee the courts remain held
         // while database operations and Stripe Checkout Session creation execute.
         // Prices come from the database so Stripe charges exactly what the holds record.
-        const initialHoldExpiresAtIso = new Date(Date.now() + 35 * 60 * 1000).toISOString();
+        const initialHoldExpiresAtIso = new Date(Date.now() + HOLD_MS).toISOString();
 
         const { data: rpcResult, error: rpcError } = await supabase.rpc(isGcash ? "hold_gcash_basket" : "hold_court_basket", {
             p_booking_date: booking_date,

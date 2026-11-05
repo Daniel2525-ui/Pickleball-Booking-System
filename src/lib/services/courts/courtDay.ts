@@ -22,7 +22,3 @@ export function courtNowNext<T extends CourtSlot>(slots: T[], courtId: string, n
         next: mine.find((s) => getBookingStart(s) > now) ?? null,
     };
 }
-
-/** "Fri, Nov 7" for a YYYY-MM-DD venue date. */
-export const shortDate = (date: string) =>
-    new Date(`${date}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric" });

@@ -4,6 +4,7 @@ import { cleanupExpiredBooking } from "@/lib/services/payments/cleanupExpiredBoo
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
 import { autoCloseStatus, buildStatusUpdate, openPlayCloseStatus } from "@/lib/services/bookings/adminStatusRules";
+import { HOLD_MS } from "@/lib/services/bookings/bookingDisplayStatus";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 /**
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
 
     while (Date.now() - startTime < CLEANUP_LOOP_BUDGET_MS) {
       const nowIso = new Date().toISOString();
-      const fallbackCutoff = new Date(Date.now() - 35 * 60 * 1000).toISOString();
+      const fallbackCutoff = new Date(Date.now() - HOLD_MS).toISOString();
 
       let query = supabase
         .from("bookings")

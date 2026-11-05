@@ -8,8 +8,11 @@ interface HoldFields {
     cancel_reason?: string | null;
 }
 
-// Same fallback as the database (hold_court_booking / cancel_expired_booking): created_at + 35 minutes
-const HOLD_FALLBACK_MS = 35 * 60 * 1000;
+/**
+ * How long an online checkout holds its court (35 minutes). The checkout sets hold_expires_at from this; older holds
+ * without one fall back to created_at + this, the same as the database (hold_court_booking / cancel_expired_booking).
+ */
+export const HOLD_MS = 35 * 60 * 1000;
 
 /** GCash proof submitted: the database keeps the hold open forever (hold_expires_at = 'infinity') until staff decide. */
 export const isAwaitingVerification = (booking: HoldFields) =>
@@ -20,7 +23,7 @@ export const isHoldExpired = (booking: HoldFields, now: Date = new Date()) => {
     if (booking.status !== "pending") return false;
     const expiry = booking.hold_expires_at
         ? new Date(booking.hold_expires_at).getTime()
-        : new Date(booking.created_at ?? NaN).getTime() + HOLD_FALLBACK_MS;
+        : new Date(booking.created_at ?? NaN).getTime() + HOLD_MS;
     return !Number.isNaN(expiry) && expiry <= now.getTime();
 };
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatTime12h, formatShortDate } from "@/lib/utils/formatTime";
 import { type OpenPlayAdminSession } from "./open-play-container";
 
 export interface PastSession extends OpenPlayAdminSession {
@@ -13,8 +13,6 @@ export interface PastSession extends OpenPlayAdminSession {
   collected: number;
 }
 
-const formatDate = (d: string) =>
-  new Date(`${d}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric" });
 
 /** The last 28 days of sessions: how full they were, who played, and the money still held. */
 export function PastSessionsTable({ sessions, loading, onPlayers }: { sessions: PastSession[]; loading: boolean; onPlayers: (s: OpenPlayAdminSession) => void }) {
@@ -46,13 +44,13 @@ export function PastSessionsTable({ sessions, loading, onPlayers }: { sessions: 
             ) : (
               sessions.map((s) => (
                 <TableRow key={s.id} className={s.status === "cancelled" ? "opacity-60" : ""}>
-                  <TableCell className="font-semibold">{formatDate(s.session_date)}</TableCell>
+                  <TableCell className="font-semibold">{formatShortDate(s.session_date)}</TableCell>
                   <TableCell>{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</TableCell>
                   <TableCell>{s.status === "cancelled" ? "Cancelled" : `${s.booked} / ${s.capacity}`}</TableCell>
                   <TableCell>{s.status === "cancelled" ? "—" : s.played}</TableCell>
                   <TableCell className="text-right tabular-nums">₱{s.collected.toLocaleString("en-PH")}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => onPlayers(s)} aria-label={`Players for ${formatDate(s.session_date)}`}>
+                    <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => onPlayers(s)} aria-label={`Players for ${formatShortDate(s.session_date)}`}>
                       <Users className="h-4 w-4" />
                       Players
                     </Button>

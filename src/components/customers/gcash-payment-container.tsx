@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { HOLD_MS } from "@/lib/services/bookings/bookingDisplayStatus";
 import Link from "next/link";
 import { CheckCircle2, Copy, Info, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -20,7 +21,7 @@ type View = "loading" | "form" | "submitted" | "expired";
 
 // Same normalisation as submit_gcash_proof: spaces and dashes are ignored
 const normaliseReference = (ref: string) => ref.replace(/[\s-]/g, "");
-const holdEnd = (r: Row) => new Date(r.hold_expires_at ?? new Date(r.created_at).getTime() + 35 * 60_000).getTime();
+const holdEnd = (r: Row) => new Date(r.hold_expires_at ?? new Date(r.created_at).getTime() + HOLD_MS).getTime();
 
 export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
   const venue = useVenueContact();

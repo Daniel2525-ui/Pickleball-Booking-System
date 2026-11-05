@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { formatManilaDate } from "@/lib/utils/bookingTime"
-import { formatTime12h } from "@/lib/utils/formatTime"
-import { shortDate } from "@/lib/services/courts/courtDay"
+import { formatShortDate, formatTime12h } from "@/lib/utils/formatTime"
 import {
   AffectedBooking,
   VenueClosure,
@@ -49,7 +48,7 @@ export const ClosedDatesCard = () => {
     const { error } = await addClosure(date, reason)
     setBusy(false)
     if (error) return toast.error(error.message)
-    toast.success(`Closed on ${shortDate(date)}. Customers can no longer book it.`)
+    toast.success(`Closed on ${formatShortDate(date)}. Customers can no longer book it.`)
     setDate("")
     setReason("")
     setAffected([])
@@ -59,7 +58,7 @@ export const ClosedDatesCard = () => {
   const remove = async (closedOn: string) => {
     const { error } = await removeClosure(closedOn)
     if (error) return toast.error(error.message)
-    toast.success(`${shortDate(closedOn)} is open for bookings again.`)
+    toast.success(`${formatShortDate(closedOn)} is open for bookings again.`)
     load()
   }
 
@@ -111,7 +110,7 @@ export const ClosedDatesCard = () => {
           <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
             <p className="flex items-center gap-1.5 font-semibold">
               <AlertTriangle className="size-3.5 shrink-0" />
-              {affected.length} {affected.length === 1 ? "booking is" : "bookings are"} already on {shortDate(date)}
+              {affected.length} {affected.length === 1 ? "booking is" : "bookings are"} already on {formatShortDate(date)}
             </p>
             <p className="mt-1">Closing the date does not cancel them. Contact these players, or cancel from Bookings or Open Play.</p>
             <ul className="mt-2 max-h-36 space-y-1 overflow-auto">
@@ -137,7 +136,7 @@ export const ClosedDatesCard = () => {
             {closures.map((c) => (
               <li key={c.closed_on} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                 <span>
-                  <span className="font-semibold">{shortDate(c.closed_on)}</span>
+                  <span className="font-semibold">{formatShortDate(c.closed_on)}</span>
                   {c.reason && <span className="text-muted-foreground"> · {c.reason}</span>}
                 </span>
                 <Button
@@ -145,7 +144,7 @@ export const ClosedDatesCard = () => {
                   size="sm"
                   onClick={() => remove(c.closed_on)}
                   className="gap-1 text-muted-foreground"
-                  aria-label={`Reopen ${shortDate(c.closed_on)}`}
+                  aria-label={`Reopen ${formatShortDate(c.closed_on)}`}
                 >
                   <X className="h-4 w-4" />
                   Reopen

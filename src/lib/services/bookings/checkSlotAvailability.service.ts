@@ -1,5 +1,6 @@
 import type { Court } from "../courts/courtsTypes";
 import type { BookingSlot } from "./fetchBookingsForDate.service";
+import { HOLD_MS } from "./bookingDisplayStatus.ts";
 
 export const to24h = (time12h: string): string => {
     const match = time12h.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -94,7 +95,7 @@ export const isBookingActive = (b: BookingSlot, now: Date = new Date()): boolean
     }
 
     if (!isNaN(createdMs)) {
-        return (createdMs + 35 * 60 * 1000 + HOLD_RELEASE_GRACE_MS) > now.getTime();
+        return (createdMs + HOLD_MS + HOLD_RELEASE_GRACE_MS) > now.getTime();
     }
 
     // Conservative fallback: do not silently free slot if hold expiry cannot be established safely

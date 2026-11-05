@@ -39,7 +39,7 @@ import { fetchBookings, BOOKINGS_PAGE_SIZE } from "@/lib/services/bookings/filte
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatTime12h, formatDate } from "@/lib/utils/formatTime";
 import { SettlePaymentModal } from "./settlePaymentModal";
 import { VerifyGcashModal } from "./verifyGcashModal";
 import { MoveBookingModal, MovedBooking } from "./moveBookingModal";
@@ -82,15 +82,6 @@ const STATUS_LABELS: Record<string, string> = {
 };
 const capitalize = (status: string) => STATUS_LABELS[status?.toLowerCase()] ?? (status ? status[0].toUpperCase() + status.slice(1) : "");
 
-const formatDate = (date: string) => {
-  const d = date.includes("T") ? new Date(date) : new Date(`${date}T12:00:00+08:00`);
-  return d.toLocaleDateString("en-US", {
-    timeZone: "Asia/Manila",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
 
 const columnCount = 6;
 
@@ -129,14 +120,22 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     setBookingsData((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...moved, courts: { name: courtName } } : b)));
 
   useEffect(() => {
+    // A slower answer for an older filter must not replace the newer one
+    let ignore = false;
     const loadBookingsData = async () => {
       setLoading(true);
-      const { data } = await fetchBookings(filters);
-      if (data) setBookingsData(data);
+      const { data, error } = await fetchBookings(filters);
+      if (ignore) return;
+      // A failed load is not an empty day: say so instead of showing "No matching reservations"
+      if (error) toast.error("Could not load reservations. Refresh the page to try again.");
+      setBookingsData(data);
       setHasMore(data.length === BOOKINGS_PAGE_SIZE);
       setLoading(false);
     };
     loadBookingsData();
+    return () => {
+      ignore = true;
+    };
   }, [filters]);
 
   const loadMore = async () => {

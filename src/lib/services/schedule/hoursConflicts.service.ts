@@ -1,8 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { formatManilaDate, getBookingEnd } from "@/lib/utils/bookingTime";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatShortDate, formatTime12h } from "@/lib/utils/formatTime";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
-import { shortDate } from "@/lib/services/courts/courtDay";
 import { HoursInput, isOutsideHours } from "./hoursRules";
 
 /**
@@ -31,7 +30,7 @@ export const findHoursConflicts = async (hours: HoursInput[]) => {
         .filter((b) => getBookingEnd(b) > now && getBookingDisplayStatus(b, now) !== "hold_expired" && isOutsideHours(b, hours))
         .map((b) => {
             const phone = b.customers?.phone || b.profiles?.phone;
-            return `${b.customer_name || "Guest Player"} · ${b.courts?.name ?? "Court"} · ${shortDate(b.booking_date)} ${formatTime12h(b.start_time)}${phone ? ` · ${phone}` : ""}`;
+            return `${b.customer_name || "Guest Player"} · ${b.courts?.name ?? "Court"} · ${formatShortDate(b.booking_date)} ${formatTime12h(b.start_time)}${phone ? ` · ${phone}` : ""}`;
         });
     const openPlayLines = (schedules.data ?? [])
         .filter((s) => {

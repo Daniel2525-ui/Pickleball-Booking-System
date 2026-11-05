@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
+import { formatDate } from "@/lib/utils/formatTime";
 import { Users, SearchX, Mail, Phone, MoreHorizontal, Pencil, CalendarSearch } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -44,21 +45,6 @@ export const CustomersTable = ({
   searchQuery,
   onEdit,
 }: CustomersTableProps) => {
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "—";
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return "—";
-      return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }).format(date);
-    } catch {
-      return "—";
-    }
-  };
-
   return (
     <div className="rounded-xl border bg-card overflow-hidden shadow-xs">
       <div className="overflow-y-auto max-h-[500px]">
@@ -159,7 +145,7 @@ export const CustomersTable = ({
                   </TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">{customer.bookings_count}</TableCell>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {customer.last_visit ? formatDate(`${customer.last_visit}T12:00:00+08:00`) : "—"}
+                    {formatDate(customer.last_visit)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {customer.no_shows >= 2 ? (

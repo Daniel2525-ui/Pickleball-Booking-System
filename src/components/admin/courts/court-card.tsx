@@ -22,8 +22,7 @@ import {
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { CourtBooking, courtBookingName } from "@/lib/services/courts/courtsData.service";
-import { shortDate } from "@/lib/services/courts/courtDay";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatTime12h, formatShortDate } from "@/lib/utils/formatTime";
 
 const statusConfig: Record<
   string,
@@ -75,7 +74,7 @@ export const CourtCard = ({ court, today, onEdit, onDelete }: CourtCardProps) =>
   const status = statusConfig[court.status?.toLowerCase()] ?? statusConfig.active;
   const { label, description, className, barColor, Icon } = status;
   const inMaintenance = court.status?.toLowerCase() === "maintenance";
-  const maintenanceLine = [court.maintenance_note || description, court.maintenance_until && `back ${shortDate(court.maintenance_until)}`]
+  const maintenanceLine = [court.maintenance_note || description, court.maintenance_until && `back ${formatShortDate(court.maintenance_until)}`]
     .filter(Boolean)
     .join(" · ");
 

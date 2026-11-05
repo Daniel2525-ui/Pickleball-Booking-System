@@ -1,4 +1,4 @@
-import { OperatingHour } from "./operatingHoursInterface";
+import type { OperatingHour } from "@/components/admin/schedules/types";
 import { formatTime12h } from "@/lib/utils/formatTime";
 
 
