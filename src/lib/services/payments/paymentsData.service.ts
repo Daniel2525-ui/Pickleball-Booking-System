@@ -3,18 +3,22 @@ import { Payment, FetchPaymentsFilters } from "./paymentsTypes";
 
 export const PAYMENTS_PAGE_SIZE = 100;
 
+// Pay-at-counter money: a pending payment on a booking that is going ahead. Online holds stay 'pending' bookings
+const COLLECTABLE_BOOKING_STATUSES = ["confirmed", "checked_in", "completed"];
+
 export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) => {
     try {
         const status = filters?.status?.trim().toLowerCase() ?? "";
         // Paid payments on cancelled bookings are owed back to the customer
         const refundOwed = status === "refund owed";
+        const toCollect = status === "to collect";
 
         let query = supabase
             .from("payments")
             .select(`
                 *,
                 refund_requests ( status, created_at ),
-                bookings${refundOwed ? "!inner" : ""} (
+                bookings${refundOwed || toCollect ? "!inner" : ""} (
                     status,
                     booking_date,
                     start_time,
@@ -34,6 +38,8 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
 
         if (refundOwed) {
             query = query.in("status", ["succeeded", "paid"]).eq("bookings.status", "cancelled");
+        } else if (toCollect) {
+            query = query.eq("status", "pending").in("bookings.status", COLLECTABLE_BOOKING_STATUSES);
         } else if (status !== "" && status !== "all statuses" && status !== "all") {
             if (status === "succeeded" || status === "paid") {
                 query = query.in("status", ["succeeded", "paid"]);
@@ -53,6 +59,17 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
         console.error("Failed to fetch payments:", error);
         return { data: [], error };
     }
+};
+
+/** Number of pending payments staff still have to collect at the counter. */
+export const countToCollect = async () => {
+    const { count, error } = await supabase
+        .from("payments")
+        .select("id, bookings!inner(status)", { count: "exact", head: true })
+        .eq("status", "pending")
+        .in("bookings.status", COLLECTABLE_BOOKING_STATUSES);
+    if (error) console.error("Failed to count payments to collect:", error);
+    return count ?? 0;
 };
 
 /** Number of paid payments whose booking was cancelled, i.e. money owed back to customers. */

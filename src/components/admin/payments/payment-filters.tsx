@@ -59,6 +59,7 @@ export default function PaymentFilters({
             <SelectItem value="Pending">Pending</SelectItem>
             <SelectItem value="Refunded">Refunded</SelectItem>
             <SelectItem value="Refund Owed">Refund Owed</SelectItem>
+            <SelectItem value="To Collect">To Collect</SelectItem>
           </SelectContent>
         </Select>
       </div>

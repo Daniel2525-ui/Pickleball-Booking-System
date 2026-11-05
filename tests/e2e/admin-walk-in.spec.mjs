@@ -98,6 +98,15 @@ test("staff can collect payment for a Pay Later walk-in", async ({ page }) => {
   await login(page, account("ADMIN"));
   const dialog = await recordWalkIn(page, "E2E Pay Later", "20:00", "21:00", "Pay Later");
   await expect(dialog).toHaveCount(0);
+
+  // The dashboard flags it as money to collect (the stale online hold seeded above is not counted)
+  await page.goto("/admin/dashboard");
+  await page.getByRole("link", { name: /1 booking to collect/ }).click();
+  await expect(page).toHaveURL(/status=To%20Collect/);
+  await expect(page.getByRole("row").filter({ hasText: "E2E Pay Later" })).toHaveCount(1);
+  await expect(page.getByRole("row").filter({ hasText: "E2E Stale Hold" })).toHaveCount(0);
+
+  await page.goto("/admin/bookings");
   const row = rowFor(page, "E2E Pay Later");
   await row.getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("menuitem", { name: "Collect Payment" }).click();
@@ -108,6 +117,9 @@ test("staff can collect payment for a Pay Later walk-in", async ({ page }) => {
     sql(`SELECT b.status || '|' || p.status || '|' || p.payment_method FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id
          WHERE b.booking_date = '${date}' AND b.start_time = '20:00'`)
   ).toBe("confirmed|paid|cash");
+  await page.goto("/admin/dashboard");
+  await page.waitForLoadState("networkidle"); // let the banner's count load before asserting it is absent
+  await expect(page.getByRole("link", { name: /to collect/ })).toHaveCount(0);
 });
 
 test("cancelling a hold that already timed out records it as expired, not as a staff cancellation", async ({ page }) => {

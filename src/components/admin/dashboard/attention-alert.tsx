@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { countRefundsOwed } from "@/lib/services/payments/paymentsData.service";
+import { countRefundsOwed, countToCollect } from "@/lib/services/payments/paymentsData.service";
 import { countAwaitingGcash } from "@/lib/services/bookings/filterBookingsData.service";
 
 // Keyed by name because the dashboard is a server component and cannot pass functions down
@@ -13,6 +13,12 @@ const ALERTS = {
     href: `/admin/payments?status=${encodeURIComponent("Refund Owed")}`,
     label: (n: number) => `${n} ${n === 1 ? "payment needs" : "payments need"} a refund`,
     detail: "paid bookings that were cancelled.",
+  },
+  collect: {
+    load: countToCollect,
+    href: `/admin/payments?status=${encodeURIComponent("To Collect")}`,
+    label: (n: number) => `${n} ${n === 1 ? "booking" : "bookings"} to collect`,
+    detail: "unpaid walk-in and counter bookings.",
   },
   gcash: {
     load: countAwaitingGcash,

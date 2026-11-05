@@ -44,6 +44,7 @@ export default async function DashboardPage() {
 
       <AttentionAlert kind="gcash" />
       <AttentionAlert kind="refunds" />
+      <AttentionAlert kind="collect" />
 
       {/* KPI Cards Strip */}
       <DashboardStats />
