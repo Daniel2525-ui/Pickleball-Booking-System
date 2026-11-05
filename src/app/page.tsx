@@ -54,7 +54,7 @@ export default async function Home() {
               ))}
             </div>
 
-            <div>
+            <div id="location" className="scroll-mt-24">
               {/* Keyless Google embed of the Settings address at city zoom.
                   shortcut: no exact pin until the venue has coordinates or a Google listing; switch the query then */}
               <iframe
@@ -130,6 +130,9 @@ export default async function Home() {
                   <Mail className="size-3.5 text-primary" />
                   <a href={`mailto:${venue.email}`} className="hover:text-foreground transition-colors">{venue.email}</a>
                 </p>
+                <a href="#location" className="inline-block pt-1 font-bold text-primary hover:underline underline-offset-4">
+                  Get directions
+                </a>
               </div>
             </div>
           </div>
