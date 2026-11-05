@@ -6,7 +6,6 @@ import { DateSelector } from "./date-selector";
 import { OperatingHour } from "@/components/admin/schedules/types";
 import { SlotStatus, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { compactRange, pickCourts, quickStarts } from "@/lib/services/bookings/quickStarts";
-import { SpotlightGroup } from "@/components/ui/spotlight-group";
 
 interface QuickBookingProps {
   selectedDate: Date;
@@ -96,9 +95,9 @@ export const QuickBooking = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <SpotlightGroup className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-4 items-start">
         <div className="flex flex-col gap-4 min-w-0">
-          <fieldset className="spotlight-card rounded-2xl border bg-card p-4 flex flex-col gap-3 min-w-0">
+          <fieldset className="rounded-2xl border bg-card p-4 flex flex-col gap-3 min-w-0">
             <legend className="sr-only">Which day?</legend>
             <h3 aria-hidden className="text-base font-extrabold flex items-center gap-2.5"><Step n={1} />Which day?</h3>
             <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
@@ -145,7 +144,7 @@ export const QuickBooking = ({
             )}
           </fieldset>
 
-          <fieldset className="spotlight-card rounded-2xl border bg-card p-4 flex flex-col gap-3">
+          <fieldset className="rounded-2xl border bg-card p-4 flex flex-col gap-3">
             <legend className="sr-only">How many courts?</legend>
             <h3 aria-hidden className="text-base font-extrabold flex items-center gap-2.5"><Step n={2} />How many courts?</h3>
             <div className="grid grid-cols-2 gap-2">
@@ -158,7 +157,7 @@ export const QuickBooking = ({
             </div>
           </fieldset>
 
-          <fieldset className="spotlight-card rounded-2xl border bg-card p-4 flex flex-col gap-3">
+          <fieldset className="rounded-2xl border bg-card p-4 flex flex-col gap-3">
             <legend className="sr-only">How long?</legend>
             <h3 aria-hidden className="text-base font-extrabold flex items-center gap-2.5"><Step n={3} />How long?</h3>
             <div className="grid grid-cols-2 gap-2">
@@ -172,7 +171,7 @@ export const QuickBooking = ({
           </fieldset>
         </div>
 
-        <section aria-labelledby="pick-start" className="spotlight-card rounded-2xl border bg-card p-4 flex flex-col gap-4 min-w-0">
+        <section aria-labelledby="pick-start" className="rounded-2xl border bg-card p-4 flex flex-col gap-4 min-w-0">
           <h3 id="pick-start" className="text-base font-extrabold flex items-center gap-2.5"><Step n={4} />Pick a start time</h3>
           {timeSlots.length === 0 ? (
             <p className="text-sm text-muted-foreground">The venue is closed on this date. Please select another date.</p>
@@ -275,7 +274,7 @@ export const QuickBooking = ({
             Different times per court? <span className="font-extrabold text-primary underline underline-offset-4">See the full board</span>
           </button>
         </section>
-      </SpotlightGroup>
+      </div>
 
       <div className="sticky bottom-0 z-20 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div

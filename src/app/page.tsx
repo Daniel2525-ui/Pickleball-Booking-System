@@ -4,7 +4,6 @@ import { Crosshair, MapPin, Phone, Mail } from "lucide-react";
 import { BookingContainer } from "@/components/customers/booking-container";
 import { PublicHeader } from "@/components/customers/public-header";
 import { FAQSection } from "@/components/customers/faq-section";
-import { SpotlightGroup } from "@/components/ui/spotlight-group";
 import { getPublicClient } from "@/lib/supabase/public";
 import { summarizeVenueHours } from "@/lib/utils/venueHours";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
@@ -52,15 +51,15 @@ export default async function Home() {
 
         <section aria-label="The venue" className="w-full border-t py-12 md:py-16">
           {/* Bento: each number in its own tile, the map in a tall tile beside them */}
-          <SpotlightGroup className="container mx-auto px-4 max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] gap-4">
+          <div className="container mx-auto px-4 max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] gap-4">
             {stats.map((s, i) => (
-              <div key={s.label} className={`spotlight-card rounded-2xl border bg-card p-5 ${i === 2 ? "sm:col-span-2 lg:col-start-1 lg:row-start-2" : ""}`}>
+              <div key={s.label} className={`rounded-2xl border bg-card p-5 ${i === 2 ? "sm:col-span-2 lg:col-start-1 lg:row-start-2" : ""}`}>
                 <p className="font-display text-6xl font-black leading-none text-primary">{s.value}</p>
                 <p className="mt-2 text-sm font-semibold text-muted-foreground max-w-[26ch]">{s.label}</p>
               </div>
             ))}
 
-            <div id="location" className="spotlight-card rounded-2xl border bg-card p-5 scroll-mt-24 sm:col-span-2 lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:row-span-2">
+            <div id="location" className="rounded-2xl border bg-card p-5 scroll-mt-24 sm:col-span-2 lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:row-span-2">
               {/* Keyless Google embed of the Settings address at city zoom.
                   shortcut: no exact pin until the venue has coordinates or a Google listing; switch the query then */}
               <iframe
@@ -85,7 +84,7 @@ export default async function Home() {
                 </a>
               </div>
             </div>
-          </SpotlightGroup>
+          </div>
         </section>
 
         <FAQSection />

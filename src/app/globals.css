@@ -328,15 +328,3 @@
     to { top: 100%; }
 }
 
-/* Card spotlight: a soft light follows the pointer (--spot-x/--spot-y set by the parent's pointermove) */
-.spotlight-card {
-    position: relative;
-}
-.spotlight-card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(260px circle at var(--spot-x, -400px) var(--spot-y, -400px), color-mix(in oklch, var(--primary) 9%, transparent), transparent 60%);
-    pointer-events: none;
-}
