@@ -5,67 +5,64 @@ import { Search, X, Users, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Customer } from "@/lib/services/customers/customersTypes";
 import { CustomersTable } from "./customers-table";
-import { fetchCustomers } from "@/lib/services/customers/fetchCustomers.service";
+import { fetchCustomers, CUSTOMERS_PAGE_SIZE } from "@/lib/services/customers/fetchCustomers.service";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { EditCustomerModal } from "./edit-customer-modal";
 import StatCard from "@/components/admin/dashboard/stat-card";
 
 export default function CustomersContainer() {
   const [search, setSearch] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0); // matches for the current search
+  const [allTotal, setAllTotal] = useState(0); // every customer, for the summary card
+  const [newThisMonth, setNewThisMonth] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [editing, setEditing] = useState<Customer | null>(null);
+  // Bumped after an edit so the list reloads
+  const [version, setVersion] = useState(0);
 
+  // Search runs on the server across every customer, not just the loaded page
   useEffect(() => {
-    const loadCustomers = async () => {
-      setLoading(true);
-      const { data } = await fetchCustomers();
-
-      if (data) {
-        setCustomers(data);
-      }
-
+    let ignore = false;
+    fetchCustomers(search).then(({ data, total, newThisMonth, error }) => {
+      if (ignore) return;
+      if (error) toast.error("Failed to load customers.");
+      setCustomers(data);
+      setTotal(total);
+      if (!search) setAllTotal(total);
+      setNewThisMonth(newThisMonth);
       setLoading(false);
+    });
+    return () => {
+      ignore = true;
     };
+  }, [search, version]);
 
-    loadCustomers();
-  }, []);
-
-  const normalizedSearch = search.trim().toLowerCase();
-
-  const filtered = customers.filter((customer) => {
-    if (!normalizedSearch) return true;
-
-    const nameMatch = customer.full_name?.toLowerCase().includes(normalizedSearch) ?? false;
-    const emailMatch = customer.email?.toLowerCase().includes(normalizedSearch) ?? false;
-    const phoneMatch = customer.phone?.toLowerCase().includes(normalizedSearch) ?? false;
-
-    return nameMatch || emailMatch || phoneMatch;
-  });
-
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-  const currentMonthName = currentDate.toLocaleDateString("en-US", { month: "long" });
-
-  const counts = {
-    total: customers.length,
-    newThisMonth: customers.filter((customer) => {
-      const joinedDate = new Date(customer.created_at);
-      return joinedDate.getMonth() === currentMonth && joinedDate.getFullYear() === currentYear;
-    }).length,
+  const loadMore = async () => {
+    setLoadingMore(true);
+    const { data, error } = await fetchCustomers(search, customers.length);
+    if (error) toast.error("Failed to load more customers.");
+    else setCustomers((prev) => [...prev, ...data]);
+    setLoadingMore(false);
   };
+
+  const currentMonthName = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "Asia/Manila" });
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
           title="Total Customers"
-          value={loading ? "—" : counts.total}
-          description="Total registered customer accounts in the system"
+          value={loading ? "—" : allTotal}
+          description="Members and walk-in records (staff accounts excluded)"
           icon={Users}
         />
         <StatCard
           title="New This Month"
-          value={loading ? "—" : counts.newThisMonth}
-          description={`Accounts registered in ${currentMonthName} ${currentYear}`}
+          value={loading ? "—" : newThisMonth}
+          description={`Added in ${currentMonthName}`}
           icon={UserPlus}
         />
       </div>
@@ -94,16 +91,30 @@ export default function CustomersContainer() {
 
         {search && (
           <div className="text-xs text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{filtered.length}</span> of {customers.length}{" "}
-            {customers.length === 1 ? "customer" : "customers"}
+            <span className="font-semibold text-foreground">{total}</span> {total === 1 ? "match" : "matches"}
           </div>
         )}
       </div>
 
       <CustomersTable
-        customers={filtered}
+        customers={customers}
         loading={loading}
         searchQuery={search}
+        onEdit={setEditing}
+      />
+
+      {customers.length < total && customers.length >= CUSTOMERS_PAGE_SIZE && (
+        <div className="flex justify-center">
+          <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading..." : "Load More Customers"}
+          </Button>
+        </div>
+      )}
+
+      <EditCustomerModal
+        customer={editing}
+        onClose={() => setEditing(null)}
+        onSaved={() => setVersion((v) => v + 1)}
       />
     </div>
   );

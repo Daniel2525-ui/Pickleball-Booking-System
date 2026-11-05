@@ -20,10 +20,11 @@ export default function BookingsContainer() {
   const statusParam = params.get("status");
   const initialStatus = statusParam || "All Statuses";
   const initialCourt = params.get("court") || "All Courts";
-  // The desk works today's list; links from the dashboard (?status=) or a court (?court=) look across every date
-  const initialDate = statusParam || params.get("court") ? "" : formatManilaDate();
+  const initialSearch = params.get("search") || "";
+  // The desk works today's list; links from the dashboard (?status=), a court (?court=) or a customer (?search=) look across every date
+  const initialDate = statusParam || params.get("court") || initialSearch ? "" : formatManilaDate();
   const [filters, setFilters] = useState<BookingFiltersState>({
-    search: "",
+    search: initialSearch,
     status: initialStatus,
     courtId: initialCourt,
     dateTime: initialDate,
@@ -46,7 +47,7 @@ export default function BookingsContainer() {
       </header>
 
       <div className="flex flex-col gap-4">
-        <BookingFilters initialStatus={initialStatus} initialDate={initialDate} initialCourt={initialCourt} onFilterChange={setFilters} />
+        <BookingFilters initialStatus={initialStatus} initialDate={initialDate} initialCourt={initialCourt} initialSearch={initialSearch} onFilterChange={setFilters} />
         <BookingsTable filters={filters} />
       </div>
     </div>

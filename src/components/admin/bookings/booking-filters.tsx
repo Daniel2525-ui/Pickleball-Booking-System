@@ -18,6 +18,7 @@ interface BookingFiltersProps {
   initialStatus?: string;
   initialDate?: string;
   initialCourt?: string;
+  initialSearch?: string;
   onFilterChange?: (filters: {
     search: string;
     status: string;
@@ -26,8 +27,8 @@ interface BookingFiltersProps {
   }) => void;
 }
 
-export default function BookingFilters({ initialStatus = "All Statuses", initialDate = "", initialCourt = "All Courts", onFilterChange }: BookingFiltersProps = {}) {
-  const [search, setSearch] = useState("");
+export default function BookingFilters({ initialStatus = "All Statuses", initialDate = "", initialCourt = "All Courts", initialSearch = "", onFilterChange }: BookingFiltersProps = {}) {
+  const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState(initialStatus);
   const [courtId, setCourtId] = useState(initialCourt);
   const [dateTime, setDateTime] = useState(initialDate);

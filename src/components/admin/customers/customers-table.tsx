@@ -7,13 +7,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Users, SearchX, Mail, Phone } from "lucide-react";
+import Link from "next/link";
+import { Users, SearchX, Mail, Phone, MoreHorizontal, Pencil, CalendarSearch } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// The Bookings search matches phone endings and names, across every date
+const bookingsHref = (c: Customer) =>
+  `/admin/bookings?search=${encodeURIComponent(c.phone?.trim() || c.full_name.trim())}`;
+
+const peso = (n: number) => `₱${Number(n || 0).toLocaleString("en-PH")}`;
 
 interface CustomersTableProps {
   customers: Customer[];
   loading?: boolean;
   searchQuery?: string;
+  onEdit?: (customer: Customer) => void;
 }
 
 const getInitials = (name?: string) => {
@@ -27,6 +42,7 @@ export const CustomersTable = ({
   customers,
   loading,
   searchQuery,
+  onEdit,
 }: CustomersTableProps) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
@@ -51,7 +67,12 @@ export const CustomersTable = ({
             <TableRow className="hover:bg-transparent">
               <TableHead className="bg-card w-[320px]">Customer</TableHead>
               <TableHead className="bg-card">Contact</TableHead>
-              <TableHead className="text-right bg-card">Registered</TableHead>
+              <TableHead className="text-right bg-card">Bookings</TableHead>
+              <TableHead className="bg-card">Last visit</TableHead>
+              <TableHead className="text-right bg-card">No-shows</TableHead>
+              <TableHead className="text-right bg-card">Spent</TableHead>
+              <TableHead className="text-right bg-card">Added</TableHead>
+              <TableHead className="bg-card"><span className="sr-only">Actions</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -73,11 +94,12 @@ export const CustomersTable = ({
                   <TableCell className="text-right">
                     <Skeleton className="h-4 w-24 ml-auto" />
                   </TableCell>
+                  <TableCell colSpan={5} />
                 </TableRow>
               ))
             ) : customers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-64 text-center">
+                <TableCell colSpan={8} className="h-64 text-center">
                   <div className="flex flex-col items-center justify-center space-y-3 max-w-sm mx-auto py-6">
                     <div className="rounded-full bg-muted p-3">
                       {searchQuery ? (
@@ -105,9 +127,14 @@ export const CustomersTable = ({
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary select-none">
                         {getInitials(customer.full_name)}
                       </div>
-                      <span className="font-medium text-foreground truncate">
-                        {customer.full_name?.trim() || "Unnamed Customer"}
-                      </span>
+                      <div className="flex flex-col items-start gap-1 min-w-0">
+                        <span className="font-medium text-foreground truncate">
+                          {customer.full_name?.trim() || "Unnamed Customer"}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] font-semibold">
+                          {customer.type === "registered" ? "Member" : "Walk-in"}
+                        </Badge>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -119,7 +146,9 @@ export const CustomersTable = ({
                       {customer.phone?.trim() ? (
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Phone className="h-3 w-3 shrink-0" />
-                          <span>{customer.phone.trim()}</span>
+                          <a href={`tel:${customer.phone.trim()}`} className="hover:text-foreground hover:underline underline-offset-2">
+                            {customer.phone.trim()}
+                          </a>
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground/60 italic">
@@ -128,8 +157,47 @@ export const CustomersTable = ({
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="text-right font-semibold tabular-nums">{customer.bookings_count}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {customer.last_visit ? formatDate(`${customer.last_visit}T12:00:00+08:00`) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {customer.no_shows >= 2 ? (
+                      <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-800 dark:text-amber-300">{customer.no_shows}</span>
+                    ) : (
+                      customer.no_shows
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums whitespace-nowrap">{peso(customer.total_spent)}</TableCell>
                   <TableCell className="text-right text-muted-foreground whitespace-nowrap text-sm font-medium">
                     {formatDate(customer.created_at)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <button
+                            type="button"
+                            aria-label={`Actions for ${customer.full_name}`}
+                            className="inline-flex items-center justify-center rounded-lg h-8 w-8 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        }
+                      >
+                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem render={<Link href={bookingsHref(customer)} />} className="cursor-pointer text-xs font-semibold">
+                          <CalendarSearch className="mr-2 h-4 w-4" />
+                          View bookings
+                        </DropdownMenuItem>
+                        {customer.type === "walk_in" && (
+                          <DropdownMenuItem onClick={() => onEdit?.(customer)} className="cursor-pointer text-xs font-semibold">
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit details
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
