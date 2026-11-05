@@ -21,6 +21,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Court } from "@/lib/services/courts/courtsTypes";
+import { CourtBooking, courtBookingName } from "@/lib/services/courts/courtsData.service";
+import { shortDate } from "@/lib/services/courts/courtDay";
+import { formatTime12h } from "@/lib/utils/formatTime";
 
 const statusConfig: Record<
   string,
@@ -62,13 +65,19 @@ const statusConfig: Record<
 
 interface CourtCardProps {
   court: Court;
+  /** Today's booking on this court right now, and the next one */
+  today?: { current: CourtBooking | null; next: CourtBooking | null };
   onEdit?: (court: Court) => void;
   onDelete?: (court: Court) => void;
 }
 
-export const CourtCard = ({ court, onEdit, onDelete }: CourtCardProps) => {
+export const CourtCard = ({ court, today, onEdit, onDelete }: CourtCardProps) => {
   const status = statusConfig[court.status?.toLowerCase()] ?? statusConfig.active;
   const { label, description, className, barColor, Icon } = status;
+  const inMaintenance = court.status?.toLowerCase() === "maintenance";
+  const maintenanceLine = [court.maintenance_note || description, court.maintenance_until && `back ${shortDate(court.maintenance_until)}`]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <Card className="group overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
@@ -120,7 +129,23 @@ export const CourtCard = ({ court, onEdit, onDelete }: CourtCardProps) => {
         </div>
       </CardHeader>
       <CardContent className="pt-0 pb-4">
-        <p className="text-xs text-muted-foreground">{description}</p>
+        {inMaintenance ? (
+          <p className="text-xs text-muted-foreground">{maintenanceLine}</p>
+        ) : (
+          <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            {today?.current && (
+              <p>
+                <span className="font-semibold text-foreground">Now:</span> {courtBookingName(today.current)} until {formatTime12h(today.current.end_time)}
+              </p>
+            )}
+            {today?.next && (
+              <p>
+                <span className="font-semibold text-foreground">Next:</span> {formatTime12h(today.next.start_time)} · {courtBookingName(today.next)}
+              </p>
+            )}
+            {!today?.current && !today?.next && <p>No more bookings today</p>}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

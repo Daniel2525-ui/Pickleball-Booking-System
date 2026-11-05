@@ -46,9 +46,19 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "Court id, name, and status are required." }, { status: 400 });
         }
 
+        // The note and return date only describe a maintenance closure; reopening a court clears them
+        const note = status === "maintenance" && typeof body?.maintenance_note === "string" ? body.maintenance_note.trim() : "";
+        const until = status === "maintenance" && typeof body?.maintenance_until === "string" ? body.maintenance_until.trim() : "";
+        if (note.length > 120) {
+            return NextResponse.json({ error: "Keep the maintenance reason under 120 characters." }, { status: 400 });
+        }
+        if (until && (!/^\d{4}-\d{2}-\d{2}$/.test(until) || Number.isNaN(Date.parse(until)))) {
+            return NextResponse.json({ error: "The return date is not a valid date." }, { status: 400 });
+        }
+
         const { data, error } = await supabase
             .from("courts")
-            .update({ name, status })
+            .update({ name, status, maintenance_note: note || null, maintenance_until: until || null })
             .eq("id", id)
             .select()
             .single();

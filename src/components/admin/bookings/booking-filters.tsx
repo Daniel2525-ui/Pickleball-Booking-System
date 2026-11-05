@@ -17,6 +17,7 @@ import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 interface BookingFiltersProps {
   initialStatus?: string;
   initialDate?: string;
+  initialCourt?: string;
   onFilterChange?: (filters: {
     search: string;
     status: string;
@@ -25,10 +26,10 @@ interface BookingFiltersProps {
   }) => void;
 }
 
-export default function BookingFilters({ initialStatus = "All Statuses", initialDate = "", onFilterChange }: BookingFiltersProps = {}) {
+export default function BookingFilters({ initialStatus = "All Statuses", initialDate = "", initialCourt = "All Courts", onFilterChange }: BookingFiltersProps = {}) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(initialStatus);
-  const [courtId, setCourtId] = useState("All Courts");
+  const [courtId, setCourtId] = useState(initialCourt);
   const [dateTime, setDateTime] = useState(initialDate);
   const [courts, setCourts] = useState<CourtOption[]>([]);
   const [awaiting, setAwaiting] = useState(0);

@@ -49,6 +49,7 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
         .filter((b) => b.court_id && b.booking_date === todayStr && (b.status === "confirmed" || b.status === "checked_in" || b.status === "in_progress"))
         .map((b) => ({
             court_id: b.court_id as string,
+            booking_date: b.booking_date,
             status: b.status,
             start_time: b.start_time,
             end_time: b.end_time,

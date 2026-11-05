@@ -1,9 +1,14 @@
-export const updateCourt = async (id: string, name: string, status: string) => {
+export const updateCourt = async (
+    id: string,
+    name: string,
+    status: string,
+    maintenance?: { note: string; until: string }
+) => {
     try {
         const res = await fetch("/api/admin/courts", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id, name, status }),
+            body: JSON.stringify({ id, name, status, maintenance_note: maintenance?.note ?? "", maintenance_until: maintenance?.until ?? "" }),
         });
         const body = await res.json().catch(() => null);
         if (!res.ok) {

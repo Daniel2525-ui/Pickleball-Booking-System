@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CourtCard } from "./court-card";
-import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
+import { CourtBooking, fetchCourtsData, fetchTodayCourtBookings } from "@/lib/services/courts/courtsData.service";
+import { courtNowNext } from "@/lib/services/courts/courtDay";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { AddCourtModal } from "./addCourtModal";
 import { EditCourtModal } from "./editCourtModal";
@@ -29,13 +30,14 @@ export default function CourtsContainer() {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [courtToEdit, setCourtToEdit] = useState<Court | null>(null);
+  const [todayBookings, setTodayBookings] = useState<CourtBooking[]>([]);
 
   const loadCourts = async () => {
-    setLoading(true);
-    const { data } = await fetchCourtsData();
+    const [{ data }, today] = await Promise.all([fetchCourtsData(), fetchTodayCourtBookings()]);
     if (data) {
       setCourts(data);
     }
+    setTodayBookings(today.data);
     setLoading(false);
   };
 
@@ -63,16 +65,19 @@ export default function CourtsContainer() {
 
   useEffect(() => {
     let ignore = false;
-    fetchCourtsData().then(({ data }) => {
-      if (!ignore && data) {
-        setCourts(data);
-      }
-      if (!ignore) {
+    // Occupied and the now / next lines follow the clock while the page stays open
+    const load = () =>
+      Promise.all([fetchCourtsData(), fetchTodayCourtBookings()]).then(([{ data }, today]) => {
+        if (ignore) return;
+        if (data) setCourts(data);
+        setTodayBookings(today.data);
         setLoading(false);
-      }
-    });
+      });
+    load();
+    const timer = setInterval(load, 60_000);
     return () => {
       ignore = true;
+      clearInterval(timer);
     };
   }, []);
 
@@ -229,6 +234,7 @@ export default function CourtsContainer() {
             <CourtCard
               key={court.id}
               court={court}
+              today={courtNowNext(todayBookings, court.id)}
               onEdit={(c) => setCourtToEdit(c)}
               onDelete={handleDelete}
             />

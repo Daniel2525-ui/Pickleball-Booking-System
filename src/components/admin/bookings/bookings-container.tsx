@@ -16,14 +16,16 @@ export interface BookingFiltersState {
 
 export default function BookingsContainer() {
   // ?status= lets the dashboard GCash alert open this page pre-filtered
-  const statusParam = useSearchParams().get("status");
+  const params = useSearchParams();
+  const statusParam = params.get("status");
   const initialStatus = statusParam || "All Statuses";
-  // The desk works today's list; a dashboard alert link (?status=) looks across every date
-  const initialDate = statusParam ? "" : formatManilaDate();
+  const initialCourt = params.get("court") || "All Courts";
+  // The desk works today's list; links from the dashboard (?status=) or a court (?court=) look across every date
+  const initialDate = statusParam || params.get("court") ? "" : formatManilaDate();
   const [filters, setFilters] = useState<BookingFiltersState>({
     search: "",
     status: initialStatus,
-    courtId: "All Courts",
+    courtId: initialCourt,
     dateTime: initialDate,
   });
 
@@ -44,7 +46,7 @@ export default function BookingsContainer() {
       </header>
 
       <div className="flex flex-col gap-4">
-        <BookingFilters initialStatus={initialStatus} initialDate={initialDate} onFilterChange={setFilters} />
+        <BookingFilters initialStatus={initialStatus} initialDate={initialDate} initialCourt={initialCourt} onFilterChange={setFilters} />
         <BookingsTable filters={filters} />
       </div>
     </div>
