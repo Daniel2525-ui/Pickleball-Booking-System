@@ -42,6 +42,9 @@ import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { SettlePaymentModal } from "./settlePaymentModal";
 import { VerifyGcashModal } from "./verifyGcashModal";
+import { MoveBookingModal, MovedBooking } from "./moveBookingModal";
+import { getBookingStart } from "@/lib/utils/bookingTime";
+import { ArrowRightLeft } from "lucide-react";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
@@ -116,6 +119,10 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
   const [selectedBookingForSettle, setSelectedBookingForSettle] = useState<Booking | null>(null);
 
   const [verifyBooking, setVerifyBooking] = useState<Booking | null>(null);
+  const [moveBooking, setMoveBooking] = useState<Booking | null>(null);
+
+  const handleMoved = (bookingId: string, moved: MovedBooking, courtName: string) =>
+    setBookingsData((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...moved, courts: { name: courtName } } : b)));
 
   useEffect(() => {
     const loadBookingsData = async () => {
@@ -440,6 +447,17 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                 </DropdownMenuItem>
                               )}
 
+                              {/* Move to another court or time before it starts (move_booking re-checks every rule) */}
+                              {booking.status?.toLowerCase() === "confirmed" && !isSpot && getBookingStart(booking) > new Date() && (
+                                <DropdownMenuItem
+                                  onClick={() => setMoveBooking(booking)}
+                                  className="cursor-pointer text-xs font-semibold"
+                                >
+                                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                  Move Booking
+                                </DropdownMenuItem>
+                              )}
+
                               {/* Game-Day Actions */}
                               {booking.status?.toLowerCase() === "confirmed" && (
                                 <>
@@ -521,6 +539,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
         onOpenChange={setSettleModalOpen}
         onSettled={handlePaymentSettled}
       />
+
+      <MoveBookingModal booking={moveBooking} onClose={() => setMoveBooking(null)} onMoved={handleMoved} />
 
       <VerifyGcashModal
         key={verifyBooking?.id}
