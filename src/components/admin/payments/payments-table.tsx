@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 import {
+  Banknote,
   CheckCircle2,
   Clock,
+  CreditCard,
   ReceiptText,
   DollarSign,
+  Smartphone,
   Undo2,
 } from "lucide-react";
 import {
@@ -20,17 +23,18 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { fetchPayments, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/paymentsData.service";
+import { fetchPayments, fetchPaymentTotals, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/paymentsData.service";
 import { toast } from "sonner";
-import { Payment } from "@/lib/services/payments/paymentsTypes";
+import { Payment, paymentMethodLabel, sumPayments } from "@/lib/services/payments/paymentsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
-import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
+import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
 import { RefundPaymentModal } from "./refundPaymentModal";
 
 interface PaymentsTableProps {
   filters?: {
     search: string;
     status: string;
+    date: string;
   };
 }
 
@@ -64,6 +68,10 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const [refundTarget, setRefundTarget] = useState<Payment | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [totals, setTotals] = useState<ReturnType<typeof sumPayments> | null>(null);
+  // Bumped after a refund so the day's totals reload
+  const [totalsVersion, setTotalsVersion] = useState(0);
+  const date = filters?.date ?? "";
 
   // Paid payments on cancelled bookings are owed back to the customer
   const needsRefund = (payment: Payment) => payment.status === "paid" && payment.bookings?.status === "cancelled";
@@ -95,6 +103,14 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
     loadPayments();
   }, [filters]);
 
+  useEffect(() => {
+    let ignore = false;
+    if (date) fetchPaymentTotals(date).then(({ data }) => !ignore && setTotals(data));
+    return () => {
+      ignore = true;
+    };
+  }, [date, totalsVersion]);
+
   const loadMore = async () => {
     setLoadingMore(true);
     const { data, error } = await fetchPayments(filters, payments.length);
@@ -112,28 +128,20 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
     return status !== "failed";
   });
 
-  // Client-side search across customer name or court name
-  const filtered = validPayments.filter((payment) => {
-    if (!filters?.search?.trim()) return true;
-    const term = filters.search.trim().toLowerCase();
-    const name = (payment.bookings?.profiles?.full_name || payment.bookings?.customer_name || "").toLowerCase();
-    const court = payment.bookings?.courts?.name?.toLowerCase() || "";
-    return name.includes(term) || court.includes(term);
-  });
+  // Search runs on the server (fetchPayments); failed rows are hidden above
+  const filtered = validPayments;
 
-  // Financial summary metrics
-  const totalVolume = validPayments
-    .filter((payment) => payment.status === "succeeded" || payment.status === "paid")
-    .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-
-  const succeededCount = validPayments.filter(
-    (payment) => payment.status === "succeeded" || payment.status === "paid"
-  ).length;
-
-  const pendingCount = validPayments.filter((payment) => payment.status === "pending").length;
-
-  const refunded = validPayments.filter((payment) => payment.status === "refunded");
-  const refundedTotal = refunded.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+  const dayLabel = date
+    ? new Date(`${date}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric" })
+    : "";
+  const money = (n: number | undefined) => (!date ? "—" : totals ? formatCurrency(n) : null);
+  const summaryCards = [
+    { title: "Collected", value: money(totals?.collected), note: totals ? `${totals.collectedCount} ${totals.collectedCount === 1 ? "payment" : "payments"} · ${dayLabel}` : dayLabel, icon: DollarSign, tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+    { title: "Cash", value: money(totals?.cash), note: "Should be in the drawer", icon: Banknote, tone: "bg-lime-500/10 text-lime-700 dark:text-lime-400" },
+    { title: "GCash", value: money(totals?.gcash), note: "Check against the GCash app", icon: Smartphone, tone: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+    { title: "Card", value: money(totals?.card), note: "Paid online by card", icon: CreditCard, tone: "bg-primary/10 text-primary" },
+    { title: "Refunded", value: money(totals?.refunded), note: totals ? `${totals.refundedCount} returned to customers` : "", icon: Undo2, tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+  ];
 
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase() || "";
@@ -179,125 +187,29 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Financial Summary Metrics Strip */}
+      {/* The chosen day's money, split by method for closing out the drawer */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-        <Card className="shadow-2xs border border-border bg-card">
-          <CardHeader className="p-4 pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Total Succeeded Volume
-              </CardTitle>
-              <div className="size-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                <DollarSign className="size-4" />
+        {summaryCards.map(({ title, value, note, icon: Icon, tone }, i) => (
+          // The fifth card spans both columns on phones so it doesn't sit alone at half width
+          <Card key={title} className={`shadow-2xs border border-border bg-card ${i === 4 ? "col-span-2 lg:col-span-1" : ""}`}>
+            <CardHeader className="p-4 pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
+                <div className={`size-8 rounded-lg flex items-center justify-center ${tone}`}>
+                  <Icon className="size-4" />
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            {loading ? (
-              <Skeleton className="h-7 w-24 mt-1" />
-            ) : (
-              <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
-                {formatCurrency(totalVolume)}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mt-0.5">Gross settled revenue</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-2xs border border-border bg-card">
-          <CardHeader className="p-4 pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Total Transactions
-              </CardTitle>
-              <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <ReceiptText className="size-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            {loading ? (
-              <Skeleton className="h-7 w-16 mt-1" />
-            ) : (
-              <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
-                {validPayments.length}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mt-0.5">Recorded in current view</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-2xs border border-border bg-card">
-          <CardHeader className="p-4 pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Successful Payments
-              </CardTitle>
-              <div className="size-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                <CheckCircle2 className="size-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            {loading ? (
-              <Skeleton className="h-7 w-16 mt-1" />
-            ) : (
-              <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
-                {succeededCount}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mt-0.5">Completed transactions</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-2xs border border-border bg-card">
-          <CardHeader className="p-4 pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Pending / Unpaid
-              </CardTitle>
-              <div className="size-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <Clock className="size-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            {loading ? (
-              <Skeleton className="h-7 w-16 mt-1" />
-            ) : (
-              <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
-                {pendingCount}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mt-0.5">Awaiting settlement</p>
-          </CardContent>
-        </Card>
-
-        {/* Spans both columns on phones so the fifth card doesn't sit alone at half width */}
-        <Card className="col-span-2 lg:col-span-1 shadow-2xs border border-border bg-card">
-          <CardHeader className="p-4 pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Refunded
-              </CardTitle>
-              <div className="size-8 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
-                <Undo2 className="size-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            {loading ? (
-              <Skeleton className="h-7 w-24 mt-1" />
-            ) : (
-              <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
-                {formatCurrency(refundedTotal)}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {refunded.length} {refunded.length === 1 ? "payment" : "payments"} returned to customers
-            </p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              {value === null ? (
+                <Skeleton className="h-7 w-24 mt-1" />
+              ) : (
+                <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">{value}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-0.5">{date ? note : "Pick a date to see totals"}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Main Transactions Table Card */}
@@ -306,7 +218,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
           <div>
             <h2 className="text-base font-semibold text-foreground">Transaction Records</h2>
             <p className="text-xs text-muted-foreground">
-              Showing {filtered.length} of {validPayments.length} transactions
+              {filtered.length} {filtered.length === 1 ? "transaction" : "transactions"}{dayLabel ? ` · ${dayLabel}` : " · all dates"}
             </p>
           </div>
         </div>
@@ -351,7 +263,9 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                       <p className="text-xs text-muted-foreground">
                         {filters?.search || filters?.status !== "All Statuses"
                           ? "No transactions match your search or filter criteria. Try adjusting your search or filters."
-                          : "No payment transactions have been recorded yet."}
+                          : date
+                            ? "No payments on this day yet. Clear the date to see every day."
+                            : "No payment transactions have been recorded yet."}
                       </p>
                     </div>
                   </TableCell>
@@ -368,9 +282,10 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                             <div className="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
                               {displayName.charAt(0).toUpperCase()}
                             </div>
-                            <span className="font-medium text-sm text-foreground">
-                              {displayName}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm text-foreground">{displayName}</span>
+                              <span className="font-mono text-[11px] text-muted-foreground">Ref {bookingRef(payment.booking_id)}</span>
+                            </div>
                           </div>
                         );
                       })()}
@@ -393,9 +308,10 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
                     {/* Amount */}
                     <TableCell className="text-right">
-                      <span className="font-bold text-foreground text-sm">
-                        {formatCurrency(payment.amount)}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        <span className="font-bold text-foreground text-sm">{formatCurrency(payment.amount)}</span>
+                        <span className="text-[11px] text-muted-foreground">{paymentMethodLabel(payment)}</span>
+                      </div>
                     </TableCell>
 
                     {/* Status */}
@@ -446,9 +362,10 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
         payment={refundTarget}
         open={refundTarget !== null}
         onOpenChange={(open) => !open && setRefundTarget(null)}
-        onRefunded={(paymentId, status) =>
-          setPayments((prev) => prev.map((p) => (p.id === paymentId ? { ...p, status } : p)))
-        }
+        onRefunded={(paymentId, status) => {
+          setPayments((prev) => prev.map((p) => (p.id === paymentId ? { ...p, status } : p)));
+          setTotalsVersion((v) => v + 1);
+        }}
       />
     </div>
   );

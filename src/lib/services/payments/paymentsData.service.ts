@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import { Payment, FetchPaymentsFilters } from "./paymentsTypes";
+import { Payment, FetchPaymentsFilters, sumPayments, venueDayWindow } from "./paymentsTypes";
+import { bookingSearchFilter } from "@/lib/services/bookings/filterBookingsData.service";
 
 export const PAYMENTS_PAGE_SIZE = 100;
 
@@ -50,6 +51,20 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
             query = query.not("status", "eq", "failed");
         }
 
+        if (filters?.date) query = query.or(dayFilter(filters.date));
+
+        const search = filters?.search?.trim() ?? "";
+        if (search) {
+            // Payer name, booking ref or phone (the Bookings search), or the GCash reference on the payment itself
+            // shortcut: matches at most 200 bookings per search, plenty for a name or ref; raise if a common name misses rows
+            const { data: matches, error: matchError } = await supabase.from("bookings").select("id").or(await bookingSearchFilter(search)).limit(200);
+            if (matchError) throw matchError;
+            const term = search.replace(/[(),%"]/g, " ").trim();
+            const ors = [`payment_reference.ilike.%${term}%`];
+            if (matches?.length) ors.push(`booking_id.in.(${matches.map((b) => b.id).join(",")})`);
+            query = query.or(ors.join(","));
+        }
+
         const { data, error } = await query;
 
         if (error) throw error;
@@ -59,6 +74,23 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
         console.error("Failed to fetch payments:", error);
         return { data: [], error };
     }
+};
+
+/** Payments whose money came in on this venue day: paid then, or created then and not paid yet. */
+const dayFilter = (date: string) => {
+    const { start, end } = venueDayWindow(date);
+    return `and(paid_at.gte."${start}",paid_at.lt."${end}"),and(paid_at.is.null,created_at.gte."${start}",created_at.lt."${end}")`;
+};
+
+/** The day's collected (by method) and refunded totals, independent of paging and search. */
+export const fetchPaymentTotals = async (date: string) => {
+    const { data, error } = await supabase
+        .from("payments")
+        .select("status, amount, payment_method")
+        .neq("status", "failed")
+        .or(dayFilter(date));
+    if (error) console.error("Failed to load payment totals:", error);
+    return { data: error ? null : sumPayments(data ?? []), error };
 };
 
 /** Number of pending payments staff still have to collect at the counter. */

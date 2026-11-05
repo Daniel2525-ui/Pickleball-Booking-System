@@ -4,18 +4,21 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PaymentFilters from "./payment-filters";
 import PaymentsTable from "./payments-table";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 export interface PaymentFiltersState {
   search: string;
   status: string;
+  date: string;
 }
 
 export default function PaymentsContainer() {
-  // ?status= lets the dashboard refund alert open this page pre-filtered
-  const initialStatus = useSearchParams().get("status") || "All Statuses";
+  // ?status= lets the dashboard alerts open this page pre-filtered, across every date; otherwise the desk closes out today
+  const statusParam = useSearchParams().get("status");
   const [filters, setFilters] = useState<PaymentFiltersState>({
     search: "",
-    status: initialStatus,
+    status: statusParam || "All Statuses",
+    date: statusParam ? "" : formatManilaDate(),
   });
 
   return (
