@@ -14,7 +14,7 @@ const shown = (v: string | number | null | undefined) => (v !== null && v !== un
 export function describeSettingsChange(c: Pick<SettingsChange, "area" | "before" | "after">): string[] {
     const b = c.before ?? {}, a = c.after ?? {};
     if (c.area === "staff") {
-        const level = (v: unknown) => (v === "owner" ? "owner" : v === "staff" || v === "admin" ? "front desk" : null);
+        const level = (v: unknown) => (v === "owner" ? "admin" : v === "staff" || v === "admin" ? "front desk" : null);
         const from = level(b.access), to = level(a.access);
         if (!to) return [`${a.account}: staff access removed`];
         return [from ? `${a.account}: ${from} → ${to}` : `${a.account}: given ${to} access`];

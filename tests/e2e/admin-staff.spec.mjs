@@ -98,7 +98,7 @@ test("the owner switches access levels and removes access; nobody changes their 
   await page.goto("/admin/settings");
 
   await page.getByLabel(`Access for ${email}`, { exact: true }).selectOption("owner");
-  await expect(page.getByText(/now has owner access/)).toBeVisible();
+  await expect(page.getByText(/now has admin access/)).toBeVisible();
   expect(access("CUSTOMER2")).toBe("admin|true");
 
   const other = await browser.newPage();

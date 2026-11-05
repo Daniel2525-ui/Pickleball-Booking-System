@@ -41,7 +41,7 @@ export async function requireOwner() {
 
     const { data: profile } = await supabase.from('profiles').select('role, is_owner').eq('id', user.id).maybeSingle()
     if (profile?.role !== 'admin' || !profile.is_owner) {
-        return { supabase: null, denied: Response.json({ error: "Only the owner can do this." }, { status: 403 }) }
+        return { supabase: null, denied: Response.json({ error: "Only an admin can do this." }, { status: 403 }) }
     }
 
     return { supabase, denied: null }

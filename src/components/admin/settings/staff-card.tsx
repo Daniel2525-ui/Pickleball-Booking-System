@@ -19,18 +19,18 @@ interface StaffMember {
   is_owner: boolean;
 }
 
-const LABEL: Record<Access, string> = { owner: "Owner", staff: "Front desk", none: "No access" };
+const LABEL: Record<Access, string> = { owner: "Admin", staff: "Front desk", none: "No access" };
 
 // set_staff_access refusals in staff wording
 const staffError = (message: string) =>
-  message.includes("CANNOT_CHANGE_SELF") ? "You can't change your own access. Ask another owner to do it."
-  : message.includes("LAST_OWNER") ? "The venue must keep at least one owner."
-  : message.includes("FORBIDDEN") ? "Only the owner can change staff access."
+  message.includes("CANNOT_CHANGE_SELF") ? "You can't change your own access. Ask another admin to do it."
+  : message.includes("LAST_OWNER") ? "The venue must keep at least one admin."
+  : message.includes("FORBIDDEN") ? "Only an admin can change staff access."
   : "Could not change staff access. Please try again.";
 
 const selectClass = "h-9 rounded-md border border-input bg-background px-2 text-sm";
 
-/** Who can open the admin pages: owners see everything, front desk everything except Pricing and Settings. */
+/** Who can open the admin pages: admins (stored as owner) see everything, front desk everything except Pricing and Settings. */
 export function StaffCard({ onChanged }: { onChanged: () => void }) {
   const [staff, setStaff] = useState<StaffMember[] | null>(null);
   const [me, setMe] = useState<string | null>(null);
@@ -87,7 +87,7 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
       <CardHeader>
         <CardTitle className="text-xl font-bold">Staff</CardTitle>
         <CardDescription>
-          Owners can use every admin page. Front desk can use everything except Pricing and Settings. Remove access as
+          Admins can use every admin page. Front desk can use everything except Pricing and Settings. Remove access as
           soon as someone leaves; it takes effect on their next action.
         </CardDescription>
       </CardHeader>
@@ -119,7 +119,7 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
                         aria-label={`Access for ${s.email ?? s.full_name}`}
                         onChange={(e) => setAccess(s.id, e.target.value as Access, label)}
                       >
-                        <option value="owner">Owner</option>
+                        <option value="owner">Admin</option>
                         <option value="staff">Front desk</option>
                       </select>
                       <Button
@@ -168,7 +168,7 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
               aria-label="Access to give"
             >
               <option value="staff">Front desk</option>
-              <option value="owner">Owner</option>
+              <option value="owner">Admin</option>
             </select>
             <Button type="submit" disabled={busy} className="gap-2 shrink-0">
               <UserPlus className="size-4" /> Give access

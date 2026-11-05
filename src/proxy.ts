@@ -41,7 +41,7 @@ export async function proxy(request: NextRequest) {
             return NextResponse.json({ error: "Admin access required." }, { status: 403 })
         }
         if (ownerOnly && !profile.is_owner) {
-            return NextResponse.json({ error: "Only the owner can do this." }, { status: 403 })
+            return NextResponse.json({ error: "Only an admin can do this." }, { status: 403 })
         }
     }
 
