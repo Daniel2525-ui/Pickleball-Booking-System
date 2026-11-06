@@ -24,11 +24,11 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
 
   return (
     <section
-      aria-label="Your basket"
+      aria-label="Your bookings"
       className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:w-[90%] sm:max-w-4xl z-50 max-h-72 flex flex-col bg-card border-t sm:border sm:rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] sm:shadow-2xl p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-8 duration-300"
     >
       <h3 className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2 shrink-0">
-        Your basket · {lines.length} {lines.length === 1 ? "court" : "courts"}
+        Your bookings · {lines.length} {lines.length === 1 ? "court" : "courts"}
       </h3>
       <ul className="divide-y min-h-0 overflow-y-auto">
         {lines.map((line) => {
@@ -38,6 +38,9 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-foreground">{line.court}</p>
                 <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{line.time}</p>
+                <p className="text-xs text-muted-foreground">
+                  ₱{line.price.toLocaleString()}{line.hasPeak ? " · peak rate" : ""}
+                </p>
               </div>
               <div className="flex items-center gap-1">
                 {Array.from({ length: maxHours - minHours + 1 }, (_, i) => minHours + i).map((hours) => {
