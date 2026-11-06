@@ -16,7 +16,7 @@ export const fetchCourtsData = async (activeBookingsOverride?: ActiveBookingSnip
     try {
         const { data: courts, error: courtsError } = await supabase
             .from("courts")
-            .select("id, name, status, maintenance_note, maintenance_until")
+            .select("id, name, status, maintenance_note, maintenance_until, photo_url, details")
             .order("name", { ascending: true });
 
         if (courtsError) throw courtsError;

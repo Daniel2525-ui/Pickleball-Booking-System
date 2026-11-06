@@ -93,3 +93,72 @@ test("reopening a court clears its maintenance reason", async ({ page }) => {
   await expect(dialog).toHaveCount(0);
   await expect.poll(() => sql(`SELECT status || '|' || coalesce(maintenance_note, 'none') FROM public.courts WHERE id = '${court.id}'`)).toBe("active|none");
 });
+
+// A 1×1 PNG, enough for the upload and the <img> on the landing page
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+const photoCount = () => sql(`SELECT count(*) FROM storage.objects WHERE bucket_id = 'court-photos' AND name LIKE '${court.id}-%'`);
+// Storage files can only be deleted through the Storage API (service role from tests/e2e/.env.e2e)
+const clearPhotos = async () => {
+  const names = sql(`SELECT name FROM storage.objects WHERE bucket_id = 'court-photos' AND name LIKE '${court.id}-%'`).split("\n").map((n) => n.trim()).filter(Boolean);
+  if (!names.length) return;
+  const key = process.env.SERVICE_ROLE_KEY;
+  await fetch(`${process.env.API_URL}/storage/v1/object/court-photos`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: names }),
+  });
+};
+const openEdit = async (page) => {
+  await cardFor(page, court.name).getByRole("button", { name: `Actions for ${court.name}` }).click();
+  await page.getByRole("menuitem", { name: "Edit Court" }).click();
+  return page.getByRole("dialog");
+};
+
+test("staff add a photo and details to a court, and the landing page shows them", async ({ page }) => {
+  sql(`UPDATE public.courts SET photo_url = NULL, details = NULL WHERE id = '${court.id}'`);
+  await clearPhotos();
+  try {
+    await login(page, account("ADMIN"));
+    await page.goto("/admin/courts");
+    let dialog = await openEdit(page);
+    await dialog.getByLabel("Details (optional)").fill("  Covered · LED lights  ");
+    await dialog.getByLabel("Court photo").setInputFiles({ name: "court.png", mimeType: "image/png", buffer: PNG });
+    await expect(dialog.getByRole("img", { name: "Photo preview" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Save Changes" }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(sql(`SELECT details FROM public.courts WHERE id = '${court.id}'`)).toBe("Covered · LED lights");
+    expect(sql(`SELECT photo_url FROM public.courts WHERE id = '${court.id}'`)).toContain("/court-photos/");
+    expect(photoCount()).toBe("1");
+
+    await page.goto("/");
+    const featured = page.getByRole("group", { name: "Featured court" });
+    await expect(featured.getByRole("img", { name: `${court.name} court` })).toHaveAttribute("src", /\/court-photos\//);
+    await expect(featured).toContainText("Covered · LED lights");
+
+    // Removing the photo deletes the file and brings the drawing back
+    await page.goto("/admin/courts");
+    dialog = await openEdit(page);
+    await dialog.getByRole("button", { name: "Remove photo" }).click();
+    await dialog.getByRole("button", { name: "Save Changes" }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(sql(`SELECT coalesce(photo_url, 'none') FROM public.courts WHERE id = '${court.id}'`)).toBe("none");
+    await expect.poll(photoCount).toBe("0");
+    await page.goto("/");
+    await expect(page.getByRole("group", { name: "Featured court" }).getByRole("img")).toHaveCount(0);
+  } finally {
+    sql(`UPDATE public.courts SET photo_url = NULL, details = NULL WHERE id = '${court.id}'`);
+    await clearPhotos();
+  }
+});
+
+test("the courts API refuses a photo from outside the bucket, and over-long details", async ({ page }) => {
+  await login(page, account("ADMIN"));
+  const patch = (extra) => page.request.patch("/api/admin/courts", { data: { id: court.id, name: court.name, status: "active", ...extra } });
+  const outside = await patch({ photo_url: "https://evil.example/x.png" });
+  expect(outside.status()).toBe(400);
+  expect((await outside.json()).error).toBe("The photo must be uploaded here.");
+  const long = await patch({ details: "x".repeat(81) });
+  expect(long.status()).toBe(400);
+  expect((await long.json()).error).toBe("Keep the details under 80 characters.");
+  expect(sql(`SELECT coalesce(photo_url, 'none') || '|' || coalesce(details, 'none') FROM public.courts WHERE id = '${court.id}'`)).toBe("none|none");
+});

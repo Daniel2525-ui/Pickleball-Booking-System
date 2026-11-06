@@ -28,6 +28,11 @@ import { CourtBooking, courtBookingName, fetchUpcomingCourtBookings } from "@/li
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 import { getBookingEnd } from "@/lib/utils/bookingTime";
 import { formatTime12h, formatShortDate } from "@/lib/utils/formatTime";
+import { supabase } from "@/lib/supabase";
+import { COURT_PHOTO_BUCKET } from "@/lib/services/courts/courtPhoto";
+
+const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // the court-photos bucket refuses anything larger
 
 interface EditCourtModalProps {
     court: Court | null;
@@ -44,6 +49,11 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
     const [note, setNote] = useState(court?.maintenance_note || "");
     const [until, setUntil] = useState(court?.maintenance_until || "");
     const [upcoming, setUpcoming] = useState<CourtBooking[]>([]);
+    const [details, setDetails] = useState(court?.details || "");
+    // The saved photo (null once removed), and a picked file waiting for Save
+    const [photoUrl, setPhotoUrl] = useState<string | null>(court?.photo_url ?? null);
+    const [pendingPhoto, setPendingPhoto] = useState<{ file: File; preview: string } | null>(null);
+    const [photoError, setPhotoError] = useState<string | null>(null);
     const [prevCourt, setPrevCourt] = useState<Court | null>(court);
 
     if (court !== prevCourt) {
@@ -53,6 +63,10 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
         setNote(court?.maintenance_note || "");
         setUntil(court?.maintenance_until || "");
         setUpcoming([]);
+        setDetails(court?.details || "");
+        setPhotoUrl(court?.photo_url ?? null);
+        setPendingPhoto(null);
+        setPhotoError(null);
         setError(null);
     }
 
@@ -83,7 +97,24 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
         setLoading(true);
         setError(null);
 
-        const { error: submitError } = await updateCourt(court.id, trimmedName, status, { note, until });
+        let nextPhotoUrl = photoUrl;
+        if (pendingPhoto) {
+            const ext = pendingPhoto.file.type.split("/")[1] === "jpeg" ? "jpg" : pendingPhoto.file.type.split("/")[1];
+            const path = `${court.id}-${Date.now()}.${ext}`;
+            const { error: uploadError } = await supabase.storage.from(COURT_PHOTO_BUCKET).upload(path, pendingPhoto.file, { contentType: pendingPhoto.file.type });
+            if (uploadError) {
+                setLoading(false);
+                setPhotoError(`The photo could not be uploaded: ${uploadError.message}`);
+                return;
+            }
+            nextPhotoUrl = supabase.storage.from(COURT_PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+        }
+        const { error: submitError } = await updateCourt(court.id, trimmedName, status, { note, until }, { photo_url: nextPhotoUrl, details });
+        // The replaced or removed file is no longer used; leaving it behind only costs storage, so this is best effort
+        const oldPath = court.photo_url?.split(`/${COURT_PHOTO_BUCKET}/`)[1];
+        if (!submitError && oldPath && court.photo_url !== nextPhotoUrl) {
+            await supabase.storage.from(COURT_PHOTO_BUCKET).remove([decodeURIComponent(oldPath)]);
+        }
 
         setLoading(false);
 
@@ -100,11 +131,11 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] max-h-[90dvh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Court</DialogTitle>
                     <DialogDescription>
-                        Update court name and operational availability.
+                        Update the court name, availability, and how it appears on the home page.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
@@ -132,6 +163,61 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
                                 <SelectItem value="maintenance">Maintenance (Temporarily closed)</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <Label htmlFor="edit-court-photo">Court photo</Label>
+                        {(pendingPhoto?.preview || photoUrl) && (
+                            // eslint-disable-next-line @next/next/no-img-element -- a local blob preview or a Supabase public URL
+                            <img
+                                src={pendingPhoto?.preview || photoUrl || ""}
+                                alt="Photo preview"
+                                className="aspect-[16/10] w-full rounded-lg border object-cover"
+                            />
+                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Input
+                                id="edit-court-photo"
+                                type="file"
+                                accept={PHOTO_TYPES.join(",")}
+                                className="min-w-0 flex-1"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    e.target.value = "";
+                                    if (!file) return;
+                                    if (!PHOTO_TYPES.includes(file.type)) return setPhotoError("Use a JPG, PNG or WebP image.");
+                                    if (file.size > PHOTO_MAX_BYTES) return setPhotoError("The photo must be 5 MB or smaller.");
+                                    setPhotoError(null);
+                                    setPendingPhoto({ file, preview: URL.createObjectURL(file) });
+                                }}
+                            />
+                            {(pendingPhoto || photoUrl) && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        setPendingPhoto(null);
+                                        setPhotoUrl(null);
+                                    }}
+                                >
+                                    Remove photo
+                                </Button>
+                            )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Shown on the home page. JPG, PNG or WebP, up to 5 MB. Without one, a drawn court is shown.</p>
+                        {photoError && <p role="alert" className="text-xs font-medium text-destructive">{photoError}</p>}
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <Label htmlFor="edit-court-details">Details (optional)</Label>
+                        <Input
+                            id="edit-court-details"
+                            placeholder="e.g. Covered · LED lights · Spectator bench"
+                            maxLength={80}
+                            value={details}
+                            onChange={(e) => setDetails(e.target.value)}
+                        />
                     </div>
 
                     {status === "maintenance" && (

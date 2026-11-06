@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
+import { isCourtPhotoUrl } from "@/lib/services/courts/courtPhoto";
 
 export async function POST(request: NextRequest) {
     try {
@@ -56,9 +57,26 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "The return date is not a valid date." }, { status: 400 });
         }
 
+        // Photo and details change only when sent; the photo must live in our own court-photos bucket
+        const extras: { photo_url?: string | null; details?: string | null } = {};
+        if (body && "photo_url" in body) {
+            const url = body.photo_url;
+            if (url !== null && (typeof url !== "string" || !isCourtPhotoUrl(url, process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""))) {
+                return NextResponse.json({ error: "The photo must be uploaded here." }, { status: 400 });
+            }
+            extras.photo_url = url;
+        }
+        if (body && "details" in body) {
+            const details = typeof body.details === "string" ? body.details.trim() : "";
+            if (details.length > 80) {
+                return NextResponse.json({ error: "Keep the details under 80 characters." }, { status: 400 });
+            }
+            extras.details = details || null;
+        }
+
         const { data, error } = await supabase
             .from("courts")
-            .update({ name, status, maintenance_note: note || null, maintenance_until: until || null })
+            .update({ name, status, maintenance_note: note || null, maintenance_until: until || null, ...extras })
             .eq("id", id)
             .select()
             .single();

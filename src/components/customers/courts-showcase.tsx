@@ -6,7 +6,7 @@ import { courtShowcaseStatus, type ShowcaseState } from "@/lib/services/courts/c
 import { getBookingWeekday } from "@/lib/services/bookings/validateBookingSlot.service";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
 
-export interface ShowcaseCourt { id: string; name: string; status: string | null; maintenance_note: string | null }
+export interface ShowcaseCourt { id: string; name: string; status: string | null; maintenance_note: string | null; photo_url: string | null; details: string | null }
 interface Hours { day_of_week: string; is_open: boolean; open_time: string | null; close_time: string | null }
 
 const REFRESH_MS = 60_000;
@@ -37,6 +37,13 @@ function CourtArt({ className }: { className?: string }) {
       </g>
     </svg>
   );
+}
+
+/** The court's photo when staff added one, else the drawing */
+function CourtPicture({ court, className, alt }: { court: ShowcaseCourt; className: string; alt: string }) {
+  if (!court.photo_url) return <CourtArt className={className} />;
+  // eslint-disable-next-line @next/next/no-img-element -- a Supabase Storage public URL; next/image would need per-venue remote config
+  return <img src={court.photo_url} alt={alt} className={`${className} object-cover`} loading="lazy" />;
 }
 
 /** "Our courts" on the landing page: one featured court, every court listed with its status right now. */
@@ -89,11 +96,12 @@ export function CourtsShowcase({ courts, hours }: { courts: ShowcaseCourt[]; hou
 
         <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <div role="group" aria-label="Featured court" aria-live="polite" className="relative overflow-hidden rounded-2xl border bg-card">
-            <CourtArt className="block aspect-[16/10] w-full" />
+            <CourtPicture court={featured} alt={`${featured.name} court`} className="block aspect-[16/10] w-full" />
             {/* Over the picture from sm up; below it on phones, where it would cover most of the court */}
             <div className="flex flex-wrap items-end justify-between gap-3 p-4 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-gradient-to-t sm:from-background/95 sm:to-transparent sm:p-5">
               <div className="min-w-0">
                 <h3 className="font-display text-4xl sm:text-5xl font-black leading-[0.9] text-foreground">{featured.name}</h3>
+                {featured.details && <p className="mt-1.5 text-sm font-semibold text-foreground/90">{featured.details}</p>}
                 {featuredStatus && (
                   <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     {pill(featuredStatus)}
@@ -123,7 +131,7 @@ export function CourtsShowcase({ courts, hours }: { courts: ShowcaseCourt[]; hou
                     onClick={() => setSelectedId(court.id)}
                     className="grid w-full grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-card p-2.5 text-left transition-colors hover:bg-muted/40 aria-pressed:border-primary aria-pressed:ring-1 aria-pressed:ring-primary"
                   >
-                    <CourtArt className="block w-[72px] rounded-md" />
+                    <CourtPicture court={court} alt="" className="block aspect-[11/6] w-[72px] rounded-md" />
                     <span className="min-w-0">
                       <span className="block truncate font-display text-xl font-black text-foreground">{court.name}</span>
                       {status && <span className="block truncate text-xs text-muted-foreground">{status.detail}</span>}

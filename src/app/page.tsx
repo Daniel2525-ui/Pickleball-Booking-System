@@ -19,7 +19,7 @@ export default async function Home() {
   const supabase = getPublicClient();
   const [{ data: operatingHours }, { data: courtRows }, { data: pricing }] = await Promise.all([
     supabase.from("operating_hours").select("day_of_week, is_open, open_time, close_time"),
-    supabase.from("courts").select("id, name, status, maintenance_note").order("name"),
+    supabase.from("courts").select("id, name, status, maintenance_note, photo_url, details").order("name"),
     fetchPricing(supabase),
   ]);
   const { cancelCutoffHours } = await fetchBookingPolicy(supabase);
