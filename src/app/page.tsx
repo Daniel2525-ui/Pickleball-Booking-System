@@ -4,6 +4,7 @@ import { Crosshair, MapPin, Phone, Mail } from "lucide-react";
 import { BookingContainer } from "@/components/customers/booking-container";
 import { PublicHeader } from "@/components/customers/public-header";
 import { FAQSection } from "@/components/customers/faq-section";
+import { CourtsShowcase } from "@/components/customers/courts-showcase";
 import { getPublicClient } from "@/lib/supabase/public";
 import { summarizeVenueHours } from "@/lib/utils/venueHours";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
@@ -16,15 +17,17 @@ export const revalidate = 300;
 export default async function Home() {
   // Anonymous read of public tables (same access the guest booking grid uses)
   const supabase = getPublicClient();
-  const [{ data: operatingHours }, { count: courtCount }, { data: pricing }] = await Promise.all([
+  const [{ data: operatingHours }, { data: courtRows }, { data: pricing }] = await Promise.all([
     supabase.from("operating_hours").select("day_of_week, is_open, open_time, close_time"),
-    supabase.from("courts").select("id", { count: "exact", head: true }),
+    supabase.from("courts").select("id, name, status, maintenance_note").order("name"),
     fetchPricing(supabase),
   ]);
   const { cancelCutoffHours } = await fetchBookingPolicy(supabase);
   const venue = await fetchVenueContact(supabase);
   const hours = summarizeVenueHours(operatingHours ?? []);
   const fromRate = pricing ? lowestHourlyRate(pricing) : null;
+  const courts = courtRows ?? [];
+  const courtCount = courts.length;
 
   const stats = [
     { value: courtCount ? String(courtCount) : "—", label: "regulation courts, 44 × 20 ft" },
@@ -48,6 +51,8 @@ export default async function Home() {
             <BookingContainer />
           </div>
         </section>
+
+        <CourtsShowcase courts={courts} hours={operatingHours ?? []} />
 
         <section aria-label="The venue" className="w-full border-t py-12 md:py-16">
           {/* Bento: each number in its own tile, the map in a tall tile beside them */}
