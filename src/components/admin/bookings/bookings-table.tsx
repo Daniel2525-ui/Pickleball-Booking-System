@@ -139,11 +139,13 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     };
   }, [filters]);
 
-  // A change made elsewhere (another desk, a player, the payment webhook) reloads the first page quietly
-  // shortcut: rows already loaded past the first page keep their old state until the filters change; fine at 100 a page
+  // A change made elsewhere (another desk, a player, the payment webhook) reloads the first page quietly.
+  // Rows loaded with "load more" are dropped rather than kept, since a new booking shifts every page by one
   useLiveRefresh(async () => {
     const { data, error } = await fetchBookings(filters);
-    if (!error) setBookingsData((prev) => [...data, ...prev.slice(BOOKINGS_PAGE_SIZE)]);
+    if (error) return;
+    setBookingsData(data);
+    setHasMore(data.length === BOOKINGS_PAGE_SIZE);
   });
 
   const loadMore = async () => {
