@@ -38,7 +38,7 @@ import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayme
 import { isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
-import { lineKey, upsertLine, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
+import { lineKey, mergeSpans, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
 import { CourtRally } from "@/components/customers/court-rally";
 import { compactRange } from "@/lib/services/bookings/quickStarts";
@@ -217,28 +217,27 @@ export const BookingContainer = () => {
     [timeSlots, selectedDate, getSlotStatus, pricing, basket, lineSpan]
   );
 
-  const setSlotWithDuration = (courtName: string, startSlotTime: string, duration: number) => {
-    const startIndex = timeSlots.indexOf(startSlotTime);
-    if (startIndex === -1) return;
-
-    const startPart = startSlotTime.split(" - ")[0].trim();
-    const endSlot = timeSlots[startIndex + duration - 1];
-    if (!endSlot) return;
-    const endPart = endSlot.split(" - ")[1].trim();
-
-    const formattedRange = `${startPart} - ${endPart}`;
-    const { total: price, hasPeak } = priceFor(selectedDate, startSlotTime, duration);
-
-    setBasket((prev) => upsertLine(prev, {
+  // A basket line for courtName covering `duration` slots from slot index `start`
+  const makeLine = (courtName: string, start: number, duration: number): Slot => {
+    const startSlot = timeSlots[start];
+    const { total: price, hasPeak } = priceFor(selectedDate, startSlot, duration);
+    return {
       date: selectedDate,
       court: courtName,
-      time: formattedRange,
+      time: `${startSlot.split(" - ")[0].trim()} - ${timeSlots[start + duration - 1].split(" - ")[1].trim()}`,
       price,
       hasPeak,
       duration,
-      startSlot: startSlotTime,
-    }));
+      startSlot,
+    };
   };
+
+  // Replaces one court's ranges; touching ranges merge into one line (within the max booking length)
+  const setCourtSpans = (courtName: string, spans: (readonly [number, number])[]) => {
+    const lines = mergeSpans(spans, maxHours).map(([s, e]) => makeLine(courtName, s, e - s));
+    setBasket((prev) => [...prev.filter((l) => l.court !== courtName), ...lines]);
+  };
+  const spansOn = (courtName: string) => basket.filter((l) => l.court === courtName).map(lineSpan);
 
   const handleSlotClick = (courtName: string, time: string) => {
     const status = getSlotStatus(selectedDate, courtName, time);
@@ -278,19 +277,19 @@ export const BookingContainer = () => {
       return;
     }
 
-    // Tapping the hour right after a range makes it one hour longer
+    // Tapping the hour right after a range adds that hour to it
     const before = onCourt.find((l) => lineSpan(l)[1] === clickedIndex);
     if (before && (before.duration || 1) < maxHours) {
-      setSlotWithDuration(courtName, before.startSlot || before.time, (before.duration || 1) + 1);
+      setCourtSpans(courtName, [...spansOn(courtName), [clickedIndex, clickedIndex + 1]]);
       return;
     }
 
-    // Otherwise this starts a new range at the shortest allowed duration
+    // Otherwise this starts a new range at the shortest allowed duration; one touching another range merges with it
     if (getMaxAvailableDuration(courtName, time) < minHours) {
       toast.error(`Bookings need at least ${minHours} consecutive free hours from this start time.`);
       return;
     }
-    setSlotWithDuration(courtName, time, minHours);
+    setCourtSpans(courtName, [...spansOn(courtName), [clickedIndex, clickedIndex + minHours]]);
   };
 
   // Guests build a basket freely and sign in only to pay
@@ -563,7 +562,10 @@ export const BookingContainer = () => {
                   lines={basket}
                   pricing={pricing}
                   getMaxDuration={(line) => getMaxAvailableDuration(line.court, line.startSlot || line.time, lineKey(line))}
-                  onDuration={(line, hours) => setSlotWithDuration(line.court, line.startSlot || line.time, hours)}
+                  onDuration={(line, hours) => {
+                    const [start] = lineSpan(line);
+                    setCourtSpans(line.court, [...basket.filter((l) => l.court === line.court && lineKey(l) !== lineKey(line)).map(lineSpan), [start, start + hours]]);
+                  }}
                   onRemove={(line) => setBasket((prev) => removeLine(prev, lineKey(line)))}
                   onCheckout={() => startCheckout()}
                 />

@@ -1,17 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { lineKey, upsertLine, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
+import { lineKey, mergeSpans, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
 
 const a = { court: "Court 1", price: 200, hasPeak: false, startSlot: "8:00 AM - 9:00 AM" };
 const b = { court: "Court 2", price: 300, hasPeak: true, startSlot: "8:00 AM - 9:00 AM" };
 const a2 = { ...a, startSlot: "2:00 PM - 3:00 PM" };
-
-test("upsertLine adds a new range and replaces the same court-and-start in place", () => {
-    assert.deepEqual(upsertLine([a], b), [a, b]);
-    assert.deepEqual(upsertLine([a, b], { ...a, price: 400 }), [{ ...a, price: 400 }, b]);
-    // A second, separate time on the same court is its own line
-    assert.deepEqual(upsertLine([a, b], a2), [a, b, a2]);
-});
 
 test("removeLine drops only that range", () => {
     assert.deepEqual(removeLine([a, b, a2], lineKey(a)), [b, a2]);
@@ -60,4 +53,14 @@ test("settleHold: an expired hold releases the whole basket, a confirmed result 
     assert.deepEqual(after("cancelled"), ["cancelled", "cancelled", "confirmed", "pending"]);
     // A sibling may have been lost to the late payment, so it waits for a refresh instead of reading as confirmed
     assert.deepEqual(after("confirmed"), ["confirmed", "pending", "confirmed", "pending"]);
+});
+
+test("mergeSpans joins touching ranges on a court, up to the max booking length", () => {
+    // 8-9 and 9-10 become 8-10; 2-3 PM stays apart; input order doesn't matter
+    assert.deepEqual(mergeSpans([[6, 7], [0, 1], [1, 2]], 6), [[0, 2], [6, 7]]);
+    // Filling the gap joins all three
+    assert.deepEqual(mergeSpans([[0, 1], [2, 3], [1, 2]], 6), [[0, 3]]);
+    // Past the max length they stay separate bookings
+    assert.deepEqual(mergeSpans([[0, 2], [2, 4]], 3), [[0, 2], [2, 4]]);
+    assert.deepEqual(mergeSpans([], 3), []);
 });

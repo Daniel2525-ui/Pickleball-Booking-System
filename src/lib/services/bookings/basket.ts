@@ -4,13 +4,22 @@ type Line = { court: string; price: number; hasPeak?: boolean; startSlot?: strin
 /** A line is one court from one start slot; changing its length keeps the same key. */
 export const lineKey = (l: Line) => `${l.court}|${l.startSlot ?? l.time ?? ""}`;
 
-export const upsertLine = <T extends Line>(lines: T[], line: T): T[] =>
-  lines.some((l) => lineKey(l) === lineKey(line))
-    ? lines.map((l) => (lineKey(l) === lineKey(line) ? line : l))
-    : [...lines, line];
-
 export const removeLine = <T extends Line>(lines: T[], key: string): T[] =>
   lines.filter((l) => lineKey(l) !== key);
+
+/**
+ * One court's picked ranges as [start, end) slot indexes, sorted, with touching ranges joined into one
+ * while the result stays within `maxLen` hours (each range becomes one booking, capped at the max length).
+ */
+export const mergeSpans = (spans: (readonly [number, number])[], maxLen: number): [number, number][] =>
+  [...spans]
+    .sort((a, b) => a[0] - b[0])
+    .reduce<[number, number][]>((out, [s, e]) => {
+      const last = out.at(-1);
+      if (last && last[1] === s && e - last[0] <= maxLen) last[1] = e;
+      else out.push([s, e]);
+      return out;
+    }, []);
 
 export const basketTotal = (lines: Line[]) => ({
   total: lines.reduce((sum, l) => sum + l.price, 0),
