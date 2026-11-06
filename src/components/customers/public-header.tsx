@@ -51,14 +51,18 @@ export function PublicHeader() {
         <div className="size-8 sm:size-9 shrink-0 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200">
           <Crosshair className="size-4 sm:size-4.5 transition-transform group-hover:rotate-45" />
         </div>
-        <span className="font-display font-black text-lg sm:text-2xl tracking-wide leading-none text-foreground uppercase whitespace-nowrap">
+        {/* Icon only from sm to lg, where the nav links need the room; the link still has its name for screen readers */}
+        <span className="font-display font-black text-lg sm:text-2xl tracking-wide leading-none text-foreground uppercase whitespace-nowrap sm:sr-only lg:not-sr-only">
           Crosshair <span className="text-primary">Dinkers</span>
         </span>
       </Link>
 
-      <nav aria-label="Main" className="flex items-center gap-1 sm:gap-2 shrink-0">
+      <nav aria-label="Main" className="flex items-center gap-1 lg:gap-2 shrink-0">
         <Link href="/#booking" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-foreground hover:bg-muted transition-colors">
           Book
+        </Link>
+        <Link href="/#courts" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-foreground hover:bg-muted transition-colors">
+          Courts
         </Link>
         <Link href="/open-play" className="hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-bold text-foreground hover:bg-muted transition-colors">
           Open Play
@@ -85,6 +89,7 @@ export function PublicHeader() {
             signOutTo="/"
             links={[
               ...(isAdmin ? [{ label: isOwner ? "Admin panel" : "Staff panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
+              { label: "Courts", href: "/#courts", icon: "bookings" },
               { label: "Open Play", href: "/open-play", icon: "bookings" },
               { label: "My bookings", href: "/my-bookings", icon: "bookings" },
               { label: "Profile and password", href: "/profile", icon: "profile" },

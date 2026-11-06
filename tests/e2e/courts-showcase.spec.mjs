@@ -51,3 +51,10 @@ test("guests see every court with its status and can switch the featured court",
   await expect(featured).toContainText("Free from 11:00 AM");
   await expect(featured.getByRole("link", { name: `Book ${first.name}` })).toHaveAttribute("href", "#booking");
 });
+
+test("the Courts link in the navbar scrolls to the section", async ({ page }) => {
+  await page.goto("/open-play");
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Courts" }).click();
+  await expect(page).toHaveURL(/\/#courts$/);
+  await expect(page.getByRole("heading", { name: "Our courts" })).toBeInViewport();
+});

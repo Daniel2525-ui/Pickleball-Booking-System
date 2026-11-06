@@ -80,7 +80,7 @@ export function CourtsShowcase({ courts, hours }: { courts: ShowcaseCourt[]; hou
     );
 
   return (
-    <section aria-label="Our courts" className="w-full border-t py-12 md:py-16">
+    <section id="courts" aria-label="Our courts" className="w-full scroll-mt-20 border-t py-12 md:py-16">
       <div className="container mx-auto px-4 max-w-6xl">
         <h2 className="text-5xl sm:text-6xl leading-[0.9] text-foreground">Our courts</h2>
         <p className="mt-2 max-w-[60ch] text-sm sm:text-base text-muted-foreground">
