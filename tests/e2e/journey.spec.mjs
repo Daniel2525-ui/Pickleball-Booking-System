@@ -64,8 +64,8 @@ test("2. the player books two hours tomorrow and pays by GCash", async ({ page }
   await page.getByRole("button", { name: "See the full board" }).click();
   await page.getByRole("button", { name: /Tmrw/ }).click();
   await page.locator("#booking").getByRole("button", { name: `Select ${court.name} at 3:00 PM - 4:00 PM` }).click();
-  await page.getByRole("group", { name: `${court.name} basket line` }).getByRole("button", { name: "2 hrs" }).click();
-  await expect(page.getByRole("region", { name: "Your basket" }).getByText("₱400", { exact: true })).toBeVisible();
+  await page.getByRole("group", { name: `${court.name} selection line` }).getByRole("button", { name: "2 hrs" }).click();
+  await expect(page.getByRole("region", { name: "Your selection" }).getByText("₱400", { exact: true }).last()).toBeVisible();
   await page.locator("#booking").getByRole("button", { name: "Continue to Checkout" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("radio", { name: "GCash" }).click();

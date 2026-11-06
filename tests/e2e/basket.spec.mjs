@@ -16,8 +16,8 @@ test.beforeEach(() => requireLocalDb());
 
 const courtId = (name) => sql(`SELECT id FROM public.courts WHERE name = '${name}'`);
 const userId = (role) => sql(`SELECT id FROM public.profiles WHERE email = '${account(role).email}'`);
-const basket = (page) => page.getByRole("region", { name: "Your basket" });
-const basketLine = (page, court) => basket(page).getByRole("group", { name: `${court} basket line` });
+const basket = (page) => page.getByRole("region", { name: "Your selection" });
+const basketLine = (page, court) => basket(page).getByRole("group", { name: `${court} selection line` });
 const slot = (page, court, time) => page.locator("#booking").getByRole("button", { name: `Select ${court} at ${time}` });
 
 async function openTomorrow(page) {
@@ -50,7 +50,7 @@ test("a two-court basket is paid in one Stripe checkout and confirms both courts
     await basketLine(page, court).getByRole("button", { name: "2 hrs" }).click();
   }
   await expect(basket(page).getByText("Your basket · 2 courts")).toBeVisible();
-  await expect(basket(page).getByText("₱800", { exact: true })).toBeVisible();
+  await expect(basket(page).getByText("₱800", { exact: true }).last()).toBeVisible();
   await expect(basket(page).getByText("All courts are held together, or none.")).toBeVisible();
 
   await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
@@ -240,7 +240,7 @@ test("removing every line closes the basket, and changing the date clears it", a
   await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
   await expect(basket(page)).toBeVisible();
   await page.getByRole("button", { name: "Next day" }).click();
-  await expect(page.getByText("Basket cleared for the new date.")).toBeVisible();
+  await expect(page.getByText("Selection cleared for the new date.")).toBeVisible();
   await expect(basket(page)).toHaveCount(0);
 });
 

@@ -164,7 +164,7 @@ export const BookingContainer = () => {
     if (d.toDateString() === selectedDate.toDateString()) return;
     if (basket.length > 0) {
       setBasket([]);
-      toast.info("Basket cleared for the new date.");
+      toast.info("Selection cleared for the new date.");
     }
     setSelectedDateRaw(d);
   };
@@ -393,7 +393,7 @@ export const BookingContainer = () => {
       });
       if (dropped.length > 0) {
         setBasket(kept);
-        toast.error(`Removed from your basket (no longer available): ${dropped.map((l) => l.court).join(", ")}.`);
+        toast.error(`Removed from your selection (no longer available): ${dropped.map((l) => l.court).join(", ")}.`);
       }
     }
   };
@@ -485,8 +485,8 @@ export const BookingContainer = () => {
           };
           if (basket.length === 0) return leave();
           setConfirmRequest({
-            title: "Clear your basket?",
-            description: `Going back to simple booking removes the ${basket.length} ${basket.length === 1 ? "slot" : "slots"} in your basket.`,
+            title: "Clear your selection?",
+            description: `Going back to simple booking removes the ${basket.length} ${basket.length === 1 ? "slot" : "slots"} in your selection.`,
             confirmLabel: "Clear and go back",
             cancelLabel: "Keep my slots",
             onConfirm: leave,
@@ -647,7 +647,7 @@ export const BookingContainer = () => {
           <DialogHeader>
             <DialogTitle>Sign in to pay</DialogTitle>
             <DialogDescription>
-              Your {basket.length === 1 ? "court stays" : "courts stay"} in your basket while you sign in or create an account.
+              Your {basket.length === 1 ? "court stays" : "courts stay"} selected while you sign in or create an account.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">

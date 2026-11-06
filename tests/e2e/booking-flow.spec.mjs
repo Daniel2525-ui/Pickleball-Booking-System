@@ -34,14 +34,14 @@ test("duration picker prices 1, 2 and 3 hours at PHP 200 per hour", async ({ pag
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   await slot(page, "8:00 AM - 9:00 AM").click();
-  const panel = page.getByRole("region", { name: "Your basket" });
-  const line = panel.getByRole("group", { name: `${court.name} basket line` });
-  await expect(panel.getByText("₱200", { exact: true })).toBeVisible();
+  const panel = page.getByRole("region", { name: "Your selection" });
+  const line = panel.getByRole("group", { name: `${court.name} selection line` });
+  await expect(panel.getByText("₱200", { exact: true }).last()).toBeVisible();
   await line.getByRole("button", { name: "2 hrs" }).click();
-  await expect(panel.getByText("₱400", { exact: true })).toBeVisible();
+  await expect(panel.getByText("₱400", { exact: true }).last()).toBeVisible();
   await line.getByRole("button", { name: "3 hrs" }).click();
   await expect(line.getByRole("button", { name: "3 hrs" })).toHaveAttribute("aria-pressed", "true");
-  await expect(panel.getByText("₱600", { exact: true })).toBeVisible();
+  await expect(panel.getByText("₱600", { exact: true }).last()).toBeVisible();
   await expect(panel.getByText("Total", { exact: true })).toBeVisible();
 });
 
@@ -49,7 +49,7 @@ test("successful Stripe test checkout confirms the booking", async ({ page }) =>
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   await slot(page, "10:00 AM - 11:00 AM").click();
-  await page.getByRole("group", { name: `${court.name} basket line` }).getByRole("button", { name: "2 hrs" }).click();
+  await page.getByRole("group", { name: `${court.name} selection line` }).getByRole("button", { name: "2 hrs" }).click();
   await page.locator("#booking").getByRole("button", { name: "Continue to Checkout" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
 

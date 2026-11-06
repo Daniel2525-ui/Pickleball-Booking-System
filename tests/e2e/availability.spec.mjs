@@ -16,7 +16,7 @@ test("guest can fill a basket and is asked to sign in only at checkout @mobile",
   test.skip((await open.count()) === 0, "no open slot today on the live grid");
 
   await open.first().click();
-  const basket = page.getByRole("region", { name: "Your basket" });
+  const basket = page.getByRole("region", { name: "Your selection" });
   await expect(basket).toBeVisible();
   await basket.getByRole("button", { name: "Continue to Checkout" }).click();
   const dialog = page.getByRole("dialog");
