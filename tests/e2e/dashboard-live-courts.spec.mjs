@@ -35,6 +35,8 @@ test("staff see who is on each court, how long they have, whether they paid, and
   await login(page, account("ADMIN"));
   await page.clock.setFixedTime(sevenThirtyFive());
   await page.goto("/admin/dashboard");
+  // The header clock shows the venue's time
+  await expect(page.locator("header time")).toHaveText("7:35 PM");
 
   const card = page.getByRole("region", { name: "Live Court Occupancy" });
   const tile = card.getByRole("group", { name: court.name, exact: true });

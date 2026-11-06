@@ -4,7 +4,7 @@ import CourtStatus from "@/components/admin/dashboard/court-status";
 import BookingOverview from "@/components/admin/dashboard/booking-overview";
 import RecentBookings from "@/components/admin/dashboard/recent-bookings";
 import AttentionAlert from "@/components/admin/dashboard/attention-alert";
-import { Clock } from "lucide-react";
+import DashboardClock from "@/components/admin/dashboard/dashboard-clock";
 import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -44,10 +44,7 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto text-xs font-medium text-muted-foreground bg-muted/40 border border-border px-3 py-1.5 rounded-lg shadow-2xs">
-          <Clock className="size-3.5 text-primary shrink-0" />
-          <span>{currentDate}</span>
-        </div>
+        <DashboardClock date={currentDate} />
       </header>
 
       <AttentionAlert kind="gcash" />
