@@ -32,7 +32,7 @@
 ### Task 1: Columns, bucket and the URL check
 
 **Files:**
-- Create: `supabase/migrations/pending_court_photos_details.sql` (renamed to the production version after it is applied)
+- Create: `supabase/migrations/20261106045612_court_photos_details.sql` (applied to production as 20261106045612)
 - Create: `src/lib/services/courts/courtPhoto.ts`
 - Test: `tests/court-photo.test.mjs`
 
