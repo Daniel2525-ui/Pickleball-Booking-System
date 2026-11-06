@@ -39,7 +39,8 @@ export const groupByCheckout = <T extends { id: string; basket_id?: string | nul
   return [...groups.values()];
 };
 
-const isLive = (b: { status: string }) => b.status !== "cancelled" && b.status !== "no_show";
+/** A court that still counts: not cancelled and not a no-show. */
+export const isLive = (b: { status: string }) => b.status !== "cancelled" && b.status !== "no_show";
 
 /** What a checkout comes to: its live courts, or every court once all were cancelled (shown struck). */
 export const checkoutTotal = (group: { status: string; total_amount?: number | null }[]) => {

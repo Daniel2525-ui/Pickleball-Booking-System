@@ -9,7 +9,7 @@ import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/can
 import { DEFAULT_POLICY, fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { getBookingStart } from "@/lib/utils/bookingTime";
 import { cancellationNote, getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
-import { checkoutTotal, groupByCheckout, pendingBasketSize, settleHold } from "@/lib/services/bookings/basket";
+import { checkoutTotal, groupByCheckout, isLive, pendingBasketSize, settleHold } from "@/lib/services/bookings/basket";
 
 // Badges for bookings that are no longer awaiting payment or confirmed (EXPIRED = checkout timed out, nothing charged)
 const HISTORY_LABELS: Record<string, string> = {
@@ -176,7 +176,6 @@ export const BookingHistoryContainer = () => {
   // Split bookings into upcoming and past
   const now = new Date();
 
-  const isLive = (b: UserBooking) => b.status !== "cancelled" && b.status !== "no_show";
   const isUpcoming = (b: UserBooking) => isLive(b) && getBookingStart(b) >= now;
   const nextStart = (g: UserBooking[]) => Math.min(...g.filter(isUpcoming).map((b) => getBookingStart(b).getTime()));
 
