@@ -8,7 +8,7 @@ import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/can
 import { DEFAULT_POLICY, fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { getBookingStart } from "@/lib/utils/bookingTime";
 import { cancellationNote, getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
-import { checkoutTotal, groupByCheckout, pendingBasketSize } from "@/lib/services/bookings/basket";
+import { checkoutTotal, groupByCheckout, pendingBasketSize, settleHold } from "@/lib/services/bookings/basket";
 
 // Badges for bookings that are no longer awaiting payment or confirmed (EXPIRED = checkout timed out, nothing charged)
 const HISTORY_LABELS: Record<string, string> = {
@@ -320,14 +320,7 @@ export const BookingHistoryContainer = () => {
                           holdExpiresAt={booking.hold_expires_at}
                           status={booking.status}
                           onStatusChange={(newStatus, cancelReason) => {
-                            // An expired hold releases every court of the basket, not just the one the card shows
-                            setBookings((prev) =>
-                              prev.map((b) =>
-                                b.id === booking.id || (booking.basket_id && b.basket_id === booking.basket_id && b.status === "pending")
-                                  ? { ...b, status: newStatus, cancel_reason: cancelReason }
-                                  : b
-                              )
-                            );
+                            setBookings((prev) => settleHold(prev, booking, newStatus, cancelReason));
                           }}
                         />
                       ) : (

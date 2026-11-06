@@ -46,3 +46,19 @@ export const checkoutTotal = (group: { status: string; total_amount?: number | n
   const counted = group.some(isLive) ? group.filter(isLive) : group;
   return counted.reduce((sum, b) => sum + Number(b.total_amount ?? 0), 0);
 };
+
+/**
+ * Applies a hold's checked status: an expired hold releases every pending court of its basket, but any other result
+ * (e.g. confirmed) changes only the court checked, since a sibling may have been lost to a late payment.
+ */
+export const settleHold = <T extends { id: string; basket_id?: string | null; status: string; cancel_reason?: string | null }>(
+  rows: T[],
+  checked: T,
+  status: string,
+  cancelReason: string | null | undefined,
+): T[] =>
+  rows.map((b) =>
+    b.id === checked.id || (status === "cancelled" && checked.basket_id && b.basket_id === checked.basket_id && b.status === "pending")
+      ? { ...b, status, cancel_reason: cancelReason }
+      : b,
+  );

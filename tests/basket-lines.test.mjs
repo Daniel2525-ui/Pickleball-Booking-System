@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { upsertLine, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal } from "../src/lib/services/bookings/basket.ts";
+import { upsertLine, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
 
 const a = { court: "Court 1", price: 200, hasPeak: false };
 const b = { court: "Court 2", price: 300, hasPeak: true };
@@ -48,4 +48,13 @@ test("checkoutTotal counts live courts, or every court when all were cancelled",
     assert.equal(checkoutTotal([l("confirmed", 510), l("cancelled", 255), l("confirmed", 300)]), 810);
     assert.equal(checkoutTotal([l("cancelled", 300), l("no_show", 300)]), 600);
     assert.equal(checkoutTotal([l("pending", 300), l("pending", null)]), 300);
+});
+
+test("settleHold: an expired hold releases the whole basket, a confirmed result only the court it checked", () => {
+    const r = (id, basket_id, status) => ({ id, basket_id, status, cancel_reason: null });
+    const rows = [r("1", "A", "pending"), r("2", "A", "pending"), r("3", "A", "confirmed"), r("4", "B", "pending")];
+    const after = (status) => settleHold(rows, rows[0], status, status === "cancelled" ? "expired" : null).map((b) => b.status);
+    assert.deepEqual(after("cancelled"), ["cancelled", "cancelled", "confirmed", "pending"]);
+    // A sibling may have been lost to the late payment, so it waits for a refresh instead of reading as confirmed
+    assert.deepEqual(after("confirmed"), ["confirmed", "pending", "confirmed", "pending"]);
 });
