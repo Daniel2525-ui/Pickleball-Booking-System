@@ -31,6 +31,11 @@ import { supabase as browserSupabase } from "@/lib/supabase";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { quoteCourtPrice, type Pricing } from "@/lib/services/pricing/quoteCourtPrice";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
+import { formatTime12h } from "@/lib/utils/formatTime";
+import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service";
+import { fetchUpcomingClosures } from "@/lib/services/schedule/venueClosures.service";
+import { fetchBookingsForDate, type BookingSlot } from "@/lib/services/bookings/fetchBookingsForDate.service";
+import { walkInStarts, walkInEnds, type WalkInSlotInput } from "@/lib/services/bookings/walkInSlots";
 
 /** "HH:MM" now in venue time, to compare with the time inputs. */
 const manilaClock = () =>
@@ -49,6 +54,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
   const [courts, setCourts] = useState<Court[]>([]);
   const [pricing, setPricing] = useState<Pricing | null>(null);
+  const [pricingFailed, setPricingFailed] = useState(false);
 
   // Player mode: "existing" or "new"
   const [playerMode, setPlayerMode] = useState<"existing" | "new">("existing");
@@ -68,8 +74,11 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   // Reservation details
   const [courtId, setCourtId] = useState("");
   const [date, setDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [pickedStart, setStartTime] = useState("");
+  const [pickedEnd, setEndTime] = useState("");
+  const [hours, setHours] = useState<WalkInSlotInput["hours"]>([]);
+  const [closedDates, setClosedDates] = useState<string[]>([]);
+  const [dayBookings, setDayBookings] = useState<BookingSlot[]>([]);
   const [amount, setAmount] = useState("200");
 
   // Payment details
@@ -104,9 +113,41 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   useEffect(() => {
     if (open) {
       fetchCourtsData().then((res) => setCourts(res.data || []));
-      fetchPricing(browserSupabase).then((res) => setPricing(res.data));
+      fetchPricing(browserSupabase).then((res) => {
+        setPricing(res.data);
+        setPricingFailed(!res.data);
+      });
+      fetchOperatingHours().then((res) => setHours(res.data || []));
+      fetchUpcomingClosures().then((res) => setClosedDates(res.data.map((c) => c.closed_on)));
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !date) return;
+    let ignore = false;
+    fetchBookingsForDate(date).then(({ data }) => {
+      if (!ignore) setDayBookings(data);
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [open, date]);
+
+  // Only real slots can be picked; a pick that stops being valid (court or date changed) reads as empty
+  const slotInput: WalkInSlotInput = {
+    date,
+    courtId,
+    courtStatus: courts.find((c) => c.id === courtId)?.status ?? "",
+    hours,
+    closedDates,
+    bookings: dayBookings,
+    minHours: pricing?.settings.min_hours as number,
+    maxHours: pricing?.settings.max_hours as number,
+  };
+  const starts = pricing && courtId && date ? walkInStarts(slotInput) : [];
+  const startTime = starts.some((s) => s.time === pickedStart && !s.taken) ? pickedStart : "";
+  const ends = startTime ? walkInEnds(slotInput, startTime) : [];
+  const endTime = ends.includes(pickedEnd) ? pickedEnd : "";
 
   // Debounced search for existing players
   useEffect(() => {
@@ -148,8 +189,10 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
     }
   };
   const handleStartTimeChange = (newStartTime: string) => {
+    const keepEnd = walkInEnds(slotInput, newStartTime).includes(endTime) ? endTime : "";
     setStartTime(newStartTime);
-    updateFee(date, newStartTime, endTime);
+    setEndTime(keepEnd);
+    updateFee(date, newStartTime, keepEnd);
   };
   const handleEndTimeChange = (newEndTime: string) => {
     setEndTime(newEndTime);
@@ -478,24 +521,43 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="walkin-start" className="text-xs font-semibold text-foreground">Start Time</Label>
-              <Input id="walkin-start"
-                type="time"
-                value={startTime}
-                onChange={(e) => handleStartTimeChange(e.target.value)}
-                className="h-9 text-xs sm:text-sm"
-              />
+              <Select value={startTime} onValueChange={(value) => handleStartTimeChange(value as string)} disabled={!courtId || !date || !starts.length}>
+                <SelectTrigger id="walkin-start" className="h-9 text-xs sm:text-sm">
+                  <SelectValue placeholder="Start">{(value) => (value ? formatTime12h(value as string) : "Start")}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {starts.map((s) => (
+                    <SelectItem key={s.time} value={s.time} disabled={s.taken} className="text-xs sm:text-sm">
+                      {formatTime12h(s.time)}{s.taken ? " · Booked" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="walkin-end" className="text-xs font-semibold text-foreground">End Time</Label>
-              <Input id="walkin-end"
-                type="time"
-                value={endTime}
-                onChange={(e) => handleEndTimeChange(e.target.value)}
-                className="h-9 text-xs sm:text-sm"
-              />
+              <Select value={endTime} onValueChange={(value) => handleEndTimeChange(value as string)} disabled={!startTime}>
+                <SelectTrigger id="walkin-end" className="h-9 text-xs sm:text-sm">
+                  <SelectValue placeholder="End">{(value) => (value ? formatTime12h(value as string) : "End")}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {ends.map((t) => (
+                    <SelectItem key={t} value={t} className="text-xs sm:text-sm">
+                      {formatTime12h(t)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
+
+          {pricingFailed && (
+            <p className="text-[11px] text-muted-foreground">Couldn&apos;t load the price list. Close and reopen this form to try again.</p>
+          )}
+          {courtId && date && pricing && !starts.some((s) => !s.taken) && (
+            <p className="text-[11px] text-muted-foreground">No open slots for this court on this date.</p>
+          )}
 
           {/* A slot that ended earlier today is saved as already played */}
           {date === formatManilaDate() && endTime.length >= 5 && endTime !== "00:00" && endTime <= manilaClock() && (
