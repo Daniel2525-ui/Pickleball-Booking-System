@@ -24,7 +24,7 @@ const startOf = (line: Slot) => to24h(line.time.split(" - ")[0].trim());
 export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemove, onCheckout }: BasketSheetProps) => {
   if (lines.length === 0) return null;
   const { total, hasPeak } = basketTotal(lines);
-  const { min_hours: minHours, max_hours: maxHours } = pricing.settings;
+  const { min_hours: minHours } = pricing.settings;
   const totalHours = lines.reduce((sum, l) => sum + (l.duration || 1), 0);
 
   // One block per court, courts in name order and times in clock order, whatever order they were tapped in
@@ -53,33 +53,29 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
                 return (
                   <li key={lineKey(line)} role="group" aria-label={`${line.court} ${line.time} selection line`} className="flex items-center gap-2 sm:gap-3">
                     <p className="min-w-0 flex-1 text-sm font-black text-foreground tabular-nums">{line.time}</p>
-                    {maxHours > minHours ? (
-                      // One compact control instead of a button per length: the time row stays a single line
-                      <div className="flex items-center rounded-lg border border-border bg-muted/40">
-                        <button
-                          type="button"
-                          aria-label="One hour shorter"
-                          disabled={duration <= minHours}
-                          onClick={() => onDuration(line, duration - 1)}
-                          className="grid size-10 sm:size-8 place-items-center rounded-l-lg text-foreground hover:bg-muted disabled:opacity-35 disabled:cursor-not-allowed"
-                        >
-                          <Minus className="size-3.5" />
-                        </button>
-                        <span className="min-w-12 text-center text-xs font-bold tabular-nums" aria-live="polite">{hrs(duration)}</span>
-                        <button
-                          type="button"
-                          aria-label="One hour longer"
-                          disabled={duration >= maxAvailable}
-                          title={duration >= maxAvailable ? (duration >= maxHours ? "Longest booking allowed" : "The next hour on this court isn't free") : undefined}
-                          onClick={() => onDuration(line, duration + 1)}
-                          className="grid size-10 sm:size-8 place-items-center rounded-r-lg text-foreground hover:bg-muted disabled:opacity-35 disabled:cursor-not-allowed"
-                        >
-                          <Plus className="size-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-xs font-bold text-muted-foreground">{hrs(duration)}</span>
-                    )}
+                    {/* One compact control instead of a button per length: the time row stays a single line */}
+                    <div className="flex items-center rounded-lg border border-border bg-muted/40">
+                      <button
+                        type="button"
+                        aria-label="One hour shorter"
+                        disabled={duration <= minHours}
+                        onClick={() => onDuration(line, duration - 1)}
+                        className="grid size-10 sm:size-8 place-items-center rounded-l-lg text-foreground hover:bg-muted disabled:opacity-35 disabled:cursor-not-allowed"
+                      >
+                        <Minus className="size-3.5" />
+                      </button>
+                      <span className="min-w-12 text-center text-xs font-bold tabular-nums" aria-live="polite">{hrs(duration)}</span>
+                      <button
+                        type="button"
+                        aria-label="One hour longer"
+                        disabled={duration >= maxAvailable}
+                        title={duration >= maxAvailable ? "The next hour on this court isn't free" : undefined}
+                        onClick={() => onDuration(line, duration + 1)}
+                        className="grid size-10 sm:size-8 place-items-center rounded-r-lg text-foreground hover:bg-muted disabled:opacity-35 disabled:cursor-not-allowed"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                    </div>
                     <div className="text-right">
                       <p className="text-sm font-black text-foreground tabular-nums">₱{line.price.toLocaleString()}</p>
                       {line.hasPeak && <p className="text-[11px] text-muted-foreground">peak rate</p>}

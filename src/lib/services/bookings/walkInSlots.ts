@@ -10,7 +10,6 @@ export interface WalkInSlotInput {
     closedDates: string[];
     bookings: BookingSlot[];
     minHours: number;
-    maxHours: number;
     now?: Date;
 }
 export interface StartOption { time: string; taken: boolean }
@@ -47,7 +46,7 @@ export function walkInEnds(input: WalkInSlotInput, start: string): string[] {
     if (!w) return [];
     const s = Number(start.slice(0, 2));
     const out: string[] = [];
-    for (let end = s + 1; end <= Math.min(s + input.maxHours, w.close) && !hourTaken(input, end - 1); end++) {
+    for (let end = s + 1; end <= w.close && !hourTaken(input, end - 1); end++) {
         if (end - s >= input.minHours) out.push(hhmm(end));
     }
     return out;

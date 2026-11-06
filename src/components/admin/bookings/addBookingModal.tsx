@@ -148,7 +148,6 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
     closedDates,
     bookings: dayBookings,
     minHours: pricing?.settings.min_hours as number,
-    maxHours: pricing?.settings.max_hours as number,
   };
   const starts = pricing && courtId && date ? walkInStarts(slotInput) : [];
   const startTime = starts.some((s) => s.time === pickedStart && !s.taken) ? pickedStart : "";
@@ -199,7 +198,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   const updateFee = (nextDate: string, nextStart: string, nextEnd: string) => {
     if (!pricing || !nextDate || !nextStart || !nextEnd) return;
     const duration = parseInt(nextEnd.split(":")[0], 10) - parseInt(nextStart.split(":")[0], 10);
-    if (duration >= pricing.settings.min_hours && duration <= pricing.settings.max_hours) {
+    if (duration >= pricing.settings.min_hours) {
       setAmount(String(quoteCourtPrice(pricing, nextDate, nextStart, duration).total));
     }
   };

@@ -3576,7 +3576,7 @@ async function main() {
     assert.equal(save(250, 2, 4, []).status, 0);
     const tooShort = runPsqlCommand(`SELECT public.hold_court_booking('${activeCourtId}', '${day}', '08:00:00', '09:00:00', '${aliceUid}', NULL, now() + interval '35 minutes');`,
       { role: "authenticated", uid: aliceUid });
-    assert.ok(tooShort.stderr.includes("between 2 and 4 consecutive hours"), tooShort.stderr);
+    assert.ok(tooShort.stderr.includes("at least 2 hour(s) long"), tooShort.stderr);
     const walkIn = JSON.parse(q(`SELECT public.create_walk_in_booking(p_court_id => '${activeCourtId}', p_customer_name => 'Priced Walk-in', p_booking_date => '${day}',
         p_start_time => '10:00:00', p_end_time => '14:00:00', p_amount => 1000, p_customer_id => '${guestCustId}', p_payment_method => 'cash');`,
       { role: "authenticated", uid: adminUid }));

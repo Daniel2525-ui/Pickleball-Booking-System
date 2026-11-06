@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/supabase/server";
 import { validatePricingInput } from "@/lib/services/pricing/validatePricingInput";
 
-/** Saves the base rate, booking length limits and peak windows (replaces all windows). Admin only. */
+/** Saves the base rate, minimum booking length and peak windows (replaces all windows). Admin only. */
 export async function POST(request: NextRequest) {
     try {
         const { supabase, denied } = await requireOwner();

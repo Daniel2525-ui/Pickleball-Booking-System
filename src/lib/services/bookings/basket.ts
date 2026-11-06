@@ -8,15 +8,14 @@ export const removeLine = <T extends Line>(lines: T[], key: string): T[] =>
   lines.filter((l) => lineKey(l) !== key);
 
 /**
- * One court's picked ranges as [start, end) slot indexes, sorted, with touching ranges joined into one
- * while the result stays within `maxLen` hours (each range becomes one booking, capped at the max length).
+ * One court's picked ranges as [start, end) slot indexes, sorted, with touching ranges joined into one.
  */
-export const mergeSpans = (spans: (readonly [number, number])[], maxLen: number): [number, number][] =>
+export const mergeSpans = (spans: (readonly [number, number])[]): [number, number][] =>
   [...spans]
     .sort((a, b) => a[0] - b[0])
     .reduce<[number, number][]>((out, [s, e]) => {
       const last = out.at(-1);
-      if (last && last[1] === s && e - last[0] <= maxLen) last[1] = e;
+      if (last && last[1] === s) last[1] = e;
       else out.push([s, e]);
       return out;
     }, []);

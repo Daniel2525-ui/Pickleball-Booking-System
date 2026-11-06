@@ -55,12 +55,12 @@ test("settleHold: an expired hold releases the whole basket, a confirmed result 
     assert.deepEqual(after("confirmed"), ["confirmed", "pending", "confirmed", "pending"]);
 });
 
-test("mergeSpans joins touching ranges on a court, up to the max booking length", () => {
+test("mergeSpans joins touching ranges on a court, however long the result", () => {
     // 8-9 and 9-10 become 8-10; 2-3 PM stays apart; input order doesn't matter
-    assert.deepEqual(mergeSpans([[6, 7], [0, 1], [1, 2]], 6), [[0, 2], [6, 7]]);
+    assert.deepEqual(mergeSpans([[6, 7], [0, 1], [1, 2]]), [[0, 2], [6, 7]]);
     // Filling the gap joins all three
-    assert.deepEqual(mergeSpans([[0, 1], [2, 3], [1, 2]], 6), [[0, 3]]);
-    // Past the max length they stay separate bookings
-    assert.deepEqual(mergeSpans([[0, 2], [2, 4]], 3), [[0, 2], [2, 4]]);
-    assert.deepEqual(mergeSpans([], 3), []);
+    assert.deepEqual(mergeSpans([[0, 1], [2, 3], [1, 2]]), [[0, 3]]);
+    // No maximum length: a whole day joins into one booking
+    assert.deepEqual(mergeSpans([[0, 6], [6, 14]]), [[0, 14]]);
+    assert.deepEqual(mergeSpans([]), []);
 });

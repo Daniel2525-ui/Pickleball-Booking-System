@@ -8,13 +8,13 @@ import {
 import { getBookingStart } from "../src/lib/utils/bookingTime.ts";
 
 // 3. Admin-configured duration limits are enforced (pricing itself: tests/quote-court-price.test.mjs)
-test("validateBookingSlot follows the configured min and max booking length", () => {
+test("validateBookingSlot enforces the configured minimum and has no maximum length", () => {
     const now = new Date("2026-10-24T06:00:00+08:00");
     const slot = (endTime, limits) => validateBookingSlot({ bookingDate: "2026-10-25", startTime: "08:00", endTime, now, limits });
-    assert.equal(slot("10:00", { min_hours: 2, max_hours: 4 }).valid, true);
-    assert.equal(slot("12:00", { min_hours: 2, max_hours: 4 }).valid, true);
-    assert.deepEqual(slot("09:00", { min_hours: 2, max_hours: 4 }), { valid: false, error: "Booking duration must be between 2 and 4 consecutive hours." });
-    assert.deepEqual(slot("13:00", { min_hours: 2, max_hours: 4 }), { valid: false, error: "Booking duration must be between 2 and 4 consecutive hours." });
+    assert.equal(slot("10:00", { min_hours: 2 }).valid, true);
+    // A whole day in one booking is fine
+    assert.equal(slot("20:00", { min_hours: 2 }).valid, true);
+    assert.deepEqual(slot("09:00", { min_hours: 2 }), { valid: false, error: "Bookings must be at least 2 hours long, in whole hours." });
 });
 
 // 4. Server-side Time and Duration Validation (Production validateBookingSlot)
@@ -76,7 +76,7 @@ test("validateBookingSlot rejects invalid durations, non-whole-hour times, and m
             endTime: "08:00",
             now: futureTime,
         }),
-        { valid: false, error: "Booking duration must be between 1 and 3 consecutive hours." }
+        { valid: false, error: "Bookings must be at least 1 hour long, in whole hours." }
     );
 
     // Inverted times / negative duration
@@ -88,19 +88,7 @@ test("validateBookingSlot rejects invalid durations, non-whole-hour times, and m
             endTime: "08:00",
             now: futureTime,
         }),
-        { valid: false, error: "Booking duration must be between 1 and 3 consecutive hours." }
-    );
-
-    // Exceeds 3 hours (4 hours)
-    assert.deepEqual(
-        validateBookingSlot({
-        limits: { min_hours: 1, max_hours: 3 },
-            bookingDate: "2026-10-25",
-            startTime: "08:00",
-            endTime: "12:00",
-            now: futureTime,
-        }),
-        { valid: false, error: "Booking duration must be between 1 and 3 consecutive hours." }
+        { valid: false, error: "Bookings must be at least 1 hour long, in whole hours." }
     );
 
     // Non-whole hour (minutes)

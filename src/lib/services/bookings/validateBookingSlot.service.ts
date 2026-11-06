@@ -12,7 +12,7 @@ export interface ValidateBookingSlotParams {
     endTime: string;
     operatingHour?: OperatingHourInfo | null;
     /** Admin-configured booking length limits (booking_settings) */
-    limits: { min_hours: number; max_hours: number };
+    limits: { min_hours: number };
     now?: Date;
 }
 
@@ -69,10 +69,10 @@ export const validateBookingSlot = (
     const endHour = parseInt(endTimeDb.slice(0, 2), 10);
     const durationHours = endHour - startHour;
 
-    if (!Number.isInteger(durationHours) || durationHours < limits.min_hours || durationHours > limits.max_hours) {
+    if (!Number.isInteger(durationHours) || durationHours < limits.min_hours) {
         return {
             valid: false,
-            error: `Booking duration must be between ${limits.min_hours} and ${limits.max_hours} consecutive hours.`,
+            error: `Bookings must be at least ${limits.min_hours} ${limits.min_hours === 1 ? "hour" : "hours"} long, in whole hours.`,
         };
     }
 
@@ -130,7 +130,7 @@ export const validateBasketLines = (params: {
     lines: unknown;
     courts: { id: string; name: string; status: string }[];
     operatingHour?: OperatingHourInfo | null;
-    limits: { min_hours: number; max_hours: number };
+    limits: { min_hours: number };
     now?: Date;
 }): ValidateBasketResult => {
     const { bookingDate, lines, courts, operatingHour, limits, now } = params;

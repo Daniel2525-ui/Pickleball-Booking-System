@@ -16,9 +16,7 @@ export function pricingChanges(before: Pricing, after: Pricing): string[] {
             : "";
         lines.push(`Base rate: ${peso(b.base_hourly_rate)} → ${peso(a.base_hourly_rate)} per hour${warn}`);
     }
-    if (b.min_hours !== a.min_hours || b.max_hours !== a.max_hours) {
-        lines.push(`Booking length: ${b.min_hours}–${b.max_hours} → ${a.min_hours}–${a.max_hours} hours`);
-    }
+    if (b.min_hours !== a.min_hours) lines.push(`Minimum booking: ${b.min_hours} → ${a.min_hours} hours`);
     const beforeKeys = new Set(before.peakRates.map(windowKey));
     const afterKeys = new Set(after.peakRates.map(windowKey));
     const added = after.peakRates.filter((p) => !beforeKeys.has(windowKey(p)));

@@ -10,7 +10,6 @@ const base = {
     closedDates: [],
     bookings: [],
     minHours: 1,
-    maxHours: 3,
 };
 const booking = (over) => ({ id: null, court_id: "c1", start_time: "09:00:00", end_time: "10:00:00", status: "confirmed", ...over });
 
@@ -34,8 +33,8 @@ test("ends stop before the next taken hour", () => {
     const b = { ...base, bookings: [booking({ start_time: "10:00:00", end_time: "11:00:00" })] };
     assert.deepEqual(walkInEnds(b, "08:00"), ["09:00", "10:00"]);
 });
-test("ends respect max length and closing", () => {
-    assert.deepEqual(walkInEnds(base, "08:00"), ["09:00", "10:00", "11:00"]);
+test("ends run to closing: no maximum length", () => {
+    assert.deepEqual(walkInEnds(base, "08:00"), ["09:00", "10:00", "11:00", "12:00"]);
     assert.deepEqual(walkInEnds(base, "11:00"), ["12:00"]);
 });
 test("min length above 1 hour", () => {

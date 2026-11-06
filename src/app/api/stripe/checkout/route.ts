@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         const dayOfWeek = getBookingWeekday(booking_date);
         const [{ data: operatingHour, error: opError }, { data: limits, error: limitsError }] = await Promise.all([
             supabase.from("operating_hours").select("is_open, open_time, close_time").eq("day_of_week", dayOfWeek).maybeSingle(),
-            supabase.from("booking_settings").select("min_hours, max_hours, gcash_number").maybeSingle(),
+            supabase.from("booking_settings").select("min_hours, gcash_number").maybeSingle(),
         ]);
 
         if (opError || limitsError || !limits) {

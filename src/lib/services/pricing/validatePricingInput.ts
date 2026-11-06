@@ -20,7 +20,7 @@ export const validatePricingInput = (body: unknown): { ok: true; value: PricingI
     if (!isRate(b.base_hourly_rate)) return { ok: false, error: `Base hourly rate must be between 1 and ${MAX_RATE.toLocaleString()}.` };
     const min = b.min_hours, max = b.max_hours;
     if (!Number.isInteger(min) || !Number.isInteger(max) || (min as number) < 1 || (max as number) > 12 || (min as number) > (max as number)) {
-        return { ok: false, error: "Booking length must be whole hours between 1 and 12, with the minimum not above the maximum." };
+        return { ok: false, error: "Minimum booking must be whole hours between 1 and 12." };
     }
 
     if (!Array.isArray(b.peak_rates) || b.peak_rates.length > MAX_PEAK_WINDOWS) {

@@ -182,7 +182,6 @@ export const BookingContainer = () => {
 
   // Admin-configured booking length (booking_settings); the database enforces the same limits
   const minHours = pricing?.settings.min_hours ?? 1;
-  const maxHours = pricing?.settings.max_hours ?? 1;
   const priceFor = (date: Date, startSlotTime: string, duration: number) => {
     if (!pricing) return { total: 0, hasPeak: false };
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date);
@@ -195,7 +194,7 @@ export const BookingContainer = () => {
     return [start, start + (l.duration || 1)] as const;
   }, [timeSlots]);
 
-  // Consecutive free hours (up to maxHours) from slotTime on courtName; other basket lines on that court
+  // Consecutive free hours from slotTime on courtName (no maximum length); other basket lines on that court
   // count as taken, so separate times on one court never overlap. `skipKey` is the line being resized.
   const getMaxAvailableDuration = useCallback(
     (courtName: string, slotTime: string, skipKey?: string): number => {
@@ -206,7 +205,7 @@ export const BookingContainer = () => {
         .map(lineSpan);
 
       let hours = 0;
-      for (let i = startIndex; i < startIndex + (pricing?.settings.max_hours ?? 1); i++) {
+      for (let i = startIndex; i < timeSlots.length; i++) {
         const slot = timeSlots[i];
         if (!slot || getSlotStatus(selectedDate, courtName, slot) !== "available") break;
         if (picked.some(([s, e]) => i >= s && i < e)) break;
@@ -214,7 +213,7 @@ export const BookingContainer = () => {
       }
       return hours;
     },
-    [timeSlots, selectedDate, getSlotStatus, pricing, basket, lineSpan]
+    [timeSlots, selectedDate, getSlotStatus, basket, lineSpan]
   );
 
   // A basket line for courtName covering `duration` slots from slot index `start`
@@ -232,9 +231,9 @@ export const BookingContainer = () => {
     };
   };
 
-  // Replaces one court's ranges; touching ranges merge into one line (within the max booking length)
+  // Replaces one court's ranges; touching ranges merge into one line
   const setCourtSpans = (courtName: string, spans: (readonly [number, number])[]) => {
-    const lines = mergeSpans(spans, maxHours).map(([s, e]) => makeLine(courtName, s, e - s));
+    const lines = mergeSpans(spans).map(([s, e]) => makeLine(courtName, s, e - s));
     setBasket((prev) => [...prev.filter((l) => l.court !== courtName), ...lines]);
   };
   const spansOn = (courtName: string) => basket.filter((l) => l.court === courtName).map(lineSpan);
@@ -279,7 +278,7 @@ export const BookingContainer = () => {
 
     // Tapping the hour right after a range adds that hour to it
     const before = onCourt.find((l) => lineSpan(l)[1] === clickedIndex);
-    if (before && (before.duration || 1) < maxHours) {
+    if (before) {
       setCourtSpans(courtName, [...spansOn(courtName), [clickedIndex, clickedIndex + 1]]);
       return;
     }

@@ -40,7 +40,6 @@ export function PricingContainer() {
   const [saving, setSaving] = useState(false);
   const [baseRate, setBaseRate] = useState("");
   const [minHours, setMinHours] = useState(1);
-  const [maxHours, setMaxHours] = useState(3);
   const [windows, setWindows] = useState<Window[]>([]);
   const [saved, setSaved] = useState<Pricing | null>(null);
   const [hours, setHours] = useState<OperatingHour[]>([]);
@@ -61,7 +60,6 @@ export function PricingContainer() {
       if (data) {
         setBaseRate(String(data.settings.base_hourly_rate));
         setMinHours(data.settings.min_hours);
-        setMaxHours(data.settings.max_hours);
         setWindows(data.peakRates.map((p, i) => ({ ...p, start_time: p.start_time.slice(0, 5), end_time: p.end_time.slice(0, 5), key: i })));
         setSaved(data);
       } else {
@@ -75,7 +73,8 @@ export function PricingContainer() {
 
   // The form as it would be saved, for the preview, the change summary and the unsaved-changes prompt
   const form: Pricing = {
-    settings: { base_hourly_rate: Number(baseRate), min_hours: minHours, max_hours: maxHours },
+    // Bookings have no maximum length; booking_settings.max_hours is kept at its column ceiling and never read as a limit
+    settings: { base_hourly_rate: Number(baseRate), min_hours: minHours, max_hours: 12 },
     peakRates: windows.map(({ label, days, start_time, end_time, hourly_rate }) => ({ label, days, start_time, end_time, hourly_rate: Number(hourly_rate) })),
   };
   const changes = saved ? pricingChanges(saved, form) : [];
@@ -109,7 +108,7 @@ export function PricingContainer() {
       body: JSON.stringify({
         base_hourly_rate: Number(baseRate),
         min_hours: minHours,
-        max_hours: maxHours,
+        max_hours: 12,
         peak_rates: windows.map(({ label, days, start_time, end_time, hourly_rate }) => ({ label, days, start_time, end_time, hourly_rate: Number(hourly_rate) })),
       }),
     });
@@ -138,7 +137,7 @@ export function PricingContainer() {
           <CardTitle className="text-xl font-bold">Standard Rate &amp; Booking Length</CardTitle>
           <CardDescription>Applies to every court and hour outside the peak windows below.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="base-rate">Base rate (₱ per hour)</Label>
             <Input id="base-rate" type="number" min={1} value={baseRate} onChange={(e) => setBaseRate(e.target.value)} />
@@ -146,10 +145,6 @@ export function PricingContainer() {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="min-hours">Minimum booking (hours)</Label>
             <Input id="min-hours" type="number" min={1} max={12} value={minHours} onChange={(e) => setMinHours(Number(e.target.value))} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="max-hours">Maximum booking (hours)</Label>
-            <Input id="max-hours" type="number" min={1} max={12} value={maxHours} onChange={(e) => setMaxHours(Number(e.target.value))} />
           </div>
         </CardContent>
       </Card>

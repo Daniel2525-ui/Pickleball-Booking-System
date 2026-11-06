@@ -17,10 +17,8 @@ export default async function TermsPage() {
   const { data: pricing } = await fetchPricing(getPublicClient());
   const venue = await fetchVenueContact(getPublicClient());
   const hoursText = pricing
-    ? pricing.settings.min_hours === pricing.settings.max_hours
-      ? `${pricing.settings.min_hours} consecutive hour${pricing.settings.min_hours === 1 ? "" : "s"}`
-      : `${pricing.settings.min_hours} to ${pricing.settings.max_hours} consecutive hours`
-    : "the number of consecutive hours shown on the booking calendar";
+    ? `at least ${pricing.settings.min_hours} consecutive hour${pricing.settings.min_hours === 1 ? "" : "s"}`
+    : "at least the number of consecutive hours shown on the booking calendar";
 
   return (
     <LegalPage title="Terms & Booking Rules">

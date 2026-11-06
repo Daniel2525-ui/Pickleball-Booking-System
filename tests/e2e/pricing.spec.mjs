@@ -25,7 +25,8 @@ test("admin sets a base rate, longer bookings and a peak window", async ({ page 
   await login(page, account("ADMIN"));
   await page.goto("/admin/pricing");
   await page.getByLabel("Base rate (₱ per hour)").fill("250");
-  await page.getByLabel("Maximum booking (hours)").fill("4");
+  // Bookings have no maximum length, so there is no maximum field
+  await expect(page.getByLabel("Maximum booking (hours)")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Add Peak Window" }).click();
   const peak = page.getByTestId("peak-window");
@@ -46,11 +47,10 @@ test("admin sets a base rate, longer bookings and a peak window", async ({ page 
   await page.getByRole("button", { name: "Save Pricing" }).click();
   const confirm = page.getByRole("dialog");
   await expect(confirm).toContainText("Base rate: ₱200 → ₱250 per hour");
-  await expect(confirm).toContainText("Booking length: 1–3 → 1–4 hours");
   await expect(confirm).toContainText("Peak window: Evening at ₱400/hr");
   await confirm.getByRole("button", { name: "Save Pricing" }).click();
   await expect(page.getByText("Pricing saved. New bookings use these rates.")).toBeVisible();
-  expect(sql("SELECT base_hourly_rate || '|' || min_hours || '|' || max_hours FROM public.booking_settings")).toBe("250.00|1|4");
+  expect(sql("SELECT base_hourly_rate || '|' || min_hours FROM public.booking_settings")).toBe("250.00|1");
   expect(sql("SELECT label || '|' || start_time || '|' || end_time || '|' || hourly_rate FROM public.peak_rates")).toBe("Evening|17:00:00|22:00:00|400.00");
 
 
@@ -73,12 +73,11 @@ test("customers can't read the price history", async () => {
 test("admin sees a clear error for an impossible booking length, and nothing is saved", async ({ page }) => {
   await login(page, account("ADMIN"));
   await page.goto("/admin/pricing");
-  await page.getByLabel("Minimum booking (hours)").fill("5");
-  await page.getByLabel("Maximum booking (hours)").fill("2");
+  await page.getByLabel("Minimum booking (hours)").fill("13");
   await page.getByRole("button", { name: "Save Pricing" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Save Pricing" }).click();
-  await expect(page.getByText(/minimum not above the maximum/)).toBeVisible();
-  expect(sql("SELECT min_hours || '|' || max_hours FROM public.booking_settings")).toBe("1|4");
+  await expect(page.getByText(/Minimum booking must be whole hours between 1 and 12/)).toBeVisible();
+  expect(sql("SELECT min_hours FROM public.booking_settings")).toBe("1");
 });
 
 test("a peak window outside opening hours is flagged, and an unchanged form has nothing to save", async ({ page }) => {
@@ -122,5 +121,5 @@ test("the landing page and terms show the configured rates", async ({ page }) =>
   await page.goto("/terms");
   await expect(page.getByText(/standard court rate is ₱250 per hour/)).toBeVisible();
   await expect(page.getByText(/Evening: .*5:00 PM–10:00 PM at ₱400\/hr/)).toBeVisible();
-  await expect(page.getByText(/1 to 4 consecutive hours/)).toBeVisible();
+  await expect(page.getByText(/at least 1 consecutive hour/)).toBeVisible();
 });
