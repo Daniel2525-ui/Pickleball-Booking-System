@@ -1,3 +1,9 @@
+/** The statuses staff pick in Add Court and Edit Court, with their labels */
+export const COURT_STATUS_LABELS: Record<string, string> = {
+    active: "Available (Open for bookings)",
+    maintenance: "Maintenance (Temporarily closed)",
+};
+
 export interface Court {
     id: string;
     name: string;

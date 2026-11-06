@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { COURT_STATUS_LABELS } from "@/lib/services/courts/courtsTypes";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -98,12 +99,11 @@ export const AddCourtModal = ({ onCourtAdded, trigger }: AddCourtModalProps) => 
                     <div className="flex flex-col gap-2">
                         <Label htmlFor="court-status">Initial Status</Label>
                         <Select value={status} onValueChange={(value) => setStatus(value || "active")}>
-                            <SelectTrigger id="court-status">
-                                <SelectValue placeholder="Select court status" />
+                            <SelectTrigger id="court-status" className="h-10 w-full">
+                                <SelectValue placeholder="Select court status">{(value) => COURT_STATUS_LABELS[value as string] ?? value}</SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="active">Available (Open for bookings)</SelectItem>
-                                <SelectItem value="maintenance">Maintenance (Temporarily closed)</SelectItem>
+                                {Object.entries(COURT_STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value} className="py-2.5">{label}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>

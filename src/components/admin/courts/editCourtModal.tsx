@@ -22,7 +22,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Court } from "@/lib/services/courts/courtsTypes";
+import { COURT_STATUS_LABELS, Court } from "@/lib/services/courts/courtsTypes";
 import { updateCourt } from "@/lib/services/courts/updateCourt.service";
 import { CourtBooking, courtBookingName, fetchUpcomingCourtBookings } from "@/lib/services/courts/courtsData.service";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
@@ -155,12 +155,11 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
                     <div className="flex flex-col gap-2">
                         <Label htmlFor="edit-court-status">Operational Status</Label>
                         <Select value={status} onValueChange={(value) => setStatus(value as string)}>
-                            <SelectTrigger id="edit-court-status">
-                                <SelectValue placeholder="Select court status" />
+                            <SelectTrigger id="edit-court-status" className="h-10 w-full">
+                                <SelectValue placeholder="Select court status">{(value) => COURT_STATUS_LABELS[value as string] ?? value}</SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="active">Available (Open for bookings)</SelectItem>
-                                <SelectItem value="maintenance">Maintenance (Temporarily closed)</SelectItem>
+                                {Object.entries(COURT_STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value} className="py-2.5">{label}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
