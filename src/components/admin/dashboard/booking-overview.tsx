@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchBookingOverview } from "@/lib/services/dashboard/bookingOverview.service";
 import { useEffect, useState } from "react";
 import { DayData } from "@/lib/services/dashboard/dashboardTypes";
-import { supabase } from "@/lib/supabase";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 
 export default function BookingOverview({ className }: { className?: string }) {
   const [weekData, setWeekData] = useState<DayData[]>([]);
@@ -31,25 +31,8 @@ export default function BookingOverview({ className }: { className?: string }) {
     };
 
     loadOverview();
-
-    // Subscribe to new bookings to update the graph in real-time
-    const channel = supabase
-      .channel("booking-overview-updates")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bookings" },
-        () => {
-          fetchBookingOverview().then(({ data }) => {
-            if (data) setWeekData(data);
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
+  useLiveRefresh(() => fetchBookingOverview().then(({ data }) => data && setWeekData(data)));
 
   const totalWeekBookings = weekData.reduce((acc, curr) => acc + curr.bookings, 0);
   const maxBookings = Math.max(...weekData.map((day) => day.bookings), 10);

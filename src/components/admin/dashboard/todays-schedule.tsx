@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { todaysSchedule } from "@/lib/services/dashboard/schedToday.service";
 import { useState, useEffect } from "react";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { calculateDuration } from "@/lib/helpers/totalDuration";
 import { bookingRef } from "@/lib/services/openPlay/bookingTitle";
@@ -78,6 +79,7 @@ export default function TodaysSchedule({
 
     getSchedule();
   }, []);
+  useLiveRefresh(() => todaysSchedule().then((data) => setSchedule(data as unknown as ScheduleItem[])));
 
   return (
     <Card className={`border border-border shadow-2xs ${className || ""}`}>

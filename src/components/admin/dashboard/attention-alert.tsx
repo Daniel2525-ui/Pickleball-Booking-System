@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { countRefundsOwed, countToCollect } from "@/lib/services/payments/paymentsData.service";
 import { countAwaitingGcash } from "@/lib/services/bookings/filterBookingsData.service";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 
 // Keyed by name because the dashboard is a server component and cannot pass functions down
 const ALERTS = {
@@ -36,6 +37,7 @@ export default function AttentionAlert({ kind }: { kind: keyof typeof ALERTS }) 
   useEffect(() => {
     alert.load().then(setCount);
   }, [alert]);
+  useLiveRefresh(() => alert.load().then(setCount));
 
   if (count === 0) return null;
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +35,8 @@ export default function CourtStatus({ className }: { className?: string }) {
   const [tiles, setTiles] = useState<LiveCourtTile[] | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [failed, setFailed] = useState(false);
+  // Bumped by a booking or payment change; reloading through the effect keeps its one-minute timer in step
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -53,7 +56,8 @@ export default function CourtStatus({ className }: { className?: string }) {
       active = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [version]);
+  useLiveRefresh(() => setVersion((v) => v + 1));
 
   return (
     <Card role="region" aria-label="Live Court Occupancy" className={`border border-border shadow-2xs ${className || ""}`}>

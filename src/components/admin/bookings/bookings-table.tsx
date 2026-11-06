@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { fetchBookings, BOOKINGS_PAGE_SIZE } from "@/lib/services/bookings/filterBookingsData.service";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
@@ -137,6 +138,13 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
       ignore = true;
     };
   }, [filters]);
+
+  // A change made elsewhere (another desk, a player, the payment webhook) reloads the first page quietly
+  // shortcut: rows already loaded past the first page keep their old state until the filters change; fine at 100 a page
+  useLiveRefresh(async () => {
+    const { data, error } = await fetchBookings(filters);
+    if (!error) setBookingsData((prev) => [...data, ...prev.slice(BOOKINGS_PAGE_SIZE)]);
+  });
 
   const loadMore = async () => {
     setLoadingMore(true);

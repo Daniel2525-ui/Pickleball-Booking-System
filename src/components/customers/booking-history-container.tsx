@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { UserBooking, fetchUserBookings } from "@/lib/services/bookings/fetchUserBookings.service";
 import { useVenueContact } from "@/hooks/use-venue-contact";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/cancelBooking.service";
 import { DEFAULT_POLICY, fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { getBookingStart } from "@/lib/utils/bookingTime";
@@ -129,6 +130,9 @@ export const BookingHistoryContainer = () => {
       active = false;
     };
   }, []);
+
+  // Staff approving a GCash payment or cancelling shows up without a reload (realtime only sends this player's rows)
+  useLiveRefresh(() => fetchCurrentUserBookings().then((latest) => !latest.failed && setBookings(latest.bookings)));
 
   const handleConfirmCancel = async () => {
     if (!bookingToCancel || cancelInFlight.current) return;
