@@ -63,7 +63,7 @@ test("2. the player books two hours tomorrow and pays by GCash", async ({ page }
   await page.goto("/#booking");
   await page.getByRole("button", { name: /Tmrw/ }).click();
   await page.locator("#booking").getByRole("button", { name: `Select ${court.name} at 3:00 PM - 4:00 PM` }).click();
-  await page.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) }).getByRole("button", { name: "2 hrs" }).click();
+  await page.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) }).getByRole("button", { name: "One hour longer" }).click();
   await expect(page.getByRole("region", { name: "Your selection" }).getByText("₱400", { exact: true }).last()).toBeVisible();
   await page.locator("#booking").getByRole("button", { name: "Continue to Checkout" }).click();
   const dialog = page.getByRole("dialog");

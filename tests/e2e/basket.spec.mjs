@@ -46,11 +46,11 @@ test("a two-court basket is paid in one Stripe checkout and confirms both courts
   await openTomorrow(page);
   for (const court of ["COURT 1", "COURT 2"]) {
     await slot(page, court, "6:00 PM - 7:00 PM").click();
-    await basketLine(page, court).getByRole("button", { name: "2 hrs" }).click();
+    await basketLine(page, court).getByRole("button", { name: "One hour longer" }).click();
   }
-  await expect(basket(page).getByText("Your selection · 2 time slots")).toBeVisible();
+  await expect(basket(page).getByText("· 2 courts, 4 hrs total")).toBeVisible();
   await expect(basket(page).getByText("₱800", { exact: true }).last()).toBeVisible();
-  await expect(basket(page).getByText("All time slots are held together, or none.")).toBeVisible();
+  await expect(basket(page).getByText(/all held together or not at all/)).toBeVisible();
 
   await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
@@ -124,7 +124,7 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket",
   await openTomorrow(page);
   await slot(page, "COURT 3", "8:00 AM - 9:00 AM").click();
   await slot(page, "COURT 4", "8:00 AM - 9:00 AM").click();
-  await expect(basket(page).getByText("Your selection · 2 time slots")).toBeVisible();
+  await expect(basket(page).getByText("· 2 courts, 2 hrs total")).toBeVisible();
 
   // CUSTOMER2 takes COURT 4 first, with the old single-court request body
   const other = await browser.newPage();
@@ -140,7 +140,7 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket",
   await expect(page.getByRole("dialog").getByText(/^COURT 4 .+ was just taken\. Nothing was reserved — please choose again\.$/)).toBeVisible();
   await expect(page.getByText("Removed from your selection (no longer available): COURT 4.")).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
-  await expect(basket(page).getByText("Your selection · 1 time slot")).toBeVisible();
+  await expect(basket(page).getByText("· 1 court, 1 hr total")).toBeVisible();
   expect(sql(`SELECT count(*) FROM public.bookings WHERE user_id = '${userId("CUSTOMER")}' AND start_time = '08:00'`)).toBe("0");
 
   // Release CUSTOMER2's hold so later tests start without an open basket
@@ -236,9 +236,9 @@ test("removing every line closes the basket, and changing the date clears it", a
   await openTomorrow(page);
   await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
   await slot(page, "COURT 2", "7:00 AM - 8:00 AM").click();
-  await expect(basket(page).getByText("Your selection · 2 time slots")).toBeVisible();
+  await expect(basket(page).getByText("· 2 courts, 2 hrs total")).toBeVisible();
   await basket(page).getByRole("button", { name: /^Remove COURT 1 / }).click();
-  await expect(basket(page).getByText("Your selection · 1 time slot")).toBeVisible();
+  await expect(basket(page).getByText("· 1 court, 1 hr total")).toBeVisible();
   await basket(page).getByRole("button", { name: /^Remove COURT 2 / }).click();
   await expect(basket(page)).toHaveCount(0);
 
@@ -253,7 +253,7 @@ test("on a phone the basket keeps checkout in view without covering the last gri
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   for (const court of ["COURT 1", "COURT 2", "COURT 3"]) await slot(page, court, "7:00 AM - 8:00 AM").click();
-  await expect(basket(page).getByText("Your selection · 3 time slots")).toBeVisible();
+  await expect(basket(page).getByText("· 3 courts, 3 hrs total")).toBeVisible();
   await expect(basket(page).getByRole("button", { name: "Continue to Checkout" })).toBeInViewport();
   await expect(basket(page).getByText("Total", { exact: true })).toBeInViewport();
 
@@ -372,7 +372,7 @@ test("one court can be booked at separate times in one checkout", async ({ page 
   await openTomorrow(page);
   await slot(page, "COURT 2", "11:00 AM - 12:00 PM").click();
   await slot(page, "COURT 2", "3:00 PM - 4:00 PM").click();
-  await expect(basket(page).getByText("Your selection · 2 time slots")).toBeVisible();
+  await expect(basket(page).getByText("· 1 court, 2 hrs total")).toBeVisible();
   await expect(basketLine(page, "COURT 2")).toHaveCount(2);
 
   const res = await checkout(page, [["COURT 2", "11:00", "12:00"], ["COURT 2", "15:00", "16:00"]]);

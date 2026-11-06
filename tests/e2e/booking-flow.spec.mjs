@@ -35,10 +35,10 @@ test("duration picker prices 1, 2 and 3 hours at PHP 200 per hour", async ({ pag
   const panel = page.getByRole("region", { name: "Your selection" });
   const line = panel.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) });
   await expect(panel.getByText("₱200", { exact: true }).last()).toBeVisible();
-  await line.getByRole("button", { name: "2 hrs" }).click();
+  await line.getByRole("button", { name: "One hour longer" }).click();
   await expect(panel.getByText("₱400", { exact: true }).last()).toBeVisible();
-  await line.getByRole("button", { name: "3 hrs" }).click();
-  await expect(line.getByRole("button", { name: "3 hrs" })).toHaveAttribute("aria-pressed", "true");
+  await line.getByRole("button", { name: "One hour longer" }).click();
+  await expect(line.getByText("3 hrs", { exact: true })).toBeVisible();
   await expect(panel.getByText("₱600", { exact: true }).last()).toBeVisible();
   await expect(panel.getByText("Total", { exact: true })).toBeVisible();
 });
@@ -47,7 +47,7 @@ test("successful Stripe test checkout confirms the booking", async ({ page }) =>
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   await slot(page, "10:00 AM - 11:00 AM").click();
-  await page.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) }).getByRole("button", { name: "2 hrs" }).click();
+  await page.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) }).getByRole("button", { name: "One hour longer" }).click();
   await page.locator("#booking").getByRole("button", { name: "Continue to Checkout" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
 

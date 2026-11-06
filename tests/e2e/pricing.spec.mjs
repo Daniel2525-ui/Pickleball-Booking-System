@@ -103,8 +103,8 @@ test("customers see the configured prices, and the hold is charged what the data
   // Grid cells show prices too, so read totals from the basket
   const panel = page.getByRole("region", { name: "Your selection" });
   await expect(panel.getByText("₱250", { exact: true }).last()).toBeVisible();
-  await expect(panel.getByRole("button", { name: "4 hrs" })).toBeVisible();
-  await panel.getByRole("button", { name: "2 hrs" }).click();
+  await expect(panel.getByRole("button", { name: "One hour longer" })).toBeEnabled();
+  await panel.getByRole("button", { name: "One hour longer" }).click();
   await expect(panel.getByText("₱650", { exact: true }).last()).toBeVisible(); // 4 PM base + 5 PM peak
   await expect(panel.getByText(/includes peak rate/)).toBeVisible();
 
