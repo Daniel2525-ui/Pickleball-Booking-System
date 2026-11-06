@@ -36,6 +36,7 @@ import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours
 import { fetchUpcomingClosures } from "@/lib/services/schedule/venueClosures.service";
 import { fetchBookingsForDate, type BookingSlot } from "@/lib/services/bookings/fetchBookingsForDate.service";
 import { walkInStarts, walkInEnds, type WalkInSlotInput } from "@/lib/services/bookings/walkInSlots";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 
 /** "HH:MM" now in venue time, to compare with the time inputs. */
 const manilaClock = () =>
@@ -133,6 +134,11 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
     };
   }, [open, date]);
 
+  // A no-show, cancellation or online booking elsewhere frees or takes hours while this form is open
+  useLiveRefresh(() => {
+    if (open && date) fetchBookingsForDate(date).then(({ data }) => setDayBookings(data));
+  });
+
   // Only real slots can be picked; a pick that stops being valid (court or date changed) reads as empty
   const slotInput: WalkInSlotInput = {
     date,
@@ -148,6 +154,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   const startTime = starts.some((s) => s.time === pickedStart && !s.taken) ? pickedStart : "";
   const ends = startTime ? walkInEnds(slotInput, startTime) : [];
   const endTime = ends.includes(pickedEnd) ? pickedEnd : "";
+  // Tell staff why a pick vanished instead of letting save fail with "complete all details"
+  const pickLost = Boolean((pickedStart && !startTime) || (pickedEnd && startTime && !endTime));
 
   // Debounced search for existing players
   useEffect(() => {
@@ -557,6 +565,11 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
           )}
           {courtId && date && pricing && !starts.some((s) => !s.taken) && (
             <p className="text-[11px] text-muted-foreground">No open slots for this court on this date.</p>
+          )}
+          {pickLost && (
+            <p role="status" className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-200">
+              The time you picked is no longer available. Pick another.
+            </p>
           )}
 
           {/* A slot that ended earlier today is saved as already played */}
