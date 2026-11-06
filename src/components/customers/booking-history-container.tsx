@@ -418,7 +418,8 @@ export const BookingHistoryContainer = () => {
                     </span>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mt-3 w-full sm:w-auto">
-                      {booking.status === "pending" && (
+                      {/* A submitted GCash payment waits on staff; there is nothing left to pay */}
+                      {booking.status === "pending" && !isAwaitingVerification(booking) && (
                         <Button
                           id={`resume-booking-${booking.id}`}
                           size="sm"

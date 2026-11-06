@@ -359,6 +359,9 @@ test("GCash pay page submits reference and screenshot", async ({ page }) => {
 
     await page.goto("/my-bookings");
     await expect(page.getByText("Awaiting verification").first()).toBeVisible();
+    // Staff verify it now; there is nothing left for the player to pay or cancel
+    await expect(page.getByRole("button", { name: "Continue Payment" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Cancel Reservation" })).toHaveCount(0);
 
     // An expired hold shows the expired view
     sql(`UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
