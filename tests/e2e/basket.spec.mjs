@@ -67,6 +67,12 @@ test("a two-court basket is paid in one Stripe checkout and confirms both courts
          JOIN public.payments p ON p.booking_id = b.id
          WHERE b.booking_date = '${date}' AND b.start_time = '18:00' AND b.user_id = '${userId("CUSTOMER")}'`)
   ).toBe("2|1|1");
+
+  await page.goto("/my-bookings");
+  await expect(page.getByText("2 COURTS", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Total · 2 courts")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel COURT 1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel COURT 2" })).toBeVisible();
 });
 
 test("cancelling one paid court refunds only that court, and cannot be repeated", async ({ page }) => {
@@ -86,6 +92,12 @@ test("cancelling one paid court refunds only that court, and cannot be repeated"
   const again = await page.request.post("/api/bookings/cancel", { data: { bookingId: id } });
   expect(again.status()).toBe(409);
   expect(sql(`SELECT count(*) FROM public.refund_requests WHERE booking_id = '${id}'`)).toBe("1");
+
+  await page.goto("/my-bookings");
+  await expect(page.getByText("2 COURTS", { exact: true })).toHaveCount(1); // still Upcoming, still one card
+  await expect(page.getByText("Total · 1 of 2 courts")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel COURT 1" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Cancel COURT 2" })).toBeVisible();
 });
 
 test("a court lost before a late payment is confirmed is refunded alone, and the success page names it", async ({ page }) => {
@@ -158,15 +170,16 @@ test("a second checkout while a basket awaits payment is refused", async ({ page
   expect(sql(`SELECT count(*) FROM public.bookings WHERE booking_date = '${date}' AND start_time = '12:00'`)).toBe("0");
 
   await page.goto("/my-bookings");
-  await expect(page.getByText("Part of a 2-court booking")).toHaveCount(2);
+  // The unpaid pair is one card: one Continue Payment and one Cancel Reservation (earlier tests left paid pairs too)
+  await expect(page.getByRole("button", { name: "Continue Payment" })).toHaveCount(1);
   const card = page
-    .getByText("Part of a 2-court booking")
-    .first()
-    .locator("xpath=ancestor::*[.//button[normalize-space()='Cancel Reservation']][1]");
+    .getByRole("button", { name: "Continue Payment" })
+    .locator("xpath=ancestor::*[.//*[normalize-space()='2 COURTS']][1]");
+  await expect(card.getByText("2 COURTS", { exact: true })).toBeVisible();
   await card.getByRole("button", { name: "Cancel Reservation" }).click();
   await expect(page.getByRole("dialog").getByText("This cancels all 2 courts in this unpaid booking.")).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Keep Reservation" }).click();
-  await expect(page.getByText("Part of a 2-court booking")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Continue Payment" })).toHaveCount(1);
 });
 
 const rowFor = (page, court, time) => page.getByRole("row").filter({ hasText: court }).filter({ hasText: time });

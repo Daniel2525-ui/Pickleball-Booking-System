@@ -8,7 +8,7 @@ import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/can
 import { DEFAULT_POLICY, fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { getBookingStart } from "@/lib/utils/bookingTime";
 import { cancellationNote, getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
-import { pendingBasketSize } from "@/lib/services/bookings/basket";
+import { checkoutTotal, groupByCheckout, pendingBasketSize } from "@/lib/services/bookings/basket";
 
 // Badges for bookings that are no longer awaiting payment or confirmed (EXPIRED = checkout timed out, nothing charged)
 const HISTORY_LABELS: Record<string, string> = {
@@ -48,6 +48,10 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { BookingCardSkeleton } from "@/components/skeletons/booking-card-skeleton";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
+
+// Notes that need the player's attention read amber
+const noteTone = (text: string) =>
+  /Cancelled by the venue|Refund failed|Refund delayed/.test(text) ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground";
 
 const formatBookingDate = (date: string) => {
   const d = date.includes("T") ? new Date(date) : new Date(`${date}T12:00:00+08:00`);
@@ -168,18 +172,15 @@ export const BookingHistoryContainer = () => {
   // Split bookings into upcoming and past
   const now = new Date();
 
-  // Upcoming reads soonest first (the next game on top); past keeps the newest-first order the query returns
-  const upcomingBookings = bookings
-    .filter((booking) => {
-      const isCancelledOrNoShow = booking.status === "cancelled" || booking.status === "no_show";
-      return !isCancelledOrNoShow && getBookingStart(booking) >= now;
-    })
-    .sort((a, b) => getBookingStart(a).getTime() - getBookingStart(b).getTime());
+  const isLive = (b: UserBooking) => b.status !== "cancelled" && b.status !== "no_show";
+  const isUpcoming = (b: UserBooking) => isLive(b) && getBookingStart(b) >= now;
+  const nextStart = (g: UserBooking[]) => Math.min(...g.filter(isUpcoming).map((b) => getBookingStart(b).getTime()));
 
-  const pastBookings = bookings.filter((booking) => {
-    const isCancelledOrNoShow = booking.status === "cancelled" || booking.status === "no_show";
-    return isCancelledOrNoShow || getBookingStart(booking) < now;
-  });
+  // One card per checkout; it stays Upcoming until its last court starts.
+  // Upcoming reads soonest first (the next game on top); past keeps the newest-first order the query returns
+  const groups = groupByCheckout(bookings);
+  const upcomingBookings = groups.filter((g) => g.some(isUpcoming)).sort((a, b) => nextStart(a) - nextStart(b));
+  const pastBookings = groups.filter((g) => !g.some(isUpcoming));
 
   const displayedBookings = activeTab === "upcoming" ? upcomingBookings : pastBookings;
 
@@ -270,26 +271,32 @@ export const BookingHistoryContainer = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {displayedBookings.map((booking) => {
+            {displayedBookings.map((group) => {
+              // The card speaks for its first live court (the first court once all are cancelled)
+              const booking = group.find(isLive) ?? group[0];
+              const multi = group.length > 1;
+              const live = group.filter(isLive);
+              const shown = live.length ? live : group;
               const cancellable = isBookingCancellable(booking, new Date(), cancelCutoffHours);
+              const lineCancellable = (m: UserBooking) => booking.status !== "pending" && isBookingCancellable(m, new Date(), cancelCutoffHours);
               const note = cancellationNote(booking);
 
               return (
                 <div
-                  key={booking.id}
+                  key={booking.basket_id ?? booking.id}
                   // Cancelled cards sit back through the surface, not opacity, so their text keeps full contrast
                   className={`grid grid-cols-[minmax(0,1fr)_76px] sm:grid-cols-[minmax(0,1fr)_96px] rounded-2xl border overflow-hidden ${booking.status === "pending" ? "border-amber-500/60" : ""} ${note ? "bg-muted/30 border-dashed" : "bg-card"}`}
                 >
                 <div className="flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center p-5 sm:p-6 min-w-0">
-                  <div className="space-y-3.5">
+                  <div className={`space-y-3.5 ${multi ? "w-full min-w-0 sm:flex-1" : ""}`}>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
                         variant="outline"
                         className="bg-primary/10 text-primary border-primary/25 font-bold text-xs px-2.5 py-0.5"
                       >
-                        {bookingTitle(booking)}
+                        {multi ? `${group.length} COURTS` : bookingTitle(booking)}
                       </Badge>
-                      <span className="font-mono text-xs text-muted-foreground">Ref {bookingRef(booking.id)}</span>
+                      {!multi && <span className="font-mono text-xs text-muted-foreground">Ref {bookingRef(booking.id)}</span>}
 
                       {booking.status === "confirmed" || booking.status === "paid" ? (
                         <Badge
@@ -313,9 +320,12 @@ export const BookingHistoryContainer = () => {
                           holdExpiresAt={booking.hold_expires_at}
                           status={booking.status}
                           onStatusChange={(newStatus, cancelReason) => {
+                            // An expired hold releases every court of the basket, not just the one the card shows
                             setBookings((prev) =>
                               prev.map((b) =>
-                                b.id === booking.id ? { ...b, status: newStatus, cancel_reason: cancelReason } : b
+                                b.id === booking.id || (booking.basket_id && b.basket_id === booking.basket_id && b.status === "pending")
+                                  ? { ...b, status: newStatus, cancel_reason: cancelReason }
+                                  : b
                               )
                             );
                           }}
@@ -337,15 +347,9 @@ export const BookingHistoryContainer = () => {
                       )}
                     </div>
 
-                    {note && (
-                      <p className={`text-xs font-semibold ${/Cancelled by the venue|Refund failed|Refund delayed/.test(note.text) ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                    {note && !multi && (
+                      <p className={`text-xs font-semibold ${noteTone(note.text)}`}>
                         {note.text}
-                      </p>
-                    )}
-
-                    {booking.status === "pending" && pendingBasketSize(bookings, booking) > 1 && (
-                      <p className="text-xs font-semibold text-muted-foreground">
-                        Part of a {pendingBasketSize(bookings, booking)}-court booking
                       </p>
                     )}
 
@@ -357,10 +361,53 @@ export const BookingHistoryContainer = () => {
                       <div className="flex items-center gap-2 text-foreground font-semibold">
                         <Clock className="size-4 text-primary shrink-0" />
                         <span>
-                          {formatTime12h(booking.start_time)} – {formatTime12h(booking.end_time)}
+                          {/* Times are HH:MM:SS, so the earliest/latest sort as strings */}
+                          {formatTime12h(shown.map((m) => m.start_time).sort()[0])} – {formatTime12h(shown.map((m) => m.end_time).sort().at(-1)!)}
                         </span>
                       </div>
                     </div>
+
+                    {multi && (
+                      <ul aria-label="Courts in this booking" className="divide-y rounded-xl border">
+                        {[...group].sort((a, b) => a.start_time.localeCompare(b.start_time) || bookingTitle(a).localeCompare(bookingTitle(b))).map((m) => {
+                          const mNote = isLive(m) ? null : cancellationNote(m);
+                          return (
+                            <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5">
+                              <div className="min-w-0 w-full sm:w-auto sm:flex-1">
+                                <p className={`text-sm font-black ${isLive(m) ? "text-foreground" : "text-muted-foreground"}`}>
+                                  {bookingTitle(m)}
+                                  {!isLive(m) && (
+                                    <Badge variant="outline" className="ml-2 bg-muted text-muted-foreground border-border font-semibold text-[10px]">
+                                      {HISTORY_LABELS[m.status] ?? m.status.toUpperCase()}
+                                    </Badge>
+                                  )}
+                                </p>
+                                <p className={`text-xs font-bold ${isLive(m) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                                  {formatTime12h(m.start_time)} – {formatTime12h(m.end_time)}
+                                </p>
+                                <p className="font-mono text-[11px] text-muted-foreground">Ref {bookingRef(m.id)}</p>
+                                {mNote && <p className={`text-xs font-semibold ${noteTone(mNote.text)}`}>{mNote.text}</p>}
+                              </div>
+                              <span className={`ml-auto text-sm font-black tabular-nums ${isLive(m) ? "text-foreground" : "text-muted-foreground line-through"}`}>
+                                ₱{Number(m.total_amount ?? 0).toLocaleString()}
+                              </span>
+                              {lineCancellable(m) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  aria-label={`Cancel ${bookingTitle(m)}`}
+                                  className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive font-semibold text-xs min-h-[44px] sm:min-h-[32px]"
+                                  onClick={() => setBookingToCancel(m)}
+                                  disabled={cancellingId !== null || resumingId !== null}
+                                >
+                                  {cancellingId === m.id ? <LoaderCircle className="size-3.5 animate-spin" /> : "Cancel"}
+                                </Button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
 
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="size-3.5 text-muted-foreground/80 shrink-0" />
@@ -370,11 +417,11 @@ export const BookingHistoryContainer = () => {
 
                   <div className="flex flex-col items-start sm:items-end w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-border/60">
                     <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">
-                      Total
+                      Total{multi && (live.length < group.length ? ` · ${live.length} of ${group.length} courts` : ` · ${group.length} courts`)}
                     </span>
                     {/* Never charged (expired or abandoned hold): the price stays visible but reads as not paid */}
                     <span className={`text-2xl font-black ${note && !note.charged ? "text-muted-foreground line-through decoration-2" : "text-foreground"}`}>
-                      {booking.total_amount ? `₱${booking.total_amount.toLocaleString()}` : "₱---"}
+                      {checkoutTotal(group) ? `₱${checkoutTotal(group).toLocaleString()}` : "₱---"}
                     </span>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mt-3 w-full sm:w-auto">
@@ -395,7 +442,8 @@ export const BookingHistoryContainer = () => {
                         </Button>
                       )}
 
-                      {cancellable && (
+                      {/* A paid checkout cancels court by court (lines above); an unpaid one only as a whole */}
+                      {cancellable && (!multi || booking.status === "pending") && (
                         <Button
                           id={`cancel-booking-${booking.id}`}
                           variant="outline"
@@ -413,7 +461,7 @@ export const BookingHistoryContainer = () => {
                         </Button>
                       )}
 
-                      {!cancellable && booking.status === "confirmed" && getBookingStart(booking) > new Date() && (
+                      {!cancellable && !group.some(lineCancellable) && booking.status === "confirmed" && getBookingStart(booking) > new Date() && (
                         <p className="text-[11px] text-muted-foreground sm:text-right max-w-[220px]">
                           Online cancellation closes {cancelCutoffHours} hours before start. Need help? Call{" "}
                           <a href={venue.phoneHref} className="font-semibold text-foreground hover:underline">
