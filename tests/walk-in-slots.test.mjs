@@ -43,6 +43,16 @@ test("min length above 1 hour", () => {
     assert.deepEqual(walkInStarts(b).map((s) => s.time), ["08:00", "09:00", "10:00"]);
     assert.deepEqual(walkInEnds(b, "10:00"), ["12:00"]);
 });
+test("start with no valid end is taken", () => {
+    const b = { ...base, minHours: 2, bookings: [booking({ start_time: "10:00:00", end_time: "11:00:00" })] };
+    const taken = (t) => walkInStarts(b).find((s) => s.time === t).taken;
+    assert.equal(taken("09:00"), true);
+    assert.equal(taken("08:00"), false);
+});
+test("off-hour booking blocks both hours it touches", () => {
+    const b = { ...base, bookings: [booking({ start_time: "09:30:00", end_time: "10:30:00" })] };
+    assert.deepEqual(walkInStarts(b).filter((s) => s.taken).map((s) => s.time), ["09:00", "10:00"]);
+});
 test("no starts when closed", () => {
     for (const b of [
         { ...base, closedDates: ["2026-11-09"] },

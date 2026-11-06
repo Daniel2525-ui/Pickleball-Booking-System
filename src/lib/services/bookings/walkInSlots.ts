@@ -38,7 +38,7 @@ export function walkInStarts(input: WalkInSlotInput): StartOption[] {
     const w = dayWindow(input);
     if (!w) return [];
     const out: StartOption[] = [];
-    for (let h = w.open; h <= w.close - input.minHours; h++) out.push({ time: hhmm(h), taken: hourTaken(input, h) });
+    for (let h = w.open; h <= w.close - input.minHours; h++) out.push({ time: hhmm(h), taken: hourTaken(input, h) || walkInEnds(input, hhmm(h)).length === 0 });
     return out;
 }
 

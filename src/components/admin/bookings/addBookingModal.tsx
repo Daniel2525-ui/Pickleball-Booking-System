@@ -54,6 +54,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
   const [courts, setCourts] = useState<Court[]>([]);
   const [pricing, setPricing] = useState<Pricing | null>(null);
+  const [pricingFailed, setPricingFailed] = useState(false);
 
   // Player mode: "existing" or "new"
   const [playerMode, setPlayerMode] = useState<"existing" | "new">("existing");
@@ -112,7 +113,10 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   useEffect(() => {
     if (open) {
       fetchCourtsData().then((res) => setCourts(res.data || []));
-      fetchPricing(browserSupabase).then((res) => setPricing(res.data));
+      fetchPricing(browserSupabase).then((res) => {
+        setPricing(res.data);
+        setPricingFailed(!res.data);
+      });
       fetchOperatingHours().then((res) => setHours(res.data || []));
       fetchUpcomingClosures().then((res) => setClosedDates(res.data.map((c) => c.closed_on)));
     }
@@ -137,8 +141,8 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
     hours,
     closedDates,
     bookings: dayBookings,
-    minHours: pricing?.settings.min_hours ?? 1,
-    maxHours: pricing?.settings.max_hours ?? 1,
+    minHours: pricing?.settings.min_hours as number,
+    maxHours: pricing?.settings.max_hours as number,
   };
   const starts = pricing && courtId && date ? walkInStarts(slotInput) : [];
   const startTime = starts.some((s) => s.time === pickedStart && !s.taken) ? pickedStart : "";
@@ -548,7 +552,10 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
             </div>
           </div>
 
-          {courtId && date && pricing && !starts.length && (
+          {pricingFailed && (
+            <p className="text-[11px] text-muted-foreground">Couldn&apos;t load the price list. Close and reopen this form to try again.</p>
+          )}
+          {courtId && date && pricing && !starts.some((s) => !s.taken) && (
             <p className="text-[11px] text-muted-foreground">No open slots for this court on this date.</p>
           )}
 
