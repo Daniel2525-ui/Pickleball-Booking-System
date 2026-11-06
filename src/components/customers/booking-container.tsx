@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, LogIn, Calendar, Clock, CreditCard, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog, type ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -19,7 +18,6 @@ import { DateSelector } from "@/components/customers/date-selector";
 import { CourtAvailabilityGrid } from "@/components/customers/court-availability-grid";
 import { BookingModal } from "@/components/customers/booking-modal";
 import { BookingScheduleSkeleton } from "@/components/skeletons/booking-schedule-skeleton";
-import { QuickBookingSkeleton } from "@/components/skeletons/quick-booking-skeleton";
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service";
 import { OperatingHour } from "@/components/admin/schedules/types";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
@@ -42,7 +40,6 @@ import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
 import { upsertLine, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
-import { QuickBooking } from "@/components/customers/quick-booking";
 import { CourtRally } from "@/components/customers/court-rally";
 import { compactRange } from "@/lib/services/bookings/quickStarts";
 
@@ -67,8 +64,6 @@ export const BookingContainer = () => {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isFetchingBookings, setIsFetchingBookings] = useState(false);
   const [showMobileCalendar, setShowMobileCalendar] = useState(false);
-  const [view, setView] = useState<"quick" | "board">("quick");
-  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   // Check auth state on mount
   useEffect(() => {
     const supabase = createClient();
@@ -93,7 +88,6 @@ export const BookingContainer = () => {
       // Availability is re-checked by the checkout API; a taken court is dropped from the basket there
       setSelectedDateRaw(date);
       setBasket(saved.lines.map((line) => ({ ...line, date })));
-      setView("board");
       setIsDialogOpen(true);
     };
     checkUser();
@@ -433,16 +427,16 @@ export const BookingContainer = () => {
             </span>
           )}
           <p className="mt-4 text-muted-foreground font-semibold max-w-md leading-relaxed">
-            Answer three quick questions, pick a time and book seamlessly.
+            Tap a free slot on any court, tap the next hour to extend, then check out.
           </p>
         </div>
         <CourtRally className="w-full max-w-sm md:max-w-none justify-self-center" />
       </div>
 
       {loading ? (
-        view === "quick" ? <QuickBookingSkeleton /> : <BookingScheduleSkeleton />
-      ) : view === "quick" ? (
-        <div className="flex flex-col gap-4">
+        <BookingScheduleSkeleton />
+      ) : (
+      <div className="flex flex-col gap-4">
           {myHold && (
             <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm">
               {myHoldVerifying ? (
@@ -459,44 +453,6 @@ export const BookingContainer = () => {
               )}
             </div>
           )}
-          <QuickBooking
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            operatingHours={operatingHours}
-            courts={courtNames}
-            timeSlots={timeSlots}
-            getSlotStatus={getSlotStatus}
-            minHours={minHours}
-            maxHours={maxHours}
-            baseRate={Number(pricing?.settings.base_hourly_rate ?? 0)}
-            priceFor={priceFor}
-            onBook={startCheckout}
-            onOpenBoard={() => setView("board")}
-          />
-        </div>
-      ) : (
-      <div className="flex flex-col gap-4">
-      <button
-        type="button"
-        onClick={() => {
-          const leave = () => {
-            setView("quick");
-            setBasket([]);
-          };
-          if (basket.length === 0) return leave();
-          setConfirmRequest({
-            title: "Clear your selection?",
-            description: `Going back to simple booking removes the ${basket.length} ${basket.length === 1 ? "slot" : "slots"} in your selection.`,
-            confirmLabel: "Clear and go back",
-            cancelLabel: "Keep my slots",
-            onConfirm: leave,
-          });
-        }}
-        className="self-start min-h-[44px] text-sm font-extrabold text-primary underline underline-offset-4"
-      >
-        ← Back to simple booking
-      </button>
-      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Mobile Quick-Date Strip */}
         <div className="lg:hidden col-span-1 space-y-2">
