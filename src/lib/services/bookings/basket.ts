@@ -28,3 +28,21 @@ export const splitTakenLines = <T extends Line>(lines: T[], isFree: (line: T) =>
   kept: lines.filter(isFree),
   dropped: lines.filter((l) => !isFree(l)),
 });
+
+/** A user's bookings, one group per checkout (basket); a booking without a basket is its own group. */
+export const groupByCheckout = <T extends { id: string; basket_id?: string | null }>(rows: T[]): T[][] => {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = row.basket_id ?? row.id;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  return [...groups.values()];
+};
+
+const isLive = (b: { status: string }) => b.status !== "cancelled" && b.status !== "no_show";
+
+/** What a checkout comes to: its live courts, or every court once all were cancelled (shown struck). */
+export const checkoutTotal = (group: { status: string; total_amount?: number | null }[]) => {
+  const counted = group.some(isLive) ? group.filter(isLive) : group;
+  return counted.reduce((sum, b) => sum + Number(b.total_amount ?? 0), 0);
+};
