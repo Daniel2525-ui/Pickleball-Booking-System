@@ -156,7 +156,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
       <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3 text-sm">
         {settings?.gcash_qr_url && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={settings.gcash_qr_url} alt="GCash QR code" className="mx-auto size-48 object-contain" />
+          <img src={settings.gcash_qr_url} alt="GCash QR code" className="w-full h-auto rounded-lg" />
         )}
         <p><span className="text-muted-foreground">Account name</span><br /><strong>{settings?.gcash_account_name}</strong></p>
         <div className="flex items-center justify-between gap-2">
