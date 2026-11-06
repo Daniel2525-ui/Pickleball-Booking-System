@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { HOLD_MS } from "@/lib/services/bookings/bookingDisplayStatus";
 import Link from "next/link";
-import { CheckCircle2, Copy, Info, LoaderCircle } from "lucide-react";
+import { CheckCircle2, Copy, Download, Info, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
@@ -155,8 +155,19 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
       <p className="text-sm text-muted-foreground">Your {spotBuyer ? "spots are" : "courts are"} held until {heldUntil}.</p>
       <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3 text-sm">
         {settings?.gcash_qr_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={settings.gcash_qr_url} alt="GCash QR code" className="w-full h-auto rounded-lg" />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={settings.gcash_qr_url} alt="GCash QR code" className="w-full h-auto rounded-lg" />
+            {/* The image is on Supabase Storage (another origin), so `download` alone is ignored; ?download makes Storage send it as an attachment */}
+            <a
+              href={`${settings.gcash_qr_url}${settings.gcash_qr_url.includes("?") ? "&" : "?"}download=gcash-qr.${settings.gcash_qr_url.split("?")[0].split(".").pop()}`}
+              download
+              className={buttonVariants({ variant: "outline", className: "w-full gap-2 font-semibold" })}
+            >
+              <Download className="size-4" />
+              Download QR code
+            </a>
+          </>
         )}
         <p><span className="text-muted-foreground">Account name</span><br /><strong>{settings?.gcash_account_name}</strong></p>
         <div className="flex items-center justify-between gap-2">
