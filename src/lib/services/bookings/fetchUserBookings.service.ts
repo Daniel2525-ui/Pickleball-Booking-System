@@ -48,7 +48,8 @@ export const fetchUserBookings = async (userId: string) => {
             .eq("user_id", userId)
             .order("booking_date", { ascending: false })
             .order("start_time", { ascending: false })
-            .limit(100);
+            // shortcut: newest 500 only (about 3 years at three games a week); the oldest checkout at the cut-off can show partly; add "load more" to Past when a player gets near it
+            .limit(500);
 
         if (error) throw error;
         const bookings = (data || []) as unknown as UserBooking[];
