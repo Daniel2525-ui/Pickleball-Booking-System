@@ -17,13 +17,12 @@ test.beforeEach(() => requireLocalDb());
 const courtId = (name) => sql(`SELECT id FROM public.courts WHERE name = '${name}'`);
 const userId = (role) => sql(`SELECT id FROM public.profiles WHERE email = '${account(role).email}'`);
 const basket = (page) => page.getByRole("region", { name: "Your selection" });
-const basketLine = (page, court) => basket(page).getByRole("group", { name: `${court} selection line` });
+// Lines are named "<court> <time range> selection line"; a court may have several
+const basketLine = (page, court) => basket(page).getByRole("group", { name: new RegExp(`^${court} .+ selection line$`) });
 const slot = (page, court, time) => page.locator("#booking").getByRole("button", { name: `Select ${court} at ${time}` });
 
 async function openTomorrow(page) {
   await page.goto("/#booking");
-  // The grid lives behind the quick picker's "full board" link
-  await page.getByRole("button", { name: "See the full board" }).click();
   await page.getByRole("button", { name: /Tmrw/ }).click();
 }
 
@@ -49,9 +48,9 @@ test("a two-court basket is paid in one Stripe checkout and confirms both courts
     await slot(page, court, "6:00 PM - 7:00 PM").click();
     await basketLine(page, court).getByRole("button", { name: "2 hrs" }).click();
   }
-  await expect(basket(page).getByText("Your selection · 2 courts")).toBeVisible();
+  await expect(basket(page).getByText("Your selection · 2 time slots")).toBeVisible();
   await expect(basket(page).getByText("₱800", { exact: true }).last()).toBeVisible();
-  await expect(basket(page).getByText("All courts are held together, or none.")).toBeVisible();
+  await expect(basket(page).getByText("All time slots are held together, or none.")).toBeVisible();
 
   await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
@@ -125,7 +124,7 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket",
   await openTomorrow(page);
   await slot(page, "COURT 3", "8:00 AM - 9:00 AM").click();
   await slot(page, "COURT 4", "8:00 AM - 9:00 AM").click();
-  await expect(basket(page).getByText("Your selection · 2 courts")).toBeVisible();
+  await expect(basket(page).getByText("Your selection · 2 time slots")).toBeVisible();
 
   // CUSTOMER2 takes COURT 4 first, with the old single-court request body
   const other = await browser.newPage();
@@ -141,7 +140,7 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket",
   await expect(page.getByRole("dialog").getByText(/^COURT 4 .+ was just taken\. Nothing was reserved — please choose again\.$/)).toBeVisible();
   await expect(page.getByText("Removed from your selection (no longer available): COURT 4.")).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
-  await expect(basket(page).getByText("Your selection · 1 court")).toBeVisible();
+  await expect(basket(page).getByText("Your selection · 1 time slot")).toBeVisible();
   expect(sql(`SELECT count(*) FROM public.bookings WHERE user_id = '${userId("CUSTOMER")}' AND start_time = '08:00'`)).toBe("0");
 
   // Release CUSTOMER2's hold so later tests start without an open basket
@@ -237,10 +236,10 @@ test("removing every line closes the basket, and changing the date clears it", a
   await openTomorrow(page);
   await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
   await slot(page, "COURT 2", "7:00 AM - 8:00 AM").click();
-  await expect(basket(page).getByText("Your selection · 2 courts")).toBeVisible();
-  await basket(page).getByRole("button", { name: "Remove COURT 1" }).click();
-  await expect(basket(page).getByText("Your selection · 1 court")).toBeVisible();
-  await basket(page).getByRole("button", { name: "Remove COURT 2" }).click();
+  await expect(basket(page).getByText("Your selection · 2 time slots")).toBeVisible();
+  await basket(page).getByRole("button", { name: /^Remove COURT 1 / }).click();
+  await expect(basket(page).getByText("Your selection · 1 time slot")).toBeVisible();
+  await basket(page).getByRole("button", { name: /^Remove COURT 2 / }).click();
   await expect(basket(page)).toHaveCount(0);
 
   await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
@@ -254,7 +253,7 @@ test("on a phone the basket keeps checkout in view without covering the last gri
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   for (const court of ["COURT 1", "COURT 2", "COURT 3"]) await slot(page, court, "7:00 AM - 8:00 AM").click();
-  await expect(basket(page).getByText("Your selection · 3 courts")).toBeVisible();
+  await expect(basket(page).getByText("Your selection · 3 time slots")).toBeVisible();
   await expect(basket(page).getByRole("button", { name: "Continue to Checkout" })).toBeInViewport();
   await expect(basket(page).getByText("Total", { exact: true })).toBeInViewport();
 
@@ -305,7 +304,6 @@ test("GCash checkout lands on the pay page; GCash hidden when not configured", a
     // Awaiting verification: the player's own slot opens no resume dialog, only a toast
     sql(`UPDATE public.bookings SET hold_expires_at = 'infinity' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
     await page.goto("/#booking");
-    await page.getByRole("button", { name: "See the full board" }).click();
     await page.getByRole("button", { name: /Tmrw/ }).click();
     await page.locator("#booking").getByRole("button", { name: "Resume your pending booking for COURT 1 at 7:00 AM - 8:00 AM" }).click();
     await expect(page.getByText("Your GCash payment is being verified. You can book again once the staff confirms it.").first()).toBeVisible();
@@ -367,4 +365,28 @@ test("GCash pay page submits reference and screenshot", async ({ page }) => {
     sql(`UPDATE public.payments SET status = 'failed' WHERE booking_id IN (SELECT id FROM public.bookings WHERE start_time = '07:00' AND booking_date = '${date}');
          UPDATE public.bookings SET status = 'cancelled', cancel_reason = 'customer' WHERE start_time = '07:00' AND booking_date = '${date}' AND status = 'pending'`);
   }
+});
+
+test("one court can be booked at separate times in one checkout", async ({ page }) => {
+  await login(page, account("CUSTOMER"));
+  await openTomorrow(page);
+  await slot(page, "COURT 2", "11:00 AM - 12:00 PM").click();
+  await slot(page, "COURT 2", "3:00 PM - 4:00 PM").click();
+  await expect(basket(page).getByText("Your selection · 2 time slots")).toBeVisible();
+  await expect(basketLine(page, "COURT 2")).toHaveCount(2);
+
+  const res = await checkout(page, [["COURT 2", "11:00", "12:00"], ["COURT 2", "15:00", "16:00"]]);
+  expect(res.status()).toBe(200);
+  expect(
+    sql(`SELECT count(DISTINCT basket_id) || '|' || count(*) FROM public.bookings
+         WHERE court_id = '${courtId("COURT 2")}' AND booking_date = '${date}' AND user_id = '${userId("CUSTOMER")}' AND status = 'pending'`)
+  ).toBe("1|2");
+
+  // Overlapping times on one court are refused before anything is held
+  const overlap = await checkout(page, [["COURT 1", "11:00", "13:00"], ["COURT 1", "12:00", "14:00"]]);
+  expect(overlap.status()).toBe(400);
+
+  // Release the hold so the run ends without an open basket
+  expect((await page.request.post("/api/bookings/cancel", { data: { bookingId: bookingId("COURT 2", "11:00") } })).status()).toBe(200);
+  expect(courtRow("COURT 2", "15:00").split("|")[0]).toBe("cancelled");
 });

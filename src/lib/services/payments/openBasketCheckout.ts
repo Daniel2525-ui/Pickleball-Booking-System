@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { paymentIdsMetadata } from "./reconcileCheckoutSession.ts";
 
 export interface CheckoutLine {
     bookingId: string;
@@ -47,7 +48,7 @@ export async function openBasketCheckout({
         success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/book`,
         // Reconciliation confirms exactly these payments, never other rows of the basket
-        metadata: { basket_id: basketId, payment_ids: lines.map((l) => l.paymentId).join(",") },
+        metadata: { basket_id: basketId, ...paymentIdsMetadata(lines.map((l) => l.paymentId)) },
         customer_email: customerEmail,
         // Stripe needs expires_at at least 30 minutes out; 33 leaves 3 minutes for latency and clock skew
         expires_at: Math.floor(Date.now() / 1000) + 33 * 60,

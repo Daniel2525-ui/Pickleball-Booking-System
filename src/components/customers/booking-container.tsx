@@ -38,7 +38,7 @@ import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayme
 import { isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
-import { upsertLine, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
+import { lineKey, upsertLine, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
 import { CourtRally } from "@/components/customers/court-rally";
 import { compactRange } from "@/lib/services/bookings/quickStarts";
@@ -189,23 +189,32 @@ export const BookingContainer = () => {
     return quoteCourtPrice(pricing, day, to24h(startSlotTime.split(" - ")[0].trim()), duration);
   };
 
-  // Calculate maximum consecutive available hours (up to maxHours) starting at slotTime for courtName
-  const getMaxAvailableDuration = useCallback(
-    (courtName: string, slotTime: string): number => {
-      const startIndex = timeSlots.indexOf(slotTime);
-      if (startIndex === -1) return 1;
+  // [first, past-last) slot indexes a basket line covers
+  const lineSpan = useCallback((l: Slot) => {
+    const start = timeSlots.indexOf(l.startSlot || l.time);
+    return [start, start + (l.duration || 1)] as const;
+  }, [timeSlots]);
 
-      let maxHours = 1;
-      for (let h = 2; h <= (pricing?.settings.max_hours ?? 1); h++) {
-        const nextSlot = timeSlots[startIndex + h - 1];
-        if (!nextSlot) break;
-        const status = getSlotStatus(selectedDate, courtName, nextSlot);
-        if (status !== "available") break;
-        maxHours = h;
+  // Consecutive free hours (up to maxHours) from slotTime on courtName; other basket lines on that court
+  // count as taken, so separate times on one court never overlap. `skipKey` is the line being resized.
+  const getMaxAvailableDuration = useCallback(
+    (courtName: string, slotTime: string, skipKey?: string): number => {
+      const startIndex = timeSlots.indexOf(slotTime);
+      if (startIndex === -1) return 0;
+      const picked = basket
+        .filter((l) => l.court === courtName && lineKey(l) !== skipKey)
+        .map(lineSpan);
+
+      let hours = 0;
+      for (let i = startIndex; i < startIndex + (pricing?.settings.max_hours ?? 1); i++) {
+        const slot = timeSlots[i];
+        if (!slot || getSlotStatus(selectedDate, courtName, slot) !== "available") break;
+        if (picked.some(([s, e]) => i >= s && i < e)) break;
+        hours++;
       }
-      return maxHours;
+      return hours;
     },
-    [timeSlots, selectedDate, getSlotStatus, pricing]
+    [timeSlots, selectedDate, getSlotStatus, pricing, basket, lineSpan]
   );
 
   const setSlotWithDuration = (courtName: string, startSlotTime: string, duration: number) => {
@@ -255,37 +264,28 @@ export const BookingContainer = () => {
 
     if (status !== "available") return;
 
-    // If clicking on a court already in the basket
-    const selectedSlot = basket.find((l) => l.court === courtName);
-    if (selectedSlot) {
-      const startSlot = selectedSlot.startSlot || selectedSlot.time;
-      const startIndex = timeSlots.indexOf(startSlot);
-      const clickedIndex = timeSlots.indexOf(time);
+    // A court can hold several separate times; each is its own basket line
+    const onCourt = basket.filter((l) => l.court === courtName);
+    const clickedIndex = timeSlots.indexOf(time);
 
-      // If clicked the exact start slot at the shortest allowed duration, deselect
-      if (startSlot === time && (selectedSlot.duration || 1) === minHours) {
-        setBasket((prev) => removeLine(prev, courtName));
-        return;
-      }
-
-      // If clicked consecutive hour right after currently selected duration, expand
-      const currentDur = selectedSlot.duration || 1;
-      if (clickedIndex === startIndex + currentDur && currentDur < maxHours) {
-        const maxDur = getMaxAvailableDuration(courtName, startSlot);
-        if (maxDur >= currentDur + 1) {
-          setSlotWithDuration(courtName, startSlot, currentDur + 1);
-          return;
-        }
-      }
-
-      // If clicked within the currently selected range, deselect
-      if (clickedIndex >= startIndex && clickedIndex < startIndex + currentDur) {
-        setBasket((prev) => removeLine(prev, courtName));
-        return;
-      }
+    // Tapping inside a picked range removes that range
+    const inside = onCourt.find((l) => {
+      const [s, e] = lineSpan(l);
+      return clickedIndex >= s && clickedIndex < e;
+    });
+    if (inside) {
+      setBasket((prev) => removeLine(prev, lineKey(inside)));
+      return;
     }
 
-    // Default: select this slot as starting slot with the shortest allowed duration
+    // Tapping the hour right after a range makes it one hour longer
+    const before = onCourt.find((l) => lineSpan(l)[1] === clickedIndex);
+    if (before && (before.duration || 1) < maxHours) {
+      setSlotWithDuration(courtName, before.startSlot || before.time, (before.duration || 1) + 1);
+      return;
+    }
+
+    // Otherwise this starts a new range at the shortest allowed duration
     if (getMaxAvailableDuration(courtName, time) < minHours) {
       toast.error(`Bookings need at least ${minHours} consecutive free hours from this start time.`);
       return;
@@ -562,12 +562,9 @@ export const BookingContainer = () => {
                 <BasketSheet
                   lines={basket}
                   pricing={pricing}
-                  getMaxDuration={(line) => getMaxAvailableDuration(line.court, line.startSlot || line.time)}
-                  onDuration={(court, hours) => {
-                    const line = basket.find((l) => l.court === court);
-                    if (line) setSlotWithDuration(court, line.startSlot || line.time, hours);
-                  }}
-                  onRemove={(court) => setBasket((prev) => removeLine(prev, court))}
+                  getMaxDuration={(line) => getMaxAvailableDuration(line.court, line.startSlot || line.time, lineKey(line))}
+                  onDuration={(line, hours) => setSlotWithDuration(line.court, line.startSlot || line.time, hours)}
+                  onRemove={(line) => setBasket((prev) => removeLine(prev, lineKey(line)))}
                   onCheckout={() => startCheckout()}
                 />
               )}

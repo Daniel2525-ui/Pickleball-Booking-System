@@ -311,11 +311,19 @@ test("validateBasketLines validates each line and names the offending court", ()
     ] });
     assert.deepEqual(bad, { valid: false, error: "Court 2: The selected time range falls outside venue operating hours." });
 
-    const dup = validateBasketLines({ ...base, lines: [
+    // Separate times on the same court are allowed, and so are back-to-back ones
+    const separate = validateBasketLines({ ...base, lines: [
         { court_id: "c1", start_time: "08:00", end_time: "09:00" },
-        { court_id: "c1", start_time: "10:00", end_time: "11:00" },
+        { court_id: "c1", start_time: "09:00", end_time: "10:00" },
+        { court_id: "c1", start_time: "14:00", end_time: "15:00" },
     ] });
-    assert.equal(dup.valid, false);
+    assert.equal(separate.valid, true);
+
+    const overlap = validateBasketLines({ ...base, lines: [
+        { court_id: "c1", start_time: "08:00", end_time: "10:00" },
+        { court_id: "c1", start_time: "09:00", end_time: "11:00" },
+    ] });
+    assert.deepEqual(overlap, { valid: false, error: "Court 1: two of your times overlap." });
 
     assert.deepEqual(
         validateBasketLines({ ...base, lines: [{ court_id: "c3", start_time: "08:00", end_time: "09:00" }] }),

@@ -3,7 +3,6 @@ import { test, expect } from "@playwright/test";
 
 test("guest can fill a basket and is asked to sign in only at checkout @mobile", async ({ page }) => {
   await page.goto("/#booking");
-  await page.getByRole("button", { name: "See the full board" }).click();
   const grid = page.locator("#booking");
   const open = grid.getByRole("button", { name: /^Select .+ at / });
   // Wait for the grid to finish loading; today may have no open slot (closed, late, or fully booked).

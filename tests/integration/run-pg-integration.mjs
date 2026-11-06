@@ -3746,10 +3746,9 @@ async function main() {
 
     // (c) Bad lines are rejected at the boundary
     for (const [lines, msg] of [
-      [[line(C1, "16:00", "18:00"), line(C1, "18:00", "20:00")], "Each court can appear once per booking"],
+      [[line(C1, "16:00", "18:00"), line(C1, "17:00", "19:00")], "Two times on the same court overlap"],
       [[], "INVALID_ARGUMENT"],
       [[{ court_id: C1, start_time: "16:00" }], "INVALID_ARGUMENT"],
-      [Array.from({ length: 5 }, (_, i) => line(C1, `${10 + i}:00`, `${11 + i}:00`)), "INVALID_ARGUMENT"],
     ]) {
       const r = basket(bobUid, lines);
       assert.notEqual(r.status, 0, JSON.stringify(lines));
@@ -3757,6 +3756,12 @@ async function main() {
     }
     const notArray = runPsqlCommand(`SELECT public.hold_court_basket('${day}', '{}'::jsonb);`, { role: "authenticated", uid: bobUid });
     assert.ok(notArray.stderr.includes("INVALID_ARGUMENT"), notArray.stderr);
+
+    // Separate times on the same court are one basket; removed again so later steps start clean
+    const separate = basket(bobUid, [line(C1, "18:00", "19:00"), line(C1, "16:00", "17:00")]);
+    assert.equal(separate.status, 0, separate.stderr);
+    assert.equal(q(`SELECT count(DISTINCT basket_id) || '|' || count(*) FROM public.bookings WHERE user_id = '${bobUid}' AND booking_date = '${day}' AND court_id = '${C1}';`), "1|2");
+    q(`DELETE FROM public.bookings WHERE user_id = '${bobUid}' AND booking_date = '${day}';`);
 
     // (d) A second basket (or single hold) while the first is open is refused; once it expires a new one succeeds
     const second = basket(aliceUid, [line(C3, "16:00", "18:00")]);

@@ -1,17 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { upsertLine, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
+import { lineKey, upsertLine, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
 
-const a = { court: "Court 1", price: 200, hasPeak: false };
-const b = { court: "Court 2", price: 300, hasPeak: true };
+const a = { court: "Court 1", price: 200, hasPeak: false, startSlot: "8:00 AM - 9:00 AM" };
+const b = { court: "Court 2", price: 300, hasPeak: true, startSlot: "8:00 AM - 9:00 AM" };
+const a2 = { ...a, startSlot: "2:00 PM - 3:00 PM" };
 
-test("upsertLine adds a new court and replaces an existing one in place", () => {
+test("upsertLine adds a new range and replaces the same court-and-start in place", () => {
     assert.deepEqual(upsertLine([a], b), [a, b]);
     assert.deepEqual(upsertLine([a, b], { ...a, price: 400 }), [{ ...a, price: 400 }, b]);
+    // A second, separate time on the same court is its own line
+    assert.deepEqual(upsertLine([a, b], a2), [a, b, a2]);
 });
 
-test("removeLine drops only that court", () => {
-    assert.deepEqual(removeLine([a, b], "Court 1"), [b]);
+test("removeLine drops only that range", () => {
+    assert.deepEqual(removeLine([a, b, a2], lineKey(a)), [b, a2]);
 });
 
 test("basketTotal sums prices and flags peak if any line has it", () => {

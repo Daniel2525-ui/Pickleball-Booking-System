@@ -18,8 +18,6 @@ test.beforeEach(() => requireLocalDb());
 
 async function openTomorrow(page) {
   await page.goto("/#booking");
-  // The grid lives behind the quick picker's "full board" link
-  await page.getByRole("button", { name: "See the full board" }).click();
   await page.getByRole("button", { name: /Tmrw/ }).click();
 }
 
@@ -35,7 +33,7 @@ test("duration picker prices 1, 2 and 3 hours at PHP 200 per hour", async ({ pag
   await openTomorrow(page);
   await slot(page, "8:00 AM - 9:00 AM").click();
   const panel = page.getByRole("region", { name: "Your selection" });
-  const line = panel.getByRole("group", { name: `${court.name} selection line` });
+  const line = panel.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) });
   await expect(panel.getByText("₱200", { exact: true }).last()).toBeVisible();
   await line.getByRole("button", { name: "2 hrs" }).click();
   await expect(panel.getByText("₱400", { exact: true }).last()).toBeVisible();
@@ -49,7 +47,7 @@ test("successful Stripe test checkout confirms the booking", async ({ page }) =>
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   await slot(page, "10:00 AM - 11:00 AM").click();
-  await page.getByRole("group", { name: `${court.name} selection line` }).getByRole("button", { name: "2 hrs" }).click();
+  await page.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) }).getByRole("button", { name: "2 hrs" }).click();
   await page.locator("#booking").getByRole("button", { name: "Continue to Checkout" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
 
@@ -94,7 +92,7 @@ test("cancelled checkout leaves a pending hold the customer can cancel", async (
   await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
   await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
 
-  // Stripe's back link goes to cancel_url (/book), which redirects to /#booking; the grid sits behind "full board"
+  // Stripe's back link goes to cancel_url (/book), which redirects to /#booking
   await openTomorrow(page);
   await expect(page.locator("#booking").getByLabel(`Resume your pending booking for ${court.name} at 1:00 PM - 2:00 PM`)).toBeVisible();
   expect(bookingRow("13:00")).toBe("pending|pending|200.00");

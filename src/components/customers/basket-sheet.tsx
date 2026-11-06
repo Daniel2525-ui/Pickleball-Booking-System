@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Pricing } from "@/lib/services/pricing/quoteCourtPrice";
-import { basketTotal } from "@/lib/services/bookings/basket";
+import { basketTotal, lineKey } from "@/lib/services/bookings/basket";
 import { Slot } from "./types";
 
 /** Keep in step with the max-h class below: the page pads its bottom by this much. */
@@ -12,8 +12,8 @@ interface BasketSheetProps {
   pricing: Pricing;
   /** Longest duration (hours) still free from the line's start slot */
   getMaxDuration: (line: Slot) => number;
-  onDuration: (court: string, hours: number) => void;
-  onRemove: (court: string) => void;
+  onDuration: (line: Slot, hours: number) => void;
+  onRemove: (line: Slot) => void;
   onCheckout: () => void;
 }
 
@@ -28,14 +28,14 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
       className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:w-[90%] sm:max-w-4xl z-50 max-h-80 flex flex-col bg-card border-t sm:border sm:rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] sm:shadow-2xl p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-8 duration-300"
     >
       <h3 className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2 shrink-0">
-        Your selection · {lines.length} {lines.length === 1 ? "court" : "courts"}
+        Your selection · {lines.length} {lines.length === 1 ? "time slot" : "time slots"}
       </h3>
       <ul className="divide-y min-h-0 overflow-y-auto">
         {lines.map((line) => {
           const maxAvailable = getMaxDuration(line);
           return (
             // Phones: court, price and remove on top, duration buttons on a full-width row below
-            <li key={line.court} role="group" aria-label={`${line.court} selection line`} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 py-3">
+            <li key={lineKey(line)} role="group" aria-label={`${line.court} ${line.time} selection line`} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 py-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-foreground">{line.court}</p>
                 <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{line.time}</p>
@@ -49,7 +49,7 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
                       type="button"
                       disabled={!isAvailable}
                       aria-pressed={(line.duration || 1) === hours}
-                      onClick={() => onDuration(line.court, hours)}
+                      onClick={() => onDuration(line, hours)}
                       title={isAvailable ? undefined : "Consecutive slot unavailable"}
                       className={`h-10 flex-1 whitespace-nowrap px-1 sm:h-9 sm:flex-none sm:px-2.5 rounded-lg text-xs font-bold transition-all ${
                         (line.duration || 1) === hours
@@ -72,8 +72,8 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
                 variant="ghost"
                 size="icon"
                 className="size-9 shrink-0 text-muted-foreground"
-                onClick={() => onRemove(line.court)}
-                aria-label={`Remove ${line.court}`}
+                onClick={() => onRemove(line)}
+                aria-label={`Remove ${line.court} ${line.time}`}
               >
                 <X className="size-4" />
               </Button>
@@ -93,7 +93,7 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
             Continue to Checkout
           </Button>
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">All courts are held together, or none.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">All time slots are held together, or none.</p>
       </div>
     </section>
   );

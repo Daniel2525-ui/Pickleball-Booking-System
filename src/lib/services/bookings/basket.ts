@@ -1,13 +1,16 @@
-/** Pure helpers for the customer's multi-court basket (one line per court). */
-type Line = { court: string; price: number; hasPeak?: boolean };
+/** Pure helpers for the customer's basket: one line per time range, so a court can appear several times. */
+type Line = { court: string; price: number; hasPeak?: boolean; startSlot?: string; time?: string };
+
+/** A line is one court from one start slot; changing its length keeps the same key. */
+export const lineKey = (l: Line) => `${l.court}|${l.startSlot ?? l.time ?? ""}`;
 
 export const upsertLine = <T extends Line>(lines: T[], line: T): T[] =>
-  lines.some((l) => l.court === line.court)
-    ? lines.map((l) => (l.court === line.court ? line : l))
+  lines.some((l) => lineKey(l) === lineKey(line))
+    ? lines.map((l) => (lineKey(l) === lineKey(line) ? line : l))
     : [...lines, line];
 
-export const removeLine = <T extends Line>(lines: T[], court: string): T[] =>
-  lines.filter((l) => l.court !== court);
+export const removeLine = <T extends Line>(lines: T[], key: string): T[] =>
+  lines.filter((l) => lineKey(l) !== key);
 
 export const basketTotal = (lines: Line[]) => ({
   total: lines.reduce((sum, l) => sum + l.price, 0),

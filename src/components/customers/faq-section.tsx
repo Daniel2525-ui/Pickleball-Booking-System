@@ -22,7 +22,7 @@ const faqs: FAQItem[] = [
   {
     question: "How does the online court reservation and payment work?",
     answer:
-      "Pick a day, how many courts and how long, then tap a start time and Book. You only need to sign in when you pay; your courts stay in your bookings. Payments are processed securely via Stripe, and your booking pass appears right away under My bookings. Need different times on different courts? Open the full board.",
+      "Pick a day, then tap any free slot on the court board; tap the next hour to make it longer. You can add as many separate times and courts as you like, then check out once. You only need to sign in when you pay. Payments are processed securely, and your booking pass appears right away under My bookings.",
   },
   {
     question: "What is your cancellation and rescheduling policy?",

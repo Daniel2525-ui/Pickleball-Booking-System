@@ -4,6 +4,7 @@ import { getServiceClient } from "@/lib/supabase/service";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
 import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
+import { formatTime12h } from "@/lib/utils/formatTime";
 
 export async function POST(req: NextRequest) {
     try {
@@ -48,9 +49,9 @@ export async function POST(req: NextRequest) {
         const loadBookings = async () => {
             const { data, error } = await supabaseAdmin
                 .from("bookings")
-                .select("id, user_id, status, open_play_spots, courts(name), payments(stripe_session_id)")
+                .select("id, user_id, status, open_play_spots, start_time, end_time, courts(name), payments(stripe_session_id)")
                 .eq("basket_id", basketId);
-            return error ? null : (data as unknown as { id: string; user_id: string; status: string; open_play_spots: number | null; courts: { name: string } | null; payments: { stripe_session_id: string | null }[] }[]);
+            return error ? null : (data as unknown as { id: string; user_id: string; status: string; open_play_spots: number | null; start_time: string; end_time: string; courts: { name: string } | null; payments: { stripe_session_id: string | null }[] }[]);
         };
 
         // 3. Verify user ownership of every booking in the checkout
@@ -114,7 +115,8 @@ export async function POST(req: NextRequest) {
         // is still in the basket, but was never paid for, so nothing was refunded for it
         const lostCourts = finalBookings
             .filter((b) => b.status === "cancelled" && (b.payments ?? []).some((p) => p.stripe_session_id === session.id))
-            .map(bookingTitle);
+            // One court can be booked at several times, so each lost line names its time too
+            .map((b) => `${bookingTitle(b)} ${formatTime12h(b.start_time)}–${formatTime12h(b.end_time)}`);
 
         const openPlay = finalBookings.some((b) => b.open_play_spots);
         // Nothing left active (e.g. staff cancelled the session mid-checkout): the payment is refunded

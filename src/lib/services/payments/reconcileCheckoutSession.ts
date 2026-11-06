@@ -5,9 +5,22 @@ import { processStripePaymentReconciliation } from "./processStripePaymentReconc
 type SessionRow = { booking_id: string; payment_id: string; amount: number; currency: string; status: string };
 type Metadata = Record<string, string | undefined>;
 
-// Stripe metadata values are capped at 500 characters; 13 uuids (36 chars + comma) fit
-export const MAX_SESSION_PAYMENTS = 13;
-const paymentIds = (m: Metadata) => (m.payment_ids ?? "").split(",").filter(Boolean);
+// Stripe Checkout allows at most 100 line items (one per time slot); that is the only cap on a checkout
+export const MAX_SESSION_PAYMENTS = 100;
+// A metadata value holds 500 characters, so payment ids are spread 13 per key: payment_ids, payment_ids_2, ...
+const IDS_PER_KEY = 13;
+export const paymentIdsMetadata = (ids: string[]): Record<string, string> =>
+    Object.fromEntries(
+        Array.from({ length: Math.ceil(ids.length / IDS_PER_KEY) }, (_, i) => [
+            i === 0 ? "payment_ids" : `payment_ids_${i + 1}`,
+            ids.slice(i * IDS_PER_KEY, (i + 1) * IDS_PER_KEY).join(","),
+        ])
+    );
+const paymentIds = (m: Metadata) =>
+    Object.keys(m)
+        .filter((k) => /^payment_ids(_\d+)?$/.test(k))
+        .flatMap((k) => (m[k] ?? "").split(","))
+        .filter(Boolean);
 
 /** Exactly the rows named in the session's payment_ids. */
 export function checkoutTargets(metadata: Metadata, rows: SessionRow[]) {

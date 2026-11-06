@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_dummy_for_tests";
-const { checkoutTargets, reconcileCheckoutSession, expireCheckoutSession } = await import("../src/lib/services/payments/reconcileCheckoutSession.ts");
+const { checkoutTargets, paymentIdsMetadata, reconcileCheckoutSession, expireCheckoutSession } = await import("../src/lib/services/payments/reconcileCheckoutSession.ts");
 const { processStripePaymentReconciliation } = await import("../src/lib/services/payments/processStripePaymentReconciliation.ts");
 
 const rowA = { booking_id: "b-A", payment_id: "p-A", amount: 250, currency: "php", status: "pending" };
@@ -120,4 +120,16 @@ test("processStripePaymentReconciliation: inline refund passes the court's amoun
         stripeClient: { refunds: { create: async (params) => ((refundParams = params), { id: "re_1", status: "succeeded" }) } },
     });
     assert.deepEqual(refundParams, { payment_intent: "pi_basket", amount: 25000 });
+});
+
+test("paymentIdsMetadata spreads many payment ids over keys that each fit Stripe's 500-character limit", () => {
+    const uuid = (i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
+    const ids = Array.from({ length: 100 }, (_, i) => uuid(i));
+    const metadata = { basket_id: "bk-1", ...paymentIdsMetadata(ids) };
+    for (const [k, v] of Object.entries(metadata)) assert.ok(v.length <= 500, `${k} is ${v.length} chars`);
+    assert.ok(Object.keys(metadata).length <= 50);
+    const rows = ids.map((id, i) => ({ booking_id: `b-${i}`, payment_id: id, amount: 200, currency: "php", status: "pending" }));
+    assert.deepEqual(checkoutTargets(metadata, rows).map((t) => t.paymentId), ids);
+    // A session opened before this change (one payment_ids key) still reads the same way
+    assert.deepEqual(paymentIdsMetadata(ids.slice(0, 2)), { payment_ids: ids.slice(0, 2).join(",") });
 });

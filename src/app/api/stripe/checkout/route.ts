@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         // Every payment id must fit in the session's metadata, which reconciliation trusts
         if (validation.lines.length > MAX_SESSION_PAYMENTS) {
             return Response.json(
-                { error: `A booking can include at most ${MAX_SESSION_PAYMENTS} courts.` },
+                { error: `A booking can include at most ${MAX_SESSION_PAYMENTS} time slots.` },
                 { status: 400 }
             );
         }
