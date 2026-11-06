@@ -156,6 +156,13 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
   const endTime = ends.includes(pickedEnd) ? pickedEnd : "";
   // Tell staff why a pick vanished instead of letting save fail with "complete all details"
   const pickLost = Boolean((pickedStart && !startTime) || (pickedEnd && startTime && !endTime));
+  // Past hours today stay pickable (late entries), but are labelled so they aren't booked by mistake
+  const clock = date === formatManilaDate() ? manilaClock() : "";
+  const pastLabel = (time: string) => {
+    if (!clock) return "";
+    const nextHour = `${String(Number(time.slice(0, 2)) + 1).padStart(2, "0")}:00`;
+    return nextHour <= clock ? " · Ended" : time <= clock ? " · Started" : "";
+  };
 
   // Debounced search for existing players
   useEffect(() => {
@@ -536,7 +543,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
                 <SelectContent>
                   {starts.map((s) => (
                     <SelectItem key={s.time} value={s.time} disabled={s.taken} className="text-xs sm:text-sm">
-                      {formatTime12h(s.time)}{s.taken ? " · Booked" : ""}
+                      {formatTime12h(s.time)}{s.taken ? " · Booked" : pastLabel(s.time)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -574,24 +581,20 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
           {/* A slot that ended earlier today is saved as already played */}
           {date === formatManilaDate() && endTime.length >= 5 && endTime !== "00:00" && endTime <= manilaClock() && (
-            <p className="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-[11px] text-blue-900 dark:text-blue-200">
-              This slot has already ended today. It will be recorded as played.
+            <p role="status" className="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-900 dark:text-blue-200">
+              This game already ended. It will be saved as played, not as an upcoming booking.
             </p>
           )}
 
-          {/* Court Fee */}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="walkin-fee" className="text-xs font-semibold text-foreground">Court Fee (₱ PHP)</Label>
-            <Input id="walkin-fee"
-              type="number"
-              value={amount}
-              readOnly
-              aria-describedby="walkin-fee-note"
-              className="h-9 text-xs sm:text-sm bg-muted/40 cursor-default"
-            />
-            <p id="walkin-fee-note" className="text-[11px] text-muted-foreground">
-              From the price list for this date and time.
-            </p>
+          {/* Court Fee: set by the price list, so shown as text */}
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-foreground">Court Fee</span>
+              <span className="text-[11px] text-muted-foreground">From the price list for this date and time.</span>
+            </div>
+            <span className="text-lg font-black text-foreground">
+              {startTime && endTime ? `₱${Number(amount).toLocaleString()}` : "—"}
+            </span>
           </div>
 
           {/* Payment Method Selector */}

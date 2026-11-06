@@ -46,7 +46,7 @@ import { VerifyGcashModal } from "./verifyGcashModal";
 import { MoveBookingModal, MovedBooking } from "./moveBookingModal";
 import { BookingHistoryModal } from "./bookingHistoryModal";
 import { CancelPaidModal } from "./cancelPaidModal";
-import { getBookingStart } from "@/lib/utils/bookingTime";
+import { getBookingStart, getBookingEnd } from "@/lib/utils/bookingTime";
 import { ArrowRightLeft, History } from "lucide-react";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
@@ -404,6 +404,12 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                           <span className="text-xs text-muted-foreground mt-0.5">
                             {formatTime12h(booking.start_time)} – {formatTime12h(booking.end_time)}
                           </span>
+                          {/* Recorded after the game ended: lets the owner review late entries */}
+                          {new Date(booking.created_at) > getBookingEnd(booking) && (
+                            <Badge variant="outline" title="Recorded after this game ended" className="mt-1 w-fit text-[11px] bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/20">
+                              Entered late
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
 
