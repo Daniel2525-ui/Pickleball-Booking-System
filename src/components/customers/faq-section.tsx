@@ -22,12 +22,12 @@ const faqs: FAQItem[] = [
   {
     question: "How does the online court reservation and payment work?",
     answer:
-      "Pick a day, how many courts and how long, then tap a start time and Book. You only need to sign in when you pay; your courts stay in your basket. Payments are processed securely via Stripe, and your booking pass appears right away under My bookings. Need different times on different courts? Open the full board.",
+      "Pick a day, how many courts and how long, then tap a start time and Book. You only need to sign in when you pay; your courts stay in your bookings. Payments are processed securely via Stripe, and your booking pass appears right away under My bookings. Need different times on different courts? Open the full board.",
   },
   {
     question: "What is your cancellation and rescheduling policy?",
     answer:
-      "You can cancel a paid reservation from 'My Bookings' up to 2 hours before your start time and receive a full refund to your card (banks usually take 5–10 business days to show it). Within 2 hours of your slot, online cancellation closes; please call the venue. Online rescheduling isn't available yet, so cancel and book a new slot instead.",
+      "All payments are final and non-refundable, and paid reservations can't be cancelled or rescheduled online. Unpaid holds can be cancelled from 'My Bookings' any time before they start. If there's a problem with the venue or court, contact the venue staff and they'll sort it out with you.",
   },
   {
     question: "What does the 'Pending' status on the court grid mean?",

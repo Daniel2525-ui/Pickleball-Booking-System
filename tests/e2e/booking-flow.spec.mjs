@@ -75,15 +75,15 @@ test("a second customer cannot take a confirmed slot", async ({ page }) => {
   expect(sql(`SELECT count(*) FROM public.bookings WHERE booking_date = '${date}' AND start_time = '10:00'`)).toBe("1");
 });
 
-test("cancelling the paid booking more than 2 hours ahead refunds it in full", async ({ page }) => {
+test("a paid booking is non-refundable: no cancel button, and the cancel route refuses it", async ({ page }) => {
   await login(page, account("CUSTOMER"));
   await page.goto("/my-bookings");
-  await page.getByRole("button", { name: "Cancel Reservation" }).first().click();
-  await expect(page.getByText(/You'll get a full refund/)).toBeVisible();
-  await page.getByRole("button", { name: "Yes, Cancel Reservation" }).click();
-  await expect(page.getByText(/Reservation cancelled\. Your full refund/)).toBeVisible();
-  // Stripe test-mode refund through the existing refund worker
-  await expect.poll(() => bookingRow("10:00"), { timeout: 30_000 }).toBe("cancelled|refunded|400.00");
+  await expect(page.getByText(/Paid bookings are non-refundable/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel Reservation" })).toHaveCount(0);
+  const id = sql(`SELECT id FROM public.bookings WHERE booking_date = '${date}' AND start_time = '10:00'`);
+  const res = await page.request.post("/api/bookings/cancel", { data: { bookingId: id } });
+  expect(res.status()).toBe(409);
+  expect(bookingRow("10:00")).toBe("confirmed|paid|400.00");
 });
 
 test("cancelled checkout leaves a pending hold the customer can cancel", async ({ page }) => {

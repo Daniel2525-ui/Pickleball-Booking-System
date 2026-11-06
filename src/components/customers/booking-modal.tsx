@@ -41,7 +41,7 @@ export const BookingModal = ({
         <DialogHeader>
           <DialogTitle>Confirm Reservation</DialogTitle>
           <DialogDescription>
-            Review your booking details before proceeding to payment.
+            Review your booking details before proceeding to payment. Payments are non-refundable.
           </DialogDescription>
         </DialogHeader>
 

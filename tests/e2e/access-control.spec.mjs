@@ -26,11 +26,11 @@ test.describe("unauthenticated page access", () => {
     await expect(page.getByText("Sign in to view and edit your profile.")).toBeVisible();
   });
 
-  test("privacy and terms pages are linked from sign-up and state the 2-hour cancellation rule", async ({ page }) => {
+  test("privacy and terms pages are linked from sign-up and state that payments are non-refundable", async ({ page }) => {
     await page.goto("/register");
     await page.getByRole("link", { name: "Booking Rules" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Terms & Booking Rules" })).toBeVisible();
-    await expect(page.getByText(/up to 2 hours before its start time and receive a full refund/)).toBeVisible();
+    await expect(page.getByText(/All payments are final and non-refundable/)).toBeVisible();
     await page.goto("/register");
     await page.getByRole("link", { name: "Privacy Policy" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Privacy Policy" })).toBeVisible();

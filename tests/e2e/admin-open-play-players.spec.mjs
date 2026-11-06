@@ -74,6 +74,7 @@ test("staff cancel one player with a refund and another keeping the payment; the
   await page.getByRole("button", { name: "Actions for E2E Customer" }).click();
   await page.getByRole("menuitem", { name: "Cancel Player" }).click();
   let dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/Cancel and refund/).check();
   await dialog.getByRole("button", { name: "Cancel Reservation" }).click();
   await expect(page.getByText("Player cancelled. Their spots are free again.")).toBeVisible();
   await expect(playerRow(page, "E2E Customer")).toContainText("Cancelled · refund owed");
@@ -82,7 +83,6 @@ test("staff cancel one player with a refund and another keeping the payment; the
   await page.getByRole("button", { name: "Actions for E2E Walkup Wally" }).click();
   await page.getByRole("menuitem", { name: "Cancel Player" }).click();
   dialog = page.getByRole("dialog");
-  await dialog.getByLabel(/Cancel and keep the payment/).check();
   await dialog.getByLabel("Reason for keeping the payment").fill("No-show notice too late");
   await dialog.getByRole("button", { name: "Cancel Reservation" }).click();
   await expect(page.getByText("Player cancelled. The payment was kept.")).toBeVisible();

@@ -6,7 +6,6 @@ import { UserBooking, fetchUserBookings } from "@/lib/services/bookings/fetchUse
 import { useVenueContact } from "@/hooks/use-venue-contact";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/cancelBooking.service";
-import { DEFAULT_POLICY, fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { getBookingStart } from "@/lib/utils/bookingTime";
 import { cancellationNote, getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
 import { checkoutTotal, groupByCheckout, isLive, pendingBasketSize, settleHold } from "@/lib/services/bookings/basket";
@@ -86,8 +85,6 @@ export const BookingHistoryContainer = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [bookings, setBookings] = useState<UserBooking[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
-  // The venue's online cancellation cutoff (Settings); the cancel route enforces the same value
-  const [cancelCutoffHours, setCancelCutoffHours] = useState(DEFAULT_POLICY.cancelCutoffHours);
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [bookingToCancel, setBookingToCancel] = useState<UserBooking | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -118,7 +115,6 @@ export const BookingHistoryContainer = () => {
 
   useEffect(() => {
     let active = true;
-    fetchBookingPolicy(createClient()).then((p) => active && setCancelCutoffHours(p.cancelCutoffHours));
     fetchCurrentUserBookings().then((res) => {
       if (!active) return;
       setIsAuthenticated(res.isAuthenticated);
@@ -158,14 +154,7 @@ export const BookingHistoryContainer = () => {
             : booking
         )
       );
-      const refundMessage = {
-        refunded: "Your full refund has been issued to your card.",
-        queued: "Your full refund is being processed to your card.",
-        manual: `Venue staff will refund your payment; questions? Call ${venue.phone}.`,
-      } as const;
-      toast.success(
-        data.refund ? `Reservation cancelled. ${refundMessage[data.refund]}` : "Court reservation cancelled successfully."
-      );
+      toast.success("Court reservation cancelled successfully.");
     }
 
     setCancellingId(null);
@@ -280,8 +269,7 @@ export const BookingHistoryContainer = () => {
               const multi = group.length > 1;
               const live = group.filter(isLive);
               const shown = live.length ? live : group;
-              const cancellable = isBookingCancellable(booking, new Date(), cancelCutoffHours);
-              const lineCancellable = (m: UserBooking) => booking.status !== "pending" && isBookingCancellable(m, new Date(), cancelCutoffHours);
+              const cancellable = isBookingCancellable(booking);
               const note = cancellationNote(booking);
 
               return (
@@ -387,18 +375,6 @@ export const BookingHistoryContainer = () => {
                               <span className={`ml-auto text-sm font-black tabular-nums ${isLive(m) ? "text-foreground" : "text-muted-foreground line-through"}`}>
                                 ₱{Number(m.total_amount ?? 0).toLocaleString()}
                               </span>
-                              {lineCancellable(m) && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  aria-label={`Cancel ${bookingTitle(m)}`}
-                                  className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive font-semibold text-xs min-h-[44px] sm:min-h-[32px]"
-                                  onClick={() => setBookingToCancel(m)}
-                                  disabled={cancellingId !== null || resumingId !== null}
-                                >
-                                  {cancellingId === m.id ? <LoaderCircle className="size-3.5 animate-spin" /> : "Cancel"}
-                                </Button>
-                              )}
                             </li>
                           );
                         })}
@@ -439,8 +415,8 @@ export const BookingHistoryContainer = () => {
                         </Button>
                       )}
 
-                      {/* A paid checkout cancels court by court (lines above); an unpaid one only as a whole */}
-                      {cancellable && (!multi || booking.status === "pending") && (
+                      {/* Only an unpaid hold can be cancelled, and only as a whole */}
+                      {cancellable && (
                         <Button
                           id={`cancel-booking-${booking.id}`}
                           variant="outline"
@@ -458,9 +434,9 @@ export const BookingHistoryContainer = () => {
                         </Button>
                       )}
 
-                      {!cancellable && !group.some(lineCancellable) && booking.status === "confirmed" && getBookingStart(booking) > new Date() && (
+                      {booking.status === "confirmed" && getBookingStart(booking) > new Date() && (
                         <p className="text-[11px] text-muted-foreground sm:text-right max-w-[220px]">
-                          Online cancellation closes {cancelCutoffHours} hours before start. Need help? Call{" "}
+                          Paid bookings are non-refundable. Problem with the venue or court? Call{" "}
                           <a href={venue.phoneHref} className="font-semibold text-foreground hover:underline">
                             {venue.phone}
                           </a>
@@ -525,15 +501,6 @@ export const BookingHistoryContainer = () => {
             <p className="text-xs text-muted-foreground">
               This cancels all {pendingBasketSize(bookings, bookingToCancel)} courts in this unpaid booking.
             </p>
-          )}
-
-          {bookingToCancel?.status === "confirmed" && (
-            <div className="flex items-start gap-2.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg leading-relaxed">
-              <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-              <p>
-                You&apos;ll get a full refund. Card payments go back to your card automatically (banks usually take 5–10 business days to show it); counter payments are refunded by venue staff. Questions? Call {venue.phone}.
-              </p>
-            </div>
           )}
 
           <DialogFooter className="flex-col sm:flex-row gap-2 mt-2">

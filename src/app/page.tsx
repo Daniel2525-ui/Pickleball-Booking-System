@@ -9,7 +9,6 @@ import { getPublicClient } from "@/lib/supabase/public";
 import { summarizeVenueHours } from "@/lib/utils/venueHours";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { lowestHourlyRate } from "@/lib/services/pricing/quoteCourtPrice";
-import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 
 // Hours, courts and pricing are edited in the admin; refresh the static page at most every 5 minutes
 export const revalidate = 300;
@@ -22,7 +21,6 @@ export default async function Home() {
     supabase.from("courts").select("id, name, status, maintenance_note, photo_url, details").order("name"),
     fetchPricing(supabase),
   ]);
-  const { cancelCutoffHours } = await fetchBookingPolicy(supabase);
   const venue = await fetchVenueContact(supabase);
   const hours = summarizeVenueHours(operatingHours ?? []);
   const fromRate = pricing ? lowestHourlyRate(pricing) : null;
@@ -32,7 +30,7 @@ export default async function Home() {
   const stats = [
     { value: courtCount ? String(courtCount) : "—", label: "regulation courts, 44 × 20 ft" },
     { value: fromRate ? `₱${fromRate.toLocaleString()}` : "—", label: "per court, per hour. Paddles and balls included" },
-    { value: `${cancelCutoffHours} hrs`, label: "before play: cancel online for a full refund" },
+    { value: "35 min", label: "hold on your slot while you pay" },
   ];
 
   return (

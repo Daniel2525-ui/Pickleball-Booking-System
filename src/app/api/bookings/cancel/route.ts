@@ -1,22 +1,20 @@
 import { NextRequest } from "next/server";
-import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
-import { refundPaidStripePayments } from "@/lib/services/payments/refundPaidStripePayments.ts";
 import { cancelReasonFor } from "@/lib/services/bookings/bookingDisplayStatus";
 import {
     CANCELLED_STATUS,
     getCancellationBlockReason,
 } from "@/lib/services/bookings/cancelBooking.service";
-import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
+import { loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { cancelRestOfBasket, closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 
 /**
  * Customer-initiated booking cancellation.
  *
- * Security: ownership, the 2-hour cutoff and the refund are enforced here, using the
- * authenticated user from the session cookie (never a user id supplied by the client).
- * RLS stops customers from cancelling confirmed bookings directly, around this route.
+ * Customers may only release unpaid holds: paid bookings are non-refundable, so staff handle those.
+ * Ownership is enforced here using the authenticated user from the session cookie
+ * (never a user id supplied by the client).
  */
 export async function POST(request: NextRequest) {
     try {
@@ -56,17 +54,13 @@ export async function POST(request: NextRequest) {
             return Response.json({ error: "Booking not found." }, { status: 404 });
         }
 
-        // 4. Enforce business rules (status + start time not yet passed)
-        const { cancelCutoffHours } = await fetchBookingPolicy(supabase);
-        const blockReason = getCancellationBlockReason(booking, new Date(), cancelCutoffHours);
+        // 4. Enforce business rules (unpaid hold + start time not yet passed)
+        const blockReason = getCancellationBlockReason(booking, new Date());
         if (blockReason) {
             return Response.json({ error: blockReason }, { status: 409 });
         }
 
-        const currentStatus = booking.status.toLowerCase();
-
-        // Service role because RLS only lets customers cancel unpaid holds directly; confirmed
-        // bookings must go through this route so the cutoff and refund always apply.
+        // Service role: the basket's sibling courts and their payments are updated together below
         const admin = getServiceClient();
         if (!admin) {
             console.error("Cancel booking: SUPABASE_SERVICE_ROLE_KEY missing");
@@ -75,31 +69,27 @@ export async function POST(request: NextRequest) {
 
         // 5. An unpaid basket is cancelled as one unit: every pending court of this user's basket.
         //    Its shared Stripe Checkout may still be open; expire it first so nobody pays for a cancelled booking.
-        let siblings: BasketSibling[] = [];
+        const loaded = await loadPendingSiblings(admin, booking, user.id);
+        if (loaded.error) {
+            console.error("Cancel booking: failed to load basket:", loaded.error);
+            return Response.json({ error: "Could not verify the payment for this booking. Please try again." }, { status: 500 });
+        }
+        const siblings = loaded.siblings;
 
-        if (currentStatus === "pending") {
-            const loaded = await loadPendingSiblings(admin, booking, user.id);
-            if (loaded.error) {
-                console.error("Cancel booking: failed to load basket:", loaded.error);
-                return Response.json({ error: "Could not verify the payment for this booking. Please try again." }, { status: 500 });
-            }
-            siblings = loaded.siblings;
-
-            try {
-                if ((await closeSiblingSessions(siblings)) === "paid") {
-                    // Payment already went through; the webhook will confirm the booking.
-                    return Response.json(
-                        { error: "Payment for this booking has already been received and is being processed. Please refresh the page and try again." },
-                        { status: 409 }
-                    );
-                }
-            } catch (stripeError) {
-                console.error("Cancel booking: failed to expire Stripe session:", stripeError);
+        try {
+            if ((await closeSiblingSessions(siblings)) === "paid") {
+                // Payment already went through; the webhook will confirm the booking.
                 return Response.json(
-                    { error: "Could not close the pending payment session. Please try again." },
-                    { status: 502 }
+                    { error: "Payment for this booking has already been received and is being processed. Please refresh the page and try again." },
+                    { status: 409 }
                 );
             }
+        } catch (stripeError) {
+            console.error("Cancel booking: failed to expire Stripe session:", stripeError);
+            return Response.json(
+                { error: "Could not close the pending payment session. Please try again." },
+                { status: 502 }
+            );
         }
 
         // 6. Conditional update: only succeeds if the booking still belongs to the user
@@ -136,10 +126,7 @@ export async function POST(request: NextRequest) {
             user.id
         );
 
-        // 8. Venue policy: a confirmed online booking cancelled within the window is refunded in full.
-        const refund = currentStatus === "confirmed" ? await refundPaidStripePayments(admin, booking.id, { reason: "CUSTOMER_CANCELLED_WITHIN_POLICY", keyPrefix: "ref_customer_cancel_" }) : null;
-
-        return Response.json({ booking: updated, refund });
+        return Response.json({ booking: updated });
     } catch (error) {
         console.error("Cancel booking error:", error);
         return Response.json({ error: "An unexpected error occurred. Please try again." }, { status: 500 });

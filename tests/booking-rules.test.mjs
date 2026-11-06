@@ -24,36 +24,18 @@ test("to24h converts 12h times accurately", () => {
 // 2. Cancellation eligibility rules test (the real shared rule used by the UI and /api/bookings/cancel)
 import { getCancellationBlockReason } from "../src/lib/services/bookings/cancelBooking.service.ts";
 
-test("confirmed bookings follow the 2-hour cutoff; unpaid holds can be released until start", () => {
+test("paid bookings are non-refundable; unpaid holds can be released until start", () => {
     const booking = (status) => ({ status, booking_date: "2026-11-01", start_time: "10:00:00" }); // 02:00Z
     const at = (iso) => new Date(iso);
 
-    assert.equal(getCancellationBlockReason(booking("confirmed"), at("2026-11-01T00:00:00Z")), null); // 2h before
-    assert.equal(getCancellationBlockReason(booking("confirmed"), at("2026-10-31T23:59:59Z")), null);
-    assert.match(getCancellationBlockReason(booking("confirmed"), at("2026-11-01T00:00:01Z")), /2 hours before/);
+    assert.match(getCancellationBlockReason(booking("confirmed"), at("2026-10-01T00:00:00Z")), /non-refundable/);
     assert.equal(getCancellationBlockReason(booking("pending"), at("2026-11-01T01:59:00Z")), null);
     assert.match(getCancellationBlockReason(booking("pending"), at("2026-11-01T02:00:00Z")), /already started/);
 });
 
-test("cancellation policy permits future confirmed/pending bookings", () => {
-    const futureBooking = {
-        status: "confirmed",
-        booking_date: "2099-01-01",
-        start_time: "10:00:00",
-    };
-    assert.equal(getCancellationBlockReason(futureBooking), null);
-
-    const pendingBooking = {
-        status: "pending",
-        booking_date: "2099-01-01",
-        start_time: "10:00:00",
-    };
-    assert.equal(getCancellationBlockReason(pendingBooking), null);
-});
-
 test("cancellation policy blocks past or completed bookings", () => {
     const pastBooking = {
-        status: "confirmed",
+        status: "pending",
         booking_date: "2020-01-01",
         start_time: "08:00:00",
     };

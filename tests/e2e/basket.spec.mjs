@@ -71,27 +71,20 @@ test("a two-court basket is paid in one Stripe checkout and confirms both courts
   await page.goto("/my-bookings");
   await expect(page.getByText("2 COURTS", { exact: true })).toHaveCount(1);
   await expect(page.getByText("Total · 2 courts")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Cancel COURT 1" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Cancel COURT 2" })).toBeVisible();
+  // Paid bookings are non-refundable: no cancel buttons, a note to contact the venue instead
+  await expect(page.getByRole("button", { name: /^Cancel/ })).toHaveCount(0);
+  await expect(page.getByText(/Paid bookings are non-refundable/).first()).toBeVisible();
 });
 
-test("cancelling one paid court refunds only that court, and cannot be repeated", async ({ page }) => {
+test("a player cannot cancel a paid court: it stays paid and nothing is refunded", async ({ page }) => {
   await login(page, account("CUSTOMER"));
   const id = bookingId("COURT 1", "18:00");
-  const paymentId = sql(`SELECT id FROM public.payments WHERE booking_id = '${id}'`);
 
   const res = await page.request.post("/api/bookings/cancel", { data: { bookingId: id } });
-  expect(res.status()).toBe(200);
-  // Stripe test-mode partial refund through the existing refund worker
-  await expect.poll(() => courtRow("COURT 1", "18:00"), { timeout: 30_000 }).toBe("cancelled|refunded|400.00");
-  expect(sql(`SELECT amount::numeric(10, 2) || '|' || idempotency_key FROM public.refund_requests WHERE booking_id = '${id}'`)).toBe(
-    `400.00|ref_customer_cancel_${paymentId}`
-  );
-  expect(courtRow("COURT 2", "18:00")).toBe("confirmed|paid|400.00");
-
-  const again = await page.request.post("/api/bookings/cancel", { data: { bookingId: id } });
-  expect(again.status()).toBe(409);
-  expect(sql(`SELECT count(*) FROM public.refund_requests WHERE booking_id = '${id}'`)).toBe("1");
+  expect(res.status()).toBe(409);
+  expect((await res.json()).error).toMatch(/non-refundable/);
+  expect(courtRow("COURT 1", "18:00")).toBe("confirmed|paid|400.00");
+  expect(sql(`SELECT count(*) FROM public.refund_requests WHERE booking_id = '${id}'`)).toBe("0");
 
   await page.goto("/my-bookings");
   await expect(page.getByText("2 COURTS", { exact: true })).toHaveCount(1); // still Upcoming, still one card

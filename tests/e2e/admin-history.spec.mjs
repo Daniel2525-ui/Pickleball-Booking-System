@@ -70,6 +70,7 @@ test("a walk-in's history names the staff member for each step", async ({ page }
   // Cancel
   await openMenu(page, "E2E History");
   await page.getByRole("menuitem", { name: "Cancel Reservation" }).click();
+  await page.getByRole("dialog").getByLabel(/Cancel and refund/).check();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel Reservation" }).click();
   await expect.poll(() => sql(`SELECT status FROM public.bookings WHERE customer_name = 'E2E History'`)).toBe("cancelled");
 

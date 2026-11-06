@@ -17,7 +17,7 @@ export const CancelPaidModal = ({
   onClose: () => void;
   onConfirm: (booking: Booking, keep: { note: string } | undefined) => Promise<boolean>;
 }) => {
-  const [choice, setChoice] = useState<"refund" | "keep">("refund");
+  const [choice, setChoice] = useState<"refund" | "keep">("keep");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -25,7 +25,7 @@ export const CancelPaidModal = ({
 
   if (booking !== prev) {
     setPrev(booking);
-    setChoice("refund");
+    setChoice("keep");
     setNote("");
     setError(null);
   }

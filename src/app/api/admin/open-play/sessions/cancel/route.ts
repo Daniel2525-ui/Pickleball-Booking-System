@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import { closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
-import { refundPaidStripePayments } from "@/lib/services/payments/refundPaidStripePayments";
 
 export async function POST(request: NextRequest) {
     try {
@@ -28,7 +27,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Could not cancel the session." }, { status: 500 });
         }
 
-        // The session is already cancelled; refunds never throw and anything left is retried by cron / staff
+        // The session is already cancelled. Payments are non-refundable by default: players who ask are refunded by staff
         const admin = getServiceClient();
         if (admin) {
             const ids = (data?.booking_ids ?? []) as string[];
@@ -43,11 +42,8 @@ export async function POST(request: NextRequest) {
                     console.error("Open play cancel: failed to expire Stripe session:", stripeError);
                 }
             }
-            for (const id of ids) {
-                await refundPaidStripePayments(admin, id, { reason: "VENUE_CANCELLED_OPEN_PLAY", keyPrefix: "ref_open_play_cancel_" });
-            }
         } else {
-            console.error("Open play cancel: SUPABASE_SERVICE_ROLE_KEY missing; refunds left for staff");
+            console.error("Open play cancel: SUPABASE_SERVICE_ROLE_KEY missing; open checkouts not expired");
         }
         return NextResponse.json({ cancelled: data?.cancelled ?? 0 });
     } catch (error) {

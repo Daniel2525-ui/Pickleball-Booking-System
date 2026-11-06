@@ -131,9 +131,9 @@ test("staff add a walk-up and cancel the session, and payments land in Refund Ow
   await expect(page.getByText("Player added.")).toBeVisible();
   await expect(page.getByText("3 of 6 spots booked")).toBeVisible();
 
-  await page.getByRole("button", { name: "Cancel session & refund everyone" }).click();
-  await page.getByRole("alertdialog").or(page.getByRole("dialog")).getByRole("button", { name: "Cancel session & refund everyone" }).click();
-  await expect(page.getByText("Session cancelled. Card payments are being refunded.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel session", exact: true }).click();
+  await page.getByRole("alertdialog").or(page.getByRole("dialog")).getByRole("button", { name: "Cancel session", exact: true }).click();
+  await expect(page.getByText("Session cancelled. Refund players who ask from the Payments page.")).toBeVisible();
   expect(sql(`SELECT string_agg(DISTINCT status, ',') FROM public.bookings WHERE open_play_session_id = '${sessionId()}'`)).toBe("cancelled");
   expect(sql(`SELECT status FROM public.open_play_sessions WHERE session_date = '${date}'`)).toBe("cancelled");
 

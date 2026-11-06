@@ -12,11 +12,10 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 
-/** The venue's booking rules: when online cancellation closes, and how long staff wait before a no-show. */
+/** The venue's booking rules: how long staff wait before a no-show. */
 export function PolicyCard({ onChanged }: { onChanged: () => void }) {
-  const [cutoff, setCutoff] = useState("");
   const [grace, setGrace] = useState("");
-  const [saved, setSaved] = useState<{ cutoff: number; grace: number } | null>(null);
+  const [saved, setSaved] = useState<{ grace: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,9 +24,8 @@ export function PolicyCard({ onChanged }: { onChanged: () => void }) {
     let active = true;
     fetchBookingPolicy(supabase).then((p) => {
       if (!active) return;
-      setCutoff(String(p.cancelCutoffHours));
       setGrace(String(p.noShowGraceMinutes));
-      setSaved({ cutoff: p.cancelCutoffHours, grace: p.noShowGraceMinutes });
+      setSaved({ grace: p.noShowGraceMinutes });
     });
     return () => {
       active = false;
@@ -35,43 +33,37 @@ export function PolicyCard({ onChanged }: { onChanged: () => void }) {
   }, []);
 
   const save = async () => {
-    const c = Number(cutoff), g = Number(grace);
-    if (!Number.isInteger(c) || c < 0 || c > 72) return setError("Online cancellation must close between 0 and 72 whole hours before start.");
+    const g = Number(grace);
     if (!Number.isInteger(g) || g < 0 || g > 120) return setError("The no-show grace period must be between 0 and 120 whole minutes.");
     setError(null);
     setSaving(true);
     const { data, error: saveError } = await supabase
       .from("booking_settings")
-      .update({ cancel_cutoff_hours: c, no_show_grace_minutes: g })
+      .update({ no_show_grace_minutes: g })
       .eq("id", true)
       .select("id");
     setSaving(false);
     if (saveError) return setError(saveError.message);
     // RLS can silently match no row: that is not a save
     if (!data?.length) return setError("The booking rules were not saved. Reload the page and try again.");
-    setSaved({ cutoff: c, grace: g });
+    setSaved({ grace: g });
     onChanged();
     toast.success("Booking rules saved.");
   };
 
-  const dirty = !!saved && (Number(cutoff) !== saved.cutoff || Number(grace) !== saved.grace);
+  const dirty = !!saved && Number(grace) !== saved.grace;
   useUnsavedChangesPrompt(dirty);
-  if (!saved) return <FormCardSkeleton fields={2} />;
+  if (!saved) return <FormCardSkeleton fields={1} />;
 
   return (
     <Card className="shadow-sm">
       <CardHeader>
         <CardTitle className="text-xl font-bold">Booking Rules</CardTitle>
         <CardDescription>
-          Applied right away to cancellations and no-shows. The landing page and Terms show the new cutoff within 5 minutes.
+          Applied right away to no-shows.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 max-w-md">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="cancel-cutoff">Online cancellation closes (hours before start)</Label>
-          <Input id="cancel-cutoff" type="number" min={0} max={72} step={1} value={cutoff} onChange={(e) => setCutoff(e.target.value)} />
-          <p className="text-xs text-muted-foreground">After this, players can&apos;t cancel a paid booking online and must ask the desk.</p>
-        </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="no-show-grace">No-show grace period (minutes after start)</Label>
           <Input id="no-show-grace" type="number" min={0} max={120} step={1} value={grace} onChange={(e) => setGrace(e.target.value)} />

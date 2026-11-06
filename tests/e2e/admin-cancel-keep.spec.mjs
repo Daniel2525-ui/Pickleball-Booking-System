@@ -30,8 +30,9 @@ async function cancel(page, name, keepNote) {
   await page.getByRole("menuitem", { name: "Cancel Reservation" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Cancel this paid reservation?")).toBeVisible();
-  if (keepNote !== undefined) {
-    await dialog.getByLabel(/Cancel and keep the payment/).check();
+  // The policy is non-refundable, so the dialog starts on "keep"; a refund is an explicit choice
+  if (keepNote === undefined) await dialog.getByLabel(/Cancel and refund/).check();
+  else {
     if (keepNote === "") {
       await dialog.getByRole("button", { name: "Cancel Reservation" }).click();
       await expect(dialog.getByRole("alert")).toHaveText("Write a short reason for keeping the payment.");

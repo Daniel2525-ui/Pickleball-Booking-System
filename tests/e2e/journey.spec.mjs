@@ -1,5 +1,5 @@
 // One player's whole life through the UI, then the staff side: sign up, book, pay by GCash, staff verify,
-// cancel, staff refund. Local Supabase stack only.
+// the player can't cancel a paid booking, so staff cancel and refund it. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
 import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt } from "./local-db.mjs";
 
@@ -109,13 +109,22 @@ test("3. staff verify the GCash payment and the booking is confirmed", async ({ 
   await expect(page.getByRole("row").filter({ hasText: player.name }).first()).toBeVisible();
 });
 
-test("4. the player sees it confirmed and cancels with plenty of notice", async ({ page }) => {
+test("4. the player sees it confirmed and non-refundable; staff cancel it with a refund on request", async ({ page }) => {
   await login(page, player);
   await page.goto("/my-bookings");
   await expect(page.getByText(/confirmed/i).first()).toBeVisible();
-  await page.getByRole("button", { name: "Cancel Reservation" }).first().click();
-  await expect(page.getByText(/refund/i).first()).toBeVisible();
-  await page.getByRole("button", { name: "Yes, Cancel Reservation" }).click();
+  await expect(page.getByText(/Paid bookings are non-refundable/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel Reservation" })).toHaveCount(0);
+
+  await page.context().clearCookies();
+  await login(page, account("ADMIN"));
+  await page.goto("/admin/bookings");
+  await page.getByRole("button", { name: "Clear date filter" }).click();
+  await page.getByRole("row").filter({ hasText: player.name }).getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("menuitem", { name: "Cancel Reservation" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/Cancel and refund/).check();
+  await dialog.getByRole("button", { name: "Cancel Reservation" }).click();
   await expect.poll(() => bookingState().split("|")[0]).toBe("cancelled");
 });
 

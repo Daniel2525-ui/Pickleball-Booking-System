@@ -1,4 +1,4 @@
-// Booking rules in Settings: the online cancellation cutoff and the no-show grace period are enforced as saved.
+// Booking rules in Settings: the no-show grace period is enforced as saved.
 // Local Supabase stack only.
 import { test, expect } from "@playwright/test";
 import { writesAllowed, requireLocalDb, sql, account, login, resetBookings, firstCourt } from "./local-db.mjs";
@@ -22,29 +22,6 @@ function bookToday(name, offset) {
 test.beforeAll(() => { if (writesAllowed) { resetBookings(); restore(); } });
 test.afterAll(() => { if (writesAllowed) { resetBookings(); restore(); } });
 test.beforeEach(() => requireLocalDb());
-
-test("staff change the cancellation cutoff, and players are held to it", async ({ page }) => {
-  test.skip(hour() < 6 || hour() >= 19, "needs a booking 3 hours from now within the day");
-  await login(page, account("ADMIN"));
-  await page.goto("/admin/settings");
-  await page.getByLabel("Online cancellation closes (hours before start)").fill("4");
-  await page.getByRole("button", { name: "Save booking rules" }).click();
-  await expect(page.getByText("Booking rules saved.")).toBeVisible();
-  expect(sql("SELECT cancel_cutoff_hours FROM public.booking_settings")).toBe("4");
-  await expect(page.getByText("Online cancellation closes: 2 → 4 hours before start").first()).toBeVisible();
-
-  // A booking 3 hours away is now inside the cutoff: the cancel route refuses it, naming the new rule
-  const id = bookToday("E2E Inside Cutoff", "3 hours");
-  await page.context().clearCookies();
-  await login(page, account("CUSTOMER"));
-  const res = await page.request.post("/api/bookings/cancel", { data: { bookingId: id } });
-  expect(res.status()).toBe(409);
-  expect((await res.json()).error).toContain("up to 4 hours before the start time");
-  expect(sql(`SELECT status FROM public.bookings WHERE id = '${id}'`)).toBe("confirmed");
-
-  await page.goto("/");
-  await expect(page.getByText("4 hrs", { exact: true })).toBeVisible();
-});
 
 test("the no-show grace period follows the saved value", async ({ page }) => {
   test.skip(hour() < 7 || hour() >= 21, "needs a booking that started a few minutes ago within the day");
@@ -73,7 +50,7 @@ test("impossible values are refused on the page", async ({ page }) => {
 test("leaving with unsaved booking rules asks first", async ({ page }) => {
   await login(page, account("ADMIN"));
   await page.goto("/admin/settings");
-  await page.getByLabel("Online cancellation closes (hours before start)").fill("5");
+  await page.getByLabel("No-show grace period (minutes after start)").fill("30");
   const dialog = page.waitForEvent("dialog");
   await page.close({ runBeforeUnload: true });
   const d = await dialog;

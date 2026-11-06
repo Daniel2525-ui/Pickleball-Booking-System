@@ -1,7 +1,6 @@
 import { Metadata } from "next";
 import { LegalPage } from "@/components/customers/legal-page";
 import { fetchVenueContact } from "@/lib/venue";
-import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { getPublicClient } from "@/lib/supabase/public";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { formatTime12h } from "@/lib/utils/formatTime";
@@ -15,10 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TermsPage() {
-  const [{ data: pricing }, { cancelCutoffHours }] = await Promise.all([
-    fetchPricing(getPublicClient()),
-    fetchBookingPolicy(getPublicClient()),
-  ]);
+  const { data: pricing } = await fetchPricing(getPublicClient());
   const venue = await fetchVenueContact(getPublicClient());
   const hoursText = pricing
     ? pricing.settings.min_hours === pricing.settings.max_hours
@@ -49,11 +45,9 @@ export default async function TermsPage() {
 
       <h2 id="cancellation">Cancellations &amp; refunds</h2>
       <ul>
-        <li>You can cancel a paid reservation in My Bookings up to {cancelCutoffHours} hours before its start time and receive a full refund. Card refunds go back to the original card; banks usually take 5–10 business days to show them. Counter payments are refunded by venue staff.</li>
-        <li>Within {cancelCutoffHours} hours of the start time, online cancellation is closed. Please contact the venue.</li>
+        <li>All payments are final and non-refundable. Paid reservations can&apos;t be cancelled or rescheduled online.</li>
         <li>Unpaid holds can be cancelled at any time before the slot starts.</li>
-        <li>If the venue has to cancel your reservation, you receive a full refund.</li>
-        <li>Online rescheduling isn&apos;t available; cancel within the window above and book a new slot.</li>
+        <li>If there is a problem with the venue or court, or the venue cancels your reservation, contact the venue staff. Refunds in these cases are at the venue&apos;s discretion and are issued by staff.</li>
       </ul>
 
       <h2>Accounts</h2>
