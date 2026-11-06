@@ -77,7 +77,7 @@ test("2. the player books two hours tomorrow and pays by GCash", async ({ page }
   await page.getByLabel("GCash reference number").fill("JRN123456");
   await page.getByLabel("Payment screenshot").setInputFiles({ name: "receipt.png", mimeType: "image/png", buffer: PNG_1X1 });
   await page.getByRole("button", { name: "Submit payment" }).click();
-  await expect(page.getByText(/The club will check your GCash payment/)).toBeVisible();
+  await expect(page.getByText(/The staff will check your GCash payment/)).toBeVisible();
 
   await page.goto("/my-bookings");
   await expect(page.getByText(court.name).first()).toBeVisible();

@@ -105,5 +105,5 @@ test("slot availability ignores expired pending holds and keeps unexpired holds 
 
 test("awaiting GCash verification blocks customer cancellation", () => {
     const awaiting = { status: "pending", hold_expires_at: "infinity", booking_date: "2099-01-01", start_time: "10:00:00" };
-    assert.equal(getCancellationBlockReason(awaiting), "Your GCash payment is being verified. Please contact the club to cancel.");
+    assert.equal(getCancellationBlockReason(awaiting), "Your GCash payment is being verified. Please contact the staff to cancel.");
 });

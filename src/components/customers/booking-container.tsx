@@ -244,7 +244,7 @@ export const BookingContainer = () => {
     if (status === "user_pending") {
       const slotBooking = getSlotBooking(courtName, time, courts, bookings);
       if (isAwaitingVerification({ status: "pending", created_at: "", hold_expires_at: slotBooking?.hold_expires_at })) {
-        toast.info("Your GCash payment is being verified. You can book again once the club confirms it.");
+        toast.info("Your GCash payment is being verified. You can book again once the staff confirms it.");
         return;
       }
       if (slotBooking?.id) {
@@ -446,7 +446,7 @@ export const BookingContainer = () => {
           {myHold && (
             <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm">
               {myHoldVerifying ? (
-                <span>Your GCash payment is being verified. You can book again once the club confirms it.</span>
+                <span>Your GCash payment is being verified. You can book again once the staff confirms it.</span>
               ) : (
                 <>
                   <span>

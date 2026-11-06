@@ -45,7 +45,7 @@ export const getCancellationBlockReason = (
     }
 
     if (isAwaitingVerification({ ...booking, status, created_at: "" })) {
-        return "Your GCash payment is being verified. Please contact the club to cancel.";
+        return "Your GCash payment is being verified. Please contact the staff to cancel.";
     }
 
     const start = getBookingStart(booking);

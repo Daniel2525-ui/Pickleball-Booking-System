@@ -120,7 +120,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
         <Info className="size-10 text-destructive mx-auto" />
         <h1 className="text-2xl font-extrabold tracking-tight">This reservation has expired</h1>
         <p className="text-sm text-muted-foreground">{spotBuyer ? "The hold on your spots has ended. Pick a session to book again." : "The hold on your courts has ended. Pick a new time to book again."}</p>
-        <p className="text-sm text-muted-foreground">Already sent the money? Contact the club at <a href={venue.phoneHref} className="font-semibold text-foreground">{venue.phone}</a> with your GCash reference.</p>
+        <p className="text-sm text-muted-foreground">Already sent the money? Contact the staff at <a href={venue.phoneHref} className="font-semibold text-foreground">{venue.phone}</a> with your GCash reference.</p>
         <Link href="/book" className="block"><Button className="w-full h-11 font-bold">Book again</Button></Link>
       </div>
     );
@@ -131,7 +131,7 @@ export const GcashPaymentContainer = ({ basketId }: { basketId: string }) => {
       <div className="max-w-lg w-full bg-card border border-border rounded-2xl shadow-md p-6 sm:p-8 text-center space-y-4">
         <CheckCircle2 className="size-10 text-emerald-600 dark:text-emerald-400 mx-auto" />
         <h1 className="text-2xl font-extrabold tracking-tight">Payment submitted</h1>
-        <p className="text-sm text-muted-foreground">The club will check your GCash payment and confirm your booking. Your {spotBuyer ? "spots stay" : "courts stay"} held until then.</p>
+        <p className="text-sm text-muted-foreground">The staff will check your GCash payment and confirm your booking. Your {spotBuyer ? "spots stay" : "courts stay"} held until then.</p>
         <Link href="/my-bookings" className="block"><Button className="w-full h-11 font-bold">View My Bookings</Button></Link>
       </div>
     );

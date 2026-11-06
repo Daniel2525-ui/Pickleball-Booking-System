@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
                     .eq("hold_expires_at", "infinity");
                 if (verifying) {
                     return Response.json(
-                        { error: "Your GCash payment is being verified. You can book again once the club confirms it." },
+                        { error: "Your GCash payment is being verified. You can book again once the staff confirms it." },
                         { status: 409 }
                     );
                 }
