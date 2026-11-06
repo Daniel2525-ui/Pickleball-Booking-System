@@ -87,3 +87,6 @@ export function liveCourtTile(
         next: upNext,
     };
 }
+
+/** Columns for the court tiles: at most 4, rows as even as possible (6 courts → 3 + 3, 7 → 4 + 3). */
+export const tileColumns = (courts: number) => Math.ceil(courts / Math.ceil(Math.max(courts, 1) / 4)) || 1;

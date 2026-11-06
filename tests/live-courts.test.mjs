@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { liveCourtTile } from "../src/lib/services/dashboard/liveCourts.ts";
+import { liveCourtTile, tileColumns } from "../src/lib/services/dashboard/liveCourts.ts";
 
 // 7:35 PM in Manila on Nov 5
 const now = new Date("2026-11-05T19:35:00+08:00");
@@ -68,4 +68,9 @@ test("a player whose GCash payment staff haven't checked yet is shown as waiting
     const tile = liveCourtTile(court, [waiting], now);
     assert.equal(tile.state, "in_play");
     assert.deepEqual(tile.payment, { paid: false, label: "GCash · waiting for your check" });
+});
+
+test("tile columns keep rows even, at most 4 across", () => {
+  const cols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(tileColumns);
+  assert.deepEqual(cols, [1, 1, 2, 3, 4, 3, 3, 4, 4, 3]);
 });

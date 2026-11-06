@@ -6,7 +6,7 @@ import { Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchLiveCourts } from "@/lib/services/dashboard/courtStatus.service";
-import type { LiveCourtTile, LiveState } from "@/lib/services/dashboard/liveCourts";
+import { tileColumns, type LiveCourtTile, type LiveState } from "@/lib/services/dashboard/liveCourts";
 import { formatTime12h } from "@/lib/utils/formatTime";
 
 const TAGS: Record<LiveState, { label: string; style: string }> = {
@@ -18,6 +18,13 @@ const TAGS: Record<LiveState, { label: string; style: string }> = {
 };
 
 const REFRESH_MS = 60_000;
+// Full class names so Tailwind sees them; 4 across only from xl, where each tile still gets ~220px
+const GRID_COLS: Record<number, string> = {
+  1: "",
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-2 lg:grid-cols-3",
+  4: "sm:grid-cols-2 xl:grid-cols-4",
+};
 
 const timeLeft = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ""} left` : `${m} min left`);
 const clock = (d: Date) => d.toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
@@ -64,7 +71,7 @@ export default function CourtStatus({ className }: { className?: string }) {
         {tiles === null && failed ? (
           <p role="alert" className="py-8 text-center text-sm text-muted-foreground">Couldn&apos;t load the courts. Trying again every minute.</p>
         ) : tiles === null ? (
-          <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">
+          <div className={`grid gap-3 ${GRID_COLS[4]}`}>
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
           </div>
         ) : tiles.length === 0 ? (
@@ -74,7 +81,7 @@ export default function CourtStatus({ className }: { className?: string }) {
             <p className="text-xs text-muted-foreground">Add courts in the Courts &amp; Rates section.</p>
           </div>
         ) : (
-          <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">
+          <div className={`grid gap-3 ${GRID_COLS[tileColumns(tiles.length)]}`}>
             {tiles.map((t) => <CourtTile key={t.name} tile={t} />)}
           </div>
         )}
