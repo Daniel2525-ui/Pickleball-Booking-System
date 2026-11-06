@@ -57,11 +57,9 @@ export default async function DashboardPage() {
       {/* KPI Cards Strip */}
       <DashboardStats />
 
-      {/* Primary Operations: Today's Schedule + Real-time Court Status */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <TodaysSchedule className="lg:col-span-2" />
-        <CourtStatus />
-      </div>
+      {/* Primary Operations: every court at a glance, then today's schedule at full width */}
+      <CourtStatus />
+      <TodaysSchedule />
 
       {/* Analytical Trends: Weekly Volume + Recent Bookings */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

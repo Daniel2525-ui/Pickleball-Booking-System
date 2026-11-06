@@ -60,11 +60,11 @@ export default function CourtStatus({ className }: { className?: string }) {
         </div>
       </CardHeader>
 
-      <CardContent className="@container">
+      <CardContent>
         {tiles === null && failed ? (
           <p role="alert" className="py-8 text-center text-sm text-muted-foreground">Couldn&apos;t load the courts. Trying again every minute.</p>
         ) : tiles === null ? (
-          <div className="grid gap-3 @lg:grid-cols-2">
+          <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
           </div>
         ) : tiles.length === 0 ? (
@@ -74,7 +74,7 @@ export default function CourtStatus({ className }: { className?: string }) {
             <p className="text-xs text-muted-foreground">Add courts in the Courts &amp; Rates section.</p>
           </div>
         ) : (
-          <div className="grid gap-3 @lg:grid-cols-2">
+          <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">
             {tiles.map((t) => <CourtTile key={t.name} tile={t} />)}
           </div>
         )}
