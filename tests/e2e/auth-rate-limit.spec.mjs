@@ -18,7 +18,7 @@ const tryLogin = async (page, email, password) => {
 
 test("five wrong passwords lock that account's sign-in for 15 minutes, even with the right password", async ({ page }) => {
   const { email, password } = account("CUSTOMER2");
-  sql(`DELETE FROM public.auth_rate_limits WHERE key = 'login:fail:${email}'`);
+  sql(`DELETE FROM public.auth_rate_limits WHERE key LIKE 'login:fail:${email}:%'`);
   for (let i = 0; i < 5; i++) {
     await tryLogin(page, email, "wrong-password");
     await expect(page.getByText("Invalid email or password. Please try again.")).toBeVisible();
@@ -28,21 +28,31 @@ test("five wrong passwords lock that account's sign-in for 15 minutes, even with
   await expect(page).toHaveURL(/\/login$/);
 
   // After the window, the correct password works again (and a success clears the failures)
-  sql(`UPDATE public.auth_rate_limits SET window_start = now() - interval '16 minutes' WHERE key = 'login:fail:${email}'`);
+  sql(`UPDATE public.auth_rate_limits SET window_start = now() - interval '16 minutes' WHERE key LIKE 'login:fail:${email}:%'`);
   await tryLogin(page, email, password);
   await expect(page).not.toHaveURL(/\/login/);
-  expect(sql(`SELECT count(*) FROM public.auth_rate_limits WHERE key = 'login:fail:${email}'`)).toBe("0");
+  expect(sql(`SELECT count(*) FROM public.auth_rate_limits WHERE key LIKE 'login:fail:${email}:%'`)).toBe("0");
+});
+
+test("wrong passwords from someone else's network do not lock the owner out of their own", async ({ request }) => {
+  const { email, password } = account("CUSTOMER2");
+  sql(`DELETE FROM public.auth_rate_limits WHERE key LIKE 'login:fail:${email}:%'`);
+  const login = (pw, ip) => request.post("/api/auth/login", { data: { email, password: pw }, headers: { "x-forwarded-for": ip } });
+  for (let i = 0; i < 5; i++) expect((await login("wrong-password", "203.0.113.9")).status()).toBe(401);
+  expect((await login(password, "203.0.113.9")).status(), "the guesser's network is locked").toBe(429);
+  expect((await login(password, "198.51.100.7")).status(), "the owner's network still signs in").toBe(200);
+  sql(`DELETE FROM public.auth_rate_limits WHERE key LIKE 'login:fail:${email}:%'`);
 });
 
 test("the right password on an unconfirmed email says to confirm, and is not counted as a failure", async ({ page }) => {
   const { email, password } = account("CUSTOMER2");
-  sql(`DELETE FROM public.auth_rate_limits WHERE key = 'login:fail:${email}'`);
+  sql(`DELETE FROM public.auth_rate_limits WHERE key LIKE 'login:fail:${email}:%'`);
   const confirmedAt = sql(`SELECT email_confirmed_at FROM auth.users WHERE email = '${email}'`);
   sql(`UPDATE auth.users SET email_confirmed_at = NULL WHERE email = '${email}'`);
   try {
     await tryLogin(page, email, password);
     await expect(page.getByText("Please confirm your email first. Check your inbox (and spam) for the email from Crosshair Dinkers.")).toBeVisible();
-    expect(sql(`SELECT count(*) FROM public.auth_rate_limits WHERE key = 'login:fail:${email}'`)).toBe("0");
+    expect(sql(`SELECT count(*) FROM public.auth_rate_limits WHERE key LIKE 'login:fail:${email}:%'`)).toBe("0");
 
     // A player whose first email never arrived can ask for another
     sql(`DELETE FROM public.auth_rate_limits WHERE key = 'confirm:email:${email}'`);

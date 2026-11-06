@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
 
         const ip = await checkRateLimit(`login:ip:${clientIp(request)}`, AUTH_LIMITS.loginAttemptsPerIp);
         if (!ip.allowed) return tooManyRequests("sign-in attempts", ip.retryAfterSeconds);
-        const failKey = `login:fail:${email}`;
+        // Per email and network: a guesser locks only their own network, never the account owner's
+        const failKey = `login:fail:${email}:${clientIp(request)}`;
         const failures = await checkRateLimit(failKey, AUTH_LIMITS.loginFailuresPerEmail, false);
         if (!failures.allowed) return tooManyRequests("failed sign-in attempts for this account", failures.retryAfterSeconds);
 
