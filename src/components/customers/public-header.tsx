@@ -89,9 +89,9 @@ export function PublicHeader() {
             signOutTo="/"
             links={[
               ...(isAdmin ? [{ label: isOwner ? "Admin panel" : "Staff panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
-              { label: "Courts", href: "/#courts", icon: "courts" },
-              { label: "Open Play", href: "/open-play", icon: "openPlay" },
-              { label: "My bookings", href: "/my-bookings", icon: "bookings" },
+              { label: "Courts", href: "/#courts", icon: "courts", mobileOnly: true },
+              { label: "Open Play", href: "/open-play", icon: "openPlay", mobileOnly: true },
+              { label: "My bookings", href: "/my-bookings", icon: "bookings", mobileOnly: true },
               { label: "My profile", href: "/profile", icon: "profile" },
             ]}
           />

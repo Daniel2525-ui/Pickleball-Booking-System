@@ -18,7 +18,8 @@ interface AccountMenuProps {
   name: string;
   email: string;
   /** Icons are named so a Server Component (the admin layout) can pass links */
-  links: { label: string; href: string; icon: keyof typeof ICONS }[];
+  /** mobileOnly: hidden from sm up, where the header already shows the same link */
+  links: { label: string; href: string; icon: keyof typeof ICONS; mobileOnly?: boolean }[];
   /** Where to land after signing out */
   signOutTo: string;
   /** Full-width trigger with email that opens upward, for a sidebar footer; collapses to the avatar */
@@ -77,10 +78,10 @@ export function AccountMenu({ name, email, links, signOutTo, inSidebar = false }
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          {links.map(({ label, href, icon }) => {
+          {links.map(({ label, href, icon, mobileOnly }) => {
             const Icon = ICONS[icon];
             return (
-            <DropdownMenuItem key={href} onClick={() => router.push(href)} className="gap-2 min-h-[40px]">
+            <DropdownMenuItem key={href} onClick={() => router.push(href)} className={`gap-2 min-h-[40px]${mobileOnly ? " sm:hidden" : ""}`}>
               <Icon className="size-4" />
               {label}
             </DropdownMenuItem>
