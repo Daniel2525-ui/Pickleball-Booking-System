@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CalendarDays, ChevronDown, House, LayoutDashboard, LogOut, UserRound } from "lucide-react";
+import { CalendarDays, ChevronDown, House, Layers, LayoutDashboard, LogOut, UserRound, UsersRound } from "lucide-react";
 import { logout } from "@/lib/services/auth.service";
 import {
   DropdownMenu,
@@ -25,7 +25,8 @@ interface AccountMenuProps {
   inSidebar?: boolean;
 }
 
-const ICONS = { bookings: CalendarDays, profile: UserRound, home: House, admin: LayoutDashboard };
+// Same icons as the staff sidebar uses for these pages
+const ICONS = { bookings: CalendarDays, courts: Layers, openPlay: UsersRound, profile: UserRound, home: House, admin: LayoutDashboard };
 
 /** Signed-in account menu (initials button + dropdown), shared by the customer and admin headers. */
 export function AccountMenu({ name, email, links, signOutTo, inSidebar = false }: AccountMenuProps) {

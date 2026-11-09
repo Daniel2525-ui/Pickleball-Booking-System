@@ -89,8 +89,8 @@ export function PublicHeader() {
             signOutTo="/"
             links={[
               ...(isAdmin ? [{ label: isOwner ? "Admin panel" : "Staff panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
-              { label: "Courts", href: "/#courts", icon: "bookings" },
-              { label: "Open Play", href: "/open-play", icon: "bookings" },
+              { label: "Courts", href: "/#courts", icon: "courts" },
+              { label: "Open Play", href: "/open-play", icon: "openPlay" },
               { label: "My bookings", href: "/my-bookings", icon: "bookings" },
               { label: "My profile", href: "/profile", icon: "profile" },
             ]}
