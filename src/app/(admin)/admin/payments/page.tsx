@@ -2,10 +2,11 @@ import { Metadata } from "next";
 import { Suspense } from "react";
 import { CreditCard } from "lucide-react";
 import PaymentsContainer from "@/components/admin/payments/payments-container";
+import { VENUE_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Payments & Transactions | Admin",
-  description: "View and audit customer payment transactions, Stripe checkout records, and booking revenue for Crosshair Dinkers.",
+  description: `View and audit customer payment transactions, Stripe checkout records, and booking revenue for ${VENUE_NAME}.`,
 };
 
 export default function PaymentsPage() {

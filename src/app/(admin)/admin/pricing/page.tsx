@@ -1,10 +1,11 @@
 import { Metadata } from "next"
 import { Tag } from "lucide-react"
 import { PricingContainer } from "@/components/admin/pricing/pricing-container"
+import { VENUE_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Pricing & Booking Rules | Admin",
-  description: "Configure court rates, peak hours and booking length for Crosshair Dinkers.",
+  description: `Configure court rates, peak hours and booking length for ${VENUE_NAME}.`,
 }
 
 export default function PricingPage() {

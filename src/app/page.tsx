@@ -9,6 +9,7 @@ import { getPublicClient } from "@/lib/supabase/public";
 import { summarizeVenueHours } from "@/lib/utils/venueHours";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { lowestHourlyRate } from "@/lib/services/pricing/quoteCourtPrice";
+import { VENUE_CITY, VENUE_NAME } from "@/lib/brand";
 
 // Hours, courts and pricing are edited in the admin; refresh the static page at most every 5 minutes
 export const revalidate = 300;
@@ -99,10 +100,10 @@ export default async function Home() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-display font-black text-xl uppercase text-foreground">
                 <Crosshair className="size-5 text-primary" />
-                <span>Crosshair Dinkers</span>
+                <span>{VENUE_NAME}</span>
               </div>
               <p className="text-xs leading-relaxed max-w-xs">
-                Butuan City&apos;s pickleball venue, open day and night.
+                {VENUE_CITY}&apos;s pickleball venue, open day and night.
               </p>
             </div>
 
@@ -146,7 +147,7 @@ export default async function Home() {
           </div>
 
           <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground/80">
-            <p>&copy; {new Date().getFullYear()} Crosshair Dinkers. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} {VENUE_NAME}. All rights reserved.</p>
             <div className="flex items-center gap-4">
               <Link href="/#faq" className="hover:text-foreground transition-colors">FAQ</Link>
               <span>•</span>

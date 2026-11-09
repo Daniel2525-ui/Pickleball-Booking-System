@@ -8,6 +8,7 @@ import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutS
 import { openBasketCheckout } from "@/lib/services/payments/openBasketCheckout";
 import { bookingTitle } from "@/lib/services/openPlay/bookingTitle";
 import { sessionErrorResponse } from "@/lib/services/openPlay/openPlayTypes";
+import { VENUE_NAME } from "@/lib/brand";
 
 const toDbTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
 
@@ -197,7 +198,7 @@ export async function POST(request: NextRequest) {
             lines: siblings.map((s) => ({
                 bookingId: s.id,
                 paymentId: s.payments[0].id,
-                courtName: s.open_play_spots ? bookingTitle(s) : s.courts?.name || "Crosshair Dinkers Court",
+                courtName: s.open_play_spots ? bookingTitle(s) : s.courts?.name || `${VENUE_NAME} court`,
                 bookingDate: s.booking_date,
                 startTime: s.start_time,
                 endTime: s.end_time,

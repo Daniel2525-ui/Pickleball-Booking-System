@@ -4,10 +4,11 @@ import { buttonVariants } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Metadata } from "next";
 import Link from "next/link";
+import { VENUE_NAME, VENUE_CITY } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "My Reservations | Crosshair Dinkers",
-  description: "View your upcoming and past pickleball court reservations at Crosshair Dinkers Butuan City.",
+  title: "My Reservations",
+  description: `View your upcoming and past pickleball court reservations at ${VENUE_NAME} ${VENUE_CITY}.`,
 };
 
 export default function MyBookingsPage() {

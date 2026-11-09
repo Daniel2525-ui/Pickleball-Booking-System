@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { VENUE_NAME } from "@/lib/brand";
 
 interface FAQItem {
   question: string;
@@ -37,7 +38,7 @@ const faqs: FAQItem[] = [
   {
     question: "Are the courts weather-protected for rain and night play?",
     answer:
-      "Yes. Crosshair Dinkers is an all-weather covered facility equipped with anti-glare, high-lux overhead LED stadium lighting, ensuring uninterrupted matches day or night, rain or shine.",
+      `Yes. ${VENUE_NAME} is an all-weather covered facility equipped with anti-glare, high-lux overhead LED stadium lighting, ensuring uninterrupted matches day or night, rain or shine.`,
   },
 ];
 

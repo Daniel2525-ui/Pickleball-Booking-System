@@ -1,9 +1,10 @@
 import { Metadata } from "next"
 import { ReportsContainer } from "@/components/admin/reports/reports-container"
+import { VENUE_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Reports | Admin",
-  description: "Revenue, bookings, busy hours and best customers for Crosshair Dinkers.",
+  description: `Revenue, bookings, busy hours and best customers for ${VENUE_NAME}.`,
 }
 
 export default function ReportsPage() {

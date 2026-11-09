@@ -1,6 +1,6 @@
 /**
  * Shared booking date/time and timezone conversion utilities.
- * All bookings in Crosshair Dinkers are scheduled in venue local time (Asia/Manila, UTC+8, no DST).
+ * All bookings are scheduled in venue local time (Asia/Manila, UTC+8, no DST).
  */
 
 export const VENUE_TIMEZONE = "Asia/Manila";

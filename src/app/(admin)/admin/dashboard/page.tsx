@@ -7,9 +7,10 @@ import AttentionAlert from "@/components/admin/dashboard/attention-alert";
 import DashboardClock from "@/components/admin/dashboard/dashboard-clock";
 import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { VENUE_NAME } from "@/lib/brand";
 
 export const metadata = {
-  title: "Dashboard | Crosshair Dinkers",
+  title: "Dashboard",
   description: "Facility operations, court schedules, and real-time reservation metrics.",
 };
 
@@ -40,7 +41,7 @@ export default async function DashboardPage() {
             {roleWord} Dashboard
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Court availability, daily booking schedules, and facility activity at Crosshair Dinkers.
+            Court availability, daily booking schedules, and facility activity at {VENUE_NAME}.
           </p>
         </div>
 

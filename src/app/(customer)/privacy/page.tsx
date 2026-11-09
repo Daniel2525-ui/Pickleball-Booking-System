@@ -2,10 +2,11 @@ import { Metadata } from "next";
 import { LegalPage } from "@/components/customers/legal-page";
 import { fetchVenueContact } from "@/lib/venue";
 import { getPublicClient } from "@/lib/supabase/public";
+import { VENUE_NAME, VENUE_CITY } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Crosshair Dinkers",
-  description: "How Crosshair Dinkers collects and uses your personal information.",
+  title: "Privacy Policy",
+  description: `How ${VENUE_NAME} collects and uses your personal information.`,
 };
 
 // Contact details are edited in Settings; refresh at most every 5 minutes
@@ -16,7 +17,7 @@ export default async function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy">
       <p>
-        Crosshair Dinkers (&quot;we&quot;) runs this court booking website for our pickleball venue in Butuan City. This
+        {VENUE_NAME} (&quot;we&quot;) runs this court booking website for our pickleball venue in {VENUE_CITY}. This
         policy explains what personal information we collect, why, and your rights under the Philippine Data Privacy
         Act of 2012 (Republic Act No. 10173).
       </p>

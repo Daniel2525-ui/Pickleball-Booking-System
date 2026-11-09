@@ -48,6 +48,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { BookingCardSkeleton } from "@/components/skeletons/booking-card-skeleton";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
+import { VENUE_NAME } from "@/lib/brand";
 
 // Notes that need the player's attention read amber
 const noteTone = (text: string) =>
@@ -383,7 +384,7 @@ export const BookingHistoryContainer = () => {
 
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="size-3.5 text-muted-foreground/80 shrink-0" />
-                      <span>Crosshair Dinkers Complex, {venue.address}</span>
+                      <span>{VENUE_NAME}, {venue.address}</span>
                     </div>
                   </div>
 

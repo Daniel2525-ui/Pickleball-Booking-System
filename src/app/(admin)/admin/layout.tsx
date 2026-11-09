@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import AppSidebar from "@/components/admin/app-sidebar"
 import { Crosshair } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+import { VENUE_NAME } from "@/lib/brand";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // The proxy already gates /admin to admins; this only reads who is signed in for the account menu
@@ -24,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <Crosshair className="size-3.5" />
               </div>
               <span className="font-extrabold text-sm tracking-tight text-foreground">
-                Crosshair Dinkers <span className="text-[10px] font-semibold text-muted-foreground uppercase ml-1">{profile?.is_owner ? "Admin" : "Staff"}</span>
+                {VENUE_NAME} <span className="text-[10px] font-semibold text-muted-foreground uppercase ml-1">{profile?.is_owner ? "Admin" : "Staff"}</span>
               </span>
             </div>
           </div>

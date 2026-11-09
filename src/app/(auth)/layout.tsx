@@ -1,6 +1,10 @@
 import { ArrowLeft, Crosshair } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
+import { VENUE_CITY, VENUE_NAME, splitBrandName } from "@/lib/brand";
+
+// Two-tone wordmark: the last word of the name in the accent colour
+const brand = splitBrandName(VENUE_NAME);
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,10 +28,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         <div className="flex flex-col">
           <span className="font-black text-xl tracking-tight leading-none text-foreground uppercase">
-            Crosshair <span className="text-primary">Dinkers</span>
+            {brand.lead && <>{brand.lead} </>}<span className="text-primary">{brand.accent}</span>
           </span>
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
-            Butuan City
+            {VENUE_CITY}
           </span>
         </div>
       </Link>
@@ -35,7 +39,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {children}
 
       <p className="mt-2 text-[11px] text-muted-foreground/70">
-        &copy; {new Date().getFullYear()} Crosshair Dinkers. All rights reserved.
+        &copy; {new Date().getFullYear()} {VENUE_NAME}. All rights reserved.
       </p>
     </div>
   );

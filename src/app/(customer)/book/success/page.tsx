@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/customers/public-header";
+import { VENUE_NAME } from "@/lib/brand";
 
 function BookingSuccessContent() {
   const venue = useVenueContact();
@@ -78,7 +79,7 @@ function BookingSuccessContent() {
               Confirming Your Reservation
             </h2>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Verifying your payment with Stripe and securing your court slot at Crosshair Dinkers...
+              Verifying your payment with Stripe and securing your court slot at {VENUE_NAME}...
             </p>
           </div>
         </main>
@@ -188,7 +189,7 @@ function BookingSuccessContent() {
               <div className="flex items-start gap-2.5">
                 <MapPin className="size-4 text-primary shrink-0 mt-0.5" />
                 <span>
-                  <strong>Venue:</strong> Crosshair Dinkers Complex, {venue.address}.
+                  <strong>Venue:</strong> {VENUE_NAME}, {venue.address}.
                 </span>
               </div>
               <div className="flex items-start gap-2.5">

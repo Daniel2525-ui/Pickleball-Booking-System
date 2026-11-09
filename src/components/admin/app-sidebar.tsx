@@ -28,6 +28,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/account-menu";
+import { VENUE_NAME } from "@/lib/brand";
 
 interface NavItem {
     title: string;
@@ -115,7 +116,7 @@ export default function AppSidebar({ account, isOwner }: { account: { name: stri
                                 </div>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-extrabold text-foreground">
-                                        Crosshair Dinkers
+                                        {VENUE_NAME}
                                     </span>
                                     <span className="truncate text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
                                         {isOwner ? "Court Admin" : "Court Staff"}

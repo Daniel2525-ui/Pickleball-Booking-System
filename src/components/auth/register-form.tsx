@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { register } from "@/lib/services/auth.service";
+import { VENUE_CITY } from "@/lib/brand";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -82,7 +83,7 @@ export function RegisterForm() {
           Create Player Account
         </h1>
         <CardDescription className="text-muted-foreground text-xs sm:text-sm leading-relaxed mt-1">
-          Sign up to reserve courts, track game sessions, and view live availability in Butuan City.
+          Sign up to reserve courts, track game sessions, and view live availability in {VENUE_CITY}.
         </CardDescription>
       </CardHeader>
 

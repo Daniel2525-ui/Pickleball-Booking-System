@@ -6,6 +6,10 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { AccountMenu } from "@/components/account-menu";
+import { VENUE_NAME, splitBrandName } from "@/lib/brand";
+
+// Two-tone wordmark: the last word of the name in the accent colour
+const brand = splitBrandName(VENUE_NAME);
 
 export function PublicHeader() {
   const [user, setUser] = useState<User | null>(null);
@@ -53,7 +57,7 @@ export function PublicHeader() {
         </div>
         {/* Icon only from sm to lg, where the nav links need the room; the link still has its name for screen readers */}
         <span className="font-display font-black text-lg sm:text-2xl tracking-wide leading-none text-foreground uppercase whitespace-nowrap sm:sr-only lg:not-sr-only">
-          Crosshair <span className="text-primary">Dinkers</span>
+          {brand.lead && <>{brand.lead} </>}<span className="text-primary">{brand.accent}</span>
         </span>
       </Link>
 

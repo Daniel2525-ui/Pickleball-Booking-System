@@ -4,7 +4,7 @@ import Link from "next/link";
 import { RegisterForm } from "@/components/auth/register-form";
 
 export const metadata: Metadata = {
-  title: "Create Account | Crosshair Dinkers",
+  title: "Create Account",
 };
 
 export default function RegisterPage() {

@@ -1,10 +1,11 @@
 import { Metadata } from "next"
 import { UsersRound } from "lucide-react"
 import { OpenPlayContainer } from "@/components/admin/open-play/open-play-container"
+import { VENUE_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Open Play | Admin",
-  description: "Run weekly open play sessions, see who booked, and add walk-ups for Crosshair Dinkers.",
+  description: `Run weekly open play sessions, see who booked, and add walk-ups for ${VENUE_NAME}.`,
 }
 
 export default function OpenPlayPage() {

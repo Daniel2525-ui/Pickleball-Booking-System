@@ -2,9 +2,10 @@ import { Suspense } from "react";
 import { Loader2, Shield } from "lucide-react";
 import { Metadata } from "next";
 import { LoginForm } from "@/components/auth/login-form";
+import { VENUE_NAME, VENUE_CITY } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Sign In | Crosshair Dinkers",
+  title: "Sign In",
 };
 
 export default function LoginPage() {
@@ -23,7 +24,7 @@ export default function LoginPage() {
       {/* Trust & Local Venue Note */}
       <div className="mt-8 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Shield className="size-3.5 text-primary" />
-        <span>Secure authentication for Crosshair Dinkers Butuan City</span>
+        <span>Secure authentication for {VENUE_NAME} {VENUE_CITY}</span>
       </div>
     </>
   );

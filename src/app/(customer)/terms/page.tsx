@@ -4,13 +4,14 @@ import { fetchVenueContact } from "@/lib/venue";
 import { getPublicClient } from "@/lib/supabase/public";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { VENUE_NAME } from "@/lib/brand";
 
 // Rates and booking length are edited in the admin; refresh at most every 5 minutes
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Terms & Booking Rules | Crosshair Dinkers",
-  description: "Booking, payment and cancellation rules for Crosshair Dinkers courts.",
+  title: "Terms & Booking Rules",
+  description: `Booking, payment and cancellation rules for ${VENUE_NAME} courts.`,
 };
 
 export default async function TermsPage() {
@@ -22,7 +23,7 @@ export default async function TermsPage() {
 
   return (
     <LegalPage title="Terms & Booking Rules">
-      <p>By creating an account or booking a court at Crosshair Dinkers you agree to these rules.</p>
+      <p>By creating an account or booking a court at {VENUE_NAME} you agree to these rules.</p>
 
       <h2>Bookings</h2>
       <ul>

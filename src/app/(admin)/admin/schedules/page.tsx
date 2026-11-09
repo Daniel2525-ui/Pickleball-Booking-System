@@ -1,10 +1,11 @@
 import { Metadata } from "next"
 import { Clock } from "lucide-react"
 import { SchedulesContainer } from "@/components/admin/schedules/schedules-container"
+import { VENUE_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Operating Hours | Admin",
-  description: "Configure daily venue operating hours and booking availability for Crosshair Dinkers.",
+  description: `Configure daily venue operating hours and booking availability for ${VENUE_NAME}.`,
 }
 
 export default function SchedulesPage() {
@@ -14,7 +15,7 @@ export default function SchedulesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Operating Hours & Schedule</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Configure daily opening and closing hours for Crosshair Dinkers.
+            Configure daily opening and closing hours for {VENUE_NAME}.
           </p>
         </div>
 

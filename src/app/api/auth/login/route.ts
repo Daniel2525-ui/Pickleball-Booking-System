@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { AUTH_LIMITS, checkRateLimit, clearRateLimit, clientIp, tooManyRequests } from "@/lib/rateLimit";
+import { VENUE_NAME } from "@/lib/brand";
 
 /** Password sign-in through the server so attempts are rate limited; sets the same session cookies as before. */
 export async function POST(request: NextRequest) {
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
         // Right password, unconfirmed email: say so, and don't count it as a failed guess
         if (error?.code === "email_not_confirmed") {
             return NextResponse.json(
-                { error: "Please confirm your email first. Check your inbox (and spam) for the email from Crosshair Dinkers.", code: "email_not_confirmed" },
+                { error: `Please confirm your email first. Check your inbox (and spam) for the email from ${VENUE_NAME}.`, code: "email_not_confirmed" },
                 { status: 403 }
             );
         }

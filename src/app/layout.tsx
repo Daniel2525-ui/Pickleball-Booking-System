@@ -3,6 +3,7 @@ import { Big_Shoulders, Manrope, Poppins } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
+import { SITE_URL, VENUE_NAME } from "@/lib/brand";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -25,10 +26,11 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "Crosshair Dinkers",
+  title: { default: VENUE_NAME, template: `%s | ${VENUE_NAME}` },
+  metadataBase: SITE_URL ? new URL(SITE_URL) : undefined,
   description: "Dink with precision. Book your court. Play your game.",
   // The preview image itself is src/app/opengraph-image.tsx
-  openGraph: { siteName: "Crosshair Dinkers", type: "website" },
+  openGraph: { siteName: VENUE_NAME, type: "website" },
   twitter: { card: "summary_large_image" },
 }
 

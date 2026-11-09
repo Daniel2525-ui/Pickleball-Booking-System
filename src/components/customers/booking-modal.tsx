@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { basketTotal } from "@/lib/services/bookings/basket";
 import { Slot } from "./types";
+import { VENUE_NAME } from "@/lib/brand";
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -78,7 +79,7 @@ export const BookingModal = ({
             </div>
             <div className="pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="size-4 shrink-0 text-primary" />
-              <span>Crosshair Dinkers, {venue.address}</span>
+              <span>{VENUE_NAME}, {venue.address}</span>
             </div>
           </div>
         )}

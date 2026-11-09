@@ -6,7 +6,7 @@ import { PublicHeader } from "@/components/customers/public-header";
 import { ProfileForm } from "@/components/customers/profile-form";
 
 export const metadata: Metadata = {
-  title: "My Profile | Crosshair Dinkers",
+  title: "My Profile",
 };
 
 export default function ProfilePage() {
