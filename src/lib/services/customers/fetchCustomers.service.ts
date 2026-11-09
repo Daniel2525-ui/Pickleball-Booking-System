@@ -35,3 +35,18 @@ export const updateWalkInCustomer = async (id: string, fields: { fullName: strin
         return { error: new Error("Could not reach the server. Check your connection and try again.") };
     }
 };
+
+/** Sets the staff note on a customer; an empty note clears it. */
+export const saveCustomerNote = async (id: string, note: string) => {
+    try {
+        const res = await fetch("/api/admin/customers", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, note }),
+        });
+        const body = await res.json().catch(() => null);
+        return res.ok ? { error: null } : { error: new Error(body?.error || "Could not save the note.") };
+    } catch {
+        return { error: new Error("Could not reach the server. Check your connection and try again.") };
+    }
+};

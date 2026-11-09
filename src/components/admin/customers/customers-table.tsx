@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils/formatTime";
-import { Users, SearchX, Mail, Phone, MoreHorizontal, Pencil, CalendarSearch } from "lucide-react";
+import { Users, SearchX, Mail, Phone, MoreHorizontal, Pencil, CalendarSearch, StickyNote } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,7 +30,16 @@ interface CustomersTableProps {
   loading?: boolean;
   searchQuery?: string;
   onEdit?: (customer: Customer) => void;
+  onNote?: (customer: Customer) => void;
 }
+
+/** The staff note, in the same amber as the repeat no-show count */
+export const CustomerNote = ({ note }: { note: string }) => (
+  <span className="flex items-start gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300 whitespace-pre-line break-words">
+    <StickyNote aria-hidden className="mt-0.5 size-3 shrink-0" />
+    <span><span className="sr-only">Staff note: </span>{note}</span>
+  </span>
+);
 
 const getInitials = (name?: string) => {
   if (!name || !name.trim()) return "?";
@@ -44,6 +53,7 @@ export const CustomersTable = ({
   loading,
   searchQuery,
   onEdit,
+  onNote,
 }: CustomersTableProps) => {
   return (
     <div className="rounded-xl border bg-card overflow-hidden shadow-xs">
@@ -120,6 +130,7 @@ export const CustomersTable = ({
                         <Badge variant="outline" className="text-[10px] font-semibold">
                           {customer.type === "registered" ? "Member" : "Walk-in"}
                         </Badge>
+                        {customer.note && <CustomerNote note={customer.note} />}
                       </div>
                     </div>
                   </TableCell>
@@ -175,6 +186,10 @@ export const CustomersTable = ({
                         <DropdownMenuItem render={<Link href={bookingsHref(customer)} />} className="cursor-pointer text-xs font-semibold">
                           <CalendarSearch className="mr-2 h-4 w-4" />
                           View bookings
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onNote?.(customer)} className="cursor-pointer text-xs font-semibold">
+                          <StickyNote className="mr-2 h-4 w-4" />
+                          {customer.note ? "Edit note" : "Add note"}
                         </DropdownMenuItem>
                         {customer.type === "walk_in" && (
                           <DropdownMenuItem onClick={() => onEdit?.(customer)} className="cursor-pointer text-xs font-semibold">

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { searchCustomers } from "@/lib/services/customers/searchCustomers.service";
+import { CustomerNote } from "@/components/admin/customers/customers-table";
 import { createWalkInCustomer } from "@/lib/services/customers/createWalkInCustomer.service";
 import { createWalkInBooking } from "@/lib/services/bookings/createWalkInBooking.service";
 import { supabase as browserSupabase } from "@/lib/supabase";
@@ -362,6 +363,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
                         <span className="text-xs text-muted-foreground">
                           {selectedPlayer.phone || selectedPlayer.email || (selectedPlayer.type === "registered" ? "Online Member" : "Walk-in Guest")}
                         </span>
+                        {selectedPlayer.note && <span className="mt-1"><CustomerNote note={selectedPlayer.note} /></span>}
                       </div>
                     </div>
                     <Button

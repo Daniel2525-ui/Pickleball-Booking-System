@@ -10,6 +10,8 @@ export interface Customer {
     last_visit: string | null;
     no_shows: number;
     total_spent: number;
+    /** Staff-only note (VIP, banned, needs invoice...) */
+    note: string | null;
 }
 
 export interface UnifiedCustomerResult {
@@ -18,6 +20,7 @@ export interface UnifiedCustomerResult {
     email?: string | null;
     phone?: string | null;
     type: 'registered' | 'walk_in';
+    note?: string | null;
 }
 
 export interface CreateWalkInCustomerInput {

@@ -14,12 +14,13 @@ export const searchCustomers = async (
         }
 
         const data: UnifiedCustomerResult[] = (body?.data || []).map(
-            (c: { id: string; full_name: string; email?: string | null; phone?: string | null; type?: "registered" | "walk_in" }) => ({
+            (c: { id: string; full_name: string; email?: string | null; phone?: string | null; type?: "registered" | "walk_in"; note?: string | null }) => ({
                 id: c.id,
                 full_name: c.full_name,
                 email: c.email || null,
                 phone: c.phone || null,
                 type: c.type || "walk_in",
+                note: c.note || null,
             })
         );
 

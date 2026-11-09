@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
             .order("id")
             .range(offset, offset + limit - 1);
         if (search) {
-            listQuery = listQuery.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
+            listQuery = listQuery.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%,note.ilike.%${search}%`);
         }
 
         // "New this month" in venue time
@@ -117,6 +117,35 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ data });
     } catch (error) {
         console.error("Update customer route error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
+
+/** Sets or clears the staff note on a member or walk-in (id from customer_directory). An empty note removes it. */
+export async function PUT(request: NextRequest) {
+    try {
+        const { supabase, denied } = await requireAdmin();
+        if (denied) return denied;
+
+        const body = await request.json().catch(() => null);
+        const id = typeof body?.id === "string" ? body.id.trim() : "";
+        const note = typeof body?.note === "string" ? body.note.trim() : "";
+
+        if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: "Customer not found." }, { status: 400 });
+        if (note.length > 300) return NextResponse.json({ error: "Keep the note to 300 characters." }, { status: 400 });
+
+        const { error } = note
+            ? await supabase.from("customer_notes").upsert({ person_id: id, note, updated_at: new Date().toISOString() })
+            : await supabase.from("customer_notes").delete().eq("person_id", id);
+
+        if (error) {
+            console.error("Failed to save customer note:", error);
+            return NextResponse.json({ error: "Could not save the note." }, { status: 500 });
+        }
+
+        return NextResponse.json({ note: note || null });
+    } catch (error) {
+        console.error("Customer note route error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

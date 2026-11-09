@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { searchCustomers } from "@/lib/services/customers/searchCustomers.service";
+import { CustomerNote } from "@/components/admin/customers/customers-table";
 import { createWalkInCustomer } from "@/lib/services/customers/createWalkInCustomer.service";
 import { UnifiedCustomerResult } from "@/lib/services/customers/customersTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
@@ -101,6 +102,7 @@ export function AddWalkupModal({ session, onClose, onAdded }: Props) {
                 <div className="flex flex-col">
                   <span className="font-semibold text-sm">{player.full_name}</span>
                   <span className="text-xs text-muted-foreground">{player.phone || player.email || "Walk-in Guest"}</span>
+                  {player.note && <span className="mt-1"><CustomerNote note={player.note} /></span>}
                 </div>
               </div>
               <Button type="button" variant="ghost" size="sm" onClick={() => setPlayer(null)}>Change</Button>

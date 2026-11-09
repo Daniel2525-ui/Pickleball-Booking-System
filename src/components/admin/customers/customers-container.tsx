@@ -9,6 +9,7 @@ import { fetchCustomers, CUSTOMERS_PAGE_SIZE } from "@/lib/services/customers/fe
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { EditCustomerModal } from "./edit-customer-modal";
+import { CustomerNoteModal } from "./customer-note-modal";
 import StatCard from "@/components/admin/dashboard/stat-card";
 
 export default function CustomersContainer() {
@@ -20,6 +21,7 @@ export default function CustomersContainer() {
   const [newThisMonth, setNewThisMonth] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
+  const [noting, setNoting] = useState<Customer | null>(null);
   // Bumped after an edit so the list reloads
   const [version, setVersion] = useState(0);
 
@@ -71,7 +73,7 @@ export default function CustomersContainer() {
         <div className="relative flex-1 max-w-md w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="Search by name, email, or phone..."
+            placeholder="Search by name, email, phone, or note..."
             aria-label="Search customers by name, email, or phone"
             className="pl-9 pr-8 bg-background"
             value={search}
@@ -101,6 +103,7 @@ export default function CustomersContainer() {
         loading={loading}
         searchQuery={search}
         onEdit={setEditing}
+        onNote={setNoting}
       />
 
       {customers.length < total && customers.length >= CUSTOMERS_PAGE_SIZE && (
@@ -114,6 +117,11 @@ export default function CustomersContainer() {
       <EditCustomerModal
         customer={editing}
         onClose={() => setEditing(null)}
+        onSaved={() => setVersion((v) => v + 1)}
+      />
+      <CustomerNoteModal
+        customer={noting}
+        onClose={() => setNoting(null)}
         onSaved={() => setVersion((v) => v + 1)}
       />
     </div>
