@@ -7,6 +7,7 @@ import { Save, LoaderCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { OperatingHoursCard } from "./operating-hours-card"
 import { ClosedDatesCard } from "./closed-dates-card"
+import { CourtBlocksCard } from "./court-blocks-card"
 import { OperatingHour } from "./types"
 import { ScheduleSkeleton } from "@/components/skeletons/schedule-skeleton"
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service"
@@ -172,6 +173,8 @@ export const SchedulesContainer = () => {
           />
 
           <ClosedDatesCard />
+
+          <CourtBlocksCard />
 
           <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
         </>
