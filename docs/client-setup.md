@@ -16,8 +16,14 @@ You change no code except the venue-specific text in step 5.
 
 ## 2. Database (Supabase)
 
-1. Load `supabase/schema.sql`. Its header names the last migration it includes; apply every file in
-   `supabase/migrations/` newer than that one, in filename order.
+1. Do **not** run every migration from the start: the base tables predate the migration files, so the oldest
+   migrations fail on an empty project.
+   - First run `supabase/schema.sql` (a snapshot of the whole database). In the SQL editor, delete its two `psql`-only
+     lines first: `\restrict schemasnapshot` near the top and `\unrestrict schemasnapshot` near the end.
+   - Its header names the last migration it includes. Then run only the files in `supabase/migrations/` newer than
+     that one, in filename order (`ls supabase/migrations | awk '$0 > "<that file name>"'` lists them).
+   - Simpler: refresh the snapshot first with `scripts/dump-schema.sh` (needs the local Supabase stack in Docker),
+     so it covers every migration and step 1 is just `schema.sql`.
 2. Cron: re-run the `cron.schedule` calls in `*_supabase_cron_cleanup.sql` and `*_profile_on_confirm.sql`.
    Set the Vault secrets they read first (the cron URL on their domain and `CRON_SECRET`).
 3. Auth → URL Configuration: Site URL and Redirect URLs on their domain.
