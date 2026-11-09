@@ -24,6 +24,7 @@ const eslintConfig = defineConfig([
     ".impeccable/**",
     "scripts/**",
     "tests/**",
+    "marketing-video/**",
   ]),
 ]);
 
