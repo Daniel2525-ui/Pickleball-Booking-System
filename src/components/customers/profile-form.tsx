@@ -8,9 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 
-type ProfileState = { id: string; fullName: string; phone: string; email: string } | null | "signed-out";
+type ProfileState = { id: string; fullName: string; phone: string; email: string; skillLevel: string } | null | "signed-out";
+
+const LEVELS: Record<string, string> = { "": "Not set", beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" };
 
 /** Lets a signed-in customer correct the name and mobile number staff use at check-in. */
 export function ProfileForm() {
@@ -22,8 +25,8 @@ export function ProfileForm() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return setProfile("signed-out");
-      const { data } = await supabase.from("profiles").select("full_name, phone").eq("id", user.id).maybeSingle();
-      setProfile({ id: user.id, fullName: data?.full_name ?? "", phone: data?.phone ?? "", email: user.email ?? "" });
+      const { data } = await supabase.from("profiles").select("full_name, phone, skill_level").eq("id", user.id).maybeSingle();
+      setProfile({ id: user.id, fullName: data?.full_name ?? "", phone: data?.phone ?? "", email: user.email ?? "", skillLevel: data?.skill_level ?? "" });
     })();
   }, []);
 
@@ -53,7 +56,7 @@ export function ProfileForm() {
     // .select() so an update RLS silently skipped (0 rows) is reported instead of shown as saved
     const { data: updated, error: updateError } = await supabase
       .from("profiles")
-      .update({ full_name: fullName, phone: profile.phone })
+      .update({ full_name: fullName, phone: profile.phone, skill_level: profile.skillLevel || null })
       .eq("id", profile.id)
       .select("id");
     setSaving(false);
@@ -103,6 +106,22 @@ export function ProfileForm() {
               placeholder="11-digit mobile number"
               className="h-11 text-base sm:text-sm"
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="profile-level" className="text-xs font-semibold">Skill Level</Label>
+            <Select value={profile.skillLevel} onValueChange={(v) => setProfile({ ...profile, skillLevel: v ?? "" })}>
+              <SelectTrigger id="profile-level" className="h-11 w-full text-base sm:text-sm">
+                <SelectValue>{() => LEVELS[profile.skillLevel] ?? "Not set"}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(LEVELS).map(([value, label]) => (
+                  <SelectItem key={value || "none"} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">Helps staff balance open play games.</p>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="profile-email" className="text-xs font-semibold">Email Address</Label>

@@ -30,7 +30,7 @@ interface SpotRow {
   open_play_spots: number;
   customer_name: string | null;
   total_amount: number | null;
-  profiles: { full_name: string | null; phone: string | null } | null;
+  profiles: { full_name: string | null; phone: string | null; skill_level: string | null } | null;
   customers: { phone: string | null } | null;
   payments: { status: string; payment_method: string | null; amount: number | null }[];
 }
@@ -62,7 +62,7 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
   const load = useCallback(async () => {
     const { data } = await supabase
       .from("bookings")
-      .select("id, user_id, status, cancel_reason, hold_expires_at, open_play_spots, customer_name, total_amount, profiles:user_id(full_name, phone), customers(phone), payments(status, payment_method, amount)")
+      .select("id, user_id, status, cancel_reason, hold_expires_at, open_play_spots, customer_name, total_amount, profiles:user_id(full_name, phone, skill_level), customers(phone), payments(status, payment_method, amount)")
       .eq("open_play_session_id", session.id)
       .is("court_id", null)
       .order("created_at", { ascending: true });
@@ -171,7 +171,12 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
                 return (
                   <TableRow key={r.id} className={r.status === "cancelled" ? "opacity-60" : ""}>
                     <TableCell>
-                      <span className="block font-semibold">{r.open_play_spots > 1 ? `${name} +${r.open_play_spots - 1}` : name}</span>
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        {r.open_play_spots > 1 ? `${name} +${r.open_play_spots - 1}` : name}
+                        {r.profiles?.skill_level && (
+                          <Badge variant="secondary" className="text-[10px] font-semibold capitalize">{r.profiles.skill_level}</Badge>
+                        )}
+                      </span>
                       <span className="block font-mono text-[11px] text-muted-foreground">Ref {bookingRef(r.id)}</span>
                     </TableCell>
                     <TableCell>
