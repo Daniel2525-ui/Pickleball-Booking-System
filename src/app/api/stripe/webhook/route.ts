@@ -4,6 +4,7 @@ import { getServiceClient } from "@/lib/supabase/service";
 import Stripe from "stripe";
 import { expireCheckoutSession, hasMetadata, reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
 import { settleRefundFromStripe } from "@/lib/services/payments/refundWorker";
+import { sendBookingEmails } from "@/lib/services/bookings/bookingEmails";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -65,6 +66,8 @@ export async function POST(req: NextRequest) {
                 }
 
                 console.log(`Reconciled checkout session ${session.id}: confirmed=${outcome.confirmed.length} refunded=${outcome.refunded.length}`);
+                // Email the confirmation now rather than at the next cron run; never throws
+                if (outcome.confirmed.length > 0) await sendBookingEmails(supabase);
                 break;
             }
 

@@ -6,6 +6,7 @@ import { isAuthorizedCronRequest } from "@/lib/utils/cronAuth";
 import { autoCloseStatus, buildStatusUpdate, openPlayCloseStatus } from "@/lib/services/bookings/adminStatusRules";
 import { HOLD_MS } from "@/lib/services/bookings/bookingDisplayStatus";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
+import { sendBookingEmails } from "@/lib/services/bookings/bookingEmails";
 
 /**
  * Cleanup cron job for expired reservation holds.
@@ -192,6 +193,9 @@ export async function GET(request: Request) {
     const { error: generateError } = await supabase.rpc("generate_open_play_sessions");
     if (generateError) console.error("Open play session generation failed:", generateError);
 
+    // Confirmation and 24-hour reminder emails; never throws
+    const emails = await sendBookingEmails(supabase);
+
     return NextResponse.json({
       success: true,
       message: `Cleanup completed. Cancelled: ${cancelledCount}, Reconciled: ${reconciledCount}, Total examined: ${totalProcessed}, Refunds processed: ${refundResult.processed}.`,
@@ -200,6 +204,7 @@ export async function GET(request: Request) {
       totalProcessed,
       refunds: refundResult,
       autoClosed,
+      emails,
     });
   } catch (error: unknown) {
     console.error("Cron job error:", error);
