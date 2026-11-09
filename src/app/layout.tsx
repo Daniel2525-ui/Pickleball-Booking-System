@@ -27,6 +27,9 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Crosshair Dinkers",
   description: "Dink with precision. Book your court. Play your game.",
+  // The preview image itself is src/app/opengraph-image.tsx
+  openGraph: { siteName: "Crosshair Dinkers", type: "website" },
+  twitter: { card: "summary_large_image" },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
