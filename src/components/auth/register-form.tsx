@@ -62,7 +62,12 @@ export function RegisterForm() {
         return;
       }
 
-      router.push("/login?registered=true");
+      if (result.signedIn) {
+        router.push("/");
+        router.refresh();
+      } else {
+        router.push("/login?registered=true");
+      }
     } catch {
       setError("Unable to complete registration. Please check your connection and try again.");
     } finally {

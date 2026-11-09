@@ -5,7 +5,7 @@ type LoginResult =
     | { success: false; error: string; unconfirmed?: boolean }
 
 export type RegisterResult =
-    | { success: true }
+    | { success: true; signedIn?: boolean }
     | { success: false; error: string }
 
 // Sign-up, sign-in and reset requests go through /api/auth/* so they are rate limited server-side
@@ -29,7 +29,7 @@ export async function register(
 ): Promise<RegisterResult> {
     try {
         const { ok, data } = await postAuth("/api/auth/register", { email, password, fullName, phone })
-        return ok ? { success: true } : { success: false, error: data?.error || "Unable to complete registration. Please try again." }
+        return ok ? { success: true, signedIn: !!data?.signedIn } : { success: false, error: data?.error || "Unable to complete registration. Please try again." }
     } catch {
         return {
             success: false,

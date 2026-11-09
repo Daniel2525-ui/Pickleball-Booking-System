@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         if (!limit.allowed) return tooManyRequests("sign-ups from this network", limit.retryAfterSeconds);
 
         const supabase = await createClient();
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
             email,
             password,
             // Must be in Supabase Auth > URL Configuration > Redirect URLs, or Supabase falls back to the Site URL
@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
         });
         if (error) return NextResponse.json({ error: error.message }, { status: error.status === 429 ? 429 : 400 });
 
-        return NextResponse.json({ success: true });
+        // With "Confirm email" off, Supabase signs the player in right away
+        return NextResponse.json({ success: true, signedIn: !!data.session });
     } catch (error) {
         console.error("Register route error:", error);
         return NextResponse.json({ error: "Unable to complete registration. Please try again." }, { status: 500 });
