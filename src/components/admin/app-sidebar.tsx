@@ -198,7 +198,7 @@ export default function AppSidebar({ account, isOwner }: { account: { name: stri
                         signOutTo="/login"
                         links={[
                             { label: "Customer site", href: "/", icon: "home" },
-                            { label: "Profile and password", href: "/profile", icon: "profile" },
+                            { label: "My profile", href: "/profile", icon: "profile" },
                         ]}
                     />
                 </SidebarFooter>

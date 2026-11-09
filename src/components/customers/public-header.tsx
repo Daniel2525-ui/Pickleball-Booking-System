@@ -92,7 +92,7 @@ export function PublicHeader() {
               { label: "Courts", href: "/#courts", icon: "bookings" },
               { label: "Open Play", href: "/open-play", icon: "bookings" },
               { label: "My bookings", href: "/my-bookings", icon: "bookings" },
-              { label: "Profile and password", href: "/profile", icon: "profile" },
+              { label: "My profile", href: "/profile", icon: "profile" },
             ]}
           />
         ) : (
