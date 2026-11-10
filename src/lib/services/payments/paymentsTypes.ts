@@ -48,6 +48,17 @@ export const paymentMethodLabel = (p: { status: string; payment_method?: string 
     return "QR Ph"; // 'stripe', or null on older online payments
 };
 
+/** Payment badge text on a booking row. A paid payment on a cancelled booking is money still held: kept, or owed back. */
+export const bookingPaymentLabel = (
+    booking: { status: string; cancel_reason?: string | null },
+    p: { status: string; payment_method?: string | null }
+) => {
+    if (p.status === "pending") return "Unpaid";
+    if (p.status !== "paid") return p.status;
+    if (booking.status !== "cancelled") return `Paid • ${paymentMethodLabel(p)}`;
+    return booking.cancel_reason === "payment_kept" ? "Payment kept" : "Refund owed";
+};
+
 /** UTC instants bounding one venue day (Asia/Manila, UTC+8, no DST). */
 export const venueDayWindow = (date: string) => {
     const start = new Date(`${date}T00:00:00+08:00`);

@@ -51,6 +51,8 @@ export interface Booking {
     payments?: BookingPayment | BookingPayment[] | null;
     /** Courts booked in the same checkout (fetchBookings); 1 for a single-court booking */
     basket_size?: number;
+    /** What the whole checkout comes to (checkoutTotal over every court, fetchBookings) */
+    basket_total?: number;
 }
 
 export interface FetchBookingsFilters {

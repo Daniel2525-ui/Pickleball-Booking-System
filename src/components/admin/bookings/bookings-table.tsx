@@ -47,6 +47,8 @@ import { CancelPaidModal } from "./cancelPaidModal";
 import { getBookingStart, getBookingEnd } from "@/lib/utils/bookingTime";
 import { ArrowRightLeft, History } from "lucide-react";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
+import { groupByCheckout, checkoutTotal } from "@/lib/services/bookings/basket";
+import { bookingPaymentLabel } from "@/lib/services/payments/paymentsTypes";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
 import { gameDayBlockReason } from "@/lib/services/bookings/adminStatusRules";
@@ -81,6 +83,12 @@ const capitalize = (status: string) => STATUS_LABELS[status?.toLowerCase()] ?? (
 
 
 const columnCount = 6;
+
+const firstPayment = (b: Booking) => (Array.isArray(b.payments) ? b.payments[0] : b.payments) ?? null;
+const paymentLabel = (b: Booking) => {
+  const payment = firstPayment(b);
+  return payment ? bookingPaymentLabel(b, payment) : null;
+};
 
 interface BookingsTableProps {
   filters?: {
@@ -237,48 +245,37 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     );
   };
 
+  const checkInAll = async (courts: Booking[]) => {
+    if (actionLoadingId) return;
+    setActionLoadingId(courts[0].id);
+    const results = await Promise.all(courts.map((c) => updateBookingStatus(c.id, "checked_in")));
+    const done = courts.filter((_, i) => !results[i].error).map((c) => c.id);
+    setBookingsData((prev) => prev.map((b) => (done.includes(b.id) ? { ...b, status: "checked_in" } : b)));
+    const failed = courts.filter((_, i) => results[i].error);
+    if (failed.length) {
+      toast.error(`Could not check in ${failed.map((c) => c.courts?.name || "a court").join(", ")}: ${results.find((r) => r.error)!.error}`);
+    } else {
+      toast.success(`${done.length} ${done.length === 1 ? "court" : "courts"} checked in.`);
+    }
+    setActionLoadingId(null);
+  };
+
   const renderPaymentBadge = (booking: Booking) => {
-    const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments ?? null);
+    const payment = firstPayment(booking);
     if (!payment) return null;
-
-    if (payment.status === "paid") {
-      const method = payment.payment_method?.toLowerCase();
-      if (method === "cash") {
-        return (
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 text-[11px] font-semibold gap-1">
-            <Banknote className="size-3" />
-            Paid • Cash
-          </Badge>
-        );
-      }
-      if (method === "gcash") {
-        return (
-          <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 text-[11px] font-semibold gap-1">
-            <Smartphone className="size-3" />
-            Paid • QR Ph
-          </Badge>
-        );
-      }
-      return (
-        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 text-[11px] font-semibold gap-1">
-          <CheckCircle2 className="size-3" />
-          Paid • Online
-        </Badge>
-      );
-    }
-
-    if (payment.status === "pending") {
-      return (
-        <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 text-[11px] font-semibold gap-1">
-          <Clock className="size-3" />
-          Unpaid
-        </Badge>
-      );
-    }
-
+    const label = bookingPaymentLabel(booking, payment);
+    const paid = label.startsWith("Paid");
+    const waiting = label === "Unpaid" || label === "Refund owed";
+    const Icon = paid ? (payment.payment_method?.toLowerCase() === "cash" ? Banknote : Smartphone) : waiting ? Clock : null;
+    const tone = paid
+      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+      : waiting
+        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+        : "";
     return (
-      <Badge variant="outline" className="text-[11px] capitalize">
-        {payment.status}
+      <Badge variant="outline" className={`text-[11px] font-semibold gap-1 capitalize ${tone}`}>
+        {Icon && <Icon className="size-3" />}
+        {label}
       </Badge>
     );
   };
@@ -332,8 +329,57 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                   </TableCell>
                 </TableRow>
               ) : (
-                bookingsData.map((booking) => {
-                  const payment = Array.isArray(booking.payments) ? booking.payments[0] : (booking.payments ?? null);
+                // One block per checkout: a header line with what the courts share, then a line per court
+                groupByCheckout(bookingsData).flatMap((group) => {
+                  const grouped = group.length > 1;
+                  const courts = [...group].sort((a, b) => getBookingStart(a).getTime() - getBookingStart(b).getTime());
+                  const head = courts[0];
+                  const size = head.basket_size ?? courts.length;
+                  // Every court loaded: total from the rows, so a status changed here shows at once
+                  const total = courts.length >= size ? checkoutTotal(courts) : head.basket_total ?? checkoutTotal(courts);
+                  const sameDate = courts.every((c) => c.booking_date === head.booking_date);
+                  const samePayment = new Set(courts.map(paymentLabel)).size === 1;
+                  const toCheckIn = courts.filter((c) => c.status === "confirmed" && !c.open_play_spots && !gameDayBlockReason("checked_in", c));
+                  const phone = head.customers?.phone || head.profiles?.phone;
+
+                  return [
+                    grouped && (
+                      <TableRow key={`group-${head.basket_id}`} className="bg-muted/40 hover:bg-muted/40">
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-foreground text-sm">
+                              {head.customer_name || head.profiles?.full_name || "Guest Player"}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {head.customer_id ? "Walk-In Guest" : "Registered Member"}
+                              {phone && (
+                                <> · <a href={`tel:${phone}`} className="underline-offset-2 hover:text-foreground hover:underline">{phone}</a></>
+                              )}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-foreground whitespace-nowrap">
+                            {courts.length < size ? `${courts.length} of ${size} courts` : `${size} courts`}
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-medium text-foreground text-xs sm:text-sm">
+                          {sameDate && formatDate(head.booking_date)}
+                        </TableCell>
+                        <TableCell className="text-right font-black text-foreground text-sm">₱{total.toLocaleString()}</TableCell>
+                        <TableCell>{samePayment && renderPaymentBadge(head)}</TableCell>
+                        <TableCell className="text-right">
+                          {toCheckIn.length > 0 && (
+                            <Button size="sm" variant="outline" disabled={!!actionLoadingId} onClick={() => checkInAll(toCheckIn)}>
+                              <UserCheck className="mr-1.5 h-4 w-4" />
+                              Check in all
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ),
+                    ...courts.map((booking) => {
+                  const payment = firstPayment(booking);
                   const displayStatus = getBookingDisplayStatus(booking);
                   // An expired online hold cannot be revived at the counter (settle_counter_payment refuses it)
                   // Spot rows are settled through the session's players (court-reserving rows are filtered out by fetchBookings)
@@ -344,6 +390,9 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                     <TableRow key={booking.id} className="group">
                       {/* Player info */}
                       <TableCell>
+                        {grouped ? (
+                          <span className="pl-4 font-mono text-[11px] text-muted-foreground">Ref {bookingRef(booking.id)}</span>
+                        ) : (
                         <div className="flex flex-col">
                           <span className="font-semibold text-foreground text-sm">
                             {booking.customer_name || booking.profiles?.full_name || "Guest Player"}
@@ -363,6 +412,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                             </a>
                           )}
                         </div>
+                        )}
                       </TableCell>
 
                       {/* Court */}
@@ -375,9 +425,11 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                       {/* Schedule */}
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-medium text-foreground text-xs sm:text-sm">
-                            {formatDate(booking.booking_date)}
-                          </span>
+                          {(!grouped || !sameDate) && (
+                            <span className="font-medium text-foreground text-xs sm:text-sm">
+                              {formatDate(booking.booking_date)}
+                            </span>
+                          )}
                           <span className="text-xs text-muted-foreground mt-0.5">
                             {formatTime12h(booking.start_time)} – {formatTime12h(booking.end_time)}
                           </span>
@@ -391,7 +443,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                       </TableCell>
 
                       {/* Total Fee */}
-                      <TableCell className="text-right font-black text-foreground text-sm">
+                      <TableCell className={grouped ? "text-right text-xs text-muted-foreground" : "text-right font-black text-foreground text-sm"}>
                         ₱{booking.total_amount ? booking.total_amount.toLocaleString() : "0"}
                       </TableCell>
 
@@ -401,7 +453,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                           <Badge variant="outline" className={`text-xs capitalize ${getStatusColor(displayStatus)}`}>
                             {capitalize(displayStatus)}
                           </Badge>
-                          {renderPaymentBadge(booking)}
+                          {(!grouped || !samePayment) && renderPaymentBadge(booking)}
                         </div>
                       </TableCell>
 
@@ -510,6 +562,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                       </TableCell>
                     </TableRow>
                   );
+                    }),
+                  ];
                 })
               )}
             </TableBody>

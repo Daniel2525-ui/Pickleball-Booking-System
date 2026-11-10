@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { Booking, FetchBookingsFilters } from "./bookingsTypes";
+import { checkoutTotal } from "./basket";
 
 export const BOOKINGS_PAGE_SIZE = 100;
 
@@ -64,6 +65,8 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
             `)
             .order("booking_date", { ascending: false })
             .order("start_time", { ascending: false })
+            // Courts sharing a date and time need a fixed order, or "load more" repeats and skips rows
+            .order("id")
             // A booking can have a later duplicate-charge payment row (20261102); keep the original first for payments[0]
             .order("created_at", { referencedTable: "payments", ascending: true })
             .range(offset, offset + BOOKINGS_PAGE_SIZE - 1)
@@ -101,14 +104,20 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
 
         // Counted over every booking in the basket, so the court filter or paging can't shrink a group
         const basketIds = [...new Set((data ?? []).flatMap((b) => (b.basket_id ? [b.basket_id] : [])))];
-        const sizes = new Map<string, number>();
+        const baskets = new Map<string, { status: string; total_amount: number | null }[]>();
         if (basketIds.length) {
-            const { data: rows, error: basketError } = await supabase.from("bookings").select("basket_id").in("basket_id", basketIds);
+            const { data: rows, error: basketError } = await supabase.from("bookings").select("basket_id, status, total_amount").in("basket_id", basketIds);
             if (basketError) throw basketError;
-            for (const r of rows ?? []) sizes.set(r.basket_id, (sizes.get(r.basket_id) ?? 0) + 1);
+            for (const r of rows ?? []) baskets.set(r.basket_id, [...(baskets.get(r.basket_id) ?? []), r]);
         }
 
-        return { data: (data ?? []).map((b) => ({ ...b, basket_size: b.basket_id ? sizes.get(b.basket_id) ?? 1 : 1 })) as Booking[], error: null };
+        return {
+            data: (data ?? []).map((b) => {
+                const basket = b.basket_id ? baskets.get(b.basket_id) : undefined;
+                return { ...b, basket_size: basket?.length ?? 1, basket_total: basket ? checkoutTotal(basket) : Number(b.total_amount ?? 0) };
+            }) as Booking[],
+            error: null,
+        };
     } catch (error) {
         console.error("Failed to fetch bookings:", error);
         return { data: [], error };
