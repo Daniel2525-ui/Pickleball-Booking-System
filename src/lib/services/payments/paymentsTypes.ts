@@ -41,11 +41,11 @@ export interface FetchPaymentsFilters {
 
 const isPaid = (status: string) => status === "paid" || status === "succeeded";
 
-/** How a payment was made, as staff say it: "Cash", "QR Ph · ref 7741", "QR Ph", or "Not paid yet". */
+/** How a payment was made, as staff say it: "Cash", "QR Ph", or "Not paid yet". */
 export const paymentMethodLabel = (p: { status: string; payment_method?: string | null; payment_reference?: string | null }) => {
     if (p.status === "pending") return "Not paid yet";
     if (p.payment_method === "cash") return "Cash";
-    if (p.payment_method === "gcash") return p.payment_reference ? `QR Ph · ref ${p.payment_reference}` : "QR Ph";
+    if (p.payment_method === "gcash") return "QR Ph"; // front desk QR Ph; its Xendit id stays searchable but is not shown
     return "QR Ph"; // 'stripe', or null on older online payments
 };
 

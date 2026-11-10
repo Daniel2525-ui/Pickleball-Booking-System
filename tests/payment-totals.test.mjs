@@ -17,7 +17,7 @@ test("sumPayments splits collected money by method and keeps refunds apart", () 
 
 test("paymentMethodLabel names the method staff recognise", () => {
     assert.equal(paymentMethodLabel({ status: "paid", payment_method: "cash" }), "Cash");
-    assert.equal(paymentMethodLabel({ status: "paid", payment_method: "gcash", payment_reference: "7741" }), "QR Ph · ref 7741");
+    assert.equal(paymentMethodLabel({ status: "paid", payment_method: "gcash", payment_reference: "7741" }), "QR Ph");
     assert.equal(paymentMethodLabel({ status: "succeeded", payment_method: null }), "QR Ph");
     assert.equal(paymentMethodLabel({ status: "pending", payment_method: null }), "Not paid yet");
 });
