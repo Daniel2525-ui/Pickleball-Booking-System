@@ -255,7 +255,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
     if (failed.length) {
       toast.error(`Could not check in ${failed.map((c) => c.courts?.name || "a court").join(", ")}: ${results.find((r) => r.error)!.error}`);
     } else {
-      toast.success(`${done.length} ${done.length === 1 ? "court" : "courts"} checked in.`);
+      toast.success(`${done.length} ${done.length === 1 ? "booking" : "bookings"} checked in.`);
     }
     setActionLoadingId(null);
   };
@@ -360,7 +360,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                         </TableCell>
                         <TableCell>
                           <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-foreground whitespace-nowrap">
-                            {courts.length < size ? `${courts.length} of ${size} courts` : `${size} courts`}
+                            {/* A line is a court at a time, and one court can be booked twice: count bookings, not courts */}
+                            {courts.length < size ? `${courts.length} of ${size} bookings` : `${size} bookings`}
                           </span>
                         </TableCell>
                         <TableCell className="font-medium text-foreground text-xs sm:text-sm">
@@ -400,7 +401,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                           <span className="text-[11px] text-muted-foreground">
                             {booking.customer_id ? "Walk-In Guest" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(booking.id)}</span>
                             {(booking.basket_size ?? 1) > 1 && (
-                              <span className="ml-1.5 rounded bg-muted px-1.5 py-px font-semibold text-foreground">Group · {booking.basket_size} courts</span>
+                              <span className="ml-1.5 rounded bg-muted px-1.5 py-px font-semibold text-foreground">Group · {booking.basket_size} bookings</span>
                             )}
                           </span>
                           {(booking.customers?.phone || booking.profiles?.phone) && (

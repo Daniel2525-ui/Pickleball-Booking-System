@@ -183,7 +183,7 @@ test("staff cannot settle a basket from a list filtered to one of its courts", a
   await page.getByRole("option", { name: "COURT 3" }).click();
   await expect(rowFor(page, "COURT 4", "10:00 AM")).toHaveCount(0);
   // The group tag counts the whole basket even with its other court filtered out; the member's phone is on the row
-  await expect(rowFor(page, "COURT 3", "10:00 AM").getByText("Group · 2 courts")).toBeVisible();
+  await expect(rowFor(page, "COURT 3", "10:00 AM").getByText("Group · 2 bookings")).toBeVisible();
   await expect(rowFor(page, "COURT 3", "10:00 AM").getByRole("link", { name: "09170000001" })).toHaveAttribute("href", "tel:09170000001");
 
   await rowFor(page, "COURT 3", "10:00 AM").getByRole("button", { name: "Open menu" }).click();
