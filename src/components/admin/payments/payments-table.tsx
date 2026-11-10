@@ -61,17 +61,17 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const needsRefund = (payment: Payment) =>
     payment.status === "paid" && payment.bookings?.status === "cancelled" && payment.bookings?.cancel_reason !== "payment_kept";
 
-  // Where the latest card refund for an owed payment stands, so staff know whether to wait, check Stripe or retry
+  // Where the latest online refund for an owed payment stands. The app cannot send a QR Ph refund itself, so every state asks staff to do it
   const cardRefundState = (payment: Payment) => {
     const latest = [...(payment.refund_requests ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     switch (latest?.status) {
       case "pending":
       case "processing":
-        return { label: "Card refund in progress", tone: "text-muted-foreground", retry: false };
+      case "pending":
+      case "processing":
       case "requires_admin_review":
-        return { label: "Delayed at Stripe: check the Stripe dashboard", tone: "text-amber-700 dark:text-amber-400", retry: false };
       case "failed":
-        return { label: "Card refund failed", tone: "text-destructive", retry: true };
+        return { label: "Refund not sent yet: send it from Xendit, then record it", tone: "text-amber-700 dark:text-amber-400", retry: false };
       default:
         return null;
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import { requireAdmin } from "@/lib/supabase/server";
+import { isXenditId } from "@/lib/xendit";
 import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.ts";
 
 /**
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
         if (method === "cash" || method === "gcash") {
             if (!receiptReference) {
                 return NextResponse.json(
-                    { error: "Enter the receipt or GCash reference for the money handed back." },
+                    { error: "Enter the receipt or refund reference for the money handed back." },
                     { status: 400 }
                 );
             }
@@ -88,6 +89,63 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: "Could not record the refund handover. Please try again." }, { status: 500 });
             }
 
+            return NextResponse.json({ status: "refunded" });
+        }
+
+        // Demo: an online QR Ph payment sits in Xendit, not Stripe. Staff refund it from the Xendit dashboard,
+        // then this records it in the same refund ledger a card refund uses.
+        // shortcut: no money is moved here, call Xendit's refund API instead once QR Ph refunds are confirmed supported
+        if (method === "stripe" && isXenditId(payment.stripe_payment_id)) {
+            if (!receiptReference) {
+                return NextResponse.json({ error: "Enter the Xendit refund reference for the money sent back." }, { status: 400 });
+            }
+            const admin = getServiceClient();
+            if (!admin) return NextResponse.json({ error: "Could not record the refund. Please try again." }, { status: 500 });
+
+            // An automatic refund the app could not send (court lost after payment) is reused, not duplicated
+            const { data: open } = await admin
+                .from("refund_requests")
+                .select("id")
+                .eq("payment_id", payment.id)
+                .neq("status", "succeeded")
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            let refundRequestId: string | undefined = open?.id;
+            if (!refundRequestId) {
+                const { data: reserved, error: reserveErr } = await supabase.rpc("reserve_payment_refund", {
+                    p_payment_id: payment.id,
+                    p_booking_id: payment.booking_id,
+                    p_amount: payment.amount,
+                    p_currency: payment.currency,
+                    p_payment_method: "stripe",
+                    p_reason: reason,
+                    p_idempotency_key: idempotencyKey,
+                    p_stripe_payment_intent: payment.stripe_payment_id,
+                });
+                if (reserveErr || !reserved?.refund_request_id) {
+                    console.error("Refund: reserve_payment_refund (QR Ph) failed:", reserveErr);
+                    return NextResponse.json({ error: "Could not record the refund. Please try again." }, { status: 500 });
+                }
+                refundRequestId = reserved.refund_request_id;
+            }
+
+            const { error: settleErr } = await admin.rpc("settle_stripe_refund", {
+                p_refund_request_id: refundRequestId,
+                p_stripe_refund_id: `xendit:${receiptReference}`,
+                p_stripe_status: "succeeded",
+                p_stripe_payment_intent: payment.stripe_payment_id,
+                p_amount: payment.amount,
+                p_currency: String(payment.currency).toLowerCase(),
+            });
+            if (settleErr) {
+                console.error("Refund: settle_stripe_refund (QR Ph) failed:", settleErr);
+                const used = settleErr.message?.includes("DUPLICATE_STRIPE_REFUND_ID");
+                return NextResponse.json(
+                    { error: used ? "That refund reference is already recorded on another payment." : "Could not record the refund. Please try again." },
+                    { status: used ? 409 : 500 }
+                );
+            }
             return NextResponse.json({ status: "refunded" });
         }
 

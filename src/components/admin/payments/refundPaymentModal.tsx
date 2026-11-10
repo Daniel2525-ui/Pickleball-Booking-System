@@ -54,7 +54,9 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
   if (!payment) return null;
 
   const method = (payment.payment_method || "stripe").toLowerCase();
-  const isManual = method === "cash" || method === "gcash";
+  const isCash = method === "cash";
+  // QR Ph payments keep the Xendit id staff look the payment up by
+  const xenditId = isCash ? null : payment.payment_reference || payment.stripe_payment_id;
   const amount = Number(payment.amount) || 0;
   const customer = payment.bookings?.profiles?.full_name || payment.bookings?.customer_name || "Customer";
 
@@ -63,7 +65,7 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
     setLoading(true);
     setError(null);
 
-    const { status, error: refundErr } = await refundPayment(payment.id, isManual ? receiptReference : undefined);
+    const { status, error: refundErr } = await refundPayment(payment.id, receiptReference);
 
     setLoading(false);
 
@@ -76,7 +78,7 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
       toast.success(`₱${amount.toLocaleString()} refunded to ${customer}`);
       onRefunded(payment.id, "refunded");
     } else {
-      toast.info("Refund queued with Stripe. It will complete automatically.");
+      toast.info("Refund queued. It will complete automatically.");
     }
     setReceiptReference("");
     onOpenChange(false);
@@ -91,11 +93,9 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
             Refund Payment
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
-            {method === "gcash"
-              ? `Send ₱${amount.toLocaleString()} back to the number on the customer's GCash screenshot, then enter the reference of your transfer.`
-              : isManual
+            {isCash
               ? "Hand the cash back to the customer, then record the receipt number here."
-              : "The full amount is returned to the customer's card through Stripe."}
+              : `Send ₱${amount.toLocaleString()} back to the customer from the Xendit dashboard, then enter the refund reference here. This only records the refund.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -114,12 +114,12 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Paid via:</span>
-              <span className="font-semibold uppercase">{method}</span>
+              <span className="font-semibold">{isCash ? "Cash" : "QR Ph"}</span>
             </div>
-            {method === "gcash" && payment.payment_reference && (
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Original GCash ref:</span>
-                <span className="font-mono text-foreground">{payment.payment_reference}</span>
+            {xenditId && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground shrink-0">Xendit payment id:</span>
+                <span className="font-mono text-foreground break-all text-right">{xenditId}</span>
               </div>
             )}
             <div className="flex items-center justify-between border-t border-border/60 pt-1.5 mt-0.5">
@@ -128,7 +128,7 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
             </div>
           </div>
 
-          {method === "gcash" && (
+          {proofPath && (
             <div className="flex flex-col gap-1">
               <span className="text-[11px] font-medium text-muted-foreground">
                 Customer&apos;s GCash screenshot: send the refund to the number under &quot;From&quot;
@@ -146,10 +146,9 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
             </div>
           )}
 
-          {isManual && (
             <div className="flex flex-col gap-1">
               <Label htmlFor="refund-reference" className="text-[11px] font-medium text-muted-foreground">
-                {method === "gcash" ? "GCash reference of your refund transfer" : "Receipt / Voucher Number"}
+                {isCash ? "Receipt / Voucher Number" : "Xendit refund reference"}
               </Label>
               <Input
                 id="refund-reference"
@@ -160,7 +159,6 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
                 className="h-8 text-xs"
               />
             </div>
-          )}
 
           <DialogFooter className="mt-4 pt-2 border-t">
             <Button type="submit" disabled={loading} className="w-full sm:w-auto font-bold text-xs sm:text-sm gap-2">

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { toStripeSession, qrExpiresAt } = await import("../src/lib/xendit.ts");
+const { toStripeSession, qrExpiresAt, isXenditId } = await import("../src/lib/xendit.ts");
 
 const pr = (status, extra = {}) => ({ payment_request_id: "pr-1", reference_id: "b", status, request_amount: 255, currency: "PHP", ...extra });
 
@@ -18,6 +18,13 @@ test("toStripeSession: only a succeeded QR is paid, only a dead one releases the
   // Still payable: cleanup must treat it as uncertain, never as expired
   assert.equal(toStripeSession(pr("REQUIRES_ACTION")).status, "complete");
   assert.equal(toStripeSession(pr("REQUIRES_ACTION")).payment_status, "unpaid");
+});
+
+test("isXenditId: Xendit ids go to the record-only refund, Stripe ids do not", () => {
+  assert.equal(isXenditId("py-cb1e6229"), true);
+  assert.equal(isXenditId("pr-37f35e08"), true);
+  assert.equal(isXenditId("pi_3Qabc"), false);
+  assert.equal(isXenditId(null), false);
 });
 
 test("qrExpiresAt: uses Xendit's expiry", () => {

@@ -1,4 +1,6 @@
 // shortcut: demo-only Xendit test-mode QR Ph client, no refunds or expiry sync; replace with the PayMongo branch for launch
+/** True for a Xendit payment request (pr-) or payment (py-) id, as stored in the stripe_* columns. */
+export const isXenditId = (id: string | null | undefined) => /^p[ry]-/.test(id ?? "");
 export const xenditEnabled = () => Boolean(process.env.XENDIT_SECRET_KEY);
 
 export interface XenditPaymentRequest {
