@@ -35,7 +35,7 @@ interface SpotRow {
   payments: { status: string; payment_method: string | null; amount: number | null }[];
 }
 
-const METHODS: Record<string, string> = { cash: "Cash", gcash: "GCash" };
+const METHODS: Record<string, string> = { cash: "Cash", gcash: "QR Ph" };
 
 // The payment is the source of truth for money; the booking status says whether the spots are still held
 const statusLabel = (r: SpotRow) => {
@@ -186,7 +186,7 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
                         "—"
                       )}
                     </TableCell>
-                    <TableCell>{method ? (METHODS[method] ?? "Card") : "—"}</TableCell>
+                    <TableCell>{method ? (METHODS[method] ?? "QR Ph") : "—"}</TableCell>
                     <TableCell><Badge variant="outline" className="text-xs font-semibold">{statusLabel(r)}</Badge></TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>

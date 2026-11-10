@@ -26,7 +26,7 @@ export default function PaymentFilters({
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name, reference, GCash ref or phone"
+          placeholder="Search by name, reference, QR Ph ref or phone"
           aria-label="Search payment transactions"
           value={filters.search}
           className="pl-9 bg-card border-border shadow-2xs"

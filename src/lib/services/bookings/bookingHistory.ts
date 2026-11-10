@@ -8,7 +8,7 @@ export interface BookingEvent {
     profiles?: { full_name: string | null } | null;
 }
 
-const METHOD: Record<string, string> = { cash: "Cash", gcash: "GCash", stripe: "Card" };
+const METHOD: Record<string, string> = { cash: "Cash", gcash: "QR Ph", stripe: "QR Ph" };
 const REASON: Record<string, string> = {
     expired: "hold expired",
     gcash_rejected: "GCash payment rejected",

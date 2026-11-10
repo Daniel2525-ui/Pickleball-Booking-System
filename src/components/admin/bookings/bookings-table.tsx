@@ -276,7 +276,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
         return (
           <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 text-[11px] font-semibold gap-1">
             <Smartphone className="size-3" />
-            Paid • GCash
+            Paid • QR Ph
           </Badge>
         );
       }

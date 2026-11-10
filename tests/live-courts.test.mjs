@@ -18,7 +18,7 @@ test("a court in play shows the player, slot, time left and that they paid", () 
     assert.deepEqual(tile.slot, { start: "19:00", end: "20:00" });
     assert.equal(tile.minutesLeft, 25);
     assert.equal(Math.round(tile.progress * 100), 58);
-    assert.deepEqual(tile.payment, { paid: true, label: "Paid · GCash" });
+    assert.deepEqual(tile.payment, { paid: true, label: "Paid · QR Ph" });
     assert.deepEqual(tile.next, { name: "Jun Dela Cruz", start: "20:00" });
 });
 

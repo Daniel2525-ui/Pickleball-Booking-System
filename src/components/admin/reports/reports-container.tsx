@@ -134,7 +134,7 @@ function ReportBody({ report }: { report: VenueReport }) {
   // No comparison at all: either all time, or a period that hasn't started
   const noComparison = period.through < period.from ? "Not started yet" : "All time";
   const best = report.series.reduce((a, b) => (b.net > a.net ? b : a), report.series[0]);
-  const moneyMax = Math.max(money.cash, money.gcash, money.card, money.refunded);
+  const moneyMax = Math.max(money.cash, money.gcash + money.card, money.refunded);
 
   return (
     <div className="flex flex-col gap-4">
@@ -163,13 +163,12 @@ function ReportBody({ report }: { report: VenueReport }) {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Where the money came from</CardTitle>
-            <CardDescription>Check each against the cash drawer, the GCash app and Stripe.</CardDescription>
+            <CardDescription>Check each against the cash drawer and the Xendit dashboard.</CardDescription>
           </CardHeader>
           <CardContent>
             <BreakdownBars max={moneyMax} items={[
               { label: "Cash", value: money.cash, display: peso(money.cash) },
-              { label: "GCash", value: money.gcash, display: peso(money.gcash) },
-              { label: "Card", value: money.card, display: peso(money.card) },
+              { label: "QR Ph", value: money.gcash + money.card, display: peso(money.gcash + money.card) },
               { label: "Refunded", value: money.refunded, display: money.refunded ? `−${peso(money.refunded)}` : peso(0), muted: true },
             ]} />
             <dl className="mt-4 flex flex-col gap-1.5 border-t border-border pt-3 text-sm">

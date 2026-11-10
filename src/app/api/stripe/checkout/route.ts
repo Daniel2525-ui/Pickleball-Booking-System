@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. Atomically hold every court slot (all-or-nothing) using database row locks.
-        // Grant an initial 35-minute safety buffer (2100s) to guarantee the courts remain held
+        // Grant the initial 15-minute hold to guarantee the courts remain held
         // while database operations and Stripe Checkout Session creation execute.
         // Prices come from the database so Stripe charges exactly what the holds record.
         const initialHoldExpiresAtIso = new Date(Date.now() + HOLD_MS).toISOString();

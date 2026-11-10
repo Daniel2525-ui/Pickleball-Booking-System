@@ -41,12 +41,12 @@ export interface FetchPaymentsFilters {
 
 const isPaid = (status: string) => status === "paid" || status === "succeeded";
 
-/** How a payment was made, as staff say it: "Cash", "GCash · ref 7741", "Card", or "Not paid yet". */
+/** How a payment was made, as staff say it: "Cash", "QR Ph · ref 7741", "QR Ph", or "Not paid yet". */
 export const paymentMethodLabel = (p: { status: string; payment_method?: string | null; payment_reference?: string | null }) => {
     if (p.status === "pending") return "Not paid yet";
     if (p.payment_method === "cash") return "Cash";
-    if (p.payment_method === "gcash") return p.payment_reference ? `GCash · ref ${p.payment_reference}` : "GCash";
-    return "Card"; // 'stripe', or null on older online payments
+    if (p.payment_method === "gcash") return p.payment_reference ? `QR Ph · ref ${p.payment_reference}` : "QR Ph";
+    return "QR Ph"; // 'stripe', or null on older online payments
 };
 
 /** UTC instants bounding one venue day (Asia/Manila, UTC+8, no DST). */

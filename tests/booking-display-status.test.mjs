@@ -8,9 +8,9 @@ const booking = (fields) => ({ status: "pending", created_at: "2026-10-29T09:50:
 test("pending hold: active until its expiry, 'hold_expired' from the expiry instant", () => {
     assert.equal(getBookingDisplayStatus(booking({ hold_expires_at: "2026-10-29T10:00:01Z" }), now), "pending");
     assert.equal(getBookingDisplayStatus(booking({ hold_expires_at: "2026-10-29T10:00:00Z" }), now), "hold_expired");
-    // No hold_expires_at: same 35-minute fallback as the database
-    assert.equal(isHoldExpired(booking({ created_at: "2026-10-29T09:25:01Z" }), now), false);
-    assert.equal(isHoldExpired(booking({ created_at: "2026-10-29T09:25:00Z" }), now), true);
+    // No hold_expires_at: 15-minute fallback
+    assert.equal(isHoldExpired(booking({ created_at: "2026-10-29T09:45:01Z" }), now), false);
+    assert.equal(isHoldExpired(booking({ created_at: "2026-10-29T09:45:00Z" }), now), true);
 });
 
 test("cancelled: 'expired' only when cleanup recorded expiry; other reasons stay 'cancelled'", () => {

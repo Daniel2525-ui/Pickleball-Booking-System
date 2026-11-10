@@ -62,7 +62,7 @@ export function pctChange(current: number, previous: number | null | undefined):
 
 /** One line per chart bucket, for the owner's accountant. */
 export function reportCsv(report: Pick<VenueReport, "period" | "series">): string {
-    const head = `${report.period.bucket === "month" ? "Month" : "Date"},Bookings,Court hours,Cash,GCash,Card,Refunded,Net`;
-    const lines = report.series.map((r) => [r.key, r.bookings, r.court_hours, r.cash, r.gcash, r.card, r.refunded, r.net].join(","));
+    const head = `${report.period.bucket === "month" ? "Month" : "Date"},Bookings,Court hours,Cash,QR Ph,Refunded,Net`;
+    const lines = report.series.map((r) => [r.key, r.bookings, r.court_hours, r.cash, r.gcash + r.card, r.refunded, r.net].join(","));
     return [head, ...lines].join("\n") + "\n";
 }

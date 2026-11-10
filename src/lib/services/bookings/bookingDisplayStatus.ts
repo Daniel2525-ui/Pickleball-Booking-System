@@ -9,10 +9,10 @@ interface HoldFields {
 }
 
 /**
- * How long an online checkout holds its court (35 minutes). The checkout sets hold_expires_at from this; older holds
+ * How long an online checkout holds its court (15 minutes, the life of a QR Ph code). The checkout sets hold_expires_at from this; older holds
  * without one fall back to created_at + this, the same as the database (hold_court_booking / cancel_expired_booking).
  */
-export const HOLD_MS = 35 * 60 * 1000;
+export const HOLD_MS = 15 * 60 * 1000;
 
 /** GCash proof submitted: the database keeps the hold open forever (hold_expires_at = 'infinity') until staff decide. */
 export const isAwaitingVerification = (booking: HoldFields) =>

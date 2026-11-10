@@ -8,6 +8,7 @@ export interface XenditPaymentRequest {
     request_amount: number;
     currency: string;
     metadata?: Record<string, string>;
+    channel_properties?: { expires_at?: string };
     actions?: { type: string; descriptor: string; value: string }[];
     latest_payment_id?: string;
     latest_payment?: { payment_id?: string; status?: string };
@@ -33,16 +34,25 @@ export const getPaymentRequest = (id: string) =>
     xendit<XenditPaymentRequest>(`/v3/payment_requests/${encodeURIComponent(id)}`);
 
 // The Stripe session fields reconcileCheckoutSession and /api/stripe/verify read, filled from a Xendit payment request
-export async function xenditAsStripeSession(id: string) {
-    const pr = await getPaymentRequest(id);
+export function toStripeSession(pr: XenditPaymentRequest) {
+    const paid = pr.status === "SUCCEEDED";
     return {
         id: pr.payment_request_id,
         metadata: pr.metadata ?? {},
-        payment_status: pr.status === "SUCCEEDED" ? "paid" : "unpaid",
+        payment_status: paid ? "paid" : "unpaid",
+        // Cleanup releases a hold only on "expired"; a QR still payable reads as uncertain ("complete" but unpaid)
+        status: paid || !DEAD.includes(pr.status) ? "complete" : "expired",
         payment_intent: pr.latest_payment_id || pr.latest_payment?.payment_id || pr.payment_request_id,
         currency: pr.currency.toLowerCase(),
         amount_total: Math.round(pr.request_amount * 100),
     } as unknown as import("stripe").Stripe.Checkout.Session;
 }
+const DEAD = ["EXPIRED", "CANCELED", "FAILED"];
+export const xenditAsStripeSession = async (id: string) => toStripeSession(await getPaymentRequest(id));
+
+// Xendit expires a QR Ph code 15 minutes after creating it
+export const QR_LIFETIME_MS = 15 * 60 * 1000;
+export const qrExpiresAt = (pr: XenditPaymentRequest) =>
+    pr.channel_properties?.expires_at ?? new Date(Date.now() + QR_LIFETIME_MS).toISOString();
 
 export const qrString = (pr: XenditPaymentRequest) => pr.actions?.find((a) => a.descriptor === "QR_STRING")?.value ?? null;

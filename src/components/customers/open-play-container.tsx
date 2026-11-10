@@ -41,7 +41,7 @@ export const OpenPlayContainer = () => {
         if (res.error) setLoadFailed(true);
         setSessions(res.data);
         setSignedIn(Boolean(auth.data.user));
-        setGcashEnabled(Boolean(settings.data?.gcash_number));
+        // demo: QR Ph only, the manual GCash option stays hidden
       })
       .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
@@ -149,7 +149,7 @@ export const OpenPlayContainer = () => {
                       onClick={() => setMethod(m)}
                       className={`h-11 rounded-xl border text-sm font-bold ${method === m ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
                     >
-                      {m === "stripe" ? "Card" : "GCash"}
+                      {m === "stripe" ? "QR Ph" : "GCash"}
                     </button>
                   ))}
                 </div>

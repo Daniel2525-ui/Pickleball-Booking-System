@@ -7,29 +7,29 @@ const { isBookingActive, checkSlotAvailability } = await import(
   "../src/lib/services/bookings/checkSlotAvailability.service.ts"
 );
 
-test("checkSlotAvailability: handles null hold_expires_at with 35m created_at fallback and conservative invalid handling", () => {
+test("checkSlotAvailability: handles null hold_expires_at with 15m created_at fallback and conservative invalid handling", () => {
   const now = new Date("2026-10-27T14:00:00Z");
 
-  // 1. Pending booking created 10 minutes ago (within 35m) -> active hold
+  // 1. Pending booking created 10 minutes ago (within 15m) -> active hold
   const recentHold = {
     id: "b-1",
     status: "pending",
     hold_expires_at: null,
     created_at: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
   };
-  assert.equal(isBookingActive(recentHold, now), true, "Hold within 35m fallback window must be active");
+  assert.equal(isBookingActive(recentHold, now), true, "Hold within 15m fallback window must be active");
 
-  // 2. Pending booking created 60 minutes ago (exceeded 35m hold + 20m grace) -> expired hold -> excluded
+  // 2. Pending booking created 60 minutes ago (exceeded 15m hold + 20m grace) -> expired hold -> excluded
   const expiredFallbackHold = {
     id: "b-2",
     status: "pending",
     hold_expires_at: null,
     created_at: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
   };
-  assert.equal(isBookingActive(expiredFallbackHold, now), false, "Hold created >55m ago must be treated as released");
+  assert.equal(isBookingActive(expiredFallbackHold, now), false, "Hold created >35m ago must be treated as released");
 
-  // 2b. Created 40 minutes ago: hold expired but still inside the 20-minute grace period -> still blocks
-  const graceFallbackHold = { ...expiredFallbackHold, created_at: new Date(now.getTime() - 40 * 60 * 1000).toISOString() };
+  // 2b. Created 20 minutes ago: hold expired but still inside the 20-minute grace period -> still blocks
+  const graceFallbackHold = { ...expiredFallbackHold, created_at: new Date(now.getTime() - 20 * 60 * 1000).toISOString() };
   assert.equal(isBookingActive(graceFallbackHold, now), true, "Expired hold inside the grace period must still block");
 
   // 2c. Explicit hold_expires_at: 5 minutes ago blocks (grace), 25 minutes ago does not

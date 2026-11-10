@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
             if (!settings?.gcash_number) {
                 return Response.json({ error: "GCash payments are not available right now." }, { status: 400 });
             }
-        } else if (!process.env.STRIPE_SECRET_KEY) {
+        } else if (!process.env.STRIPE_SECRET_KEY && !process.env.XENDIT_SECRET_KEY) {
             return Response.json({ error: "Stripe is not configured. Please contact the administrator." }, { status: 500 });
         }
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         return Response.json({ url });
     } catch (error) {
         console.error("Open play booking error:", error);
-        // Stripe refused before any session existed: free the spots now instead of holding them 35 minutes.
+        // Stripe refused before any session existed: free the spots now instead of holding them 15 minutes.
         // Ambiguous failures (network) keep the hold; cron cleanup or resume-payment resolves it.
         const definite =
             error instanceof Stripe.errors.StripeInvalidRequestError ||

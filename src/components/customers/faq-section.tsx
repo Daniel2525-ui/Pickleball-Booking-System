@@ -33,7 +33,7 @@ const faqs: FAQItem[] = [
   {
     question: "What does the 'Pending' status on the court grid mean?",
     answer:
-      "When a player proceeds to checkout, the slot is held as 'Pending' for about 35 minutes so nobody else can book it while they pay. If checkout is abandoned, the slot releases back to 'Available' automatically shortly after the hold ends.",
+      "When a player proceeds to checkout, the slot is held as 'Pending' for 15 minutes so nobody else can book it while they pay. If checkout is abandoned, the slot releases back to 'Available' automatically shortly after the hold ends.",
   },
   {
     question: "Are the courts weather-protected for rain and night play?",

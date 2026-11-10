@@ -33,6 +33,7 @@ export interface OpenPlayAdminSession {
   start_time: string;
   end_time: string;
   capacity: number;
+  price_per_spot?: number;
   status: "open" | "cancelled" | "flagged";
   flag_reason: string | null;
   booked: number;
@@ -64,7 +65,7 @@ export function OpenPlayContainer() {
     const from = new Date(today.getTime() - WINDOW_DAYS * 86400000);
     const { data: sess, error } = await supabase
       .from("open_play_sessions")
-      .select("id, session_date, start_time, end_time, capacity, status, flag_reason")
+      .select("id, session_date, start_time, end_time, capacity, status, flag_reason, price_per_spot")
       .gte("session_date", formatManilaDate(from))
       .lt("session_date", formatManilaDate(today))
       .neq("status", "flagged")
@@ -93,7 +94,7 @@ export function OpenPlayContainer() {
       supabase.from("open_play_schedules").select("*").eq("active", true),
       supabase
         .from("open_play_sessions")
-        .select("id, session_date, start_time, end_time, capacity, status, flag_reason")
+        .select("id, session_date, start_time, end_time, capacity, status, flag_reason, price_per_spot")
         .gte("session_date", formatManilaDate(today))
         .lte("session_date", formatManilaDate(end))
         .order("session_date")

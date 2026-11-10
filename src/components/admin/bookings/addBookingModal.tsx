@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { Loader2, Plus, AlertCircle, Search, UserCheck, UserPlus, Banknote, Smartphone, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { CounterQr } from "@/components/admin/payments/counter-qr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,7 +87,9 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
 
   // Payment details
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash" | "unpaid">("cash");
+  // For QR Ph this is the paid code's Xendit id, set when the customer has paid
   const [paymentReference, setPaymentReference] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
 
   const resetForm = () => {
     setPlayerMode("existing");
@@ -309,7 +313,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
+        <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
           {error && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs leading-relaxed">
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
@@ -625,7 +629,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
                 }`}
               >
                 <Smartphone className="size-4" />
-                <span>GCash (Paid)</span>
+                <span>QR Ph</span>
               </button>
 
               <button
@@ -642,23 +646,21 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
               </button>
             </div>
 
-            {/* Optional GCash Reference Field */}
+            {/* shortcut: the QR is paid before the reservation is saved, so a slot taken meanwhile leaves a payment to refund by hand; save as unpaid first before launch */}
             {paymentMethod === "gcash" && (
-              <div className="flex flex-col gap-1 mt-1">
-                <Label className="text-[11px] font-medium text-muted-foreground">
-                  GCash Reference No. (Optional)
-                </Label>
-                <Input
-                  type="text"
-                  placeholder="e.g. 1029384756"
-                  value={paymentReference}
-                  onChange={(e) => setPaymentReference(e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
+              <CounterQr
+                key={amount}
+                amount={Number(amount)}
+                disabled={!startTime || !endTime || !(Number(amount) > 0) || loading}
+                onPaid={(ref) => {
+                  flushSync(() => setPaymentReference(ref));
+                  formRef.current?.requestSubmit();
+                }}
+              />
             )}
           </div>
 
+          {(paymentMethod !== "gcash" || paymentReference) && (
           <DialogFooter className="mt-4 pt-2 border-t">
             <Button
               type="submit"
@@ -675,6 +677,7 @@ export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) =
               )}
             </Button>
           </DialogFooter>
+          )}
         </form>
       </DialogContent>
     </Dialog>

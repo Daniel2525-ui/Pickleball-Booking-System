@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
 import { stripe as defaultStripe } from "../../stripe.ts";
 import { reconcileCheckoutSession } from "./reconcileCheckoutSession.ts";
+import { xenditAsStripeSession } from "../../xendit.ts";
 
 export interface ExpiredBooking {
     id: string;
@@ -41,7 +42,9 @@ export async function cleanupExpiredBooking(
 
         let session: Stripe.Checkout.Session;
         try {
-            session = await stripeClient.checkout.sessions.retrieve(payment.stripe_session_id);
+            session = payment.stripe_session_id.startsWith("pr-")
+                ? await xenditAsStripeSession(payment.stripe_session_id)
+                : await stripeClient.checkout.sessions.retrieve(payment.stripe_session_id);
         } catch (err) {
             // An API error never means unpaid
             console.error(`Uncertain Stripe state for payment ${payment.id} on booking ${booking.id}:`, (err as Error).message);

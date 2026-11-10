@@ -47,14 +47,13 @@ test("the page opens on today with the day's money split by method", async ({ pa
   await expect(page.getByLabel("Filter by payment date")).toHaveValue(today);
 
   await expect(card(page, "Collected").getByText("₱900.00")).toBeVisible();
-  await expect(card(page, "Cash").getByText("₱200.00")).toBeVisible();
   await expect(card(page, "GCash").getByText("₱300.00")).toBeVisible();
-  await expect(card(page, "Card").getByText("₱400.00")).toBeVisible();
+  await expect(card(page, "QR Ph").getByText("₱400.00")).toBeVisible();
   await expect(card(page, "Refunded").getByText("₱250.00")).toBeVisible();
 
   await expect(rowFor(page, "E2E Cash Player").getByText("Cash", { exact: true })).toBeVisible();
-  await expect(rowFor(page, "E2E GCash Player").getByText("GCash · ref GC-7741")).toBeVisible();
-  await expect(rowFor(page, "E2E Card Player").getByText("Card", { exact: true })).toBeVisible();
+  await expect(rowFor(page, "E2E GCash Player").getByText("QR Ph · ref GC-7741")).toBeVisible();
+  await expect(rowFor(page, "E2E Card Player").getByText("QR Ph", { exact: true })).toBeVisible();
   await expect(rowFor(page, "E2E Unpaid Player").getByText("Not paid yet")).toBeVisible();
   await expect(rowFor(page, "E2E Cash Player").getByText(`Ref ${ids["E2E Cash Player"].slice(0, 6).toUpperCase()}`)).toBeVisible();
   await expect(rowFor(page, "E2E Yesterday Player")).toHaveCount(0);

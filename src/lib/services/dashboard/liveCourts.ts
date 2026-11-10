@@ -36,7 +36,7 @@ export interface LiveCourtTile {
     next: { name: string; start: string } | null;
 }
 
-const METHODS: Record<string, string> = { cash: "Cash", gcash: "GCash" };
+const METHODS: Record<string, string> = { cash: "Cash", gcash: "QR Ph" };
 const hhmm = (t: string) => t.slice(0, 5);
 
 /** The name staff use for a booking: walk-ins are marked, open play is just "Open play". */
@@ -48,7 +48,7 @@ export const liveName = (s: LiveSlot) =>
 function paymentLine(s: LiveSlot): LiveCourtTile["payment"] {
     if (s.open_play_session_id) return null;
     const paid = (s.payments ?? []).find((p) => p.status === "paid");
-    if (paid) return { paid: true, label: `Paid · ${METHODS[paid.payment_method ?? ""] ?? "Card"}` };
+    if (paid) return { paid: true, label: `Paid · ${METHODS[paid.payment_method ?? ""] ?? "QR Ph"}` };
     if (s.status === "pending" && s.hold_expires_at === "infinity") return { paid: false, label: "GCash · waiting for your check" };
     const owed = (s.payments ?? []).filter((p) => p.status === "pending").reduce((sum, p) => sum + Number(p.amount || 0), 0) || Number(s.total_amount || 0);
     return { paid: false, label: `Unpaid · collect ₱${owed.toLocaleString("en-PH")}` };

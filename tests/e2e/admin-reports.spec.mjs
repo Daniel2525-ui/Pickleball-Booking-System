@@ -47,7 +47,7 @@ test("CSV matches the screen", async ({ page }) => {
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download CSV" }).click()]);
   expect(download.suggestedFilename()).toBe("reports-2026-09-01-to-2026-09-30.csv");
   const lines = readFileSync(await download.path(), "utf8").trim().split("\n");
-  expect(lines[0]).toBe("Date,Bookings,Court hours,Cash,GCash,Card,Refunded,Net");
+  expect(lines[0]).toBe("Date,Bookings,Court hours,Cash,QR Ph,Refunded,Net");
   expect(lines).toHaveLength(31);
   expect(lines.find((l) => l.startsWith("2026-09-10"))).toBe("2026-09-10,3,3,400,350,300,0,1050");
 });

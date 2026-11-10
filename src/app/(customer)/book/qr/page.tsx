@@ -1,13 +1,19 @@
-import QRCode from "qrcode";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { buttonVariants } from "@/components/ui/button";
 import { PublicHeader } from "@/components/customers/public-header";
 import { XenditQrPoller } from "@/components/customers/xendit-qr-poller";
-import { getPaymentRequest, qrString } from "@/lib/xendit";
+import { getPaymentRequest, qrExpiresAt } from "@/lib/xendit";
+import { qrImage } from "@/lib/xenditQr";
+import { QrPhImage } from "@/components/customers/qr-ph-image";
 
 export default async function QrPaymentPage({ searchParams }: { searchParams: Promise<{ pr?: string }> }) {
   const { pr: prId } = await searchParams;
-  const pr = prId?.startsWith("pr-") ? await getPaymentRequest(prId).catch(() => null) : null;
-  const qr = pr && qrString(pr);
-  const src = qr ? await QRCode.toDataURL(qr, { margin: 1, width: 288 }) : null;
+  const pr = prId?.startsWith("pr-") ? await getPaymentRequest(prId).catch((err) => (console.error("QR page: Xendit lookup failed:", err), null)) : null;
+  // Already paid (page reopened or refreshed): the success page confirms the booking
+  if (pr?.status === "SUCCEEDED") redirect(`/book/success?session_id=${encodeURIComponent(pr.payment_request_id)}`);
+  const expired = pr !== null && ["EXPIRED", "CANCELED", "FAILED"].includes(pr.status);
+  const src = pr ? await qrImage(pr) : null;
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -18,13 +24,17 @@ export default async function QrPaymentPage({ searchParams }: { searchParams: Pr
           {pr && src ? (
             <>
               <p className="text-sm text-muted-foreground">Open GCash, Maya or your bank app and scan this QR Ph code.</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="QR Ph payment code" width={288} height={288} className="mx-auto rounded-lg bg-white p-2" />
+              <QrPhImage src={src} />
               <p className="text-3xl font-extrabold">₱{pr.request_amount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</p>
-              <XenditQrPoller prId={pr.payment_request_id} testMode={Boolean(process.env.XENDIT_SECRET_KEY?.startsWith("xnd_development_"))} />
+              <XenditQrPoller prId={pr.payment_request_id} expiresAt={qrExpiresAt(pr)} testMode={Boolean(process.env.XENDIT_SECRET_KEY?.startsWith("xnd_development_"))} />
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">This payment could not be loaded. Check My Bookings for your reservation.</p>
+            <>
+              <p className="text-sm text-muted-foreground">
+                {expired ? "This QR code has expired and your court hold was released. No payment was taken." : "This payment could not be loaded. Check My Bookings for your reservation."}
+              </p>
+              <Link href={expired ? "/#booking" : "/my-bookings"} className={buttonVariants({ className: "w-full h-11 font-bold" })}>{expired ? "Book again" : "My Bookings"}</Link>
+            </>
           )}
         </div>
       </main>

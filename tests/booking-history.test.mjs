@@ -17,7 +17,7 @@ test("describeEvent words the details staff need", () => {
     assert.equal(describeEvent(ev({ action: "cancelled", detail: "gcash_rejected" }), null).detail, "GCash payment rejected");
     assert.equal(describeEvent(ev({ action: "cancelled", detail: "payment_kept|Late cancellation" }), null).detail, "payment kept: Late cancellation");
     assert.equal(describeEvent(ev({ action: "cancelled", detail: "admin" }), null).detail, null);
-    assert.equal(describeEvent(ev({ action: "paid", detail: "gcash · ref 7741 · 300.00" }), null).detail, "GCash · ref 7741 · ₱300");
-    assert.equal(describeEvent(ev({ action: "refunded", detail: "stripe · 1200.00" }), null).detail, "Card · ₱1,200");
+    assert.equal(describeEvent(ev({ action: "paid", detail: "gcash · ref 7741 · 300.00" }), null).detail, "QR Ph · ref 7741 · ₱300");
+    assert.equal(describeEvent(ev({ action: "refunded", detail: "stripe · 1200.00" }), null).detail, "QR Ph · ₱1,200");
     assert.equal(describeEvent(ev({ action: "moved", detail: "COURT 1 · Nov 6 10:00 AM → COURT 2 · Nov 6 10:00 AM" }), null).detail, "COURT 1 · Nov 6 10:00 AM → COURT 2 · Nov 6 10:00 AM");
 });

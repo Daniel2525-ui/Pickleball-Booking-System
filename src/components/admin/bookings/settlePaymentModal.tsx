@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Loader2, Banknote, Smartphone, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { settleCounterPayment } from "@/lib/services/payments/settleCounterPayment.service";
 import { Booking } from "@/lib/services/bookings/bookingsTypes";
+import { CounterQr } from "@/components/admin/payments/counter-qr";
 
 interface SettlePaymentModalProps {
   booking: Booking | null;
@@ -36,7 +36,6 @@ export const SettlePaymentModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash">("cash");
-  const [paymentReference, setPaymentReference] = useState("");
 
   if (!booking) return null;
 
@@ -44,8 +43,8 @@ export const SettlePaymentModal = ({
   const courts = due?.ids.length ?? 1;
   const amount = due?.total ?? (booking.total_amount || 0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // `reference` is the paid QR Ph code; cash has none
+  const settle = async (reference?: string) => {
     if (!payment?.id) {
       setError("No pending payment record found for this reservation.");
       return;
@@ -58,7 +57,7 @@ export const SettlePaymentModal = ({
       paymentId: payment.id,
       bookingId: booking.id,
       paymentMethod,
-      paymentReference: paymentMethod === "gcash" ? paymentReference : undefined,
+      paymentReference: reference,
       expectedAmount: amount,
     });
 
@@ -69,7 +68,7 @@ export const SettlePaymentModal = ({
     } else {
       // The basket RPC reports what it actually settled, including courts not loaded in this list
       const settled = Number(data?.amount) || amount;
-      toast.success(`Payment of ₱${settled.toLocaleString()} received via ${paymentMethod.toUpperCase()}`);
+      toast.success(`Payment of ₱${settled.toLocaleString()} received via ${paymentMethod === "cash" ? "cash" : "QR Ph"}`);
       onSettled(due?.ids ?? [booking.id], paymentMethod);
       onOpenChange(false);
     }
@@ -88,7 +87,7 @@ export const SettlePaymentModal = ({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
+        <form onSubmit={(e) => { e.preventDefault(); if (paymentMethod === "cash") void settle(); }} className="flex flex-col gap-4 py-2">
           {error && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs leading-relaxed">
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
@@ -141,29 +140,15 @@ export const SettlePaymentModal = ({
                 }`}
               >
                 <Smartphone className="size-4" />
-                <span>GCash Transfer</span>
+                <span>QR Ph</span>
               </button>
             </div>
           </div>
 
-          {/* GCash Reference Field (required by /api/admin/payments/settle) */}
-          {paymentMethod === "gcash" && (
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="gcash-reference" className="text-[11px] font-medium text-muted-foreground">
-                GCash Reference Code
-              </Label>
-              <Input
-                id="gcash-reference"
-                type="text"
-                required
-                placeholder="e.g. 1029384756"
-                value={paymentReference}
-                onChange={(e) => setPaymentReference(e.target.value)}
-                className="h-8 text-xs"
-              />
-            </div>
-          )}
+          {/* Stored as 'gcash' with the QR's Xendit id as its reference (the database knows cash and gcash) */}
+          {paymentMethod === "gcash" && <CounterQr key={amount} amount={amount} disabled={loading} onPaid={(ref) => void settle(ref)} />}
 
+          {paymentMethod === "cash" && (
           <DialogFooter className="mt-4 pt-2 border-t">
             <Button
               type="submit"
@@ -180,6 +165,7 @@ export const SettlePaymentModal = ({
               )}
             </Button>
           </DialogFooter>
+          )}
         </form>
       </DialogContent>
     </Dialog>

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { paymentIdsMetadata } from "./reconcileCheckoutSession.ts";
-import { xendit, xenditEnabled, type XenditPaymentRequest } from "@/lib/xendit";
+import { qrExpiresAt, xendit, xenditEnabled, type XenditPaymentRequest } from "@/lib/xendit";
 
 export interface CheckoutLine {
     bookingId: string;
@@ -94,7 +94,8 @@ async function openXenditQr({ supabase, lines, basketId }: { supabase: SupabaseC
         description: `Court booking ${lines[0]?.bookingDate ?? ""}`,
         metadata: { basket_id: basketId, ...paymentIdsMetadata(lines.map((l) => l.paymentId)) },
     });
-    const holdExpiresAtIso = new Date(Date.now() + 35 * 60 * 1000).toISOString();
+    // The hold ends exactly when the QR does: 15 minutes
+    const holdExpiresAtIso = new Date(qrExpiresAt(pr)).toISOString();
     for (const l of lines) {
         const { error } = await supabase.rpc("confirm_checkout_hold", {
             p_booking_id: l.bookingId,

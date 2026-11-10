@@ -591,7 +591,7 @@ export const BookingContainer = () => {
         lines={basket}
         isLoading={isCheckoutLoading}
         error={checkoutError}
-        gcashEnabled={gcashEnabled}
+        gcashEnabled={false} // demo: QR Ph only, the manual GCash option is hidden
         onConfirm={confirmBooking}
       />
 

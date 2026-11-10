@@ -15,6 +15,8 @@ import { StaffCard } from "./staff-card";
 import { PolicyCard } from "./policy-card";
 import { ContactCard } from "./contact-card";
 
+// demo: QR Ph replaces the manual GCash flow, so its settings are hidden
+const SHOW_GCASH_SETTINGS: boolean = false;
 const BOTH_OR_NONE = "Enter both the account name and the GCash number, or clear both to turn GCash off.";
 
 export function SettingsContainer() {
@@ -136,6 +138,7 @@ export function SettingsContainer() {
 
   return (
     <div className="flex flex-col gap-6">
+      {SHOW_GCASH_SETTINGS && (
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-xl font-bold">GCash Payments</CardTitle>
@@ -227,6 +230,7 @@ export function SettingsContainer() {
           {dirty && <p className="text-xs text-muted-foreground">You have unsaved changes.</p>}
         </CardContent>
       </Card>
+      )}
 
       <ContactCard onChanged={loadHistory} />
 

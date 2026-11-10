@@ -31,7 +31,7 @@ export default async function Home() {
   const stats = [
     { value: courtCount ? String(courtCount) : "—", label: "regulation courts, 44 × 20 ft" },
     { value: fromRate ? `₱${fromRate.toLocaleString()}` : "—", label: "per court, per hour. Paddles and balls included" },
-    { value: "35 min", label: "hold on your slot while you pay" },
+    { value: "15 min", label: "hold on your slot while you pay" },
   ];
 
   return (

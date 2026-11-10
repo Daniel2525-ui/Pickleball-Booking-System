@@ -8,7 +8,6 @@ import {
   CreditCard,
   ReceiptText,
   DollarSign,
-  Smartphone,
   Undo2,
 } from "lucide-react";
 import {
@@ -132,8 +131,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const summaryCards = [
     { title: "Collected", value: money(totals?.collected), note: totals ? `${totals.collectedCount} ${totals.collectedCount === 1 ? "payment" : "payments"} · ${dayLabel}` : dayLabel, icon: DollarSign, tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
     { title: "Cash", value: money(totals?.cash), note: "Should be in the drawer", icon: Banknote, tone: "bg-lime-500/10 text-lime-700 dark:text-lime-400" },
-    { title: "GCash", value: money(totals?.gcash), note: "Check against the GCash app", icon: Smartphone, tone: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-    { title: "Card", value: money(totals?.card), note: "Paid online by card", icon: CreditCard, tone: "bg-primary/10 text-primary" },
+    { title: "QR Ph", value: money(totals ? totals.gcash + totals.card : undefined), note: "Online and front desk. Check against Xendit", icon: CreditCard, tone: "bg-primary/10 text-primary" },
     { title: "Refunded", value: money(totals?.refunded), note: totals ? `${totals.refundedCount} returned to customers` : "", icon: Undo2, tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
   ];
 
@@ -182,10 +180,9 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   return (
     <div className="flex flex-col gap-6">
       {/* The chosen day's money, split by method for closing out the drawer */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-        {summaryCards.map(({ title, value, note, icon: Icon, tone }, i) => (
-          // The fifth card spans both columns on phones so it doesn't sit alone at half width
-          <Card key={title} className={`shadow-2xs border border-border bg-card ${i === 4 ? "col-span-2 lg:col-span-1" : ""}`}>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {summaryCards.map(({ title, value, note, icon: Icon, tone }) => (
+          <Card key={title} className="shadow-2xs border border-border bg-card">
             <CardHeader className="p-4 pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>

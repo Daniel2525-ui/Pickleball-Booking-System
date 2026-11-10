@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { flushSync } from "react-dom";
+import { CounterQr } from "@/components/admin/payments/counter-qr";
 import { Loader2, Search, UserCheck, UserPlus, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +32,7 @@ export function AddWalkupModal({ session, onClose, onAdded }: Props) {
   const [spots, setSpots] = useState("1");
   const [method, setMethod] = useState<"cash" | "gcash">("cash");
   const [reference, setReference] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,7 +90,7 @@ export function AddWalkupModal({ session, onClose, onAdded }: Props) {
             Record a walk-up for {session.session_date} · {formatTime12h(session.start_time)}. Payment is taken at the counter.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <form ref={formRef} onSubmit={submit} className="flex flex-col gap-4">
           {error && (
             <div role="alert" className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs">
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
@@ -162,24 +165,31 @@ export function AddWalkupModal({ session, onClose, onAdded }: Props) {
                   onClick={() => setMethod(m)}
                   className={`p-2.5 rounded-lg border text-xs font-semibold transition-colors ${method === m ? "border-primary bg-primary/10 text-foreground font-bold" : "border-border text-muted-foreground hover:bg-muted/50"}`}
                 >
-                  {m === "cash" ? "Cash" : "GCash"}
+                  {m === "cash" ? "Cash" : "QR Ph"}
                 </button>
               ))}
             </div>
             {method === "gcash" && (
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="walkup-ref" className="text-[11px] font-medium text-muted-foreground">GCash reference no.</Label>
-                <Input id="walkup-ref" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. 1029384756" required />
-              </div>
+              <CounterQr
+                key={spots}
+                amount={Number(spots) * Number(session.price_per_spot ?? 0)}
+                disabled={!player || saving || !(Number(spots) * Number(session.price_per_spot ?? 0) > 0)}
+                onPaid={(ref) => {
+                  flushSync(() => setReference(ref));
+                  formRef.current?.requestSubmit();
+                }}
+              />
             )}
           </fieldset>
 
+          {(method !== "gcash" || reference) && (
           <DialogFooter>
             <Button type="submit" disabled={saving} className="gap-2 font-bold">
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {saving ? "Adding..." : "Add player"}
             </Button>
           </DialogFooter>
+          )}
         </form>
       </DialogContent>
     </Dialog>

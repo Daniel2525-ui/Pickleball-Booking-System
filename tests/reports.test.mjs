@@ -36,11 +36,11 @@ test("the CSV has one plain line per day", () => {
     };
     assert.equal(
         reportCsv(report),
-        "Date,Bookings,Court hours,Cash,GCash,Card,Refunded,Net\n2026-10-01,3,4,400,200,0,0,600\n2026-10-02,0,0,0,0,0,0,0\n",
+        "Date,Bookings,Court hours,Cash,QR Ph,Refunded,Net\n2026-10-01,3,4,400,200,0,600\n2026-10-02,0,0,0,0,0,0\n",
     );
 });
 
 test("long periods are summed by month in the CSV", () => {
     const report = { period: { from: "2026-06-01", to: "2026-08-31", through: "2026-08-31", bucket: "month" }, series: [row("2026-06")] };
-    assert.equal(reportCsv(report).split("\n")[0], "Month,Bookings,Court hours,Cash,GCash,Card,Refunded,Net");
+    assert.equal(reportCsv(report).split("\n")[0], "Month,Bookings,Court hours,Cash,QR Ph,Refunded,Net");
 });
