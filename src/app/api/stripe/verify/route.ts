@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
+import { xenditAsStripeSession } from "@/lib/xendit";
 import { getServiceClient } from "@/lib/supabase/service";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { reconcileCheckoutSession } from "@/lib/services/payments/reconcileCheckoutSession";
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Retrieve session from Stripe
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const session = sessionId.startsWith("pr-") ? await xenditAsStripeSession(sessionId) : await stripe.checkout.sessions.retrieve(sessionId);
 
         if (!session) {
             return Response.json({ error: "Session not found" }, { status: 404 });

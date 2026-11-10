@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { paymentIdsMetadata } from "./reconcileCheckoutSession.ts";
+import { xendit, xenditEnabled, type XenditPaymentRequest } from "@/lib/xendit";
 
 export interface CheckoutLine {
     bookingId: string;
@@ -32,6 +33,7 @@ export async function openBasketCheckout({
     customerEmail?: string;
     baseUrl: string;
 }): Promise<{ url: string | null; confirmError: { message?: string } | null }> {
+    if (xenditEnabled()) return openXenditQr({ supabase, lines, basketId });
     const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
         line_items: lines.map((l) => ({
@@ -77,4 +79,30 @@ export async function openBasketCheckout({
     }
 
     return { url: session.url, confirmError: null };
+}
+
+// Demo: a Xendit QR Ph payment request stands in for the Stripe session (its id fills stripe_session_id)
+async function openXenditQr({ supabase, lines, basketId }: { supabase: SupabaseClient; lines: CheckoutLine[]; basketId: string }) {
+    const pr = await xendit<XenditPaymentRequest>("/v3/payment_requests", {
+        reference_id: basketId,
+        type: "PAY",
+        country: "PH",
+        currency: "PHP",
+        request_amount: lines.reduce((sum, l) => sum + l.amount, 0),
+        capture_method: "AUTOMATIC",
+        channel_code: "QRPH",
+        description: `Court booking ${lines[0]?.bookingDate ?? ""}`,
+        metadata: { basket_id: basketId, ...paymentIdsMetadata(lines.map((l) => l.paymentId)) },
+    });
+    const holdExpiresAtIso = new Date(Date.now() + 35 * 60 * 1000).toISOString();
+    for (const l of lines) {
+        const { error } = await supabase.rpc("confirm_checkout_hold", {
+            p_booking_id: l.bookingId,
+            p_payment_id: l.paymentId,
+            p_stripe_session_id: pr.payment_request_id,
+            p_hold_expires_at: holdExpiresAtIso,
+        });
+        if (error) return { url: null, confirmError: error };
+    }
+    return { url: `/book/qr?pr=${encodeURIComponent(pr.payment_request_id)}`, confirmError: null };
 }

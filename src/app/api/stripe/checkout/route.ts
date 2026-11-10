@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     let createdPaymentIds: string[] = [];
 
     try {
-        if (!process.env.STRIPE_SECRET_KEY) {
+        if (!process.env.STRIPE_SECRET_KEY && !process.env.XENDIT_SECRET_KEY) {
             return Response.json(
                 { error: "Stripe is not configured. Please contact the administrator." },
                 { status: 500 }

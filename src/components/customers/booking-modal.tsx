@@ -102,7 +102,7 @@ export const BookingModal = ({
                 onClick={() => setMethod(m)}
                 className={`h-11 rounded-xl border text-sm font-bold ${method === m ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
               >
-                {m === "card" ? "Card" : "GCash"}
+                {m === "card" ? "QR Ph" : "GCash"}
               </button>
             ))}
           </div>
