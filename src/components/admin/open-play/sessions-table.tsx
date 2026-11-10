@@ -94,15 +94,11 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                             {s.status === "open" && !hasEnded(s) && (
                               <DropdownMenuItem
                                 onClick={() => onCancel(s)}
-                                disabled={s.awaiting}
                                 className="cursor-pointer text-destructive focus:text-destructive text-xs font-semibold"
                               >
                                 <XCircle className="mr-2 h-4 w-4" />
                                 Cancel this date
                               </DropdownMenuItem>
-                            )}
-                            {s.status === "open" && !hasEnded(s) && s.awaiting && (
-                              <p className="px-2 py-1.5 text-[11px] text-amber-800 dark:text-amber-300">Approve or reject the GCash payments waiting for verification first.</p>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>

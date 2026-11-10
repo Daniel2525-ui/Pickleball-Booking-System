@@ -62,7 +62,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
 
         const search = filters?.search?.trim() ?? "";
         if (search) {
-            // Payer name, booking ref or phone (the Bookings search), or the GCash reference on the payment itself
+            // Payer name, booking ref or phone (the Bookings search), or the reference on the payment itself
             // shortcut: matches at most 200 bookings per search, plenty for a name or ref; raise if a common name misses rows
             const { data: matches, error: matchError } = await supabase.from("bookings").select("id").or(await bookingSearchFilter(search)).limit(200);
             if (matchError) throw matchError;

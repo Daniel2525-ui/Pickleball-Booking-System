@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
             .eq("id", booking.id)
             .eq("user_id", user.id)
             .eq("status", booking.status)
-            // A GCash proof submitted meanwhile makes the hold infinite: staff decide then (.or keeps NULL holds)
+            // A hold the database keeps open with no end is left alone (.or keeps NULL holds)
             .or("hold_expires_at.is.null,hold_expires_at.neq.infinity")
             .select("id, status")
             .maybeSingle();

@@ -15,7 +15,7 @@ export const fetchLiveCourts = async (now: Date = new Date()): Promise<{ data: L
                 .select("id, court_id, booking_date, start_time, end_time, status, hold_expires_at, total_amount, open_play_session_id, customer_name, profiles(full_name), customers(full_name), payments(status, amount, payment_method)")
                 .eq("booking_date", today)
                 .not("court_id", "is", null)
-                // Pending included: liveCourtTile keeps those whose hold hasn't run out (e.g. GCash waiting for staff)
+                // Pending included: liveCourtTile keeps those whose hold hasn't run out
                 .in("status", ["pending", "confirmed", "checked_in", "in_progress"]),
             supabase.from("open_play_sessions").select("id, capacity").eq("session_date", today).neq("status", "cancelled"),
         ]);

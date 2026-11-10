@@ -7,7 +7,7 @@ import { useVenueContact } from "@/hooks/use-venue-contact";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/cancelBooking.service";
 import { getBookingStart } from "@/lib/utils/bookingTime";
-import { cancellationNote, getBookingDisplayStatus, isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
+import { cancellationNote, getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 import { checkoutTotal, groupByCheckout, isLive, pendingBasketSize, settleHold } from "@/lib/services/bookings/basket";
 
 // Badges for bookings that are no longer awaiting payment or confirmed (EXPIRED = checkout timed out, nothing charged)
@@ -17,7 +17,6 @@ const HISTORY_LABELS: Record<string, string> = {
   no_show: "NO-SHOW",
   completed: "COMPLETED",
   checked_in: "CHECKED IN",
-  awaiting_verification: "AWAITING VERIFICATION",
   in_progress: "IN PROGRESS",
 };
 import { formatTime12h } from "@/lib/utils/formatTime";
@@ -128,7 +127,7 @@ export const BookingHistoryContainer = () => {
     };
   }, []);
 
-  // Staff approving a GCash payment or cancelling shows up without a reload (realtime only sends this player's rows)
+  // Staff confirming or cancelling a booking shows up without a reload (realtime only sends this player's rows)
   useLiveRefresh(() => fetchCurrentUserBookings().then((latest) => !latest.failed && setBookings(latest.bookings)));
 
   const handleConfirmCancel = async () => {
@@ -298,14 +297,6 @@ export const BookingHistoryContainer = () => {
                           <CheckCircle2 className="size-3" />
                           CONFIRMED PASS
                         </Badge>
-                      ) : isAwaitingVerification(booking) ? (
-                        <Badge
-                          variant="outline"
-                          className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold text-xs gap-1"
-                        >
-                          <Clock className="size-3" />
-                          {HISTORY_LABELS.awaiting_verification}
-                        </Badge>
                       ) : booking.status === "pending" ? (
                         <BookingCountdown
                           bookingId={booking.id}
@@ -398,8 +389,7 @@ export const BookingHistoryContainer = () => {
                     </span>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mt-3 w-full sm:w-auto">
-                      {/* A submitted GCash payment waits on staff; there is nothing left to pay */}
-                      {booking.status === "pending" && !isAwaitingVerification(booking) && (
+                      {booking.status === "pending" && (
                         <Button
                           id={`resume-booking-${booking.id}`}
                           size="sm"

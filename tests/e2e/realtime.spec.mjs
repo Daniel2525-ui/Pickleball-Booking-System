@@ -18,17 +18,6 @@ const insertAwaitingGcash = (date, name) => {
   return id;
 };
 
-test("the dashboard shows a new GCash payment and booking without a reload", async ({ page }) => {
-  requireLocalDb();
-  await login(page, account("ADMIN"));
-  await page.goto("/admin/dashboard");
-  await expect(page.getByText("No matches scheduled today")).toBeVisible();
-
-  insertAwaitingGcash(today(), "E2E Realtime Walk");
-  await expect(page.getByText("1 GCash payment to verify")).toBeVisible();
-  await expect(page.getByText("E2E Realtime Walk")).toBeVisible();
-});
-
 test("the bookings table shows a booking made elsewhere without a reload", async ({ page }) => {
   requireLocalDb();
   await login(page, account("ADMIN"));
@@ -37,15 +26,4 @@ test("the bookings table shows a booking made elsewhere without a reload", async
 
   insertAwaitingGcash(today(), "E2E Realtime Table");
   await expect(page.getByText("E2E Realtime Table").first()).toBeVisible();
-});
-
-test("a player's GCash booking turns confirmed when staff approve it", async ({ page }) => {
-  requireLocalDb();
-  const id = insertAwaitingGcash(today(), "E2E Realtime Player");
-  await login(page, account("CUSTOMER"));
-  await page.goto("/my-bookings");
-  await expect(page.getByText("AWAITING VERIFICATION")).toBeVisible();
-
-  sql(`UPDATE public.bookings SET status = 'confirmed', hold_expires_at = NULL WHERE id = '${id}'`);
-  await expect(page.getByText("CONFIRMED PASS")).toBeVisible();
 });

@@ -15,7 +15,7 @@ export interface BookingFiltersState {
 }
 
 export default function BookingsContainer() {
-  // ?status= lets the dashboard GCash alert open this page pre-filtered
+  // ?status= lets a dashboard alert open this page pre-filtered
   const params = useSearchParams();
   const statusParam = params.get("status");
   const initialStatus = statusParam || "All Statuses";

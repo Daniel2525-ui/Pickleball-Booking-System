@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
         // 2. Parse the basket
         const body = await request.json().catch(() => null);
         const booking_date = body?.booking_date;
-        const isGcash = body?.payment_method === "gcash";
         const lines: unknown = body?.lines;
 
         if (typeof booking_date !== "string" || !booking_date) {
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
         const dayOfWeek = getBookingWeekday(booking_date);
         const [{ data: operatingHour, error: opError }, { data: limits, error: limitsError }] = await Promise.all([
             supabase.from("operating_hours").select("is_open, open_time, close_time").eq("day_of_week", dayOfWeek).maybeSingle(),
-            supabase.from("booking_settings").select("min_hours, gcash_number").maybeSingle(),
+            supabase.from("booking_settings").select("min_hours").maybeSingle(),
         ]);
 
         if (opError || limitsError || !limits) {
@@ -73,10 +72,6 @@ export async function POST(request: NextRequest) {
                 { error: "Failed to verify venue operating hours." },
                 { status: 500 }
             );
-        }
-
-        if (isGcash && !limits.gcash_number) {
-            return Response.json({ error: "GCash payments are not available right now." }, { status: 400 });
         }
 
         // Server-side validation of every line: shape, one per court, whole-hour boundaries,
@@ -110,7 +105,7 @@ export async function POST(request: NextRequest) {
         // Prices come from the database so Stripe charges exactly what the holds record.
         const initialHoldExpiresAtIso = new Date(Date.now() + HOLD_MS).toISOString();
 
-        const { data: rpcResult, error: rpcError } = await supabase.rpc(isGcash ? "hold_gcash_basket" : "hold_court_basket", {
+        const { data: rpcResult, error: rpcError } = await supabase.rpc("hold_court_basket", {
             p_booking_date: booking_date,
             p_lines: validation.lines.map((l) => ({
                 court_id: l.courtId,
@@ -124,19 +119,6 @@ export async function POST(request: NextRequest) {
             const msg = rpcError.message ?? "";
 
             if (msg.includes("OPEN_BASKET_EXISTS")) {
-                // The open basket may be a GCash payment only the club can settle, possibly on another date
-                const { count: verifying } = await supabase
-                    .from("bookings")
-                    .select("id", { count: "exact", head: true })
-                    .eq("user_id", user.id)
-                    .eq("status", "pending")
-                    .eq("hold_expires_at", "infinity");
-                if (verifying) {
-                    return Response.json(
-                        { error: "Your GCash payment is being verified. You can book again once the staff confirms it." },
-                        { status: 409 }
-                    );
-                }
                 return Response.json(
                     { error: "You already have a reservation awaiting payment. Complete or cancel it under 'My Bookings' first." },
                     { status: 409 }
@@ -170,10 +152,6 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            if (msg.includes("GCASH_NOT_CONFIGURED")) {
-                return Response.json({ error: "GCash payments are not available right now." }, { status: 400 });
-            }
-
             if (msg.includes("INVALID_ARGUMENT")) {
                 return Response.json({ error: "Invalid booking details." }, { status: 400 });
             }
@@ -204,11 +182,6 @@ export async function POST(request: NextRequest) {
                 { error: "Could not create reservation hold. Please try again." },
                 { status: 500 }
             );
-        }
-
-        // GCash: the player pays outside Stripe, on our pay page
-        if (isGcash) {
-            return Response.json({ url: `/book/gcash?basket=${basket.basket_id}` });
         }
 
         // 4. One Stripe Checkout for every held court, each hold tied to it under the court lock

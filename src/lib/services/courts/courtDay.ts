@@ -10,7 +10,7 @@ export interface CourtSlot {
 }
 
 /** The booking still holds its court: any live status, or a pending one whose hold hasn't run out
- *  (a GCash booking waiting for staff to check the payment is held with no end: 'infinity'). Same rule as the database. */
+ *  (the database may hold a booking with no end: 'infinity'). Same rule as the database. */
 export const holdsCourt = (b: CourtSlot, now: Date = new Date()) =>
     b.status !== "pending" || b.hold_expires_at === "infinity" || (!!b.hold_expires_at && new Date(b.hold_expires_at) > now);
 

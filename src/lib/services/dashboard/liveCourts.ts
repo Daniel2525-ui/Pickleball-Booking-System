@@ -49,7 +49,6 @@ function paymentLine(s: LiveSlot): LiveCourtTile["payment"] {
     if (s.open_play_session_id) return null;
     const paid = (s.payments ?? []).find((p) => p.status === "paid");
     if (paid) return { paid: true, label: `Paid · ${METHODS[paid.payment_method ?? ""] ?? "QR Ph"}` };
-    if (s.status === "pending" && s.hold_expires_at === "infinity") return { paid: false, label: "GCash · waiting for your check" };
     const owed = (s.payments ?? []).filter((p) => p.status === "pending").reduce((sum, p) => sum + Number(p.amount || 0), 0) || Number(s.total_amount || 0);
     return { paid: false, label: `Unpaid · collect ₱${owed.toLocaleString("en-PH")}` };
 }

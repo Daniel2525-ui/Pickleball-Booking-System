@@ -5,7 +5,7 @@ import { qrExpiresAt, xendit, xenditEnabled, type XenditPaymentRequest } from "@
 import { qrImage } from "@/lib/xenditQr";
 
 // Demo: a QR Ph code the front desk shows a walk-in. Staff record the payment once Xendit reports it paid.
-// shortcut: the paid QR is not tied to the booking on the server (staff are trusted, as with a typed GCash reference); verify it in the settle RPCs before launch
+// shortcut: the paid QR is not tied to the booking on the server (staff are trusted); verify it in the settle RPCs before launch
 export async function POST(request: NextRequest) {
     try {
         const { denied } = await requireAdmin();

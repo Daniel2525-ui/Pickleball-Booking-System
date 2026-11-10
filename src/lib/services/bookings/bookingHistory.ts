@@ -11,7 +11,6 @@ export interface BookingEvent {
 const METHOD: Record<string, string> = { cash: "Cash", gcash: "QR Ph", stripe: "QR Ph" };
 const REASON: Record<string, string> = {
     expired: "hold expired",
-    gcash_rejected: "GCash payment rejected",
     checkout_failed: "checkout failed",
     slot_conflict: "slot was taken",
     court_unavailable: "court unavailable",

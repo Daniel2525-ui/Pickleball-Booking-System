@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { countRefundsOwed, countToCollect } from "@/lib/services/payments/paymentsData.service";
-import { countAwaitingGcash } from "@/lib/services/bookings/filterBookingsData.service";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 
 // Keyed by name because the dashboard is a server component and cannot pass functions down
@@ -20,12 +19,6 @@ const ALERTS = {
     href: `/admin/payments?status=${encodeURIComponent("To Collect")}`,
     label: (n: number) => `${n} ${n === 1 ? "booking" : "bookings"} to collect`,
     detail: "unpaid walk-in and counter bookings.",
-  },
-  gcash: {
-    load: countAwaitingGcash,
-    href: `/admin/bookings?status=${encodeURIComponent("Awaiting Verification")}`,
-    label: (n: number) => `${n} GCash ${n === 1 ? "payment" : "payments"} to verify`,
-    detail: "customers sent a screenshot and are waiting for approval.",
   },
 };
 

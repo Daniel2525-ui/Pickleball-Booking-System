@@ -11,7 +11,6 @@ import {
 import { Search, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
-import { countAwaitingGcash } from "@/lib/services/bookings/filterBookingsData.service";
 import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 
 interface BookingFiltersProps {
@@ -33,7 +32,6 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
   const [courtId, setCourtId] = useState(initialCourt);
   const [dateTime, setDateTime] = useState(initialDate);
   const [courts, setCourts] = useState<CourtOption[]>([]);
-  const [awaiting, setAwaiting] = useState(0);
 
   useEffect(() => {
     const loadCourts = async () => {
@@ -42,7 +40,6 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
     };
 
     loadCourts();
-    countAwaitingGcash().then(setAwaiting);
   }, []);
 
   const updateFilters = (
@@ -95,9 +92,6 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
             <SelectItem value="All Statuses">All Statuses</SelectItem>
             <SelectItem value="Confirmed">Confirmed</SelectItem>
             <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="Awaiting Verification">
-              Awaiting Verification{awaiting > 0 ? ` (${awaiting})` : ""}
-            </SelectItem>
             <SelectItem value="Checked In">Checked In</SelectItem>
             <SelectItem value="Completed">Completed</SelectItem>
             <SelectItem value="No-Show">No-Show</SelectItem>

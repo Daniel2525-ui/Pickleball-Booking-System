@@ -47,8 +47,7 @@ test("the page opens on today with the day's money split by method", async ({ pa
   await expect(page.getByLabel("Filter by payment date")).toHaveValue(today);
 
   await expect(card(page, "Collected").getByText("₱900.00")).toBeVisible();
-  await expect(card(page, "GCash").getByText("₱300.00")).toBeVisible();
-  await expect(card(page, "QR Ph").getByText("₱400.00")).toBeVisible();
+  await expect(card(page, "QR Ph").getByText("₱700.00")).toBeVisible();
   await expect(card(page, "Refunded").getByText("₱250.00")).toBeVisible();
 
   await expect(rowFor(page, "E2E Cash Player").getByText("Cash", { exact: true })).toBeVisible();

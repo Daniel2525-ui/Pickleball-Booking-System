@@ -25,19 +25,7 @@ export function describeSettingsChange(c: Pick<SettingsChange, "area" | "before"
         if (b.no_show_grace_minutes !== a.no_show_grace_minutes) lines.push(`No-show grace period: ${b.no_show_grace_minutes} → ${a.no_show_grace_minutes} minutes`);
         return lines;
     }
-    if (c.area !== "gcash") {
-        return Object.keys({ ...b, ...a })
-            .filter((k) => (b[k] ?? null) !== (a[k] ?? null))
-            .map((k) => `${k.replace(/_/g, " ")}: ${shown(b[k])} → ${shown(a[k])}`);
-    }
-    const lines: string[] = [];
-    if (!b.number && a.number) lines.push("GCash turned on");
-    if (b.number && !a.number) lines.push("GCash turned off");
-    if ((b.number ?? null) !== (a.number ?? null) && b.number && a.number) lines.push(`GCash number: ${b.number} → ${a.number}`);
-    else if (!b.number && a.number) lines.push(`GCash number: ${a.number}`);
-    if ((b.account_name ?? null) !== (a.account_name ?? null) && a.account_name) {
-        lines.push(b.account_name ? `Account name: ${b.account_name} → ${a.account_name}` : `Account name: ${a.account_name}`);
-    }
-    if ((b.qr_url ?? null) !== (a.qr_url ?? null)) lines.push(!b.qr_url ? "QR code added" : !a.qr_url ? "QR code removed" : "QR code replaced");
-    return lines;
+    return Object.keys({ ...b, ...a })
+        .filter((k) => (b[k] ?? null) !== (a[k] ?? null))
+        .map((k) => `${k.replace(/_/g, " ")}: ${shown(b[k])} → ${shown(a[k])}`);
 }

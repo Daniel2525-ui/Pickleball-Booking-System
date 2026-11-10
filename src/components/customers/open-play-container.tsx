@@ -20,10 +20,8 @@ export const OpenPlayContainer = () => {
   const [sessions, setSessions] = useState<OpenPlaySession[]>([]);
   const [loading, setLoading] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
-  const [gcashEnabled, setGcashEnabled] = useState(false);
   const [active, setActive] = useState<OpenPlaySession | null>(null);
   const [spots, setSpots] = useState(1);
-  const [method, setMethod] = useState<"stripe" | "gcash">("stripe");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -34,14 +32,12 @@ export const OpenPlayContainer = () => {
     Promise.all([
       fetchOpenPlaySessions(formatManilaDate(today), formatManilaDate(new Date(today.getTime() + WINDOW_DAYS * 86_400_000))),
       supabase.auth.getUser(),
-      supabase.from("booking_settings").select("gcash_number").maybeSingle(),
     ])
-      .then(([res, auth, settings]) => {
+      .then(([res, auth]) => {
         // A failed load must not read as "no sessions scheduled"
         if (res.error) setLoadFailed(true);
         setSessions(res.data);
         setSignedIn(Boolean(auth.data.user));
-        // demo: QR Ph only, the manual GCash option stays hidden
       })
       .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
@@ -53,7 +49,6 @@ export const OpenPlayContainer = () => {
     if (!signedIn) return router.push("/login");
     setActive(s);
     setSpots(1);
-    setMethod("stripe");
     setError(null);
   };
 
@@ -61,7 +56,7 @@ export const OpenPlayContainer = () => {
     if (!active) return;
     setSubmitting(true);
     setError(null);
-    const { url, error } = await bookOpenPlay(active.id, spots, gcashEnabled ? method : "stripe");
+    const { url, error } = await bookOpenPlay(active.id, spots);
     if (url) return void (window.location.href = url);
     setError(error ?? "Could not book your spots.");
     setSubmitting(false);
@@ -138,22 +133,6 @@ export const OpenPlayContainer = () => {
                   </Button>
                 </div>
               </div>
-              {gcashEnabled && (
-                <div role="radiogroup" aria-label="Payment method" className="grid grid-cols-2 gap-2">
-                  {(["stripe", "gcash"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      role="radio"
-                      aria-checked={method === m}
-                      onClick={() => setMethod(m)}
-                      className={`h-11 rounded-xl border text-sm font-bold ${method === m ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
-                    >
-                      {m === "stripe" ? "QR Ph" : "GCash"}
-                    </button>
-                  ))}
-                </div>
-              )}
               <div className="flex items-center justify-between rounded-xl bg-muted p-4">
                 <span className="text-sm text-muted-foreground">Total</span>
                 <span className="text-lg font-extrabold">₱{(spots * Number(active.price_per_spot)).toLocaleString()}</span>

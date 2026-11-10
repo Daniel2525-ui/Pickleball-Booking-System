@@ -122,11 +122,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // A GCash basket is paid on our own page, not Stripe
-        if (clicked.payments[0]?.payment_method === "gcash") {
-            return Response.json({ url: `/book/gcash?basket=${booking.basket_id}` });
-        }
-
         for (const line of siblings) {
             // 5. Check if the scheduled match time has already passed
             if (getBookingStart(line) <= new Date()) {

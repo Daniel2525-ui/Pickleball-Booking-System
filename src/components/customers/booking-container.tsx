@@ -35,7 +35,6 @@ import { formatManilaDate } from "@/lib/utils/bookingTime";
 import { checkSlotAvailability, getSlotBooking, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
-import { isAwaitingVerification } from "@/lib/services/bookings/bookingDisplayStatus";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
 import { lineKey, mergeSpans, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
@@ -57,7 +56,6 @@ export const BookingContainer = () => {
   const [closures, setClosures] = useState<VenueClosure[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [pricing, setPricing] = useState<Pricing | null>(null);
-  const [gcashEnabled, setGcashEnabled] = useState(false);
   const [bookings, setBookings] = useState<BookingSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
@@ -103,15 +101,13 @@ export const BookingContainer = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
-      const [hoursRes, courtsRes, pricingRes, gcashRes, closuresRes] = await Promise.all([
+      const [hoursRes, courtsRes, pricingRes, closuresRes] = await Promise.all([
         fetchOperatingHours(),
         fetchCourtsData(),
         fetchPricing(browserSupabase),
-        browserSupabase.from("booking_settings").select("gcash_account_name, gcash_number").maybeSingle(),
         fetchUpcomingClosures(),
       ]);
       setClosures(closuresRes.data);
-      setGcashEnabled(Boolean(gcashRes.data?.gcash_number));
       if (hoursRes.data) setOperatingHours(hoursRes.data);
       if (pricingRes.data) setPricing(pricingRes.data);
       if (courtsRes.data) {
@@ -244,10 +240,6 @@ export const BookingContainer = () => {
     // If user clicked their own pending slot, allow them to resume or cancel
     if (status === "user_pending") {
       const slotBooking = getSlotBooking(courtName, time, courts, bookings);
-      if (isAwaitingVerification({ status: "pending", created_at: "", hold_expires_at: slotBooking?.hold_expires_at })) {
-        toast.info("Your GCash payment is being verified. You can book again once the staff confirms it.");
-        return;
-      }
       if (slotBooking?.id) {
         setPendingBookingToResume({
           bookingId: slotBooking.id,
@@ -322,7 +314,7 @@ export const BookingContainer = () => {
   const myHold = user
     ? courtNames.flatMap((court) => timeSlots.filter((time) => getSlotStatus(selectedDate, court, time) === "user_pending").map((time) => ({ court, time })))[0]
     : undefined;
-  const myHoldVerifying = myHold ? isAwaitingVerification({ status: "pending", created_at: "", hold_expires_at: getSlotBooking(myHold.court, myHold.time, courts, bookings)?.hold_expires_at }) : false;
+
 
   const handleResumeGridBooking = async () => {
     if (!pendingBookingToResume || isResumingGridBooking) return;
@@ -355,7 +347,7 @@ export const BookingContainer = () => {
     setIsCancellingGridBooking(false);
   };
 
-  const confirmBooking = async (paymentMethod: "card" | "gcash") => {
+  const confirmBooking = async () => {
     if (basket.length === 0 || !user) return;
 
     setIsCheckoutLoading(true);
@@ -368,7 +360,7 @@ export const BookingContainer = () => {
         return { courtId: court.id, timeRange: line.time };
       });
 
-      const url = await createCheckoutSession({ date: basket[0].date, lines, paymentMethod });
+      const url = await createCheckoutSession({ date: basket[0].date, lines });
 
       window.location.assign(url);
     } catch (err: unknown) {
@@ -437,18 +429,12 @@ export const BookingContainer = () => {
       <div className="flex flex-col gap-4">
           {myHold && (
             <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm">
-              {myHoldVerifying ? (
-                <span>Your GCash payment is being verified. You can book again once the staff confirms it.</span>
-              ) : (
-                <>
-                  <span>
-                    You have an unpaid hold on <b>{myHold.court}</b>, {compactRange([myHold.time], 0, 1)}. Pay before it expires.
-                  </span>
-                  <Button size="sm" className="font-bold" onClick={() => handleSlotClick(myHold.court, myHold.time)}>
-                    Resume
-                  </Button>
-                </>
-              )}
+              <span>
+                You have an unpaid hold on <b>{myHold.court}</b>, {compactRange([myHold.time], 0, 1)}. Pay before it expires.
+              </span>
+              <Button size="sm" className="font-bold" onClick={() => handleSlotClick(myHold.court, myHold.time)}>
+                Resume
+              </Button>
             </div>
           )}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -591,7 +577,6 @@ export const BookingContainer = () => {
         lines={basket}
         isLoading={isCheckoutLoading}
         error={checkoutError}
-        gcashEnabled={false} // demo: QR Ph only, the manual GCash option is hidden
         onConfirm={confirmBooking}
       />
 

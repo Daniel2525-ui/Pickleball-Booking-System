@@ -14,7 +14,6 @@ export const CANCELLED_STATUS = "cancelled";
 
 // Relative import so node:test can load this module without the @/ alias
 import { getBookingStart } from "../../utils/bookingTime.ts";
-import { isAwaitingVerification } from "./bookingDisplayStatus.ts";
 export { getBookingStart };
 
 interface CancellableBookingFields {
@@ -41,10 +40,6 @@ export const getCancellationBlockReason = (
 
     if (!(customerCancellableStatuses as readonly string[]).includes(status)) {
         return `Bookings with status "${booking.status}" can no longer be cancelled.`;
-    }
-
-    if (isAwaitingVerification({ ...booking, status, created_at: "" })) {
-        return "Your GCash payment is being verified. Please contact the staff to cancel.";
     }
 
     const start = getBookingStart(booking);

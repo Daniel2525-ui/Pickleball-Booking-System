@@ -19,19 +19,14 @@ export async function POST(request: NextRequest) {
         const parsed = parseSpotRequest(await request.json().catch(() => null));
         if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });
 
-        if (parsed.method === "gcash") {
-            const { data: settings } = await supabase.from("booking_settings").select("gcash_number").maybeSingle();
-            if (!settings?.gcash_number) {
-                return Response.json({ error: "GCash payments are not available right now." }, { status: 400 });
-            }
-        } else if (!process.env.STRIPE_SECRET_KEY && !process.env.XENDIT_SECRET_KEY) {
-            return Response.json({ error: "Stripe is not configured. Please contact the administrator." }, { status: 500 });
+        if (!process.env.STRIPE_SECRET_KEY && !process.env.XENDIT_SECRET_KEY) {
+            return Response.json({ error: "Online payment is not configured. Please contact the administrator." }, { status: 500 });
         }
 
         const { data: held, error: rpcError } = await supabase.rpc("hold_open_play_spots", {
             p_session_id: parsed.sessionId,
             p_spots: parsed.spots,
-            p_payment_method: parsed.method,
+            p_payment_method: "stripe",
         });
         if (rpcError) {
             const mapped = sessionErrorResponse(rpcError.message);
@@ -43,10 +38,6 @@ export async function POST(request: NextRequest) {
             return Response.json({ error: "Failed to reserve your spots. Please try again." }, { status: 500 });
         }
         hold = held;
-
-        if (parsed.method === "gcash") {
-            return Response.json({ url: `/book/gcash?basket=${held.basket_id}` });
-        }
 
         // The hold result carries no time; read the held row (RLS lets the owner see it)
         const { data: row } = await supabase

@@ -31,12 +31,12 @@ export const fetchOpenPlaySessions = async (from: string, to: string) => {
     return { data: (data ?? []) as OpenPlaySession[], error };
 };
 
-export const bookOpenPlay = async (sessionId: string, spots: number, method: "stripe" | "gcash"): Promise<{ url?: string; error?: string }> => {
+export const bookOpenPlay = async (sessionId: string, spots: number): Promise<{ url?: string; error?: string }> => {
     try {
         const res = await fetch("/api/open-play/book", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId, spots, payment_method: method }),
+            body: JSON.stringify({ sessionId, spots }),
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok || !body.url) return { error: body.error ?? "Could not book your spots. Please try again." };

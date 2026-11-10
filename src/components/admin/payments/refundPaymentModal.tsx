@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, Undo2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { supabase } from "@/lib/supabase";
 import { refundPayment } from "@/lib/services/payments/refundPayment.service";
 import { Payment } from "@/lib/services/payments/paymentsTypes";
 
@@ -29,28 +28,6 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receiptReference, setReceiptReference] = useState("");
-  const [proof, setProof] = useState<{ path: string; url: string | null } | null>(null);
-
-  // Staff read the customer's GCash number off their payment screenshot to send the refund
-  const proofPath = payment?.payment_method?.toLowerCase() === "gcash" ? payment.gcash_proof_path : null;
-  // Keyed by path so a previous payment's screenshot never shows on this one
-  const loaded = proof && proof.path === proofPath ? proof : null;
-  const proofUrl = loaded?.url ?? null;
-  const proofFailed = !!loaded && !loaded.url;
-  useEffect(() => {
-    if (!open || !proofPath) return;
-    let stale = false;
-    supabase.storage
-      .from("gcash-receipts")
-      .createSignedUrl(proofPath, 300)
-      .then(({ data }) => {
-        if (!stale) setProof({ path: proofPath, url: data?.signedUrl ?? null });
-      });
-    return () => {
-      stale = true;
-    };
-  }, [open, proofPath]);
-
   if (!payment) return null;
 
   const method = (payment.payment_method || "stripe").toLowerCase();
@@ -127,24 +104,6 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
               <span className="font-extrabold text-sm text-foreground">₱{amount.toLocaleString()}</span>
             </div>
           </div>
-
-          {proofPath && (
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium text-muted-foreground">
-                Customer&apos;s GCash screenshot: send the refund to the number under &quot;From&quot;
-              </span>
-              {proofUrl ? (
-                <a href={proofUrl} target="_blank" rel="noopener noreferrer" title="Open full size">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not optimisable */}
-                  <img src={proofUrl} alt="Customer's GCash payment screenshot" className="max-h-64 w-full rounded-lg border border-border object-contain bg-muted/30 cursor-zoom-in" />
-                </a>
-              ) : (
-                <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">
-                  {!proofPath ? "No screenshot" : proofFailed ? "Couldn't load screenshot" : <Loader2 className="size-4 animate-spin" />}
-                </div>
-              )}
-            </div>
-          )}
 
             <div className="flex flex-col gap-1">
               <Label htmlFor="refund-reference" className="text-[11px] font-medium text-muted-foreground">

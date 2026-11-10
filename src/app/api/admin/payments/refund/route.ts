@@ -9,7 +9,7 @@ import { processPendingRefundJobs } from "@/lib/services/payments/refundWorker.t
  *
  * - Stripe: reserves a full refund in the ledger (reserve_payment_refund) and runs the existing
  *   refund worker immediately; anything it cannot finish is retried by the cron job.
- * - Cash / GCash: staff hand the money back, then this records the handover receipt
+ * - Cash / front desk QR Ph (stored as 'gcash'): staff hand or send the money back, then this records the receipt
  *   (request_manual_cash_refund + confirm_manual_cash_refund).
  * Full refunds only, enforced by the database. Idempotent per payment.
  */

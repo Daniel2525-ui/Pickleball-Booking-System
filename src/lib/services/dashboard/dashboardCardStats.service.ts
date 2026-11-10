@@ -44,7 +44,7 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
     if (error) throw error;
 
     const allBookings = bookings || [];
-    // fetchCourtsData loads today's court holds itself, including GCash bookings waiting for staff
+    // fetchCourtsData loads today's court holds itself
     const courtStats = await availableCourts();
 
     let todayBookingsCount = 0;

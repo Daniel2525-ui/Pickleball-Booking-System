@@ -15,16 +15,17 @@ export async function POST(request: NextRequest) {
         const paymentMethod = typeof body?.paymentMethod === "string" ? body.paymentMethod.trim().toLowerCase() : "";
         const paymentReference = typeof body?.paymentReference === "string" ? body.paymentReference.trim() : null;
 
+        // 'gcash' is the value the database stores for a front desk QR Ph payment (its Xendit id is the reference)
         if (!paymentId || !bookingId || (paymentMethod !== "cash" && paymentMethod !== "gcash")) {
             return NextResponse.json(
-                { error: "paymentId, bookingId, and a valid paymentMethod ('cash' or 'gcash') are required." },
+                { error: "paymentId, bookingId, and a valid paymentMethod are required." },
                 { status: 400 }
             );
         }
 
         if (paymentMethod === "gcash" && !paymentReference) {
             return NextResponse.json(
-                { error: "paymentReference is required for GCash payments." },
+                { error: "The QR Ph payment reference is required." },
                 { status: 400 }
             );
         }

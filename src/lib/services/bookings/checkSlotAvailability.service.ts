@@ -83,7 +83,7 @@ export const isBookingActive = (b: BookingSlot, now: Date = new Date()): boolean
         return true;
     }
 
-    // GCash awaiting verification ('infinity' parses as NaN): held until staff decide
+    // An infinite hold (the database may keep one open) parses as NaN: keep it held
     if (b.hold_expires_at === "infinity") return true;
 
     // Pending hold expiry evaluation

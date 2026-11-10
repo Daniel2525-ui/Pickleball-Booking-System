@@ -90,7 +90,7 @@ export const fetchTodayCourtBookings = async () => {
         .select(COURT_BOOKING_COLUMNS)
         .eq("booking_date", formatManilaDate())
         .not("court_id", "is", null)
-        // Pending included: courtNowNext keeps those whose hold hasn't run out (e.g. GCash waiting for staff)
+        // Pending included: courtNowNext keeps those whose hold hasn't run out
         .in("status", ["pending", "confirmed", "checked_in", "in_progress"]);
     if (error) console.error("Failed to fetch today's court bookings:", error);
     return { data: (data ?? []) as unknown as CourtBooking[], error };

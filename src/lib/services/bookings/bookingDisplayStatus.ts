@@ -14,10 +14,6 @@ interface HoldFields {
  */
 export const HOLD_MS = 15 * 60 * 1000;
 
-/** GCash proof submitted: the database keeps the hold open forever (hold_expires_at = 'infinity') until staff decide. */
-export const isAwaitingVerification = (booking: HoldFields) =>
-    booking.status === "pending" && booking.hold_expires_at === "infinity";
-
 /** True for an online hold whose checkout window is over, before or after cleanup has cancelled it. */
 export const isHoldExpired = (booking: HoldFields, now: Date = new Date()) => {
     if (booking.status !== "pending") return false;
@@ -42,11 +38,10 @@ export const cancellationNote = (booking: {
     refund_status?: string | null;
 }): { text: string; charged: boolean } | null => {
     if (booking.status !== "cancelled") return null;
-    if (booking.cancel_reason === "gcash_rejected") return { text: "GCash payment could not be verified", charged: false };
     if (booking.cancel_reason === "payment_kept") return { text: "Cancelled by the venue · Payment kept under the venue's cancellation policy", charged: true };
     const payments = booking.payments ?? [];
     const outstanding = payments.find((p) => p.status === "paid");
-    // A paid row on a cancelled booking is money still owed back: card refunds run automatically, cash/GCash at the counter
+    // A paid row on a cancelled booking is money still owed back: online refunds are sent by the venue, cash at the counter
     const cardRefund =
         booking.refund_status === "failed" ? "Refund failed · The venue will contact you"
         : booking.refund_status === "requires_admin_review" ? "Refund delayed · The venue is checking it"
@@ -70,7 +65,6 @@ export const getBookingDisplayStatus = (
     now: Date = new Date()
 ) => {
     if (booking.status === "cancelled" && booking.cancel_reason === "expired") return "expired";
-    if (isAwaitingVerification(booking)) return "awaiting_verification";
     if (isHoldExpired(booking, now)) return "hold_expired";
     // An open play court block is never checked in (players are) and the cron skips it, so it follows the clock
     if (booking.status === "confirmed" && booking.open_play_session_id && booking.court_id && !booking.open_play_spots

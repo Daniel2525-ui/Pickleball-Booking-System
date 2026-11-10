@@ -14,12 +14,6 @@ export async function POST(request: NextRequest) {
 
         const { data, error } = await supabase.rpc("cancel_open_play_session", { p_session_id: sessionId });
         if (error) {
-            if (error.message?.includes("GCASH_PENDING_VERIFICATION")) {
-                return NextResponse.json(
-                    { error: "Approve or reject the GCash payments waiting for verification first." },
-                    { status: 409 }
-                );
-            }
             if (error.message?.includes("NOT_FOUND")) {
                 return NextResponse.json({ error: "Session not found." }, { status: 404 });
             }

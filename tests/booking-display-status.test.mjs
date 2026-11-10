@@ -35,12 +35,6 @@ test("non-pending bookings are never treated as expired holds", () => {
     }
 });
 
-test("awaiting verification: infinite hold is never expired and shows its own status", () => {
-    const awaiting = booking({ hold_expires_at: "infinity" });
-    assert.equal(getBookingDisplayStatus(awaiting, now), "awaiting_verification");
-    assert.equal(isHoldExpired(awaiting, now), false);
-});
-
 test("cancellationNote: who cancelled and what happened to the money", () => {
     const pay = (status, payment_method = "stripe") => ({ status, payment_method });
     const cancelled = (cancel_reason, payments) => ({ status: "cancelled", cancel_reason, payments });
@@ -54,7 +48,6 @@ test("cancellationNote: who cancelled and what happened to the money", () => {
     assert.deepEqual(cancellationNote(cancelled("customer", [])), { text: "Not charged", charged: false });
     // Money still out beats an earlier refund (a duplicate charge being refunded)
     assert.deepEqual(cancellationNote(cancelled("customer", [pay("refunded"), pay("paid")])), { text: "Refund on its way to your card", charged: true });
-    assert.deepEqual(cancellationNote(cancelled("gcash_rejected", [pay("failed", "gcash")])), { text: "GCash payment could not be verified", charged: false });
 });
 
 test("cancellationNote: a card refund that failed or stalled at Stripe says so", () => {

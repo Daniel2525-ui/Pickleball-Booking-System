@@ -145,7 +145,7 @@ export const SettlePaymentModal = ({
             </div>
           </div>
 
-          {/* Stored as 'gcash' with the QR's Xendit id as its reference (the database knows cash and gcash) */}
+          {/* Stored as 'gcash' with the QR's Xendit id as its reference (the database's name for a non-cash counter payment) */}
           {paymentMethod === "gcash" && <CounterQr key={amount} amount={amount} disabled={loading} onPaid={(ref) => void settle(ref)} />}
 
           {paymentMethod === "cash" && (

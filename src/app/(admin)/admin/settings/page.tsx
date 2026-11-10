@@ -3,7 +3,7 @@ import { SettingsContainer } from "@/components/admin/settings/settings-containe
 
 export const metadata: Metadata = {
   title: "Settings | Admin",
-  description: "Manage the GCash payment details players see at checkout.",
+  description: "Manage contact details, booking rules and staff access.",
 }
 
 export default function SettingsPage() {

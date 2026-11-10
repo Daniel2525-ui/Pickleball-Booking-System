@@ -56,50 +56,6 @@ test("admin schedules open play and the court grid shows it", async ({ page }) =
   await expect(item).toContainText("spots left");
 });
 
-test("a player books two spots with GCash and staff approve them", async ({ page }) => {
-  sql(`UPDATE public.booking_settings SET gcash_account_name = 'Pickle Club Co.', gcash_number = '09171234567'`);
-  await login(page, account("CUSTOMER"));
-  await page.goto("/open-play");
-  await page.getByRole("button", { name: `Book a spot on ${shortDate}` }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "One more spot" }).click();
-  await dialog.getByRole("radio", { name: "GCash" }).click();
-  await expect(dialog.getByText("₱300")).toBeVisible();
-  await dialog.getByRole("button", { name: "Continue to Checkout" }).click();
-  await page.waitForURL(/\/book\/gcash\?basket=/);
-  await page.getByLabel("GCash reference number").fill("7770001");
-  await page.getByLabel("Payment screenshot").setInputFiles({ name: "proof.png", mimeType: "image/png", buffer: PNG_1X1 });
-  await page.getByRole("button", { name: "Submit payment" }).click();
-  await expect(page.getByText("Payment submitted")).toBeVisible();
-  expect(sql(`SELECT b.status || '|' || b.open_play_spots || '|' || p.status || '|' || p.payment_method FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id WHERE b.open_play_session_id = '${sessionId()}'`))
-    .toBe("pending|2|pending|gcash");
-
-  await page.context().clearCookies();
-  await login(page, account("ADMIN"));
-  await openAllBookings(page);
-  await page.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: /Awaiting Verification/ }).click();
-  await page.getByRole("row").filter({ hasText: "Open play" }).first().getByRole("button", { name: "Open menu" }).click();
-  await page.getByRole("menuitem", { name: "Verify" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Approve — mark paid" }).click();
-  await expect.poll(() => sql(`SELECT status FROM public.bookings WHERE open_play_session_id = '${sessionId()}' AND court_id IS NULL`)).toBe("confirmed");
-
-  // The Bookings table lists the player's spot booking, but not the ₱0 rows that reserve the courts
-  expect(Number(sql(`SELECT count(*) FROM public.bookings WHERE open_play_session_id = '${sessionId()}' AND court_id IS NOT NULL`))).toBeGreaterThan(0);
-  await openAllBookings(page);
-  await expect(page.getByRole("row").filter({ hasText: "Open play · 2 spots" })).toHaveCount(1);
-  await expect(page.getByText("Open play (court reserved)")).toHaveCount(0);
-  await expect(page.getByRole("row").filter({ hasText: "₱0" })).toHaveCount(0);
-
-  await page.context().clearCookies();
-  await login(page, account("CUSTOMER"));
-  await page.goto("/my-bookings");
-  await expect(page.getByText("Open play · 2 spots")).toBeVisible();
-  await expect(page.getByText("CONFIRMED PASS")).toBeVisible();
-  await page.goto("/open-play");
-  await expect(page.getByRole("listitem").filter({ hasText: shortDate }).getByText("4 of 6")).toBeVisible();
-});
-
 test("the dashboard schedule shows how full today's open play session is", async ({ page }) => {
   // Move the approved session (2 of 6 spots) to today for this check only, then put it back
   const id = sessionId();

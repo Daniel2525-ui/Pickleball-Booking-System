@@ -37,8 +37,6 @@ export interface OpenPlayAdminSession {
   status: "open" | "cancelled" | "flagged";
   flag_reason: string | null;
   booked: number;
-  /** GCash payments waiting for staff; the session cannot be cancelled until they are resolved */
-  awaiting: boolean;
   /** Set when the date is a closed date (venue_closures): the reason, or "" when none was given */
   closedReason?: string | null;
 }
@@ -77,7 +75,7 @@ export function OpenPlayContainer() {
     setPast(
       (sess ?? []).map((s) => {
         const sum = sums.get(s.id) ?? { booked: 0, played: 0, collected: 0 };
-        return { ...s, awaiting: false, ...sum } as PastSession;
+        return { ...s, ...sum } as PastSession;
       })
     );
   }, []);
@@ -108,10 +106,10 @@ export function OpenPlayContainer() {
     setCourts(courtRes.data);
 
     const { data: spotRows, error: spotError } = await fetchSpotRows((sess.data ?? []).map((s) => s.id));
-    // Without spot rows the counts read 0 and the GCash-awaiting guard on Cancel is off: say so
+    // Without spot rows the counts read 0: say so
     if (sched.error || sess.error || courtRes.error || spotError) toast.error("Failed to load open play. Refresh before changing anything.");
-    const { booked, awaiting } = tallySpots(spotRows);
-    const rows = (sess.data ?? []).map((s) => ({ ...s, booked: booked.get(s.id) ?? 0, awaiting: awaiting.has(s.id), closedReason: closedOn.get(s.session_date) ?? null })) as OpenPlayAdminSession[];
+    const { booked } = tallySpots(spotRows);
+    const rows = (sess.data ?? []).map((s) => ({ ...s, booked: booked.get(s.id) ?? 0, closedReason: closedOn.get(s.session_date) ?? null })) as OpenPlayAdminSession[];
     setSessions(rows);
     setSelected((cur) => rows.find((s) => s.id === cur?.id) ?? null);
     setLoading(false);

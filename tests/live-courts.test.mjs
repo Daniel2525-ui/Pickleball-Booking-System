@@ -63,13 +63,6 @@ test("a court with bookings for other courts is free", () => {
     assert.equal(liveCourtTile(court, [slot("19:00", "20:00", { court_id: "c2" })], now).state, "free");
 });
 
-test("a player whose GCash payment staff haven't checked yet is shown as waiting, not unpaid", () => {
-    const waiting = slot("19:00", "20:00", { status: "pending", hold_expires_at: "infinity", payments: [{ status: "pending", amount: 400, payment_method: "gcash" }] });
-    const tile = liveCourtTile(court, [waiting], now);
-    assert.equal(tile.state, "in_play");
-    assert.deepEqual(tile.payment, { paid: false, label: "GCash · waiting for your check" });
-});
-
 test("tile columns keep rows even, at most 4 across", () => {
   const cols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(tileColumns);
   assert.deepEqual(cols, [1, 1, 2, 3, 4, 3, 3, 4, 4, 3]);

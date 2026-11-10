@@ -8,7 +8,6 @@ export interface Payment {
     status: string;
     payment_method?: string | null;
     payment_reference?: string | null;
-    gcash_proof_path?: string | null;
     paid_at: string | null;
     created_at: string;
     // Refund ledger rows for this payment (admins only, newest decides what Refund Owed says)

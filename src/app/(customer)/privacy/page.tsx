@@ -26,7 +26,7 @@ export default async function PrivacyPage() {
       <ul>
         <li><strong>Account details:</strong> your full name, mobile number, email address and password when you register. Passwords are stored by our authentication provider in hashed form; we never see them.</li>
         <li><strong>Reservations:</strong> the court, date, time, status and amount of each booking you make, and walk-in bookings staff record for you.</li>
-        <li><strong>Payments:</strong> card payments are processed by Stripe. We receive the payment status, amount and a Stripe reference, but never your full card number. Counter payments (cash or GCash) are recorded with the reference staff enter.</li>
+        <li><strong>Payments:</strong> online and front desk QR Ph payments are processed by Xendit. We receive the payment status, amount and a Xendit reference, but never your bank or e-wallet login. Cash payments at the counter are recorded by staff.</li>
       </ul>
 
       <h2>How we use it</h2>

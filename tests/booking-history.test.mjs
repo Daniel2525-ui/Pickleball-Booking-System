@@ -14,7 +14,6 @@ test("describeEvent words the details staff need", () => {
     assert.equal(describeEvent(ev({ detail: "pending" }), null).what, "Booked online, awaiting payment");
     assert.equal(describeEvent(ev({ detail: "completed" }), null).what, "Recorded as played");
     assert.equal(describeEvent(ev({ detail: "confirmed" }), null).what, "Booked");
-    assert.equal(describeEvent(ev({ action: "cancelled", detail: "gcash_rejected" }), null).detail, "GCash payment rejected");
     assert.equal(describeEvent(ev({ action: "cancelled", detail: "payment_kept|Late cancellation" }), null).detail, "payment kept: Late cancellation");
     assert.equal(describeEvent(ev({ action: "cancelled", detail: "admin" }), null).detail, null);
     assert.equal(describeEvent(ev({ action: "paid", detail: "gcash · ref 7741 · 300.00" }), null).detail, "QR Ph · ref 7741 · ₱300");

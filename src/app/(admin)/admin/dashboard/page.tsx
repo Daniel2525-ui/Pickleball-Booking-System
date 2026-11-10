@@ -48,7 +48,6 @@ export default async function DashboardPage() {
         <DashboardClock date={currentDate} />
       </header>
 
-      <AttentionAlert kind="gcash" />
       <AttentionAlert kind="refunds" />
       <AttentionAlert kind="collect" />
 

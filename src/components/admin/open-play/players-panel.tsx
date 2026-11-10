@@ -42,7 +42,7 @@ const statusLabel = (r: SpotRow) => {
   const p = r.payments[0];
   if (r.status === "cancelled" && r.cancel_reason === "payment_kept") return "Cancelled · payment kept";
   if (r.status === "cancelled") return p?.status === "refunded" ? "Cancelled · refunded" : p?.status === "paid" || p?.status === "succeeded" ? "Cancelled · refund owed" : "Cancelled";
-  if (r.status === "pending") return r.hold_expires_at === "infinity" ? "Awaiting verification" : "Unpaid (holding)";
+  if (r.status === "pending") return "Unpaid (holding)";
   return p?.status === "paid" || p?.status === "succeeded" ? "Paid" : "Unpaid";
 };
 
@@ -101,7 +101,6 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
     });
   };
 
-  const awaiting = rows?.some((r) => r.status === "pending" && r.hold_expires_at === "infinity") ?? false;
   const collected = (rows ?? []).flatMap((r) => r.payments).filter((p) => p.status === "paid" || p.status === "succeeded").reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const date = new Date(`${session.session_date}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric" });
 
@@ -126,7 +125,7 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
               </Button>
             )}
             {!hasEnded(session) && (
-              <Button variant="destructive" className="font-bold" disabled={awaiting} onClick={() => onCancel(session)}>
+              <Button variant="destructive" className="font-bold" onClick={() => onCancel(session)}>
                 Cancel session &amp; refund everyone
               </Button>
             )}
@@ -139,11 +138,6 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
           <p role="alert" className="mb-3 px-(--card-spacing) text-xs text-amber-800 dark:text-amber-300">
             The venue is closed on this date{session.closedReason ? ` (${session.closedReason})` : ""}. Players can no longer book it.
             {(rows ?? []).some((r) => r.status === "confirmed") ? " Cancel the session to refund the players already booked, or reopen the date." : ""}
-          </p>
-        )}
-        {awaiting && !hasEnded(session) && (
-          <p role="alert" className="mb-3 px-(--card-spacing) text-xs text-amber-800 dark:text-amber-300">
-            Approve or reject the GCash payments waiting for verification first (Bookings, filter &quot;Awaiting verification&quot;), then reopen this list to cancel the session.
           </p>
         )}
         <Table>
@@ -166,8 +160,8 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
                 const name = r.profiles?.full_name || r.customer_name || "Guest Player";
                 const method = r.payments[0]?.payment_method;
                 const phone = r.profiles?.phone || r.customers?.phone;
-                // Awaiting GCash is approved or rejected first; an ended session is not cancelled player by player
-                const canCancel = (r.status === "confirmed" || (r.status === "pending" && r.hold_expires_at !== "infinity")) && !hasEnded(session);
+                // An ended session is not cancelled player by player
+                const canCancel = (r.status === "confirmed" || r.status === "pending") && !hasEnded(session);
                 return (
                   <TableRow key={r.id} className={r.status === "cancelled" ? "opacity-60" : ""}>
                     <TableCell>
