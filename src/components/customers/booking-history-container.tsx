@@ -287,7 +287,7 @@ export const BookingHistoryContainer = () => {
                       >
                         {multi ? `${group.length} COURTS` : bookingTitle(booking)}
                       </Badge>
-                      {!multi && <span className="font-mono text-xs text-muted-foreground">Ref {bookingRef(booking.id)}</span>}
+                      <span className="font-mono text-xs text-muted-foreground">Ref {bookingRef(booking)}</span>
 
                       {booking.status === "confirmed" || booking.status === "paid" ? (
                         <Badge
@@ -361,7 +361,6 @@ export const BookingHistoryContainer = () => {
                                 <p className={`text-xs font-bold ${isLive(m) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
                                   {formatTime12h(m.start_time)} – {formatTime12h(m.end_time)}
                                 </p>
-                                <p className="font-mono text-[11px] text-muted-foreground">Ref {bookingRef(m.id)}</p>
                                 {mNote && <p className={`text-xs font-semibold ${noteTone(mNote.text)}`}>{mNote.text}</p>}
                               </div>
                               <span className={`ml-auto text-sm font-black tabular-nums ${isLive(m) ? "text-foreground" : "text-muted-foreground line-through"}`}>

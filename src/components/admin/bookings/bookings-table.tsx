@@ -351,7 +351,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                               {head.customer_name || head.profiles?.full_name || "Guest Player"}
                             </span>
                             <span className="text-[11px] text-muted-foreground">
-                              {head.customer_id ? "Walk-In Guest" : "Registered Member"}
+                              {head.customer_id ? "Walk-In Guest" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(head)}</span>
                               {phone && (
                                 <> · <a href={`tel:${phone}`} className="underline-offset-2 hover:text-foreground hover:underline">{phone}</a></>
                               )}
@@ -391,15 +391,14 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                     <TableRow key={booking.id} className="group">
                       {/* Player info */}
                       <TableCell>
-                        {grouped ? (
-                          <span className="pl-4 font-mono text-[11px] text-muted-foreground">Ref {bookingRef(booking.id)}</span>
-                        ) : (
+                        {/* A grouped line's player and ref are on its header line */}
+                        {grouped ? null : (
                         <div className="flex flex-col">
                           <span className="font-semibold text-foreground text-sm">
                             {booking.customer_name || booking.profiles?.full_name || "Guest Player"}
                           </span>
                           <span className="text-[11px] text-muted-foreground">
-                            {booking.customer_id ? "Walk-In Guest" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(booking.id)}</span>
+                            {booking.customer_id ? "Walk-In Guest" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(booking)}</span>
                             {(booking.basket_size ?? 1) > 1 && (
                               <span className="ml-1.5 rounded bg-muted px-1.5 py-px font-semibold text-foreground">Group · {booking.basket_size} bookings</span>
                             )}

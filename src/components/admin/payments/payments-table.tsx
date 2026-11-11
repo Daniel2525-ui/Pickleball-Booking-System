@@ -275,7 +275,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                             </div>
                             <div className="flex flex-col">
                               <span className="font-medium text-sm text-foreground">{displayName}</span>
-                              <span className="font-mono text-[11px] text-muted-foreground">Ref {bookingRef(payment.booking_id)}</span>
+                              <span className="font-mono text-[11px] text-muted-foreground">Ref {bookingRef({ id: payment.booking_id, basket_id: payment.bookings?.basket_id })}</span>
                             </div>
                           </div>
                         );

@@ -12,6 +12,7 @@ export const todaysSchedule = async () => {
             .from("bookings")
             .select(`
                 id,
+                basket_id,
                 booking_date,
                 start_time,
                 end_time,

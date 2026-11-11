@@ -31,7 +31,7 @@ export const BookingHistoryModal = ({ booking, onClose }: { booking: Booking | n
         <DialogHeader>
           <DialogTitle>Booking History</DialogTitle>
           <DialogDescription>
-            {booking?.customer_name} · Ref {booking && bookingRef(booking.id)}
+            {booking?.customer_name} · Ref {booking && bookingRef(booking)}
           </DialogDescription>
         </DialogHeader>
         {events === null ? (

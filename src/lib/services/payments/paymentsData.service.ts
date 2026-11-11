@@ -23,6 +23,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
                 *,
                 refund_requests ( status, created_at ),
                 bookings${refundOwed || toCollect ? "!inner" : ""} (
+                    basket_id,
                     status,
                     cancel_reason,
                     booking_date,

@@ -14,6 +14,7 @@ export interface Payment {
     refund_requests?: { status: string; created_at: string }[] | null;
     // Joined fields
     bookings?: {
+        basket_id?: string | null;
         status?: string;
         cancel_reason?: string | null;
         booking_date: string;

@@ -10,10 +10,11 @@ export const BOOKINGS_PAGE_SIZE = 100;
 export const bookingSearchFilter = async (search: string) => {
     const term = search.trim().replace(/[(),%]/g, " ").trim(); // characters that break the or() filter syntax
     const ors = [`customer_name.ilike.%${term}%`];
-    // Booking ref (bookingRef): uuid columns can't ilike, so match the id prefix as a range
+    // Booking ref (bookingRef): uuid columns can't ilike, so match the prefix as a range.
+    // basket_id is the ref shown; id keeps per-court refs handed out before refs were per checkout working
     if (/^[0-9a-f]{6}$/i.test(term)) {
         const p = term.toLowerCase();
-        ors.push(`and(id.gte.${p}00-0000-0000-0000-000000000000,id.lte.${p}ff-ffff-ffff-ffff-ffffffffffff)`);
+        for (const col of ["basket_id", "id"]) ors.push(`and(${col}.gte.${p}00-0000-0000-0000-000000000000,${col}.lte.${p}ff-ffff-ffff-ffff-ffffffffffff)`);
     }
     // Mobile number: phones live on profiles (online) and customers (walk-ins), stored as 09xxxxxxxxx.
     // Matched as an ending (full number or last digits), so a network prefix like 0917 can't flood the id list.

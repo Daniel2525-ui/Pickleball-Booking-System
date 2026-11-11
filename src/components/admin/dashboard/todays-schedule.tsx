@@ -45,6 +45,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 interface ScheduleItem {
   id: string;
+  basket_id?: string | null;
   booking_date: string;
   start_time: string;
   end_time: string;
@@ -165,7 +166,7 @@ export default function TodaysSchedule({
                         </span>
                       )}
                       {!booking.open_play_session_id && (
-                        <span className="block font-mono text-[11px] font-normal text-muted-foreground">Ref {bookingRef(booking.id)}</span>
+                        <span className="block font-mono text-[11px] font-normal text-muted-foreground">Ref {bookingRef(booking)}</span>
                       )}
                     </td>
 

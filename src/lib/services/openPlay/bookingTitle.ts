@@ -4,5 +4,5 @@ export function bookingTitle(b: { courts?: { name?: string } | null; open_play_s
     return b.courts?.name || "Court";
 }
 
-/** Short code players read out at check-in; admin search matches it (fetchBookings). */
-export const bookingRef = (id: string) => id.slice(0, 6).toUpperCase();
+/** Short code players read out at check-in, one per checkout (every court in it shares it); admin search matches it (bookingSearchFilter). */
+export const bookingRef = (b: { id: string; basket_id?: string | null }) => (b.basket_id ?? b.id).slice(0, 6).toUpperCase();

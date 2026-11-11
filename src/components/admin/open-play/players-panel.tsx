@@ -23,6 +23,7 @@ import { type OpenPlayAdminSession, hasEnded } from "./open-play-container";
 
 interface SpotRow {
   id: string;
+  basket_id: string | null;
   user_id: string | null;
   status: string;
   cancel_reason: string | null;
@@ -62,7 +63,7 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
   const load = useCallback(async () => {
     const { data } = await supabase
       .from("bookings")
-      .select("id, user_id, status, cancel_reason, hold_expires_at, open_play_spots, customer_name, total_amount, profiles:user_id(full_name, phone, skill_level), customers(phone), payments(status, payment_method, amount)")
+      .select("id, basket_id, user_id, status, cancel_reason, hold_expires_at, open_play_spots, customer_name, total_amount, profiles:user_id(full_name, phone, skill_level), customers(phone), payments(status, payment_method, amount)")
       .eq("open_play_session_id", session.id)
       .is("court_id", null)
       .order("created_at", { ascending: true });
@@ -171,7 +172,7 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
                           <Badge variant="secondary" className="text-[10px] font-semibold capitalize">{r.profiles.skill_level}</Badge>
                         )}
                       </span>
-                      <span className="block font-mono text-[11px] text-muted-foreground">Ref {bookingRef(r.id)}</span>
+                      <span className="block font-mono text-[11px] text-muted-foreground">Ref {bookingRef(r)}</span>
                     </TableCell>
                     <TableCell>
                       {phone ? (
