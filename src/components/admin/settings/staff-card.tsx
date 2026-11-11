@@ -87,7 +87,7 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
   return (
     <Card className="shadow-sm">
       <CardHeader>
-        <CardTitle className="text-xl font-bold">Staff</CardTitle>
+        <CardTitle className="text-xl font-bold">Access Control</CardTitle>
         <CardDescription>
           Admins can use every admin page. Front desk can use everything except Pricing and Settings. Remove access as
           soon as someone leaves; it takes effect on their next action.
@@ -160,7 +160,7 @@ export function StaffCard({ onChanged }: { onChanged: () => void }) {
         )}
 
         <form onSubmit={add} className="flex flex-col gap-1.5">
-          <Label htmlFor="staff-email">Give staff access</Label>
+          <Label htmlFor="staff-email">Give staff/admin access</Label>
           <div className="flex flex-col sm:flex-row gap-2">
             <Input
               id="staff-email"
