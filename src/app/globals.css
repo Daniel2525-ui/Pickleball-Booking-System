@@ -308,6 +308,34 @@
     100% { transform: translateY(320px) rotate(540deg); opacity: 0; }
 }
 
+/* Hero court (court-lines.tsx): a dink rally of four shots, R→L cross, L→R straight, R→L cross, L→R straight,
+   ending where it starts so it loops seamlessly. Each shot: hit (h 18) → over the net → bounce in the far
+   kitchen (h 0) → rises to the other player's paddle. .rally-ground = where the ball is over the court (steady
+   speed), .rally-ball / .rally-shadow = its height (eases out going up, in coming down). SVG units. */
+.rally-ground { animation: rally-ground 6s linear infinite; }
+.rally-ball { animation: rally-ball 6s infinite; }
+.rally-shadow { animation: rally-shadow 6s infinite; }
+@keyframes rally-ground {
+    0%, 100% { transform: translate(305px, 50px); }
+    17.5%    { transform: translate(175px, 150px); }
+    25%      { transform: translate(135px, 165px); }
+    42.5%    { transform: translate(265px, 140px); }
+    50%      { transform: translate(305px, 135px); }
+    67.5%    { transform: translate(175px, 40px); }
+    75%      { transform: translate(135px, 30px); }
+    92.5%    { transform: translate(265px, 60px); }
+}
+@keyframes rally-ball {
+    0%, 25%, 50%, 75%, 100% { transform: translateY(-18px) scale(1.1); animation-timing-function: ease-out; }
+    8.75%, 33.75%, 58.75%, 83.75% { transform: translateY(-60px) scale(1.33); animation-timing-function: ease-in; }
+    17.5%, 42.5%, 67.5%, 92.5% { transform: translateY(0) scale(1); animation-timing-function: ease-out; }
+}
+@keyframes rally-shadow {
+    0%, 25%, 50%, 75%, 100% { transform: scale(0.93); animation-timing-function: ease-out; }
+    8.75%, 33.75%, 58.75%, 83.75% { transform: scale(0.76); animation-timing-function: ease-in; }
+    17.5%, 42.5%, 67.5%, 92.5% { transform: scale(1); animation-timing-function: ease-out; }
+}
+
 /* Room for the phone tab bar (public-header.tsx) under every customer page */
 @media (max-width: 767px) {
     body:has(.mobile-tabbar) {

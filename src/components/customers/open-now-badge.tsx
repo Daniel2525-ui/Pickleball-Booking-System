@@ -21,7 +21,7 @@ function useNow() {
 /** The same status as plain text, for the "Find us" details */
 export function OpenNowText({ hours }: { hours: HoursInput[] }) {
   const now = useNow();
-  return <span>{now ? openNowLabel(hours, now).text : "See opening hours above"}</span>;
+  return <span>{now ? openNowLabel(hours, now).text : "See opening hours below"}</span>;
 }
 
 /** Hero badge: a pulsing dot and a slow shine while the venue is open, still and grey when it isn't. */

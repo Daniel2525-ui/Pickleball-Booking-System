@@ -10,7 +10,7 @@ import { summarizeVenueHours } from "@/lib/utils/venueHours";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { lowestHourlyRate } from "@/lib/services/pricing/quoteCourtPrice";
 import { VENUE_CITY, VENUE_NAME, brandInitials } from "@/lib/brand";
-import { CourtLines } from "@/components/court-lines";
+import { CourtRally } from "@/components/court-lines";
 import { OpenNowBadge, OpenNowText } from "@/components/customers/open-now-badge";
 
 // Hours, courts and pricing are edited in the admin; refresh the static page at most every 5 minutes
@@ -42,51 +42,37 @@ export default async function Home() {
       <PublicHeader />
 
       <main className="flex-1 flex flex-col">
-        <section aria-label={`Welcome to ${VENUE_NAME}`} className="relative isolate overflow-hidden border-b bg-card">
-          <CourtLines />
-          <div className="relative container mx-auto px-4 max-w-6xl py-12 md:py-16 grid gap-10 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] items-center">
+        <section aria-label={`Welcome to ${VENUE_NAME}`} className="relative isolate overflow-hidden border-b bg-primary text-primary-foreground">
+          <div className="container mx-auto px-4 max-w-6xl py-12 md:py-16 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-center">
             <div className="flex flex-col gap-5">
-              <OpenNowBadge hours={operatingHours ?? []} />
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.02] text-balance">Book a court in under a minute.</h1>
-              <p className="text-lg text-muted-foreground max-w-[46ch] leading-relaxed">
+              <p className="text-sm font-bold uppercase tracking-[0.12em] opacity-85">{VENUE_NAME} · {VENUE_CITY}</p>
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-[0.98] tracking-tight text-balance">
+                Dink. Drive.<br />Book in a minute.
+              </h1>
+              <p className="text-lg opacity-90 max-w-[42ch] leading-relaxed">
                 See every court live, pick your hours, and pay with QR Ph using GCash, Maya or your bank app. Your booking is confirmed the moment you pay.
               </p>
               <div className="flex flex-wrap gap-3">
-                <a href="#booking" className="inline-flex min-h-12 items-center rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
+                <a href="#booking" className="inline-flex min-h-12 items-center rounded-xl bg-primary-foreground px-6 text-base font-bold text-primary hover:opacity-90 transition-opacity">
                   Book a court
                 </a>
-                <Link href="/open-play" className="inline-flex min-h-12 items-center rounded-xl border border-input bg-card px-5 text-base font-semibold hover:bg-muted transition-colors">
+                <Link href="/open-play" className="inline-flex min-h-12 items-center rounded-xl border-[1.5px] border-current/60 px-5 text-base font-semibold hover:bg-primary-foreground/10 transition-colors">
                   Join open play
                 </Link>
               </div>
-              <dl className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <OpenNowBadge hours={operatingHours ?? []} />
+              <CourtRally className="w-full h-auto" />
+              <dl className="flex flex-wrap gap-3">
                 {stats.map((s) => (
-                  <div key={s.label} className="flex flex-col-reverse">
-                    <dt className="text-sm text-muted-foreground">{s.label}</dt>
-                    <dd className="font-display text-2xl font-bold">{s.value}</dd>
+                  <div key={s.label} className="flex flex-col-reverse rounded-xl bg-card text-card-foreground px-4 py-2.5 shadow-lg">
+                    <dt className="text-xs text-muted-foreground">{s.label}</dt>
+                    <dd className="font-display font-bold">{s.value}</dd>
                   </div>
                 ))}
               </dl>
-            </div>
-
-            <div className="rounded-2xl border bg-card p-5 shadow-sm">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Clock className="size-4.5 text-primary" aria-hidden />
-                Opening hours
-              </h2>
-              {hours ? (
-                <ul className="mt-3 divide-y text-sm">
-                  {hours.groups.map((g) => (
-                    <li key={g.days} className="flex justify-between gap-4 py-2.5">
-                      <span className="text-muted-foreground">{g.days}</span>
-                      <span className="font-semibold text-right">{g.hours}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">See the booking calendar for hours.</p>
-              )}
-              <p className="mt-3 text-xs text-muted-foreground">Philippine time. Hours after midnight belong to the night before.</p>
             </div>
           </div>
         </section>
@@ -132,6 +118,22 @@ export default async function Home() {
                     <a href={`mailto:${venue.email}`} className="hover:underline underline-offset-4 break-all">{venue.email}</a>
                   </li>
                 </ul>
+                <div>
+                  <h3 className="text-sm font-bold">Opening hours</h3>
+                  {hours ? (
+                    <ul className="mt-1 divide-y text-sm">
+                      {hours.groups.map((g) => (
+                        <li key={g.days} className="flex justify-between gap-4 py-2">
+                          <span className="text-muted-foreground">{g.days}</span>
+                          <span className="font-semibold text-right">{g.hours}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-sm text-muted-foreground">See the booking calendar for hours.</p>
+                  )}
+                  <p className="mt-1 text-xs text-muted-foreground">Philippine time. Hours after midnight belong to the night before.</p>
+                </div>
                 <div className="mt-auto flex flex-wrap gap-2">
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${mapQuery}`}
