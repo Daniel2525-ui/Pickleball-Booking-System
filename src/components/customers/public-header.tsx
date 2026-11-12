@@ -86,6 +86,7 @@ export function PublicHeader() {
             name={fullName || (user.is_anonymous ? "Guest" : "")}
             // A guest paid without an account: offer to create one (it keeps the same bookings)
             email={user.is_anonymous ? "Guest · no account yet" : user.email ?? ""}
+            guest={!!user.is_anonymous}
             signOutTo="/"
             links={[
               ...(isAdmin ? [{ label: isOwner ? "Admin panel" : "Staff panel", href: "/admin/dashboard", icon: "admin" as const }] : []),

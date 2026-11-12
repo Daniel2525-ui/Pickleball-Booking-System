@@ -15,6 +15,7 @@ const REASON: Record<string, string> = {
     slot_conflict: "slot was taken",
     court_unavailable: "court unavailable",
     start_passed: "start time passed",
+    discount_used_up: "discount code ran out before payment",
     payment_kept: "payment kept",
 };
 const CREATED: Record<string, string> = { pending: "Booked online, awaiting payment", completed: "Recorded as played" };

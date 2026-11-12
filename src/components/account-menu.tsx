@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog, type ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { CalendarDays, ChevronDown, House, Layers, LayoutDashboard, LogOut, UserRound, UsersRound } from "lucide-react";
 import { logout } from "@/lib/services/auth.service";
 import {
@@ -22,6 +24,8 @@ interface AccountMenuProps {
   links: { label: string; href: string; icon: keyof typeof ICONS; mobileOnly?: boolean }[];
   /** Where to land after signing out */
   signOutTo: string;
+  /** A guest (no account): signing out asks first, since this device then can't show their bookings again */
+  guest?: boolean;
   /** Full-width trigger with email that opens upward, for a sidebar footer; collapses to the avatar */
   inSidebar?: boolean;
 }
@@ -30,8 +34,9 @@ interface AccountMenuProps {
 const ICONS = { bookings: CalendarDays, courts: Layers, openPlay: UsersRound, profile: UserRound, home: House, admin: LayoutDashboard };
 
 /** Signed-in account menu (initials button + dropdown), shared by the customer and admin headers. */
-export function AccountMenu({ name, email, links, signOutTo, inSidebar = false }: AccountMenuProps) {
+export function AccountMenu({ name, email, links, signOutTo, inSidebar = false, guest = false }: AccountMenuProps) {
   const router = useRouter();
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const shown = name || email.split("@")[0] || "";
   const initials = shown.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "?";
 
@@ -42,6 +47,7 @@ export function AccountMenu({ name, email, links, signOutTo, inSidebar = false }
   };
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
@@ -89,11 +95,28 @@ export function AccountMenu({ name, email, links, signOutTo, inSidebar = false }
           })}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={handleLogout} className="gap-2 min-h-[40px]">
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() =>
+            guest
+              ? setConfirmRequest({
+                  title: "Sign out of your guest bookings?",
+                  description:
+                    "You booked without an account, so once you sign out this device can't show those bookings again. Your confirmation email still has the details. Create an account first to keep them.",
+                  confirmLabel: "Sign out anyway",
+                  cancelLabel: "Stay signed in",
+                  onConfirm: handleLogout,
+                })
+              : handleLogout()
+          }
+          className="gap-2 min-h-[40px]"
+        >
           <LogOut className="size-4" />
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
+    </>
   );
 }

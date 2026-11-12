@@ -147,3 +147,22 @@ test("a guest can choose to create an account instead, and an email in use is no
   expect(res.status()).toBe(400);
   expect((await res.json()).error).toBe("We couldn't use that email. If you already have an account, sign in instead.");
 });
+
+test("signing out as a guest asks first, since the bookings can't be shown again", async ({ page }) => {
+  await openCheckout(page);
+  await dialog(page).getByLabel("Full name").fill("Sam Signout");
+  await dialog(page).getByLabel("Mobile number").fill("09201234567");
+  await dialog(page).getByLabel("Email").fill(`sam-${Date.now()}@example.com`);
+  await dialog(page).getByRole("button", { name: /^Pay ₱/ }).click();
+  await expect(dialog(page).getByRole("alert").or(page.getByText(/QR/)).first()).toBeVisible({ timeout: 30_000 });
+  await page.keyboard.press("Escape");
+
+  const menu = page.getByRole("button", { name: /Account menu/ }).first();
+  await menu.click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page.getByRole("alertdialog").or(page.getByRole("dialog")).getByText("Sign out of your guest bookings?")).toBeVisible();
+  await page.getByRole("button", { name: "Stay signed in" }).click();
+  // Still the same guest
+  await menu.click();
+  await expect(page.getByText("Guest · no account yet").first()).toBeVisible();
+});
