@@ -1,19 +1,13 @@
 import type { Metadata, Viewport } from "next"
-import { Big_Shoulders, Manrope, Poppins } from "next/font/google"
+import { Inter, Space_Grotesk } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
-import { SITE_URL, VENUE_NAME } from "@/lib/brand";
+import { BRAND_COLOR, SITE_URL, VENUE_NAME, onBrandColor } from "@/lib/brand";
 
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  variable: "--font-poppins",
-})
-
-// Customer side (the "crosshair" theme): scoreboard headings + Manrope body, see globals.css
-const bigShoulders = Big_Shoulders({ subsets: ["latin"], variable: "--font-big-shoulders" })
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" })
+// Inter for text, Space Grotesk for headings (globals.css)
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-space-grotesk" })
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -21,7 +15,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0d131f" },
+    { media: "(prefers-color-scheme: dark)", color: "#ffffff" },
   ],
 }
 
@@ -36,8 +30,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
-      <body className={`${poppins.variable} ${bigShoulders.variable} ${manrope.variable} font-sans antialiased selection:bg-primary/20 selection:text-primary`}>
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+      style={{ "--brand": BRAND_COLOR, "--on-brand": onBrandColor(BRAND_COLOR) } as React.CSSProperties}
+    >
+      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased selection:bg-primary/20 selection:text-primary`}>
         <ThemeProvider>
           {children}
           <Toaster />

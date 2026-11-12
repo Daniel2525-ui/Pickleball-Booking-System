@@ -1,6 +1,6 @@
 // Weekly operating hours: warning before hours drop existing bookings, whole-hour times, server checks. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, requireQrPh, sql, account, login, tomorrowManila, resetBookings, firstCourt } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -76,6 +76,7 @@ test("a day can close after midnight", async ({ page }) => {
 });
 
 test("checkout holds late-night hours on their real dates and never across closing", async ({ page }) => {
+  requireQrPh();
   const nextDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(Date.now() + 2 * 86_400_000));
   const court = firstCourt();
   await login(page, account("CUSTOMER"));
@@ -99,11 +100,10 @@ test("the booking grid lists last night's late hours under their own heading and
   const todayName = new Date().toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Manila" });
   sql(`UPDATE public.operating_hours SET close_time = '02:00' WHERE day_of_week = '${todayName}'`);
   const court = firstCourt();
-  await page.setViewportSize({ width: 412, height: 915 }); // the day strip with "Tmrw" is the phone layout
   await page.goto("/#booking");
   await page.getByRole("button", { name: /Tmrw/ }).click();
 
-  await expect(page.getByText(`${todayName} late night`)).toBeVisible();
+  await expect(page.getByText(`${todayName} late night`).filter({ visible: true })).toBeVisible();
   await page.getByRole("button", { name: `Select ${court.name} at 1:00 AM - 2:00 AM` }).click();
   await page.getByRole("button", { name: `Select ${court.name} at 6:00 AM - 7:00 AM` }).click();
   // 1-2 AM and 6-7 AM sit next to each other in the list but stay two bookings

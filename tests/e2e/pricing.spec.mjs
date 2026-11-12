@@ -1,11 +1,12 @@
 // Changes venue pricing and creates holds: local Supabase stack only.
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, requireQrPh } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 // Phone width shows the quick-date strip ("Tmrw")
-test.use({ viewport: { width: 412, height: 915 } });
+// Desktop layout: the grid shows every court at once (phones show one court at a time)
+test.use({ viewport: { width: 1280, height: 900 } });
 
 let court;
 const date = tomorrowManila();
@@ -94,6 +95,7 @@ test("a peak window outside opening hours is flagged, and an unchanged form has 
 });
 
 test("customers see the configured prices, and the hold is charged what the database quotes", async ({ page }) => {
+  requireQrPh();
   await login(page, account("CUSTOMER"));
   await page.goto("/#booking");
   await page.getByRole("button", { name: /Tmrw/ }).click();
@@ -108,8 +110,8 @@ test("customers see the configured prices, and the hold is charged what the data
   await expect(panel.getByText(/includes peak rate/)).toBeVisible();
 
   await panel.getByRole("button", { name: "Continue to Checkout" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
-  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
+  await page.getByRole("dialog").getByRole("button", { name: /^Pay ₱[\d,]+ with QR Ph$/ }).click();
+  await page.waitForURL(/\/book\/qr\?pr=/, { timeout: 30_000 });
   expect(
     sql(`SELECT b.total_amount || '|' || p.amount FROM public.bookings b JOIN public.payments p ON p.booking_id = b.id
          WHERE b.booking_date = '${date}' AND b.start_time = '16:00'`)

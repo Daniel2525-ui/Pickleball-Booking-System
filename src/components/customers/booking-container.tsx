@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn, Calendar, Clock, CreditCard, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { LoaderCircle, LogIn, Calendar, Clock, QrCode, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Slot } from "@/components/customers/types";
 import { DateSelector } from "@/components/customers/date-selector";
-import { CourtAvailabilityGrid } from "@/components/customers/court-availability-grid";
+import { CourtAvailabilityGrid, GridLegend } from "@/components/customers/court-availability-grid";
 import { BookingModal } from "@/components/customers/booking-modal";
 import { BookingScheduleSkeleton } from "@/components/skeletons/booking-schedule-skeleton";
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service";
@@ -30,6 +30,7 @@ import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
+import { windowsForWeekday } from "@/lib/services/schedule/hoursRules";
 import { fetchUpcomingClosures, VenueClosure } from "@/lib/services/schedule/venueClosures.service";
 import { formatManilaDate, lateNightLabel } from "@/lib/utils/bookingTime";
 import { formatTime12h } from "@/lib/utils/formatTime";
@@ -40,7 +41,6 @@ import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
 import { lineKey, mergeSpans, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
-import { CourtRally } from "@/components/customers/court-rally";
 import { compactRange } from "@/lib/services/bookings/quickStarts";
 
 // A guest's basket survives the trip to /login (this tab only); restored once they are signed in
@@ -309,6 +309,15 @@ export const BookingContainer = () => {
     setShowLoginPrompt(true);
   };
 
+  const dayNote = (d: Date) => {
+    const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
+    const own = operatingHours.find((h) => h.day_of_week === weekday && h.is_open);
+    if (closures.some((c) => c.closed_on === formatManilaDate(d)) || windowsForWeekday(weekday, operatingHours).length === 0 || !own) {
+      return { closed: true, text: "Closed" };
+    }
+    return { closed: false, text: `till ${formatTime12h(own.close_time).replace(":00 ", " ")}` };
+  };
+
   const openHours = courtNames.reduce(
     (n, court) => n + timeSlots.filter((time) => getSlotStatus(selectedDate, court, time) === "available").length,
     0
@@ -394,15 +403,15 @@ export const BookingContainer = () => {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-6 md:gap-10 items-end pb-8">
+      <div className="flex flex-wrap items-end justify-between gap-4 pb-6">
         <div>
-          <p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.14em] text-primary">
-            <span className="size-2 rounded-full bg-primary animate-pulse" aria-hidden />
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+            <span className="size-2 rounded-full bg-primary live-dot" aria-hidden />
             {loading
               ? "Live availability"
               : `${isToday ? "Live · " : ""}${selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}${closesAt ? ` · open till ${closesAt}` : " · closed"}`}
           </p>
-          <h1 className="mt-3 text-5xl sm:text-7xl lg:text-8xl leading-[0.88] text-balance">
+          <h2 className="mt-2 text-3xl sm:text-4xl font-bold leading-tight text-balance">
             {loading ? (
               "Book a court"
             ) : timeSlots.length === 0 ? (
@@ -420,17 +429,16 @@ export const BookingContainer = () => {
                 <span className="text-primary tabular-nums">{openHours}</span> {slotWord} open {isToday ? "today" : `on ${dayName}`}
               </>
             )}
-          </h1>
-          {!loading && timeSlots.length > 0 && goingFast && (
-            <span className="mt-4 inline-block text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              Going fast
-            </span>
-          )}
-          <p className="mt-4 text-muted-foreground font-semibold max-w-md leading-relaxed">
-            Tap a free slot on any court, tap the next hour to extend, then check out.
+          </h2>
+          <p className="mt-2 text-muted-foreground max-w-md">
+            Tap a free slot on any court, tap the next hour to make it longer, then check out.
           </p>
         </div>
-        <CourtRally className="w-full max-w-sm md:max-w-none justify-self-center" />
+        {!loading && timeSlots.length > 0 && goingFast && (
+          <span className="text-xs font-semibold text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-full">
+            Going fast
+          </span>
+        )}
       </div>
 
       {loading ? (
@@ -447,100 +455,96 @@ export const BookingContainer = () => {
               </Button>
             </div>
           )}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Mobile Quick-Date Strip */}
-        <div className="lg:hidden col-span-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() - 1);
-                const today = new Date(); today.setHours(0,0,0,0);
-                if (d >= today) setSelectedDate(d);
-              }}
-              className="size-9 shrink-0 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-              aria-label="Previous day"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <div className="flex-1 overflow-x-auto scrollbar-none">
-              <div className="flex gap-1.5 pb-1">
-                {Array.from({ length: 7 }).map((_, i) => {
-                  const d = new Date();
-                  d.setHours(0, 0, 0, 0);
-                  d.setDate(d.getDate() + i);
-                  const isSelected = d.toDateString() === selectedDate.toDateString();
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => setSelectedDate(d)}
-                      className={`shrink-0 flex flex-col items-center px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                        isSelected
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-card border border-border hover:border-primary/40"
-                      }`}
-                    >
-                      <span className="text-[10px] uppercase tracking-wider opacity-80">
-                        {i === 0 ? "Today" : i === 1 ? "Tmrw" : d.toLocaleDateString("en-US", { weekday: "short" })}
-                      </span>
-                      <span className="text-sm font-bold mt-0.5">{d.getDate()}</span>
-                    </button>
-                  );
-                })}
-              </div>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const d = new Date(selectedDate);
+              d.setDate(d.getDate() - 1);
+              const today = new Date(); today.setHours(0, 0, 0, 0);
+              if (d >= today) setSelectedDate(d);
+            }}
+            className="size-11 shrink-0 rounded-xl border bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+            aria-label="Previous day"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <div className="flex-1 overflow-x-auto scrollbar-none">
+            <div className="flex gap-2 pb-1">
+              {Array.from({ length: 7 }).map((_, i) => {
+                const d = new Date();
+                d.setHours(0, 0, 0, 0);
+                d.setDate(d.getDate() + i);
+                const isSelected = d.toDateString() === selectedDate.toDateString();
+                const sub = dayNote(d);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedDate(d)}
+                    aria-pressed={isSelected}
+                    className={`shrink-0 min-w-24 flex flex-col items-start px-3.5 py-2 rounded-xl text-left transition-colors border ${
+                      isSelected ? "bg-primary text-primary-foreground border-primary" : sub.closed ? "bg-muted text-muted-foreground" : "bg-card hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="text-[11px] font-semibold opacity-85">
+                      {i === 0 ? "Today" : i === 1 ? "Tmrw" : d.toLocaleDateString("en-US", { weekday: "short" })}
+                    </span>
+                    <span className="text-base font-bold">{d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    <span className={`text-[11px] font-semibold ${isSelected ? "" : sub.closed ? "" : "text-primary"}`}>{sub.text}</span>
+                  </button>
+                );
+              })}
             </div>
-            <button
-              onClick={() => {
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() + 1);
+          </div>
+          <button
+            onClick={() => {
+              const d = new Date(selectedDate);
+              d.setDate(d.getDate() + 1);
+              setSelectedDate(d);
+            }}
+            className="size-11 shrink-0 rounded-xl border bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+            aria-label="Next day"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMobileCalendar((prev) => !prev)}
+            aria-expanded={showMobileCalendar}
+            className="hidden sm:inline-flex shrink-0 min-h-11 items-center gap-2 rounded-xl border bg-card px-3.5 text-sm font-semibold hover:bg-muted"
+          >
+            <Calendar className="size-4" />
+            Pick another date
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowMobileCalendar((prev) => !prev)}
+          aria-expanded={showMobileCalendar}
+          className="sm:hidden self-start text-primary font-semibold text-sm flex items-center gap-1.5 py-1 px-1"
+        >
+          <Calendar className="size-3.5" />
+          {showMobileCalendar ? "Hide calendar" : "Pick another date"}
+        </button>
+        {showMobileCalendar && (
+          <div className="max-w-md animate-in fade-in slide-in-from-top-2 duration-200">
+            <DateSelector
+              selectedDate={selectedDate}
+              onSelectDate={(d) => {
                 setSelectedDate(d);
+                setShowMobileCalendar(false);
               }}
-              className="size-9 shrink-0 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-              aria-label="Next day"
-            >
-              <ChevronRight className="size-4" />
-            </button>
+              operatingHours={operatingHours}
+            />
           </div>
+        )}
+        <GridLegend />
+      </div>
 
-          <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">
-              {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowMobileCalendar((prev) => !prev)}
-              className="text-primary hover:underline font-semibold flex items-center gap-1.5 py-1 px-2 rounded-md hover:bg-primary/10 transition-colors"
-            >
-              <Calendar className="size-3.5" />
-              <span>{showMobileCalendar ? "Hide Calendar" : "Pick Other Date"}</span>
-            </button>
-          </div>
-
-          {showMobileCalendar && (
-            <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-200">
-              <DateSelector
-                selectedDate={selectedDate}
-                onSelectDate={(d) => {
-                  setSelectedDate(d);
-                  setShowMobileCalendar(false);
-                }}
-                operatingHours={operatingHours}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="hidden lg:block lg:col-span-4 xl:col-span-3">
-          <DateSelector
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            operatingHours={operatingHours}
-          />
-        </div>
-
-        <div className="lg:col-span-8 xl:col-span-9">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+        <div className="min-w-0">
           {timeSlots.length > 0 ? (
-            <div className={`space-y-6 ${basket.length > 0 ? BASKET_SHEET_PADDING : ""}`}>
+            <div className={basket.length > 0 ? BASKET_SHEET_PADDING : ""}>
               <CourtAvailabilityGrid
                 selectedDate={selectedDate}
                 courts={courtNames}
@@ -550,10 +554,20 @@ export const BookingContainer = () => {
                 selectedSlots={basket}
                 isFetching={isFetchingBookings}
                 priceOf={(time) => priceFor(selectedDate, time, 1).total}
+                peakOf={(time) => priceFor(selectedDate, time, 1).hasPeak}
                 headingOf={(time) => lateNightLabel(selectedDateStr, slotTimes(time).start, pricing?.settings.day_ends_at) ?? dayName}
               />
 
-              {pricing && (
+            </div>
+          ) : (
+            <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed text-muted-foreground text-sm">
+              {closure?.reason
+                ? `The venue is closed on this date (${closure.reason}). Please select another date.`
+                : "The venue is closed on this date. Please select another date."}
+            </div>
+          )}
+        </div>
+        {pricing && (
                 <BasketSheet
                   lines={basket}
                   pricing={pricing}
@@ -566,15 +580,6 @@ export const BookingContainer = () => {
                   onCheckout={() => startCheckout()}
                 />
               )}
-            </div>
-          ) : (
-            <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed text-muted-foreground text-sm">
-              {closure?.reason
-                ? `The venue is closed on this date (${closure.reason}). Please select another date.`
-                : "The venue is closed on this date. Please select another date."}
-            </div>
-          )}
-        </div>
       </div>
       </div>
       )}
@@ -693,9 +698,9 @@ export const BookingContainer = () => {
               {isResumingGridBooking ? (
                 <LoaderCircle className="size-3.5 animate-spin" />
               ) : (
-                <CreditCard className="size-3.5" />
+                <QrCode className="size-3.5" />
               )}
-              {isResumingGridBooking ? "Connecting to Stripe..." : "Continue to Payment"}
+              {isResumingGridBooking ? "Opening QR Ph..." : "Continue to Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

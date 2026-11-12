@@ -95,7 +95,7 @@ export function CourtsShowcase({ courts, hours }: { courts: ShowcaseCourt[]; hou
   return (
     <section id="courts" aria-label="Our courts" className="w-full scroll-mt-20 border-t py-12 md:py-16">
       <div className="container mx-auto px-4 max-w-6xl">
-        <h2 className="text-5xl sm:text-6xl leading-[0.9] text-foreground">Our courts</h2>
+        <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Our courts</h2>
         <p className="mt-2 max-w-[60ch] text-sm sm:text-base text-muted-foreground">
           Pick a court to see it up close and whether it&apos;s free right now.
         </p>
@@ -106,7 +106,7 @@ export function CourtsShowcase({ courts, hours }: { courts: ShowcaseCourt[]; hou
             {/* Over the picture from sm up; below it on phones, where it would cover most of the court */}
             <div className="flex flex-wrap items-end justify-between gap-3 p-4 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-gradient-to-t sm:from-background/95 sm:to-transparent sm:p-5">
               <div className="min-w-0">
-                <h3 className="font-display text-4xl sm:text-5xl font-black leading-[0.9] text-foreground">{featured.name}</h3>
+                <h3 className="font-display text-3xl sm:text-4xl font-bold leading-tight text-foreground">{featured.name}</h3>
                 {featured.details && <p className="mt-1.5 text-sm font-semibold text-foreground/90">{featured.details}</p>}
                 {featuredStatus && (
                   <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -139,7 +139,7 @@ export function CourtsShowcase({ courts, hours }: { courts: ShowcaseCourt[]; hou
                   >
                     <CourtPicture court={court} alt="" className="block aspect-[11/6] w-[72px] rounded-md" />
                     <span className="min-w-0">
-                      <span className="block truncate font-display text-xl font-black text-foreground">{court.name}</span>
+                      <span className="block truncate font-display text-lg font-bold text-foreground">{court.name}</span>
                       {status && <span className="block truncate text-xs text-muted-foreground">{status.detail}</span>}
                     </span>
                     {pill(status)}

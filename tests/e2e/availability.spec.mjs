@@ -7,7 +7,7 @@ test("guest can fill a basket and is asked to sign in only at checkout @mobile",
   const open = grid.getByRole("button", { name: /^Select .+ at / });
   // Wait for the grid to finish loading; today may have no open slot (closed, late, or fully booked).
   await expect(
-    grid.locator('[aria-label*=" at "]').first()
+    grid.locator('[aria-label*=" at "]:visible').first()
       .or(grid.getByText(/venue is closed/))
       .or(grid.getByRole("button", { name: /^Show \d+ earlier time slot/ }))
       .first(),

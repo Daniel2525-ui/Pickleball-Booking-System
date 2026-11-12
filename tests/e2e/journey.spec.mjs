@@ -4,7 +4,8 @@ import { test, expect } from "@playwright/test";
 import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
-test.use({ viewport: { width: 412, height: 915 } });
+// Desktop layout: the grid shows every court at once (phones show one court at a time)
+test.use({ viewport: { width: 1280, height: 900 } });
 
 const stamp = Date.now();
 const player = { name: "Journey Player", phone: "09175550123", email: `e2e-journey-${stamp}@example.com`, password: "journey-pass-1" };

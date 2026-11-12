@@ -1,10 +1,11 @@
-// Multi-court basket: real holds, Stripe test-mode sessions, refunds and counter settlement. Local Supabase stack only.
+// Multi-court basket: real holds, QR Ph test-mode payments, refunds and counter settlement. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, payOnStripe, openAllBookings } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, payWithQrPh, openAllBookings, requireQrPh } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 // Phone width shows the quick-date strip ("Tmrw"), the simplest stable way to pick tomorrow
-test.use({ viewport: { width: 412, height: 915 } });
+// Desktop layout: the grid shows every court at once (phones show one court at a time)
+test.use({ viewport: { width: 1280, height: 900 } });
 
 const date = tomorrowManila();
 
@@ -41,7 +42,8 @@ const courtRow = (court, start) =>
 const bookingId = (court, start) =>
   sql(`SELECT id FROM public.bookings WHERE court_id = '${courtId(court)}' AND booking_date = '${date}' AND start_time = '${start}' ORDER BY created_at DESC LIMIT 1`);
 
-test("a two-court basket is paid in one Stripe checkout and confirms both courts", async ({ page }) => {
+test("a two-court basket is paid with one QR Ph payment and confirms both courts", async ({ page }) => {
+  requireQrPh();
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   for (const court of ["COURT 1", "COURT 2"]) {
@@ -53,8 +55,8 @@ test("a two-court basket is paid in one Stripe checkout and confirms both courts
   await expect(basket(page).getByText(/all held together or not at all/)).toBeVisible();
 
   await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
-  await payOnStripe(page);
+  await page.getByRole("dialog").getByRole("button", { name: /^Pay ₱[\d,]+ with QR Ph$/ }).click();
+  await payWithQrPh(page);
   await page.waitForURL(/\/book\/success\?session_id=/, { timeout: 60_000 });
   await expect(page.getByText("Confirmed & Paid")).toBeVisible({ timeout: 30_000 });
 
@@ -76,6 +78,7 @@ test("a two-court basket is paid in one Stripe checkout and confirms both courts
 });
 
 test("a player cannot cancel a paid court: it stays paid and nothing is refunded", async ({ page }) => {
+  requireQrPh(); // uses the basket paid in the test above
   await login(page, account("CUSTOMER"));
   const id = bookingId("COURT 1", "18:00");
 
@@ -93,13 +96,14 @@ test("a player cannot cancel a paid court: it stays paid and nothing is refunded
 });
 
 test("a court lost before a late payment is confirmed is refunded alone, and the success page names it", async ({ page }) => {
+  requireQrPh();
   await login(page, account("CUSTOMER"));
   // Stand in for a late webhook: the success page (whose verify call confirms the basket) does not load yet
   await page.route("**/book/success**", (route) => route.fulfill({ contentType: "text/html", body: "<p>held</p>" }));
   const res = await checkout(page, [["COURT 3", "16:00", "17:00"], ["COURT 4", "16:00", "17:00"]]);
   expect(res.status()).toBe(200);
   await page.goto((await res.json()).url);
-  await payOnStripe(page);
+  await payWithQrPh(page);
   await page.waitForURL(/\/book\/success\?session_id=/, { timeout: 60_000 });
   const successUrl = page.url();
   expect(courtRow("COURT 3", "16:00")).toBe("pending|pending|200.00");
@@ -120,6 +124,7 @@ test("a court lost before a late payment is confirmed is refunded alone, and the
 });
 
 test("a court taken mid-basket reserves nothing and is dropped from the basket", async ({ page, browser }) => {
+  requireQrPh();
   await login(page, account("CUSTOMER"));
   await openTomorrow(page);
   await slot(page, "COURT 3", "8:00 AM - 9:00 AM").click();
@@ -133,10 +138,10 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket",
     data: { booking_date: date, lines: [{ court_id: courtId("COURT 4"), start_time: "08:00", end_time: "09:00" }] },
   });
   expect(first.status()).toBe(200);
-  expect((await first.json()).url).toMatch(/^https:\/\/checkout\.stripe\.com\//);
+  expect((await first.json()).url).toMatch(/^\/book\/qr\?pr=/);
 
   await basket(page).getByRole("button", { name: "Continue to Checkout" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Continue to Checkout" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /^Pay ₱[\d,]+ with QR Ph$/ }).click();
   await expect(page.getByRole("dialog").getByText(/^COURT 4 .+ was just taken\. Nothing was reserved — please choose again\.$/)).toBeVisible();
   await expect(page.getByText("Removed from your selection (no longer available): COURT 4.")).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
@@ -151,6 +156,7 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket",
 });
 
 test("a second checkout while a basket awaits payment is refused", async ({ page }) => {
+  requireQrPh(); // the first basket has to reach the QR Ph payment
   await login(page, account("CUSTOMER"));
   expect((await checkout(page, [["COURT 3", "10:00", "11:00"], ["COURT 4", "10:00", "11:00"]])).status()).toBe(200);
 
@@ -177,6 +183,7 @@ test("a second checkout while a basket awaits payment is refused", async ({ page
 const rowFor = (page, court, time) => page.getByRole("row").filter({ hasText: court }).filter({ hasText: time });
 
 test("staff cannot settle a basket from a list filtered to one of its courts", async ({ page }) => {
+  requireQrPh(); // uses the unpaid basket from the test above
   await login(page, account("ADMIN"));
   await openAllBookings(page);
   await page.getByRole("combobox").filter({ hasText: "All Courts" }).click();
@@ -197,6 +204,7 @@ test("staff cannot settle a basket from a list filtered to one of its courts", a
 });
 
 test("staff collect cash for a whole unpaid basket from one court", async ({ page }) => {
+  requireQrPh(); // uses the unpaid basket from the tests above
   await login(page, account("ADMIN"));
   await openAllBookings(page);
   await rowFor(page, "COURT 3", "10:00 AM").getByRole("button", { name: "Open menu" }).click();
@@ -217,6 +225,7 @@ test("staff collect cash for a whole unpaid basket from one court", async ({ pag
 });
 
 test("staff cancelling one court of an unpaid basket cancels every court", async ({ page, browser }) => {
+  requireQrPh(); // the basket has to reach the QR Ph payment first
   const customer = await browser.newPage();
   await login(customer, account("CUSTOMER2"));
   expect((await checkout(customer, [["COURT 3", "14:00", "15:00"], ["COURT 4", "14:00", "15:00"]])).status()).toBe(200);

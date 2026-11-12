@@ -1,10 +1,9 @@
-import { ArrowLeft, Crosshair } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
-import { VENUE_CITY, VENUE_NAME, splitBrandName } from "@/lib/brand";
+import { VENUE_CITY, VENUE_NAME, brandInitials } from "@/lib/brand";
 
 // Two-tone wordmark: the last word of the name in the accent colour
-const brand = splitBrandName(VENUE_NAME);
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -23,12 +22,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       {/* Brand Identity */}
       <Link href="/" className="flex items-center gap-2.5 mb-8 group">
-        <div className="flex aspect-square size-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary shadow-xs group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200">
-          <Crosshair className="size-5 transition-transform group-hover:rotate-45" />
-        </div>
+        <span className="size-10 shrink-0 rounded-xl bg-primary text-primary-foreground grid place-items-center font-display font-bold">
+          {brandInitials(VENUE_NAME)}
+        </span>
         <div className="flex flex-col">
-          <span className="font-black text-xl tracking-tight leading-none text-foreground uppercase">
-            {brand.lead && <>{brand.lead} </>}<span className="text-primary">{brand.accent}</span>
+          <span className="font-display font-bold text-xl leading-none text-foreground">
+            {VENUE_NAME}
           </span>
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
             {VENUE_CITY}

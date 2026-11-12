@@ -68,18 +68,16 @@ export function localSupabase() {
   return { url, anonKey };
 }
 
-// Pays the open Stripe Checkout page with the 4242 test card (test mode only)
-export async function payOnStripe(page) {
-  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
-  const email = page.locator("#email");
-  if (await email.isVisible().catch(() => false)) await email.fill("e2e-customer@example.com");
-  await page.locator("#cardNumber").fill("4242 4242 4242 4242");
-  await page.locator("#cardExpiry").fill("12 / 34");
-  await page.locator("#cardCvc").fill("123");
-  await page.locator("#billingName").fill("E2E Customer");
-  const postal = page.locator("#billingPostalCode");
-  if (await postal.isVisible().catch(() => false)) await postal.fill("10001");
-  await page.getByTestId("hosted-payment-submit-button").click();
+// QR Ph is the only online payment method; the local app needs a Xendit test key for it (scripts/e2e-app.sh)
+export function requireQrPh() {
+  test.skip(!process.env.XENDIT_SECRET_KEY, "QR Ph checkout needs XENDIT_SECRET_KEY (a Xendit test key) in tests/e2e/.env.e2e");
+}
+
+// Pays the open QR Ph page with Xendit's test-mode simulation, as a player scanning it would
+export async function payWithQrPh(page) {
+  requireQrPh();
+  await page.waitForURL(/\/book\/qr\?pr=/, { timeout: 30_000 });
+  await page.getByRole("button", { name: "Simulate payment (test mode)" }).click();
 }
 
 /** Opens the admin bookings list across every date; it opens on today by default. */

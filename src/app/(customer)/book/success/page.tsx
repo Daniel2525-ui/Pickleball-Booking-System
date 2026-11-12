@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/customers/public-header";
 import { VENUE_NAME } from "@/lib/brand";
+import { Confetti } from "@/components/customers/confetti";
 
 function BookingSuccessContent() {
   const venue = useVenueContact();
@@ -79,7 +80,7 @@ function BookingSuccessContent() {
               Confirming Your Reservation
             </h2>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Verifying your payment with Stripe and securing your court slot at {VENUE_NAME}...
+              Checking your QR Ph payment and securing your court at {VENUE_NAME}...
             </p>
           </div>
         </main>
@@ -147,20 +148,21 @@ function BookingSuccessContent() {
       <PublicHeader />
 
       <main className="flex-1 flex flex-col items-center justify-center p-4 py-12 sm:py-16">
-        <div className="max-w-lg w-full bg-card border border-border rounded-2xl shadow-md p-6 sm:p-8 space-y-6">
+        <div className="relative overflow-hidden max-w-lg w-full bg-card border border-border rounded-2xl shadow-xs p-6 sm:p-8 space-y-6">
+          <Confetti onceKey={sessionId ?? "booking"} />
           {/* Success Status Emblem */}
-          <div className="flex flex-col items-center text-center">
-            <div className="size-16 sm:size-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-4 shadow-xs">
+          <div className="relative flex flex-col items-center text-center">
+            <div className="pop-in size-16 sm:size-20 rounded-full bg-primary text-primary-foreground ring-8 ring-primary/15 flex items-center justify-center mb-5">
               <CheckCircle2 className="size-8 sm:size-10" />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/20 px-3 py-1 text-xs font-bold text-primary mb-2">
               <ShieldCheck className="size-3.5" />
               <span>Confirmed &amp; Paid</span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-              {verifyResult.openPlay ? "Spot booked!" : "Court Reserved Successfully!"}
+              {verifyResult.openPlay ? "Your spot is booked." : "You're booked."}
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-2 leading-relaxed">
               {verifyResult.openPlay

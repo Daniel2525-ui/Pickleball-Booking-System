@@ -37,6 +37,7 @@ export default async function TermsPage() {
           )}{" "}
           The total is shown before you pay.
         </li>
+        <li>You pay online with QR Ph: scan the code with GCash, Maya or any bank app.</li>
         <li>When you continue to checkout, your slot is held for 15 minutes while you pay. If payment isn&apos;t completed, the hold ends and the slot is released.</li>
         <li>A reservation is confirmed only after payment succeeds; it then appears in My Bookings.</li>
         <li>Please check in at reception 10 minutes before your slot. Non-marking court shoes are required.</li>

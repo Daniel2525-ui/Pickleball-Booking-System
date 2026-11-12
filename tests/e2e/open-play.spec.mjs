@@ -3,7 +3,8 @@ import { test, expect } from "@playwright/test";
 import { requireLocalDb, writesAllowed, sql, account, login, tomorrowManila, resetBookings, openAllBookings } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
-test.use({ viewport: { width: 412, height: 915 } });
+// Desktop layout: the grid shows every court at once (phones show one court at a time)
+test.use({ viewport: { width: 1280, height: 900 } });
 
 const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 // Tomorrow's weekday: the first generated session is tomorrow, on a day with no other bookings

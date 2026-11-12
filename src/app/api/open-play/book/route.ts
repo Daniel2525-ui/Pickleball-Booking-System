@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
-import { openBasketCheckout } from "@/lib/services/payments/openBasketCheckout";
+import { openBasketCheckout, QR_PH_NOT_CONFIGURED } from "@/lib/services/payments/openBasketCheckout";
 import { parseSpotRequest, sessionErrorResponse } from "@/lib/services/openPlay/openPlayTypes";
 
 export async function POST(request: NextRequest) {
@@ -75,17 +75,18 @@ export async function POST(request: NextRequest) {
         return Response.json({ url });
     } catch (error) {
         console.error("Open play booking error:", error);
-        // Stripe refused before any session existed: free the spots now instead of holding them 15 minutes.
+        // Payment refused before any session existed: free the spots now instead of holding them 15 minutes.
         // Ambiguous failures (network) keep the hold; cron cleanup or resume-payment resolves it.
         const definite =
             error instanceof Stripe.errors.StripeInvalidRequestError ||
             error instanceof Stripe.errors.StripeAuthenticationError ||
-            error instanceof Stripe.errors.StripePermissionError;
+            error instanceof Stripe.errors.StripePermissionError ||
+            (error as Error)?.message === QR_PH_NOT_CONFIGURED;
         const admin = definite && hold ? getServiceClient() : null;
         if (admin && hold) {
             await admin.from("payments").update({ status: "failed" }).eq("id", hold.payment_id).eq("status", "pending");
             await admin.from("bookings").update({ status: "cancelled", cancel_reason: "checkout_failed" }).eq("id", hold.booking_id).eq("status", "pending");
-            return Response.json({ error: "Card payment could not be started. Please try again." }, { status: 400 });
+            return Response.json({ error: "Payment could not be started. Please try again." }, { status: 400 });
         }
         return Response.json({ error: "An unexpected error occurred. Please try again." }, { status: 500 });
     }

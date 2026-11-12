@@ -58,7 +58,7 @@ test("front desk runs the day but never sees Pricing or Settings", async ({ page
   await expect(page.getByRole("heading", { name: "Staff Dashboard" })).toBeVisible();
   await expect(page.getByText("Court Staff")).toBeVisible();
   await expect(page.getByRole("link", { name: "Bookings", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Pricing", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Prices", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0);
 
   await page.goto("/");

@@ -40,7 +40,8 @@ export default async function PrivacyPage() {
       <h2>Who we share it with</h2>
       <ul>
         <li><strong>Supabase</strong>, which hosts our database and accounts.</li>
-        <li><strong>Stripe</strong>, which processes card payments and refunds.</li>
+        <li><strong>Xendit</strong>, which processes QR Ph payments (GCash, Maya and bank apps).</li>
+        <li><strong>Stripe</strong>, which processed card payments made before QR Ph and handles their refunds.</li>
         <li><strong>Vercel</strong>, which hosts this website.</li>
       </ul>
       <p>These providers process data only to run the service for us. Venue staff with admin access can see bookings and customer contact details.</p>

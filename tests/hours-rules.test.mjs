@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkWeeklyHours, isOutsideHours, bookableWindows } from "../src/lib/services/schedule/hoursRules.ts";
+import { checkWeeklyHours, isOutsideHours, bookableWindows, openNowLabel } from "../src/lib/services/schedule/hoursRules.ts";
 import { validateBookingSlot } from "../src/lib/services/bookings/validateBookingSlot.service.ts";
 import { formatTime12h } from "../src/lib/utils/formatTime.ts";
 import { getBookingEnd, businessDate, businessToday, lateNightLabel, lateNightOf } from "../src/lib/utils/bookingTime.ts";
@@ -134,4 +134,14 @@ test("summaries and emails read late hours correctly", () => {
     assert.equal(summary.range, "7 AM – 2 AM");
     const email = renderBookingEmail("confirmation", { to: "a@b.c", name: "Ana", rows: [{ id: "1", booking_date: "2026-11-07", business_date: "2026-11-06", start_time: "00:00:00", end_time: "02:00:00", customer_name: "Ana", courts: { name: "Court 1" } }] }, { phone: "0917", phoneHref: "tel:0917", email: "play@venue.ph", address: "Butuan" });
     assert.match(email.text, /Court 1 · Sat, Nov 7 · 12:00 AM – 2:00 AM \(Friday late night\)/);
+});
+
+test("openNowLabel: open, opening later, closed, and late-night hours", () => {
+    const week = [open("Friday", "07:00", "01:00"), open("Saturday", "08:00", "22:00"), { day_of_week: "Sunday", is_open: false }];
+    const at = (iso) => openNowLabel(week, new Date(iso));
+    assert.deepEqual(at("2026-11-06T23:30:00+08:00"), { open: true, text: "Open now · until 1:00 AM" });
+    assert.deepEqual(at("2026-11-07T00:30:00+08:00"), { open: true, text: "Open now · until 1:00 AM" }); // Friday late night
+    assert.deepEqual(at("2026-11-07T03:00:00+08:00"), { open: false, text: "Opens today at 8:00 AM" });
+    assert.deepEqual(at("2026-11-07T22:30:00+08:00"), { open: false, text: "Closed for today" });
+    assert.deepEqual(at("2026-11-08T10:00:00+08:00"), { open: false, text: "Closed for today" });
 });

@@ -2,7 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { brandName, splitBrandName } from "../src/lib/brand.ts";
+import { brandName, splitBrandName, brandInitials, brandColor, onBrandColor } from "../src/lib/brand.ts";
+
+test("brand colour: only a #RRGGBB value is used, and text on it stays readable", () => {
+  assert.equal(brandColor("#1d4ed8"), "#1d4ed8");
+  assert.equal(brandColor(" #0E7C66 "), "#0E7C66");
+  assert.equal(brandColor("blue"), "#0E7C66");
+  assert.equal(brandColor(undefined), "#0E7C66");
+  assert.equal(onBrandColor("#0E7C66"), "#FFFFFF");
+  assert.equal(onBrandColor("#1D4ED8"), "#FFFFFF");
+  assert.equal(onBrandColor("#C6F432"), "#111816"); // lime is too light for white text
+  assert.equal(onBrandColor("#FACC15"), "#111816");
+  assert.equal(brandInitials("Riverside Pickle Club"), "RP");
+  assert.equal(brandInitials("smashville"), "S");
+});
 
 test("brandName: trims, falls back when blank, keeps & and apostrophes as typed", () => {
   assert.equal(brandName(undefined, "X"), "X");

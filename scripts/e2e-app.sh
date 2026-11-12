@@ -20,6 +20,10 @@ export NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="$(read_local NEXT_PUBLIC_STRIPE_PUBLI
 case "$STRIPE_SECRET_KEY" in sk_test_*) ;; *) echo "REFUSING: Stripe secret key is not a test key"; exit 1;; esac
 case "$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" in pk_test_*) ;; *) echo "REFUSING: Stripe publishable key is not a test key"; exit 1;; esac
 case "$NEXT_PUBLIC_SUPABASE_URL" in http://127.0.0.1:*|http://localhost:*) ;; *) echo "REFUSING: Supabase URL is not local"; exit 1;; esac
+# QR Ph: only a Xendit test key from .env.e2e. Set (even empty) here, so .env.local's key can never load.
+export XENDIT_SECRET_KEY="${XENDIT_SECRET_KEY:-}" XENDIT_WEBHOOK_TOKEN="${XENDIT_WEBHOOK_TOKEN:-}"
+case "$XENDIT_SECRET_KEY" in ""|xnd_development_*) ;; *) echo "REFUSING: Xendit key is not a test key"; exit 1;; esac
+[ -n "$XENDIT_SECRET_KEY" ] || echo "Note: no XENDIT_SECRET_KEY in tests/e2e/.env.e2e, so checkout will say QR Ph is not configured"
 
 cd "$ROOT"
 exec npx next dev -p 3200

@@ -1,6 +1,6 @@
 import { getBookingWeekday } from "../bookings/validateBookingSlot.service.ts";
 import { formatTime12h } from "../../utils/formatTime.ts";
-import { shiftDate } from "../../utils/bookingTime.ts";
+import { formatManilaDate, shiftDate } from "../../utils/bookingTime.ts";
 
 export const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -87,4 +87,19 @@ export function bookableWindows(bookingDate: string, hours: HoursInput[], closed
 /** One window must hold the whole slot, so 1-2 AM never joins 8-9 AM. */
 export function isWithinWindows(windows: BookableWindow[], startTime: string, endTime: string) {
     return windows.some((w) => hhmm(startTime) >= w.start && hhmm(endTime) <= w.end);
+}
+
+/** "Open now · until 1:00 AM" from the weekly hours and the visitor's clock (Manila time). */
+export function openNowLabel(hours: HoursInput[], now: Date) {
+  const today = formatManilaDate(now);
+  const weekday = getBookingWeekday(today);
+  const clock = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false });
+  const windows = windowsForWeekday(weekday, hours);
+  // A window ending at 24:00 runs on past midnight: show the real closing time
+  const closeOf = (end: string) => (end === "24:00" ? hours.find((h) => h.day_of_week === weekday)?.close_time ?? "00:00" : end);
+  const current = windows.find((w) => clock >= w.start && clock < w.end);
+  if (current) return { open: true, text: `Open now · until ${formatTime12h(closeOf(current.end))}` };
+  const next = windows.find((w) => clock < w.start);
+  if (next) return { open: false, text: `Opens today at ${formatTime12h(next.start)}` };
+  return { open: false, text: "Closed for today" };
 }

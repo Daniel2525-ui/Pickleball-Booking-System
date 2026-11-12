@@ -19,8 +19,7 @@ import {
     Users,
     Clock,
     Tag,
-    CreditCard,
-    Crosshair,
+    Wallet,
     Settings,
     UsersRound,
     BarChart3,
@@ -28,7 +27,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/account-menu";
-import { VENUE_NAME } from "@/lib/brand";
+import { VENUE_NAME, brandInitials } from "@/lib/brand";
 
 interface NavItem {
     title: string;
@@ -38,62 +37,35 @@ interface NavItem {
     ownerOnly?: boolean;
 }
 
-const operationsNav: NavItem[] = [
+// Grouped by what the desk does: today's work first, then the venue set-up, then people and money
+const navGroups: { label: string; items: NavItem[] }[] = [
     {
-        title: "Dashboard",
-        url: "/admin/dashboard",
-        icon: LayoutDashboard,
+        label: "Today",
+        items: [
+            { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard },
+            { title: "Bookings", url: "/admin/bookings", icon: CalendarDays },
+            { title: "Payments", url: "/admin/payments", icon: Wallet },
+        ],
     },
     {
-        title: "Bookings",
-        url: "/admin/bookings",
-        icon: CalendarDays,
+        label: "Venue",
+        items: [
+            { title: "Courts", url: "/admin/courts", icon: Layers },
+            { title: "Hours & schedules", url: "/admin/schedules", icon: Clock },
+            { title: "Open play", url: "/admin/open-play", icon: UsersRound },
+            { title: "Prices", url: "/admin/pricing", ownerOnly: true, icon: Tag },
+        ],
     },
     {
-        title: "Courts",
-        url: "/admin/courts",
-        icon: Layers,
+        label: "People & money",
+        items: [
+            { title: "Customers", url: "/admin/customers", icon: Users },
+            { title: "Reports", url: "/admin/reports", ownerOnly: true, icon: BarChart3 },
+        ],
     },
     {
-        title: "Operating Hours",
-        url: "/admin/schedules",
-        icon: Clock,
-    },
-    {
-        title: "Open Play",
-        url: "/admin/open-play",
-        icon: UsersRound,
-    },
-    {
-        title: "Pricing",
-        url: "/admin/pricing",
-        ownerOnly: true,
-        icon: Tag,
-    },
-];
-
-const managementNav: NavItem[] = [
-    {
-        title: "Customer Directory",
-        url: "/admin/customers",
-        icon: Users,
-    },
-    {
-        title: "Payments & Revenue",
-        url: "/admin/payments",
-        icon: CreditCard,
-    },
-    {
-        title: "Reports",
-        url: "/admin/reports",
-        ownerOnly: true,
-        icon: BarChart3,
-    },
-    {
-        title: "Settings",
-        url: "/admin/settings",
-        ownerOnly: true,
-        icon: Settings,
+        label: "Setup",
+        items: [{ title: "Settings", url: "/admin/settings", ownerOnly: true, icon: Settings }],
     },
 ];
 
@@ -111,11 +83,11 @@ export default function AppSidebar({ account, isOwner }: { account: { name: stri
                                 size="lg"
                                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group"
                             >
-                                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200">
-                                    <Crosshair className="size-4.5 transition-transform group-hover:rotate-45" />
-                                </div>
+                                <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-display font-bold text-xs">
+                                    {brandInitials(VENUE_NAME)}
+                                </span>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-extrabold text-foreground">
+                                    <span className="truncate font-display font-bold text-foreground">
                                         {VENUE_NAME}
                                     </span>
                                     <span className="truncate text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
@@ -128,66 +100,40 @@ export default function AppSidebar({ account, isOwner }: { account: { name: stri
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent className="pt-2">
-                {/* Operations Section */}
-                <SidebarGroup>
-                    <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-3">
-                        Operations
-                    </SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu className="gap-1">
-                            {operationsNav.filter((item) => isOwner || !item.ownerOnly).map((item) => {
-                                const isActive = currentPath === item.url || currentPath.startsWith(`${item.url}/`);
-                                const Icon = item.icon;
-
-                                return (
-                                    <SidebarMenuItem key={item.title}>
-                                        <Link href={item.url}>
-                                            <SidebarMenuButton
-                                                className="cursor-pointer py-5 [&>svg]:size-4 font-medium transition-colors"
-                                                isActive={isActive}
-                                                tooltip={item.title}
-                                            >
-                                                <Icon className={isActive ? "text-primary" : "text-muted-foreground"} />
-                                                <span>{item.title}</span>
-                                            </SidebarMenuButton>
-                                        </Link>
-                                    </SidebarMenuItem>
-                                );
-                            })}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
-
-                {/* Management & Finance Section */}
-                <SidebarGroup className="pt-2">
-                    <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-3">
-                        Management
-                    </SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu className="gap-1">
-                            {managementNav.filter((item) => isOwner || !item.ownerOnly).map((item) => {
-                                const isActive = currentPath === item.url || currentPath.startsWith(`${item.url}/`);
-                                const Icon = item.icon;
-
-                                return (
-                                    <SidebarMenuItem key={item.title}>
-                                        <Link href={item.url}>
-                                            <SidebarMenuButton
-                                                className="cursor-pointer py-5 [&>svg]:size-4 font-medium transition-colors"
-                                                isActive={isActive}
-                                                tooltip={item.title}
-                                            >
-                                                <Icon className={isActive ? "text-primary" : "text-muted-foreground"} />
-                                                <span>{item.title}</span>
-                                            </SidebarMenuButton>
-                                        </Link>
-                                    </SidebarMenuItem>
-                                );
-                            })}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
+            <SidebarContent className="pt-1">
+                {navGroups.map((group) => {
+                    const items = group.items.filter((item) => isOwner || !item.ownerOnly);
+                    if (items.length === 0) return null;
+                    return (
+                        <SidebarGroup key={group.label} className="py-1">
+                            <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-3">
+                                {group.label}
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu className="gap-0.5">
+                                    {items.map((item) => {
+                                        const isActive = currentPath === item.url || currentPath.startsWith(`${item.url}/`);
+                                        const Icon = item.icon;
+                                        return (
+                                            <SidebarMenuItem key={item.title}>
+                                                <Link href={item.url}>
+                                                    <SidebarMenuButton
+                                                        className="cursor-pointer py-5 [&>svg]:size-4 font-medium transition-colors data-[active=true]:font-semibold"
+                                                        isActive={isActive}
+                                                        tooltip={item.title}
+                                                    >
+                                                        <Icon className={isActive ? "text-primary" : "text-muted-foreground"} />
+                                                        <span>{item.title}</span>
+                                                    </SidebarMenuButton>
+                                                </Link>
+                                            </SidebarMenuItem>
+                                        );
+                                    })}
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
+                    );
+                })}
             </SidebarContent>
 
             {account && (

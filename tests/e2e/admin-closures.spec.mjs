@@ -45,7 +45,6 @@ test("staff close a date and see the booking already on it", async ({ page }) =>
 
 test("customers see the date closed and cannot book it, even through checkout", async ({ page }) => {
   await login(page, account("CUSTOMER"));
-  await page.setViewportSize({ width: 412, height: 915 }); // the day strip with "Tmrw" is the phone layout
   await page.goto("/#booking");
   await page.getByRole("button", { name: /Tmrw/ }).click();
   await expect(page.getByText("The venue is closed on this date (E2E Holiday). Please select another date.")).toBeVisible();
@@ -87,7 +86,6 @@ test("reopening the date lets customers book it again", async ({ page }) => {
 
   await page.context().clearCookies();
   await login(page, account("CUSTOMER"));
-  await page.setViewportSize({ width: 412, height: 915 }); // the day strip with "Tmrw" is the phone layout
   await page.goto("/#booking");
   await page.getByRole("button", { name: /Tmrw/ }).click();
   await expect(page.getByText(/The venue is closed on this date/)).toHaveCount(0);

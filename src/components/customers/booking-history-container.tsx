@@ -180,7 +180,7 @@ export const BookingHistoryContainer = () => {
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-5xl sm:text-6xl leading-[0.9] text-foreground">
+        <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
           My bookings
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base mt-1.5 leading-relaxed">
@@ -350,7 +350,7 @@ export const BookingHistoryContainer = () => {
                           return (
                             <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5">
                               <div className="min-w-0 w-full sm:w-auto sm:flex-1">
-                                <p className={`text-sm font-black ${isLive(m) ? "text-foreground" : "text-muted-foreground"}`}>
+                                <p className={`text-sm font-semibold ${isLive(m) ? "text-foreground" : "text-muted-foreground"}`}>
                                   {bookingTitle(m)}
                                   {!isLive(m) && (
                                     <Badge variant="outline" className="ml-2 bg-muted text-muted-foreground border-border font-semibold text-[10px]">
@@ -363,7 +363,7 @@ export const BookingHistoryContainer = () => {
                                 </p>
                                 {mNote && <p className={`text-xs font-semibold ${noteTone(mNote.text)}`}>{mNote.text}</p>}
                               </div>
-                              <span className={`ml-auto text-sm font-black tabular-nums ${isLive(m) ? "text-foreground" : "text-muted-foreground line-through"}`}>
+                              <span className={`ml-auto text-sm font-bold tabular-nums ${isLive(m) ? "text-foreground" : "text-muted-foreground line-through"}`}>
                                 ₱{Number(m.total_amount ?? 0).toLocaleString()}
                               </span>
                             </li>
@@ -383,7 +383,7 @@ export const BookingHistoryContainer = () => {
                       Total{multi && (live.length < group.length ? ` · ${live.length} of ${group.length} courts` : ` · ${group.length} courts`)}
                     </span>
                     {/* Never charged (expired or abandoned hold): the price stays visible but reads as not paid */}
-                    <span className={`text-2xl font-black ${note && !note.charged ? "text-muted-foreground line-through decoration-2" : "text-foreground"}`}>
+                    <span className={`font-display text-2xl font-bold ${note && !note.charged ? "text-muted-foreground line-through decoration-2" : "text-foreground"}`}>
                       {checkoutTotal(group) ? `₱${checkoutTotal(group).toLocaleString()}` : "₱---"}
                     </span>
 
@@ -441,7 +441,7 @@ export const BookingHistoryContainer = () => {
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
                     {new Date(`${booking.booking_date}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })}
                   </span>
-                  <span className="font-display text-4xl font-black leading-none">{Number(booking.booking_date.slice(8, 10))}</span>
+                  <span className="font-display text-3xl font-bold leading-none">{Number(booking.booking_date.slice(8, 10))}</span>
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
                     {new Date(`${booking.booking_date}T00:00:00`).toLocaleDateString("en-US", { month: "short" })}
                   </span>

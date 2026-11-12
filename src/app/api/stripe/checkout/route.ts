@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import { validateBasketLines } from "@/lib/services/bookings/validateBookingSlot.service";
 import { bookableWindows } from "@/lib/services/schedule/hoursRules";
-import { openBasketCheckout } from "@/lib/services/payments/openBasketCheckout";
+import { openBasketCheckout, QR_PH_NOT_CONFIGURED } from "@/lib/services/payments/openBasketCheckout";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 
 interface HeldBasket {
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 4. One Stripe Checkout for every held court, each hold tied to it under the court lock
+        // 4. One QR Ph payment for every held court, each hold tied to it under the court lock
         const { url, confirmError } = await openBasketCheckout({
             supabase,
             basketId: basket.basket_id,
@@ -225,7 +225,8 @@ export async function POST(request: NextRequest) {
             error instanceof Stripe.errors.StripeInvalidRequestError ||
             error instanceof Stripe.errors.StripeAuthenticationError ||
             error instanceof Stripe.errors.StripePermissionError ||
-            Boolean((error as Error)?.message?.includes("Stripe is not configured"));
+            Boolean((error as Error)?.message?.includes("Stripe is not configured")) ||
+            (error as Error)?.message === QR_PH_NOT_CONFIGURED;
 
         // Only release records on definite pre-creation failure where no session could exist at Stripe.
         // For network timeouts or connection drops, preserve pending records so payment resumption,
