@@ -26,7 +26,7 @@ export const OpenPlayContainer = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [dayEndsAt, setDayEndsAt] = useState("04:00");
+  const [dayEndsAt, setDayEndsAt] = useState("00:00");
 
   useEffect(() => {
     const supabase = createClient();

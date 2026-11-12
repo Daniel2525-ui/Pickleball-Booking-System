@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import PaymentFilters from "./payment-filters";
 import PaymentsTable from "./payments-table";
 import { businessToday } from "@/lib/utils/bookingTime";
+import { useDayEndsAt } from "@/hooks/use-day-ends-at";
 
 export interface PaymentFiltersState {
   search: string;
@@ -13,13 +14,18 @@ export interface PaymentFiltersState {
 }
 
 export default function PaymentsContainer() {
+  // The desk's day starts at the venue's cutoff, so the first view waits for it
+  const dayEndsAt = useDayEndsAt();
+  return dayEndsAt === null ? null : <Payments dayEndsAt={dayEndsAt} />;
+}
+
+function Payments({ dayEndsAt }: { dayEndsAt: string }) {
   // ?status= lets the dashboard alerts open this page pre-filtered, across every date; otherwise the desk closes out today
   const statusParam = useSearchParams().get("status");
   const [filters, setFilters] = useState<PaymentFiltersState>({
     search: "",
     status: statusParam || "All Statuses",
-    // shortcut: assumes the default 4 AM day cutoff for the first view, read booking_settings.day_ends_at if a venue changes it
-    date: statusParam ? "" : businessToday(),
+    date: statusParam ? "" : businessToday(dayEndsAt),
   });
 
   return (

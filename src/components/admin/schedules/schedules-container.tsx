@@ -42,8 +42,8 @@ export const SchedulesContainer = () => {
   const [savedHours, setSavedHours] = useState(JSON.stringify(defaultHours))
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null)
   // booking_settings.day_ends_at: the latest a day may close after midnight (the save route checks the real value again)
-  const [dayEndsAt, setDayEndsAt] = useState("04:00")
-  const [savedDayEndsAt, setSavedDayEndsAt] = useState("04:00")
+  const [dayEndsAt, setDayEndsAt] = useState("00:00")
+  const [savedDayEndsAt, setSavedDayEndsAt] = useState("00:00")
   const dirty = JSON.stringify(hours) !== savedHours || dayEndsAt !== savedDayEndsAt
 
   useUnsavedChangesPrompt(dirty)
@@ -56,7 +56,7 @@ export const SchedulesContainer = () => {
         fetchOperatingHours(),
         supabase.from("booking_settings").select("day_ends_at").maybeSingle(),
       ])
-      const cutoff: string = (settings?.day_ends_at ?? "04:00").slice(0, 5)
+      const cutoff: string = (settings?.day_ends_at ?? "00:00").slice(0, 5)
       setDayEndsAt(cutoff)
       setSavedDayEndsAt(cutoff)
 

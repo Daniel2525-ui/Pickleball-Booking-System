@@ -8,7 +8,7 @@ export interface BookingPolicy {
     dayEndsAt: string;
 }
 
-export const DEFAULT_POLICY: BookingPolicy = { noShowGraceMinutes: NO_SHOW_GRACE_MINUTES, dayEndsAt: "04:00:00" };
+export const DEFAULT_POLICY: BookingPolicy = { noShowGraceMinutes: NO_SHOW_GRACE_MINUTES, dayEndsAt: "00:00:00" };
 
 /** The venue's booking rules from Settings (public read); today's defaults if they can't be read. */
 export const fetchBookingPolicy = async (client: SupabaseClient): Promise<BookingPolicy> => {

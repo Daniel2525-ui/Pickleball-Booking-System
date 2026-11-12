@@ -20,7 +20,7 @@ const WHOLE_HOUR = /^([01]\d|2[0-3]):00(:00)?$/;
  * (booking_settings.day_ends_at) is the latest that can be, and the earliest a day can open.
  * Returns the first problem in staff wording, or the rows to store.
  */
-export function checkWeeklyHours(hours: unknown, dayEndsAt = "04:00"): { error: string } | { rows: { day_of_week: string; is_open: boolean; open_time: string | null; close_time: string | null }[] } {
+export function checkWeeklyHours(hours: unknown, dayEndsAt = "00:00"): { error: string } | { rows: { day_of_week: string; is_open: boolean; open_time: string | null; close_time: string | null }[] } {
     if (!Array.isArray(hours) || hours.length === 0) return { error: "Operating hours data is required." };
     const seen = new Set<string>();
     const rows = [];

@@ -47,7 +47,7 @@ export const gameDayBlockReason = (
     newStatus: string,
     booking: { booking_date: string; start_time?: string; business_date?: string | null },
     now: Date = new Date(),
-    dayEndsAt = "04:00"
+    dayEndsAt = "00:00"
 ) => {
     const today = businessToday(dayEndsAt, now); // YYYY-MM-DD, so string comparison orders dates
     const day = booking.business_date ?? businessDate(booking.booking_date, booking.start_time ?? "12:00", dayEndsAt);

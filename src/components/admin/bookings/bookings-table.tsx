@@ -91,6 +91,8 @@ const paymentLabel = (b: Booking) => {
 };
 
 interface BookingsTableProps {
+  /** booking_settings.day_ends_at: check-in is allowed on the booking's business day */
+  dayEndsAt?: string;
   filters?: {
     search: string;
     status: string;
@@ -104,7 +106,8 @@ const cancelsWith = (b: Booking, target: Booking) =>
   b.id === target.id ||
   (target.status === "pending" && !!target.basket_id && b.basket_id === target.basket_id && b.status === "pending");
 
-export default function BookingsTable({ filters }: BookingsTableProps = {}) {
+export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps = {}) {
+  const blockReason = (status: string, b: Parameters<typeof gameDayBlockReason>[1]) => gameDayBlockReason(status, b, new Date(), dayEndsAt);
   const [bookingsData, setBookingsData] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -339,7 +342,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                   const total = courts.length >= size ? checkoutTotal(courts) : head.basket_total ?? checkoutTotal(courts);
                   const sameDate = courts.every((c) => c.booking_date === head.booking_date);
                   const samePayment = new Set(courts.map(paymentLabel)).size === 1;
-                  const toCheckIn = courts.filter((c) => c.status === "confirmed" && !c.open_play_spots && !gameDayBlockReason("checked_in", c));
+                  const toCheckIn = courts.filter((c) => c.status === "confirmed" && !c.open_play_spots && !blockReason("checked_in", c));
                   const phone = head.customers?.phone || head.profiles?.phone;
 
                   return [
@@ -512,8 +515,8 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleStatusChange(booking, "checked_in")}
-                                    disabled={actionLoadingId === booking.id || !!gameDayBlockReason("checked_in", booking)}
-                                    title={gameDayBlockReason("checked_in", booking) ?? undefined}
+                                    disabled={actionLoadingId === booking.id || !!blockReason("checked_in", booking)}
+                                    title={blockReason("checked_in", booking) ?? undefined}
                                     className="cursor-pointer text-blue-600 focus:text-blue-600 text-xs font-semibold"
                                   >
                                     {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCheck className="mr-2 h-4 w-4" />}
@@ -534,7 +537,7 @@ export default function BookingsTable({ filters }: BookingsTableProps = {}) {
                               {booking.status?.toLowerCase() === "no_show" && (
                                 <DropdownMenuItem
                                   onClick={() => handleStatusChange(booking, "completed")}
-                                  disabled={actionLoadingId === booking.id || !!gameDayBlockReason("completed", booking)}
+                                  disabled={actionLoadingId === booking.id || !!blockReason("completed", booking)}
                                   title={gameDayBlockReason("completed", booking) ?? undefined}
                                   className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
                                 >

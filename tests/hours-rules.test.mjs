@@ -42,12 +42,12 @@ test("isOutsideHours compares a booking with its weekday's hours", () => {
 const lateWeek = [open("Thursday", "08:00", "00:00"), open("Friday", "22:00", "02:00"), open("Saturday", "08:00", "22:00"), { day_of_week: "Sunday", is_open: false }];
 
 test("checkWeeklyHours accepts closing after midnight up to the day's end", () => {
-    assert.ok(checkWeeklyHours([open("Friday", "22:00", "02:00")]).rows);
-    assert.ok(checkWeeklyHours([open("Friday", "08:00", "00:00")]).rows);
-    assert.ok(checkWeeklyHours([open("Friday", "08:00", "04:00")]).rows);
-    assert.match(checkWeeklyHours([open("Friday", "08:00", "05:00")]).error, /after midnight up to 4:00 AM/);
+    assert.ok(checkWeeklyHours([open("Friday", "22:00", "02:00")], "04:00").rows);
+    assert.ok(checkWeeklyHours([open("Friday", "08:00", "00:00")], "04:00").rows);
+    assert.ok(checkWeeklyHours([open("Friday", "08:00", "04:00")], "04:00").rows);
+    assert.match(checkWeeklyHours([open("Friday", "08:00", "05:00")], "04:00").error, /after midnight up to 4:00 AM/);
     assert.ok(checkWeeklyHours([open("Friday", "08:00", "05:00")], "06:00:00").rows);
-    assert.match(checkWeeklyHours([open("Friday", "03:00", "22:00")]).error, /earlier than 4:00 AM/);
+    assert.match(checkWeeklyHours([open("Friday", "03:00", "22:00")], "04:00").error, /earlier than 4:00 AM/);
 });
 
 test("bookableWindows gives a date the previous day's late-night tail and its own hours", () => {
@@ -84,14 +84,14 @@ test("a booking can end at 24:00 and formats as 12:00 AM", () => {
 });
 
 test("the business day: hours before the cutoff belong to the day before", () => {
-    assert.equal(businessDate("2026-11-07", "01:00:00"), "2026-11-06");
-    assert.equal(businessDate("2026-11-07", "04:00:00"), "2026-11-07");
+    assert.equal(businessDate("2026-11-07", "01:00:00", "04:00"), "2026-11-06");
+    assert.equal(businessDate("2026-11-07", "04:00:00", "04:00"), "2026-11-07");
     assert.equal(businessDate("2026-11-07", "01:00:00", "00:00:00"), "2026-11-07");
-    assert.equal(businessDate("2026-11-01", "00:00"), "2026-10-31");
+    assert.equal(businessDate("2026-11-01", "00:00", "04:00"), "2026-10-31");
     assert.equal(businessToday("04:00:00", new Date("2026-11-07T01:30:00+08:00")), "2026-11-06");
     assert.equal(businessToday("04:00:00", new Date("2026-11-07T04:00:00+08:00")), "2026-11-07");
-    assert.equal(lateNightLabel("2026-11-07", "01:00:00"), "Friday late night");
-    assert.equal(lateNightLabel("2026-11-07", "08:00:00"), null);
+    assert.equal(lateNightLabel("2026-11-07", "01:00:00", "04:00"), "Friday late night");
+    assert.equal(lateNightLabel("2026-11-07", "08:00:00", "04:00"), null);
     assert.equal(lateNightOf({ booking_date: "2026-11-07", business_date: "2026-11-06" }), "Friday late night");
     assert.equal(lateNightOf({ booking_date: "2026-11-07", business_date: "2026-11-07" }), null);
     assert.equal(lateNightOf({ booking_date: "2026-11-07" }), null);
