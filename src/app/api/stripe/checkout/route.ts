@@ -3,14 +3,17 @@ import { HOLD_MS } from "@/lib/services/bookings/bookingDisplayStatus";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
-import { validateBasketLines } from "@/lib/services/bookings/validateBookingSlot.service";
+import { heldOnTheirDates, validateBasketLines } from "@/lib/services/bookings/validateBookingSlot.service";
+
+// Thrown when the database held lines on other dates than sent (an older hold_court_basket): the holds are released
+const HOLD_DATES_MISMATCH = "HOLD_DATES_MISMATCH";
 import { businessDayWindows } from "@/lib/services/schedule/hoursRules";
 import { openBasketCheckout, QR_PH_NOT_CONFIGURED } from "@/lib/services/payments/openBasketCheckout";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 
 interface HeldBasket {
     basket_id: string;
-    items: { booking_id: string; payment_id: string; court_name: string; booking_date: string; start_time: string; end_time: string; amount: number | string }[];
+    items: { booking_id: string; payment_id: string; court_id: string; court_name: string; booking_date?: string; start_time: string; end_time: string; amount: number | string }[];
 }
 
 export async function POST(request: NextRequest) {
@@ -186,6 +189,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        if (!heldOnTheirDates(validation.lines, items)) {
+            console.error("hold_court_basket ignored line dates: apply migration 20261112140000_late_night_basket");
+            throw new Error(HOLD_DATES_MISMATCH);
+        }
+
         // 4. One QR Ph payment for every held court, each hold tied to it under the court lock
         const { url, confirmError } = await openBasketCheckout({
             supabase,
@@ -196,7 +204,7 @@ export async function POST(request: NextRequest) {
                 bookingId: item.booking_id,
                 paymentId: item.payment_id,
                 courtName: item.court_name,
-                bookingDate: item.booking_date,
+                bookingDate: item.booking_date!,
                 startTime: item.start_time,
                 endTime: item.end_time,
                 amount: Number(item.amount),
@@ -226,7 +234,8 @@ export async function POST(request: NextRequest) {
             error instanceof Stripe.errors.StripeAuthenticationError ||
             error instanceof Stripe.errors.StripePermissionError ||
             Boolean((error as Error)?.message?.includes("Stripe is not configured")) ||
-            (error as Error)?.message === QR_PH_NOT_CONFIGURED;
+            (error as Error)?.message === QR_PH_NOT_CONFIGURED ||
+            (error as Error)?.message === HOLD_DATES_MISMATCH;
 
         // Only release records on definite pre-creation failure where no session could exist at Stripe.
         // For network timeouts or connection drops, preserve pending records so payment resumption,

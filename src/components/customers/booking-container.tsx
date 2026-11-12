@@ -32,7 +32,8 @@ import { User } from "@supabase/supabase-js";
 
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
 import { fetchUpcomingClosures, VenueClosure } from "@/lib/services/schedule/venueClosures.service";
-import { businessToday, formatManilaDate } from "@/lib/utils/bookingTime";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
+import { bookingToday } from "@/lib/services/schedule/hoursRules";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { checkSlotAvailability, getSlotBooking, slotTimes } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
@@ -131,8 +132,8 @@ export const BookingContainer = () => {
       if (hoursRes.data) setOperatingHours(hoursRes.data);
       if (pricingRes.data) {
         setPricing(pricingRes.data);
-        // Past midnight the day can still be running (open till 2 AM): open on it, not on the calendar date
-        const day = businessToday(pricingRes.data.settings.day_ends_at);
+        // Past midnight the night can still be running (open till 2 AM): open on it, not on the calendar date
+        const day = bookingToday(hoursRes.data ?? [], pricingRes.data.settings.day_ends_at, new Date(), closuresRes.data.map((c) => c.closed_on));
         if (!restoredDate.current && day !== formatManilaDate(new Date())) setSelectedDateRaw(dayStart(day));
       }
       if (courtsRes.data) {
@@ -377,8 +378,8 @@ export const BookingContainer = () => {
     (n, court) => n + timeSlots.filter((time) => getSlotStatus(selectedDate, court, time) === "available").length,
     0
   );
-  // The day strip starts on the business day: at 12:30 AM a day open till 2 AM is still "Today"
-  const firstDay = dayStart(businessToday(pricing?.settings.day_ends_at));
+  // The day strip starts on the night still running: at 12:30 AM a day open till 2 AM is still "Today"
+  const firstDay = dayStart(bookingToday(operatingHours, pricing?.settings.day_ends_at, new Date(), closures.map((c) => c.closed_on)));
   const isToday = selectedDate.toDateString() === firstDay.toDateString();
   const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
   // The day's own closing time when it has one (2 AM for a late close, not the midnight its last slot here ends at)

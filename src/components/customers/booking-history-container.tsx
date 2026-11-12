@@ -8,7 +8,7 @@ import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { cancelBooking, isBookingCancellable } from "@/lib/services/bookings/cancelBooking.service";
 import { getBookingStart } from "@/lib/utils/bookingTime";
 import { cancellationNote, getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
-import { checkoutTotal, groupByCheckout, isLive, pendingBasketSize, settleHold } from "@/lib/services/bookings/basket";
+import { checkoutSpan, checkoutTotal, groupByCheckout, isLive, pendingBasketSize, settleHold } from "@/lib/services/bookings/basket";
 
 // Badges for bookings that are no longer awaiting payment or confirmed (EXPIRED = checkout timed out, nothing charged)
 const HISTORY_LABELS: Record<string, string> = {
@@ -337,15 +337,14 @@ export const BookingHistoryContainer = () => {
                       <div className="flex items-center gap-2 text-foreground font-semibold">
                         <Clock className="size-4 text-primary shrink-0" />
                         <span>
-                          {/* Times are HH:MM:SS, so the earliest/latest sort as strings */}
-                          {formatTime12h(shown.map((m) => m.start_time).sort()[0])} – {formatTime12h(shown.map((m) => m.end_time).sort().at(-1)!)}
+                          {formatTime12h(checkoutSpan(shown).start)} – {formatTime12h(checkoutSpan(shown).end)}
                         </span>
                       </div>
                     </div>
 
                     {multi && (
                       <ul aria-label="Courts in this booking" className="divide-y rounded-xl border">
-                        {[...group].sort((a, b) => a.start_time.localeCompare(b.start_time) || bookingTitle(a).localeCompare(bookingTitle(b))).map((m) => {
+                        {[...group].sort((a, b) => `${a.booking_date} ${a.start_time}`.localeCompare(`${b.booking_date} ${b.start_time}`) || bookingTitle(a).localeCompare(bookingTitle(b))).map((m) => {
                           const mNote = isLive(m) ? null : cancellationNote(m);
                           return (
                             <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5">

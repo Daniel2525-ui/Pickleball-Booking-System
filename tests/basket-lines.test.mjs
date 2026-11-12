@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { lineKey, mergeSpans, splitAtMidnight, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
+import { lineKey, mergeSpans, splitAtMidnight, checkoutSpan, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
 
 const a = { court: "Court 1", price: 200, hasPeak: false, startSlot: "8:00 AM - 9:00 AM" };
 const b = { court: "Court 2", price: 300, hasPeak: true, startSlot: "8:00 AM - 9:00 AM" };
@@ -75,4 +75,17 @@ test("splitAtMidnight stores a run across midnight as two bookings, one on each 
     assert.deepEqual(splitAtMidnight(friday, [0, 1], "2026-11-06"), [{ booking_date: "2026-11-06", start_time: "22:00", end_time: "23:00" }]);
     assert.deepEqual(splitAtMidnight(friday, [0, 2], "2026-11-30"), [{ booking_date: "2026-11-30", start_time: "22:00", end_time: "24:00" }]);
     assert.deepEqual(splitAtMidnight(friday, [3, 4], "2026-12-31"), [{ booking_date: "2027-01-01", start_time: "01:00", end_time: "02:00" }]);
+});
+
+test("groupByCheckout keeps a checkout's courts in real time order, so a night across midnight reads 11 PM then 12 AM", () => {
+    const row = (id, booking_date, start_time, end_time) => ({ id, basket_id: "k", booking_date, start_time, end_time });
+    const [group] = groupByCheckout([row("b", "2026-11-07", "00:00:00", "01:00:00"), row("a", "2026-11-06", "23:00:00", "24:00:00")]);
+    assert.deepEqual(group.map((r) => r.id), ["a", "b"]);
+});
+
+test("checkoutSpan is the first start and the last end of a checkout, across midnight too", () => {
+    const row = (booking_date, start_time, end_time) => ({ booking_date, start_time, end_time });
+    assert.deepEqual(checkoutSpan([row("2026-11-06", "23:00:00", "24:00:00"), row("2026-11-07", "00:00:00", "01:00:00")]), { start: "23:00:00", end: "01:00:00" });
+    // Courts side by side on one date: the longest one sets the end
+    assert.deepEqual(checkoutSpan([row("2026-11-06", "08:00:00", "12:00:00"), row("2026-11-06", "09:00:00", "10:00:00")]), { start: "08:00:00", end: "12:00:00" });
 });

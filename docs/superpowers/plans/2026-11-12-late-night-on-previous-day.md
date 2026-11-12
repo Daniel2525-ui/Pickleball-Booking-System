@@ -19,7 +19,7 @@
 - Migration tested only on the local stack (`supabase_db_localdb`). Production apply only after the user says so. Ship a rollback file in `supabase/`.
 - Write e2e only through `scripts/e2e-app.sh` on :3200 against local Supabase; `.env.local` is production.
 - CRLF files: preserve line endings when editing.
-- Deploy order: the migration goes to production before the new app code. Old SQL ignores the per-line dates, so a tail line would be refused (OUTSIDE_OPERATING_HOURS). That fails safely, but a player couldn't book it.
+- Deploy order (hard release step): apply the migration to production BEFORE deploying the app; revert the app BEFORE applying the rollback. Old SQL ignores line dates and could hold a 12 AM hour on the wrong night; the checkout route now detects that (heldOnTheirDates) and releases the holds, but the order still matters.
 
 ## Review Focus
 

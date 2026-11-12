@@ -119,6 +119,15 @@ export type ValidateBasketResult =
       }
     | { valid: false; error: string };
 
+/**
+ * True when hold_court_basket held every line on the date it was sent with. An older database function ignores
+ * line dates and would hold a night's 12 AM hour on the wrong date, so checkout must not go on to payment.
+ */
+export const heldOnTheirDates = (
+    lines: BasketLine[],
+    items: { court_id: string; booking_date?: string; start_time: string }[]
+) => items.every((i) => lines.some((l) => l.courtId === i.court_id && l.bookingDate === i.booking_date && l.startTimeDb === i.start_time));
+
 const hoursOf = (l: BasketLine) => Number(l.endTimeDb.slice(0, 2)) - Number(l.startTimeDb.slice(0, 2));
 
 /**

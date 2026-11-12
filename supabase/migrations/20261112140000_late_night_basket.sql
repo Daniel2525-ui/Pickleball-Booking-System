@@ -36,20 +36,20 @@ BEGIN
   END IF;
 
   -- A line's date defaults to the basket's; the business day's after-midnight hours are on the next date
-  CREATE TEMP TABLE IF NOT EXISTS pg_temp.basket_lines (court_id uuid, line_date date, start_time time, end_time time) ON COMMIT DROP;
+  CREATE TEMP TABLE IF NOT EXISTS pg_temp.basket_lines (ord bigint, court_id uuid, line_date date, start_time time, end_time time) ON COMMIT DROP;
   TRUNCATE pg_temp.basket_lines;
   INSERT INTO pg_temp.basket_lines
-  SELECT (e->>'court_id')::uuid, coalesce((e->>'booking_date')::date, p_booking_date), (e->>'start_time')::time, (e->>'end_time')::time
-  FROM jsonb_array_elements(p_lines) e;
+  SELECT e.ord, (e.v->>'court_id')::uuid, coalesce((e.v->>'booking_date')::date, p_booking_date), (e.v->>'start_time')::time, (e.v->>'end_time')::time
+  FROM jsonb_array_elements(p_lines) WITH ORDINALITY e(v, ord);
 
   IF EXISTS (SELECT 1 FROM pg_temp.basket_lines l WHERE public.business_date(l.line_date, l.start_time) IS DISTINCT FROM p_booking_date) THEN
     RAISE EXCEPTION 'INVALID_ARGUMENT: A time is not on this booking day' USING ERRCODE = '22000';
   END IF;
   IF EXISTS (
     SELECT 1
-    FROM (SELECT l.*, row_number() OVER () AS i FROM pg_temp.basket_lines l) a
-    JOIN (SELECT l.*, row_number() OVER () AS j FROM pg_temp.basket_lines l) b
-      ON a.i < b.j AND a.court_id = b.court_id AND a.line_date = b.line_date
+    FROM pg_temp.basket_lines a
+    JOIN pg_temp.basket_lines b
+      ON a.ord < b.ord AND a.court_id = b.court_id AND a.line_date = b.line_date
      AND a.start_time < b.end_time AND b.start_time < a.end_time
   ) THEN
     RAISE EXCEPTION 'INVALID_ARGUMENT: Two times on the same court overlap' USING ERRCODE = '22000';

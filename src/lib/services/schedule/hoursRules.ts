@@ -1,6 +1,6 @@
 import { getBookingWeekday } from "../bookings/validateBookingSlot.service.ts";
 import { formatTime12h } from "../../utils/formatTime.ts";
-import { formatManilaDate, shiftDate } from "../../utils/bookingTime.ts";
+import { businessToday, formatManilaDate, shiftDate } from "../../utils/bookingTime.ts";
 
 export const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -95,6 +95,19 @@ export function businessDayWindows(bookingDate: string, hours: HoursInput[], clo
         ...windowsForWeekday(getBookingWeekday(bookingDate), hours).filter((w) => !w.lateNight).map((w) => ({ ...w, date: bookingDate })),
         ...windowsForWeekday(getBookingWeekday(next), hours).filter((w) => w.lateNight).map((w) => ({ ...w, date: next })),
     ];
+}
+
+/**
+ * The day the booking page opens on (YYYY-MM-DD): after midnight it is the night before while that night's
+ * after-midnight hours are still open (Friday till 2 AM at 12:30 AM Saturday), otherwise the calendar date.
+ */
+export function bookingToday(hours: HoursInput[], dayEndsAt = "00:00", now: Date = new Date(), closedDates: string[] = []) {
+    const calendar = formatManilaDate(now);
+    const day = businessToday(dayEndsAt, now);
+    if (day === calendar) return calendar;
+    const clock = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false });
+    const tail = businessDayWindows(day, hours, closedDates).find((w) => w.lateNight);
+    return tail && clock < tail.end ? day : calendar;
 }
 
 /** One window must hold the whole slot, so 1-2 AM never joins 8-9 AM. */

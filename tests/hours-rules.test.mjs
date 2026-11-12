@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkWeeklyHours, isOutsideHours, bookableWindows, businessDayWindows, openNowLabel, hoursSummary } from "../src/lib/services/schedule/hoursRules.ts";
+import { checkWeeklyHours, isOutsideHours, bookableWindows, businessDayWindows, bookingToday, openNowLabel, hoursSummary } from "../src/lib/services/schedule/hoursRules.ts";
 import { validateBookingSlot } from "../src/lib/services/bookings/validateBookingSlot.service.ts";
 import { formatTime12h } from "../src/lib/utils/formatTime.ts";
 import { getBookingEnd, businessDate, businessToday, lateNightLabel, lateNightOf } from "../src/lib/utils/bookingTime.ts";
@@ -175,4 +175,16 @@ test("hoursSummary: the day's hours in plain words, with the next day named afte
     assert.deepEqual(hoursSummary("Sunday", "22:00", "01:00"), { nextDay: true, text: "Open 3 hours · until 1 AM Monday" });
     assert.deepEqual(hoursSummary("Monday", "08:30", "10:00"), { nextDay: false, text: "Open 1 hour 30 min · until 10 AM" });
     assert.equal(hoursSummary("Monday", "", "22:00"), null);
+});
+
+test("the booking page's Today is the night still running, else the calendar date", () => {
+    const at = (iso) => new Date(iso);
+    // Friday runs till 2 AM: at 12:30 AM Saturday the page opens on Friday; at 2:30 AM on Saturday
+    assert.equal(bookingToday(lateWeek, "04:00", at("2026-11-07T00:30:00+08:00")), "2026-11-06");
+    assert.equal(bookingToday(lateWeek, "04:00", at("2026-11-07T02:30:00+08:00")), "2026-11-07");
+    // Thursday closes at midnight: at 1 AM Friday there is nothing left of Thursday to book
+    assert.equal(bookingToday(lateWeek, "04:00", at("2026-11-06T01:00:00+08:00")), "2026-11-06");
+    // A closed Friday leaves no night to return to
+    assert.equal(bookingToday(lateWeek, "04:00", at("2026-11-07T00:30:00+08:00"), ["2026-11-06"]), "2026-11-07");
+    assert.equal(bookingToday(lateWeek, "00:00", at("2026-11-07T15:00:00+08:00")), "2026-11-07");
 });

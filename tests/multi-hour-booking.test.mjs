@@ -4,6 +4,7 @@ import {
     validateBookingSlot,
     getBookingWeekday,
     validateBasketLines,
+    heldOnTheirDates,
 } from "../src/lib/services/bookings/validateBookingSlot.service.ts";
 import { getBookingStart } from "../src/lib/utils/bookingTime.ts";
 import { businessDayWindows } from "../src/lib/services/schedule/hoursRules.ts";
@@ -363,4 +364,16 @@ test("validateBasketLines takes a date per line and counts the minimum across mi
     assert.equal(validateBasketLines({ ...base, limits: { min_hours: 1 }, lines: [line("c1", "2026-11-06", "23:00", "24:00"), line("c1", "2026-11-07", "00:00", "01:00")] }).valid, true);
     assert.deepEqual(validateBasketLines({ ...base, lines: [{ court_id: "c1", booking_date: 7, start_time: "00:00", end_time: "02:00" }] }),
         { valid: false, error: "Line 1: Missing required booking details." });
+});
+
+// An older hold_court_basket ignores line dates: its holds must be caught, not paid for on the wrong night
+test("heldOnTheirDates checks the database held each line on its own date", () => {
+    const lines = [
+        { courtId: "c1", courtName: "Court 1", bookingDate: "2026-11-06", startTimeDb: "23:00:00", endTimeDb: "24:00:00" },
+        { courtId: "c1", courtName: "Court 1", bookingDate: "2026-11-07", startTimeDb: "00:00:00", endTimeDb: "01:00:00" },
+    ];
+    const item = (court_id, booking_date, start_time) => ({ court_id, booking_date, start_time });
+    assert.equal(heldOnTheirDates(lines, [item("c1", "2026-11-06", "23:00:00"), item("c1", "2026-11-07", "00:00:00")]), true);
+    assert.equal(heldOnTheirDates(lines, [item("c1", "2026-11-06", "23:00:00"), item("c1", undefined, "00:00:00")]), false);
+    assert.equal(heldOnTheirDates(lines, [item("c1", "2026-11-06", "23:00:00"), item("c1", "2026-11-06", "00:00:00")]), false);
 });

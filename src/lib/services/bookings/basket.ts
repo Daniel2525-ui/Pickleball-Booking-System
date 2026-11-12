@@ -66,14 +66,26 @@ export const splitTakenLines = <T extends Line>(lines: T[], isFree: (line: T) =>
   dropped: lines.filter((l) => !isFree(l)),
 });
 
-/** A user's bookings, one group per checkout (basket); a booking without a basket is its own group. */
-export const groupByCheckout = <T extends { id: string; basket_id?: string | null }>(rows: T[]): T[][] => {
+/**
+ * A user's bookings, one group per checkout (basket); a booking without a basket is its own group. Each group is in
+ * real time order: a night's 11 PM booking comes before its 12 AM one, which is stored on the next date.
+ */
+export const groupByCheckout = <T extends { id: string; basket_id?: string | null; booking_date?: string; start_time?: string }>(rows: T[]): T[][] => {
   const groups = new Map<string, T[]>();
   for (const row of rows) {
     const key = row.basket_id ?? row.id;
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
-  return [...groups.values()];
+  const at = (r: T) => `${r.booking_date ?? ""} ${r.start_time ?? ""}`;
+  return [...groups.values()].map((g) => g.sort((a, b) => at(a).localeCompare(at(b))));
+};
+
+/** A checkout's first start and last end; its bookings may sit on two dates (a night over midnight). */
+export const checkoutSpan = (rows: { booking_date: string; start_time: string; end_time: string }[]) => {
+  const key = (date: string, time: string) => `${date} ${time}`;
+  const first = rows.reduce((m, r) => (key(r.booking_date, r.start_time) < key(m.booking_date, m.start_time) ? r : m));
+  const last = rows.reduce((m, r) => (key(r.booking_date, r.end_time) > key(m.booking_date, m.end_time) ? r : m));
+  return { start: first.start_time, end: last.end_time };
 };
 
 /** A court that still counts: not cancelled and not a no-show. */
