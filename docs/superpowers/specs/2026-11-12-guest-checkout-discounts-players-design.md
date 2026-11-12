@@ -97,6 +97,20 @@ with the admin side to manage both:
   create form; edit max uses, dates and on/off. Code, kind and value are fixed once a code has been used.
   Same staff access as the pricing page. Each code shows its recent uses (date, player, amount off).
 
+## Builder check answers (my calls, 2026-11-12)
+
+- Open play stays for accounts: `/api/open-play/book` refuses anonymous callers ("Sign in or create an account to join open play").
+- Creating an account from a guest session is `updateUser({ email, data })`; when the email is confirmed at once
+  (Confirm email off) the password is set in the same step, otherwise the confirmation link lands on a
+  "set your password" page. Same user id either way.
+- Guest checkout limit is 30 per IP per hour, like sign-ups (players share the venue Wi-Fi).
+- Discount codes are owner-only like pricing; staff see the applied code and amount on each booking.
+- `proxy.ts` lets anonymous sessions open `/login` and `/register`.
+- A trigger keeps `profiles.is_guest` from being changed by the player themself (only the service role or the
+  confirmation trigger changes it).
+- The checkout passes the guest's email as the payment's customer email.
+- The 3-argument `hold_court_basket` is dropped; the new one has defaults for the two new arguments.
+
 ## Tests
 
 - Unit: guest details validation and phone normalisation; player-count bounds; percent and fixed discount

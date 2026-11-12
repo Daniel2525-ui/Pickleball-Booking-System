@@ -41,12 +41,14 @@ test("discount codes are trimmed and upper-cased, letters, digits and dashes, 3 
     assert.equal(normaliseCode(7), null);
 });
 
-test("applyDiscount takes a percent off each line, or a fixed amount from the lines in order", () => {
+test("applyDiscount takes a percent off each line, or a fixed amount from the lines in order, each court keeping ₱1", () => {
     assert.deepEqual(applyDiscount([400, 200], { kind: "percent", value: 10 }), [360, 180]);
     // Rounded to centavos per line
     assert.deepEqual(applyDiscount([333], { kind: "percent", value: 15 }), [283.05]);
-    // A fixed amount larger than the first line spills into the next, never below zero
-    assert.deepEqual(applyDiscount([200, 400], { kind: "fixed", value: 250 }), [0, 350]);
-    assert.deepEqual(applyDiscount([200, 400], { kind: "fixed", value: 1000 }), [0, 0]);
-    assert.deepEqual(applyDiscount([200], { kind: "percent", value: 100 }), [0]);
+    assert.deepEqual(applyDiscount([200], { kind: "percent", value: 90 }), [20]);
+    // A fixed amount larger than the first line spills into the next; a court never drops below ₱1
+    assert.deepEqual(applyDiscount([200, 400], { kind: "fixed", value: 250 }), [1, 349]);
+    assert.deepEqual(applyDiscount([200, 400], { kind: "fixed", value: 598 }), [1, 1]);
+    // Worth more than the booking can give: refused, never part-applied
+    assert.equal(applyDiscount([200, 400], { kind: "fixed", value: 599 }), null);
 });
