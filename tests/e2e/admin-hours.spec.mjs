@@ -95,18 +95,23 @@ test("checkout holds late-night hours on their real dates and never across closi
   expect(sql(`SELECT end_time || ' ' || status FROM public.bookings WHERE booking_date = '${date}' AND start_time = '23:00'`)).toBe("24:00:00 pending");
 });
 
-test("the booking grid lists last night's late hours under their own heading and never joins them to the morning", async ({ page }) => {
+test("the booking grid lists a day's late hours at its bottom under their own heading, never on the next date", async ({ page }) => {
   resetBookings();
-  const todayName = new Date().toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Manila" });
-  sql(`UPDATE public.operating_hours SET close_time = '02:00' WHERE day_of_week = '${todayName}'`);
+  const tomorrowName = new Date(Date.now() + 86_400_000).toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Manila" });
+  sql(`UPDATE public.operating_hours SET close_time = '02:00' WHERE day_of_week = '${tomorrowName}'`);
   const court = firstCourt();
   await page.goto("/#booking");
   await page.getByRole("button", { name: /Tmrw/ }).click();
 
-  await expect(page.getByText(`${todayName} late night`).filter({ visible: true })).toBeVisible();
-  await page.getByRole("button", { name: `Select ${court.name} at 1:00 AM - 2:00 AM` }).click();
-  await page.getByRole("button", { name: `Select ${court.name} at 6:00 AM - 7:00 AM` }).click();
-  // 1-2 AM and 6-7 AM sit next to each other in the list but stay two bookings
+  await expect(page.getByText("After midnight", { exact: true }).filter({ visible: true })).toBeVisible();
+  await page.getByRole("button", { name: `Select ${court.name} at 1:00 AM - 2:00 AM` }).filter({ visible: true }).click();
+  await page.getByRole("button", { name: `Select ${court.name} at 6:00 AM - 7:00 AM` }).filter({ visible: true }).click();
+  // 6-7 AM opens the day and 1-2 AM ends it: two separate bookings
   const lines = page.getByRole("region", { name: "Your selection" }).getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) });
   await expect(lines).toHaveCount(2);
+
+  // The next date starts at its own opening: the 1-2 AM hour belongs to the night before
+  await page.getByRole("button", { name: "Next day" }).click();
+  await expect(page.getByRole("button", { name: `Select ${court.name} at 6:00 AM - 7:00 AM` }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Select ${court.name} at 1:00 AM - 2:00 AM` })).toHaveCount(0);
 });
