@@ -30,3 +30,18 @@ test("isXenditId: Xendit ids go to the record-only refund, Stripe ids do not", (
 test("qrExpiresAt: uses Xendit's expiry", () => {
   assert.equal(qrExpiresAt(pr("REQUIRES_ACTION", { channel_properties: { expires_at: "2026-11-10T04:27:23Z" } })), "2026-11-10T04:27:23Z");
 });
+
+test("closeQrPayment: paid stays paid, a payable QR is cancelled, a QR that won't cancel blocks the cancellation", async () => {
+    const { closeQrPayment } = await import("../src/lib/xendit.ts");
+    const api = (states, cancel) => {
+        const seen = [...states];
+        return { get: async () => pr(seen.length > 1 ? seen.shift() : seen[0]), cancel: cancel ?? (async () => pr("CANCELED")) };
+    };
+    assert.equal(await closeQrPayment("pr-1", api(["SUCCEEDED"])), "paid");
+    assert.equal(await closeQrPayment("pr-1", api(["EXPIRED"])), "closed");
+    assert.equal(await closeQrPayment("pr-1", api(["REQUIRES_ACTION"])), "closed");
+    // Paid in the same moment: Xendit refuses the cancel, and the QR now reads paid
+    assert.equal(await closeQrPayment("pr-1", api(["REQUIRES_ACTION", "SUCCEEDED"], async () => { throw new Error("400"); })), "paid");
+    // Still payable and Xendit won't cancel it: the booking must not be cancelled
+    await assert.rejects(closeQrPayment("pr-1", api(["REQUIRES_ACTION"], async () => { throw new Error("503"); })));
+});

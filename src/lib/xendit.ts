@@ -58,3 +58,36 @@ export const qrExpiresAt = (pr: XenditPaymentRequest) =>
     pr.channel_properties?.expires_at ?? new Date(Date.now() + QR_LIFETIME_MS).toISOString();
 
 export const qrString = (pr: XenditPaymentRequest) => pr.actions?.find((a) => a.descriptor === "QR_STRING")?.value ?? null;
+
+/** Stops a QR Ph payment request from being paid (Xendit: POST /v3/payment_requests/{id}/cancel). */
+export const cancelPaymentRequest = (id: string) =>
+    xendit<XenditPaymentRequest>(`/v3/payment_requests/${encodeURIComponent(id)}/cancel`, {});
+
+/**
+ * Before a booking paid by this QR is cancelled: "paid" when the player already paid (the webhook confirms it),
+ * "closed" once the QR can no longer be paid. Throws when it is still payable and Xendit would not cancel it,
+ * so nobody can pay for a cancelled court.
+ */
+export async function closeQrPayment(
+    id: string,
+    api: { get: typeof getPaymentRequest; cancel: typeof cancelPaymentRequest } = { get: getPaymentRequest, cancel: cancelPaymentRequest }
+): Promise<"closed" | "paid"> {
+    const pr = await api.get(id);
+    if (pr.status === "SUCCEEDED") return "paid";
+    if (DEAD.includes(pr.status)) return "closed";
+    try {
+        const after = await api.cancel(id);
+        if (after.status === "SUCCEEDED") return "paid";
+        if (DEAD.includes(after.status)) return "closed";
+    } catch (error) {
+        // Paid or expired at the same moment, or Xendit refused: decide on what the QR is now
+        const now = await api.get(id);
+        if (now.status === "SUCCEEDED") return "paid";
+        if (DEAD.includes(now.status)) return "closed";
+        throw error;
+    }
+    const now = await api.get(id);
+    if (now.status === "SUCCEEDED") return "paid";
+    if (DEAD.includes(now.status)) return "closed";
+    throw new Error(`Xendit payment request ${id} is still ${now.status} after cancelling`);
+}

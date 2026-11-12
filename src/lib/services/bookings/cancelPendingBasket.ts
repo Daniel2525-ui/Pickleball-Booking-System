@@ -1,15 +1,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
+import { closeQrPayment, isXenditId } from "@/lib/xendit";
 import { type BasketSibling, pendingPaymentIds, siblingSessionIds } from "./basketSiblings";
 
 // Server only: kept out of basketSiblings.ts, which the admin bookings table imports in the browser
 
 /**
- * Closes the open Checkout of an unpaid basket so nobody pays for a cancelled booking.
- * "paid" when a session already completed (the webhook will confirm it); throws when Stripe fails.
+ * Closes the open payment of an unpaid basket (QR Ph, or an older Stripe Checkout) so nobody pays for a
+ * cancelled booking. "paid" when it was already paid (the webhook will confirm it); throws when it can't be closed.
  */
 export async function closeSiblingSessions(siblings: Pick<BasketSibling, "payments">[]): Promise<"closed" | "paid"> {
     for (const sessionId of siblingSessionIds(siblings)) {
+        // QR Ph payments (Xendit pr- ids) live in the same column as the older Stripe sessions
+        if (isXenditId(sessionId)) {
+            if ((await closeQrPayment(sessionId)) === "paid") return "paid";
+            continue;
+        }
         const session = await stripe.checkout.sessions.retrieve(sessionId);
         if (session.status === "complete") return "paid";
         if (session.status === "open") await stripe.checkout.sessions.expire(sessionId);
