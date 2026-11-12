@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import { Clock, LoaderCircle, ChevronDown, Moon } from "lucide-react";
 import { Slot } from "./types";
 import { SlotStatus, slotTimes } from "@/lib/services/bookings/checkSlotAvailability.service";
-import { compactRange } from "@/lib/services/bookings/quickStarts";
+import { compactRange, hourRangeLabel } from "@/lib/services/bookings/quickStarts";
 
 interface CourtAvailabilityGridProps {
   selectedDate: Date;
@@ -179,8 +179,8 @@ export const CourtAvailabilityGrid = ({
 
       {/* Tablets and up: courts across, hours down */}
       <div className="hidden md:block overflow-x-auto pb-1">
-        <div className="min-w-[var(--grid-min)]" style={{ "--grid-min": `${96 + colCount * 104}px` } as React.CSSProperties}>
-          <div className="grid border-b bg-muted/30" style={{ gridTemplateColumns: `96px repeat(${colCount}, minmax(0, 1fr))` }}>
+        <div className="min-w-[var(--grid-min)]" style={{ "--grid-min": `${112 + colCount * 104}px` } as React.CSSProperties}>
+          <div className="grid border-b bg-muted/30" style={{ gridTemplateColumns: `112px repeat(${colCount}, minmax(0, 1fr))` }}>
             <div className="px-3 py-3 text-xs font-semibold text-muted-foreground sticky left-0 z-20 bg-muted/30">Time</div>
             {courts.map((court) => (
               <div key={court} className="px-2 py-3 text-center text-sm font-bold border-l">{court}</div>
@@ -191,9 +191,9 @@ export const CourtAvailabilityGrid = ({
           {visibleSlots.map((time, timeIdx) => (
             <Fragment key={time}>
               {headingBefore(timeIdx) && heading(time)}
-              <div className="grid border-t border-border/60" style={{ gridTemplateColumns: `96px repeat(${colCount}, minmax(0, 1fr))` }}>
+              <div className="grid border-t border-border/60" style={{ gridTemplateColumns: `112px repeat(${colCount}, minmax(0, 1fr))` }}>
                 <div className="px-3 flex flex-col justify-center min-h-14 sticky left-0 z-10 bg-card">
-                  <span className="text-sm font-bold">{compactRange([time], 0, 1).split("-")[0]}</span>
+                  <span className="text-sm font-bold whitespace-nowrap">{hourRangeLabel(time)}</span>
                   {peakOf?.(time) && <span className="text-[10px] font-bold text-amber-800">PEAK</span>}
                 </div>
                 {courts.map((court) => {
