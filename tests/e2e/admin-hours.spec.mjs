@@ -81,7 +81,7 @@ test("checkout holds late-night hours on their real dates and never across closi
   const court = firstCourt();
   await login(page, account("CUSTOMER"));
   const checkout = (booking_date, start_time, end_time) =>
-    page.request.post("/api/stripe/checkout", { data: { booking_date, lines: [{ court_id: court.id, start_time, end_time }] } });
+    page.request.post("/api/stripe/checkout", { data: { player_count: 2, booking_date, lines: [{ court_id: court.id, start_time, end_time }] } });
 
   // Tomorrow is open 10 PM to 2 AM: nothing before 10 PM, nothing past 2 AM, and 1 AM never joins the next morning
   for (const [d, start, end] of [[date, "21:00", "22:00"], [nextDate, "01:00", "03:00"], [nextDate, "01:00", "07:00"]]) {

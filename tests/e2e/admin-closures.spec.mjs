@@ -51,7 +51,7 @@ test("customers see the date closed and cannot book it, even through checkout", 
 
   // A page opened before the closure would still offer slots: the database refuses the hold
   const res = await page.request.post("/api/stripe/checkout", {
-    data: { booking_date: date, lines: [{ court_id: court.id, start_time: "10:00", end_time: "11:00" }] },
+    data: { player_count: 2, booking_date: date, lines: [{ court_id: court.id, start_time: "10:00", end_time: "11:00" }] },
   });
   expect(res.status()).toBe(400);
   expect((await res.json()).error).toBe("The venue is closed on this date.");

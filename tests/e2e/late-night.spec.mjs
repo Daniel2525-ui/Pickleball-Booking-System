@@ -61,7 +61,7 @@ test("11 PM to 1 AM on one court is one line, priced as two hours, and the serve
   // The API takes a date per line; Friday-night hours posted as the next date's own are refused
   const c1 = courtId("COURT 1");
   const own = await page.request.post("/api/stripe/checkout", {
-    data: { booking_date: next, lines: [{ court_id: c1, start_time: "00:00", end_time: "01:00" }] },
+    data: { player_count: 2, booking_date: next, lines: [{ court_id: c1, start_time: "00:00", end_time: "01:00" }] },
   });
   expect(own.status()).toBe(400);
   expect((await own.json()).error).toMatch(/outside venue operating hours/);
@@ -69,7 +69,7 @@ test("11 PM to 1 AM on one court is one line, priced as two hours, and the serve
   if (!process.env.XENDIT_SECRET_KEY) {
     // Without QR Ph the holds are made, then released when the payment can't open: proof the database took both dates
     const res = await page.request.post("/api/stripe/checkout", {
-      data: { booking_date: day, lines: [
+      data: { player_count: 2, booking_date: day, lines: [
         { court_id: c1, booking_date: day, start_time: "23:00", end_time: "24:00" },
         { court_id: c1, booking_date: next, start_time: "00:00", end_time: "01:00" },
       ] },
@@ -97,7 +97,7 @@ test("a requirement of two hours counts the run across midnight", async ({ page 
   try {
     await login(page, account("CUSTOMER"));
     const res = await page.request.post("/api/stripe/checkout", {
-      data: { booking_date: day, lines: [{ court_id: courtId("COURT 2"), booking_date: next, start_time: "01:00", end_time: "02:00" }] },
+      data: { player_count: 2, booking_date: day, lines: [{ court_id: courtId("COURT 2"), booking_date: next, start_time: "01:00", end_time: "02:00" }] },
     });
     expect(res.status()).toBe(400);
     expect((await res.json()).error).toMatch(/at least 2 hours/);

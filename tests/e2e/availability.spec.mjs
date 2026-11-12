@@ -1,7 +1,7 @@
 // Read-only: browses the live grid as a guest; never creates a hold.
 import { test, expect } from "@playwright/test";
 
-test("guest can fill a basket and is asked to sign in only at checkout @mobile", async ({ page }) => {
+test("a guest fills a basket and checks out with their details, or signs in instead @mobile", async ({ page }) => {
   await page.goto("/#booking");
   const grid = page.locator("#booking");
   const open = grid.getByRole("button", { name: /^Select .+ at / });
@@ -19,11 +19,13 @@ test("guest can fill a basket and is asked to sign in only at checkout @mobile",
   await expect(basket).toBeVisible();
   await basket.getByRole("button", { name: "Continue to Checkout" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("Sign in to pay")).toBeVisible();
+  // No account needed: the checkout asks for their details, and signing in stays one tap away
+  await expect(dialog.getByText("No account needed.")).toBeVisible();
+  await expect(dialog.getByLabel("Full name")).toBeVisible();
+  await dialog.getByRole("button", { name: "Have an account? Sign in" }).click();
+  await expect(page).toHaveURL(/\/login$/);
   // The basket is parked for after sign-in
   expect(await page.evaluate(() => sessionStorage.getItem("crosshair:pending-basket"))).toContain('"lines"');
-  await dialog.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/login$/);
 });
 
 test("pages fit a phone screen without horizontal scroll @mobile", async ({ page }) => {

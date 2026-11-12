@@ -30,7 +30,7 @@ async function openTomorrow(page) {
 // lines: [courtName, "HH:MM", "HH:MM"][]
 const checkout = (page, lines) =>
   page.request.post("/api/stripe/checkout", {
-    data: { booking_date: date, lines: lines.map(([court, start_time, end_time]) => ({ court_id: courtId(court), start_time, end_time })) },
+    data: { player_count: 2, booking_date: date, lines: lines.map(([court, start_time, end_time]) => ({ court_id: courtId(court), start_time, end_time })) },
   });
 
 // "<booking status>|<payment status>|<payment amount>" for one court's latest booking at a start time
@@ -135,7 +135,7 @@ test("a court taken mid-basket reserves nothing and is dropped from the basket",
   const other = await browser.newPage();
   await login(other, account("CUSTOMER2"));
   const first = await other.request.post("/api/stripe/checkout", {
-    data: { booking_date: date, lines: [{ court_id: courtId("COURT 4"), start_time: "08:00", end_time: "09:00" }] },
+    data: { player_count: 2, booking_date: date, lines: [{ court_id: courtId("COURT 4"), start_time: "08:00", end_time: "09:00" }] },
   });
   expect(first.status()).toBe(200);
   expect((await first.json()).url).toMatch(/^\/book\/qr\?pr=/);
