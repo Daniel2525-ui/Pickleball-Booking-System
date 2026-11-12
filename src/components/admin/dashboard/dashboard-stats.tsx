@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import StatCard from "@/components/admin/dashboard/stat-card";
-import { CalendarCheck, CalendarDays, PhilippinePeso, CircleCheck } from "lucide-react";
+import { CalendarCheck, CalendarDays, Wallet, CircleCheck } from "lucide-react";
+import { fetchPaymentTotals } from "@/lib/services/payments/paymentsData.service";
+import { fetchBusinessToday } from "@/lib/services/settings/bookingPolicy";
+import { supabase } from "@/lib/supabase";
 import {
   fetchDashboardCardStats,
 } from "@/lib/services/dashboard/dashboardCardStats.service";
@@ -11,8 +14,8 @@ export default function DashboardStats() {
   const [todayBookingsCount, setTodayBookingsCount] = useState(0);
   const [yesterdayBookingsCount, setYesterdayBookingsCount] = useState(0);
   const [upcomingBookingsCount, setUpcomingBookingsCount] = useState(0);
-  const [revToday, setRevToday] = useState(0);
-  const [revYesterday, setRevYesterday] = useState(0);
+  // Money actually taken today (the Payments close-out), split QR Ph online / cash at the desk
+  const [collected, setCollected] = useState({ total: 0, cash: 0 });
   const [courtStats, setCourtStats] = useState({
     total: 0,
     occupied: 0,
@@ -26,8 +29,8 @@ export default function DashboardStats() {
         setTodayBookingsCount(stats.todayBookingsCount);
         setYesterdayBookingsCount(stats.yesterdayBookingsCount);
         setUpcomingBookingsCount(stats.upcomingBookingsCount);
-        setRevToday(stats.revToday);
-        setRevYesterday(stats.revYesterday);
+        const totals = await fetchPaymentTotals(await fetchBusinessToday(supabase));
+        if (totals.data) setCollected({ total: totals.data.collected, cash: totals.data.cash });
         setCourtStats(stats.courtStats);
       } catch (err) {
         console.error("Failed to load dashboard statistics:", err);
@@ -44,45 +47,33 @@ export default function DashboardStats() {
       ? "Same volume as yesterday"
       : `${bookingDiff > 0 ? "+" : ""}${bookingDiff} booking${Math.abs(bookingDiff) === 1 ? "" : "s"} vs yesterday`;
 
-  const revDiff = revToday - revYesterday;
-  const revDesc =
-    revYesterday === 0
-      ? revToday > 0
-        ? "First revenue recorded today"
-        : "No revenue recorded yesterday"
-      : revDiff > 0
-        ? `+₱${revDiff.toLocaleString()} vs yesterday`
-        : revDiff < 0
-          ? `-₱${Math.abs(revDiff).toLocaleString()} vs yesterday`
-          : `Same revenue as yesterday`;
-
   const stats = [
     {
-      title: "Bookings Today",
+      title: "Bookings today",
       value: todayBookingsCount,
       description: bookingDesc,
       icon: CalendarCheck,
       trendType: bookingDiff > 0 ? ("positive" as const) : bookingDiff < 0 ? ("negative" as const) : ("neutral" as const),
     },
     {
-      title: "Upcoming (7 Days)",
-      value: upcomingBookingsCount,
-      description: "Confirmed player reservations",
-      icon: CalendarDays,
+      title: "Collected today",
+      value: `₱${collected.total.toLocaleString()}`,
+      description: `QR Ph ₱${(collected.total - collected.cash).toLocaleString()} · Cash ₱${collected.cash.toLocaleString()}`,
+      icon: Wallet,
       trendType: "neutral" as const,
     },
     {
-      title: "Revenue Today",
-      value: `₱${revToday.toLocaleString()}`,
-      description: revDesc,
-      icon: PhilippinePeso,
-      trendType: revDiff > 0 ? ("positive" as const) : revDiff < 0 ? ("negative" as const) : ("neutral" as const),
+      title: "In play now",
+      value: `${courtStats.occupied} / ${courtStats.available}`,
+      description: `${courtStats.available - courtStats.occupied} free right now${courtStats.total > courtStats.available ? ` · ${courtStats.total - courtStats.available} closed` : ""}`,
+      icon: CircleCheck,
+      trendType: "neutral" as const,
     },
     {
-      title: "Active Courts",
-      value: `${courtStats.available} / ${courtStats.total}`,
-      description: `${courtStats.occupied} of ${courtStats.total} courts currently in play`,
-      icon: CircleCheck,
+      title: "Upcoming (7 days)",
+      value: upcomingBookingsCount,
+      description: "Confirmed bookings this week",
+      icon: CalendarDays,
       trendType: "neutral" as const,
     },
   ];

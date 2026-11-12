@@ -10,8 +10,19 @@ interface OperatingHourRowProps {
   onTimeChange: (index: number, field: "open_time" | "close_time", value: string) => void
 }
 
+// Opening hours as a bar over 6 AM to 6 AM the next day; null when the times aren't whole and set
+const hoursBar = (open: string, close: string) => {
+  const o = Number(open.slice(0, 2));
+  const c = Number(close.slice(0, 2));
+  if (!/^\d\d:/.test(open) || !/^\d\d:/.test(close)) return null;
+  const from = (o - 6 + 24) % 24;
+  const to = (close <= open ? c + 24 : c) - 6;
+  return to > from ? { left: (from / 24) * 100, width: ((Math.min(to, 24) - from) / 24) * 100 } : null;
+};
+
 export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: OperatingHourRowProps) => {
   const switchId = `toggle-${hour.day_of_week}`
+  const bar = hour.is_open && hour.open_time && hour.close_time ? hoursBar(hour.open_time, hour.close_time) : null
 
   return (
     <div
@@ -83,7 +94,15 @@ export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: Operat
 
           {/* A closing time at or before opening is after midnight */}
           {hour.close_time && hour.close_time <= hour.open_time && (
-            <span className="text-xs font-medium text-muted-foreground">Closes the next day</span>
+            <span className="text-xs font-semibold text-primary">Closes the next day</span>
+          )}
+
+          {/* The day at a glance: 6 AM on the left, midnight at the line, 6 AM next day on the right */}
+          {bar && (
+            <div className="relative h-5 w-full sm:w-44 rounded-md bg-muted" aria-hidden>
+              <span className="absolute inset-y-0 left-3/4 w-px bg-border" />
+              <span className="absolute top-1 bottom-1 rounded bg-primary" style={{ left: `${bar.left}%`, width: `${bar.width}%` }} />
+            </div>
           )}
         </div>
       ) : (

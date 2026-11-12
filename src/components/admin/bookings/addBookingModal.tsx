@@ -48,11 +48,13 @@ import { Court } from "@/lib/services/courts/courtsTypes";
 import { UnifiedCustomerResult } from "@/lib/services/customers/customersTypes";
 
 interface AddBookingModalProps {
+  /** Open on arrival (the dashboard's "New walk-in" link) */
+  defaultOpen?: boolean;
   onBookingAdded?: () => void;
 }
 
-export const AddBookingModal = ({ onBookingAdded }: AddBookingModalProps = {}) => {
-  const [open, setOpen] = useState(false);
+export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBookingModalProps = {}) => {
+  const [open, setOpen] = useState(defaultOpen);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -18,30 +18,22 @@ export default function StatCard({
 }: StatCardProps) {
   const trendColor =
     trendType === "positive"
-      ? "text-emerald-600 dark:text-emerald-400 font-medium"
+      ? "text-primary font-semibold"
       : trendType === "negative"
       ? "text-destructive font-medium"
       : "text-muted-foreground";
 
   return (
-    <Card className="shadow-2xs border border-border bg-card hover:border-primary/30 transition-colors">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            {title}
-          </CardTitle>
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary shrink-0">
-            <Icon className="size-4" />
-          </div>
+    <Card className="gap-0 py-0 shadow-none">
+      <CardHeader className="px-4 pt-4 pb-1">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm font-semibold text-muted-foreground">{title}</CardTitle>
+          <Icon className="size-4 text-primary shrink-0" aria-hidden />
         </div>
       </CardHeader>
-      <CardContent>
-        <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-          {value}
-        </p>
-        <p className={`mt-1 text-xs leading-normal ${trendColor}`}>
-          {description}
-        </p>
+      <CardContent className="px-4 pb-4">
+        <p className="font-display text-3xl font-bold text-foreground tabular-nums">{value}</p>
+        <p className={`mt-1 text-xs leading-normal ${trendColor}`}>{description}</p>
       </CardContent>
     </Card>
   );

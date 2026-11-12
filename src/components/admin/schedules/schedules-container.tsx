@@ -160,10 +160,7 @@ export const SchedulesContainer = () => {
         <>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-card border shadow-xs">
             <div className="text-sm">
-              <span className="font-semibold text-foreground">Real-Time Sync:</span>
-              <span className="text-muted-foreground">
-                Updated operating hours immediately reflect on the player booking calendar.
-              </span>
+              <span className="text-muted-foreground">Players see new hours on the booking page as soon as you save.</span>
             </div>
 
             <Button

@@ -9,7 +9,8 @@ const manila = (now: Date) => ({
 });
 
 /** The venue's date and time, ticking. The server renders the date; the time appears once the browser takes over. */
-export default function DashboardClock({ date }: { date: string }) {
+/** `timeOnly` when the date is already the page title */
+export default function DashboardClock({ date, timeOnly = false }: { date: string; timeOnly?: boolean }) {
   const [now, setNow] = useState<{ date: string; time: string } | null>(null);
 
   useEffect(() => {
@@ -24,9 +25,9 @@ export default function DashboardClock({ date }: { date: string }) {
   }, []);
 
   return (
-    <div className="flex items-center gap-2 self-start sm:self-auto text-xs font-medium text-muted-foreground bg-muted/40 border border-border px-3 py-1.5 rounded-lg shadow-2xs">
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
       <Clock className="size-3.5 text-primary shrink-0" />
-      <span>{now?.date ?? date}</span>
+      {timeOnly ? <span>Venue time</span> : <span>{now?.date ?? date}</span>}
       {now && (
         <>
           <span aria-hidden="true">·</span>

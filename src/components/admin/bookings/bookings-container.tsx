@@ -7,6 +7,7 @@ import { useDayEndsAt } from "@/hooks/use-day-ends-at";
 import BookingFilters from "./booking-filters";
 import BookingsTable from "./bookings-table";
 import { AddBookingModal } from "./addBookingModal";
+import { AdminPageHeader } from "@/components/admin/page-header";
 
 export interface BookingFiltersState {
   search: string;
@@ -42,18 +43,10 @@ function Reservations({ dayEndsAt }: { dayEndsAt: string }) {
   return (
     <div className="flex flex-col gap-6">
       {/* Page Header */}
-      <header className="sticky top-14 z-20 bg-background/95 backdrop-blur-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 pb-4 sm:pt-7 sm:pb-4 border-b border-border/60 -mx-4 px-4 lg:-mx-8 lg:px-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Court Reservations
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Monitor player reservations, manage slot confirmations, and record walk-in bookings.
-          </p>
-        </div>
-        {/* A new filters object makes the table reload, so the recorded booking appears */}
-        <AddBookingModal onBookingAdded={() => setFilters((current) => ({ ...current }))} />
-      </header>
+      <AdminPageHeader title="Bookings" description="Every court booking: check players in, collect payments, move or cancel.">
+        {/* A new filters object makes the table reload, so the recorded booking appears. ?new=walkin (dashboard) opens it */}
+        <AddBookingModal defaultOpen={params.get("new") === "walkin"} onBookingAdded={() => setFilters((current) => ({ ...current }))} />
+      </AdminPageHeader>
 
       <div className="flex flex-col gap-4">
         <BookingFilters initialStatus={initialStatus} initialDate={initialDate} initialCourt={initialCourt} initialSearch={initialSearch} onFilterChange={setFilters} />

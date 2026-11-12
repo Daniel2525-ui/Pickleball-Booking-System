@@ -22,7 +22,7 @@ export default function PaymentFilters({
   onFilterChange,
 }: PaymentFiltersProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-2xl border bg-card p-3">
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input

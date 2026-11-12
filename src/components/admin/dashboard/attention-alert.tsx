@@ -12,13 +12,13 @@ const ALERTS = {
     load: countRefundsOwed,
     href: `/admin/payments?status=${encodeURIComponent("Refund Owed")}`,
     label: (n: number) => `${n} ${n === 1 ? "payment needs" : "payments need"} a refund`,
-    detail: "paid bookings that were cancelled.",
+    detail: "Paid bookings that were cancelled.",
   },
   collect: {
     load: countToCollect,
     href: `/admin/payments?status=${encodeURIComponent("To Collect")}`,
     label: (n: number) => `${n} ${n === 1 ? "booking" : "bookings"} to collect`,
-    detail: "unpaid walk-in and counter bookings.",
+    detail: "Unpaid walk-ins and desk bookings.",
   },
 };
 
@@ -37,15 +37,14 @@ export default function AttentionAlert({ kind }: { kind: keyof typeof ALERTS }) 
   return (
     <Link
       href={alert.href}
-      className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200 hover:bg-amber-500/15 transition-colors"
+      className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3 text-sm text-amber-950 hover:bg-amber-100 transition-colors"
     >
-      <AlertTriangle className="size-4 shrink-0" />
+      <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-700" aria-hidden />
       <span className="flex-1">
-        <span className="font-semibold">{alert.label(count)}</span> — {alert.detail}
+        <span className="font-semibold block">{alert.label(count)}</span>
+        <span className="text-amber-900/90">{alert.detail}</span>
       </span>
-      <span className="flex items-center gap-1 font-semibold">
-        Review <ArrowRight className="size-3.5" />
-      </span>
+      <ArrowRight className="size-4 shrink-0 mt-0.5" aria-hidden />
     </Link>
   );
 }

@@ -22,6 +22,7 @@ import { deleteCourt } from "@/lib/services/courts/deleteCourt.service";
 import StatCard from "@/components/admin/dashboard/stat-card";
 import { toast } from "sonner";
 import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
+import { AdminPageHeader } from "@/components/admin/page-header";
 
 export default function CourtsContainer() {
   const [search, setSearch] = useState("");
@@ -106,15 +107,9 @@ export default function CourtsContainer() {
   return (
     <div className="flex flex-col gap-6">
       {/* Page Header */}
-      <header className="sticky top-14 z-20 bg-background/95 backdrop-blur-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 pb-4 sm:pt-7 sm:pb-4 border-b border-border/60 -mx-4 px-4 lg:-mx-8 lg:px-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Courts</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your pickleball courts, operating status, and availability.
-          </p>
-        </div>
+      <AdminPageHeader title="Courts" description="Your courts, whether players can book them, and their photos. Changes show on the booking page right away.">
         <AddCourtModal onCourtAdded={loadCourts} />
-      </header>
+      </AdminPageHeader>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -169,10 +164,12 @@ export default function CourtsContainer() {
           </div>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value || "all")}>
             <SelectTrigger className="w-full sm:w-[180px] bg-background" aria-label="Filter courts by status">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder="Status">
+                {(value) => ({ all: "All statuses", active: "Available", maintenance: "Maintenance", occupied: "Occupied" } as Record<string, string>)[value as string] ?? value}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Available</SelectItem>
               <SelectItem value="maintenance">Maintenance</SelectItem>
               <SelectItem value="occupied">Occupied</SelectItem>

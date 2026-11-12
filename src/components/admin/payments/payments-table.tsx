@@ -182,29 +182,27 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
       {/* The chosen day's money, split by method for closing out the drawer */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {summaryCards.map(({ title, value, note, icon: Icon, tone }) => (
-          <Card key={title} className="shadow-2xs border border-border bg-card">
-            <CardHeader className="p-4 pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
-                <div className={`size-8 rounded-lg flex items-center justify-center ${tone}`}>
-                  <Icon className="size-4" />
-                </div>
+          <Card key={title} className="gap-0 py-0 shadow-none">
+            <CardHeader className="px-4 pt-4 pb-1">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-sm font-semibold text-muted-foreground">{title}</CardTitle>
+                <Icon className={`size-4 shrink-0 ${tone.split(" ").find((c) => c.startsWith("text-")) ?? "text-primary"}`} aria-hidden />
               </div>
             </CardHeader>
-            <CardContent className="p-4 pt-0">
+            <CardContent className="px-4 pb-4">
               {value === null ? (
-                <Skeleton className="h-7 w-24 mt-1" />
+                <Skeleton className="h-8 w-24 mt-1" />
               ) : (
-                <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">{value}</p>
+                <p className="font-display text-2xl sm:text-3xl font-bold text-foreground tabular-nums">{value}</p>
               )}
-              <p className="text-xs text-muted-foreground mt-0.5">{date ? note : "Pick a date to see totals"}</p>
+              <p className="text-xs text-muted-foreground mt-1">{date ? note : "Pick a date to see totals"}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Main Transactions Table Card */}
-      <div className="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
+      <div className="rounded-2xl border bg-card overflow-hidden">
         <div className="p-4 border-b border-border flex items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-foreground">Transaction Records</h2>

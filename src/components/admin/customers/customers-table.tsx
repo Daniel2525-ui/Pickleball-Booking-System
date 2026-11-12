@@ -56,7 +56,7 @@ export const CustomersTable = ({
   onNote,
 }: CustomersTableProps) => {
   return (
-    <div className="rounded-xl border bg-card overflow-hidden shadow-xs">
+    <div className="rounded-2xl border bg-card overflow-hidden">
       <div className="overflow-y-auto max-h-[500px]">
         <Table>
           <TableHeader className="sticky top-0 bg-card z-10 border-b">

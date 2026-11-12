@@ -57,7 +57,7 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
   };
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border bg-card p-3">
       <div className="flex flex-1 items-center space-x-2">
         <div className="relative w-full sm:max-w-sm flex items-center">
           <Search className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -70,7 +70,7 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
               updateFilters(value, status, courtId, dateTime);
             }}
             placeholder="Search by name or reference number"
-            className="w-full pl-9 bg-background h-9 text-xs sm:text-sm"
+            className="w-full pl-9 bg-background h-10 text-sm"
           />
         </div>
       </div>

@@ -79,13 +79,24 @@ export const CourtCard = ({ court, today, onEdit, onDelete }: CourtCardProps) =>
     .join(" · ");
 
   return (
-    <Card className="group overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
-      {/* Status color banner */}
-      <div className={`h-1.5 w-full ${barColor}`} />
+    <Card className="group overflow-hidden gap-0 py-0 shadow-none transition-colors hover:border-primary/40">
+      {/* The court's photo when staff added one (the landing page shows it too), else a plain court pattern */}
+      <div className="relative h-28 bg-muted">
+        {court.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a Supabase Storage public URL; next/image would need per-venue remote config
+          <img src={court.photo_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <div aria-hidden className="h-full w-full bg-[repeating-linear-gradient(135deg,#EEF1EF_0_12px,#E6EAE8_12px_24px)]" />
+        )}
+        <span className={`absolute inset-x-0 bottom-0 h-1 ${barColor}`} aria-hidden />
+      </div>
 
-      <CardHeader className="pb-2">
+      <CardHeader className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-base truncate">{court.name}</h3>
+          <div className="min-w-0">
+            <h3 className="font-display font-bold text-lg truncate">{court.name}</h3>
+            {court.details && <p className="text-xs text-muted-foreground truncate">{court.details}</p>}
+          </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
             <Badge variant="outline" className={`flex items-center gap-1 text-xs font-medium ${className}`}>
@@ -127,7 +138,7 @@ export const CourtCard = ({ court, today, onEdit, onDelete }: CourtCardProps) =>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-0 pb-4">
+      <CardContent className="px-4 pt-0 pb-4">
         {inMaintenance ? (
           <p className="text-xs text-muted-foreground">{maintenanceLine}</p>
         ) : (

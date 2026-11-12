@@ -7,7 +7,11 @@ import AttentionAlert from "@/components/admin/dashboard/attention-alert";
 import DashboardClock from "@/components/admin/dashboard/dashboard-clock";
 import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { VENUE_NAME } from "@/lib/brand";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { AdminPageHeader } from "@/components/admin/page-header";
+import TodayTimeline from "@/components/admin/dashboard/today-timeline";
 
 export const metadata = {
   title: "Dashboard",
@@ -34,31 +38,36 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6 px-4 lg:px-8 pb-4 lg:pb-8 pt-0 w-full max-w-7xl mx-auto overflow-visible">
-      {/* Dashboard Operational Header */}
-      <header className="sticky top-14 z-20 bg-background/95 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-6 pb-4 sm:pt-7 sm:pb-4 border-b border-border/60 -mx-4 px-4 lg:-mx-8 lg:px-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            {roleWord} Dashboard
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Court availability, daily booking schedules, and facility activity at {VENUE_NAME}.
-          </p>
-        </div>
+      <AdminPageHeader
+        eyebrow={<span aria-hidden>{roleWord} dashboard</span>}
+        title={<><span className="sr-only">{roleWord} Dashboard · </span>{currentDate.replace(/, \d{4}$/, "")}</>}
+        description={<DashboardClock date={currentDate} timeOnly />}
+      >
+        <Link href="/#booking" target="_blank" className={buttonVariants({ variant: "outline", className: "h-10 font-semibold" })}>
+          Open booking page<span className="sr-only"> (opens in a new tab)</span>
+        </Link>
+        <Link href="/admin/bookings?new=walkin" className={buttonVariants({ className: "h-10 gap-1.5 font-semibold" })}>
+          <Plus className="size-4" aria-hidden />
+          New walk-in
+        </Link>
+      </AdminPageHeader>
 
-        <DashboardClock date={currentDate} />
-      </header>
-
-      <AttentionAlert kind="refunds" />
-      <AttentionAlert kind="collect" />
-
-      {/* KPI Cards Strip */}
       <DashboardStats />
 
-      {/* Primary Operations: every court at a glance, then today's schedule at full width */}
       <CourtStatus />
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
+        <TodayTimeline />
+        <section aria-labelledby="needs-you" className="rounded-2xl border bg-card p-5 flex flex-col gap-3">
+          <h2 id="needs-you" className="text-lg font-bold">Needs you</h2>
+          <AttentionAlert kind="collect" />
+          <AttentionAlert kind="refunds" />
+          <p className="text-sm text-muted-foreground">Money to collect at the desk and refunds owed show up here as they happen.</p>
+        </section>
+      </div>
+
       <TodaysSchedule />
 
-      {/* Analytical Trends: Weekly Volume + Recent Bookings */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <BookingOverview className="lg:col-span-2" />
         <RecentBookings />

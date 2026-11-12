@@ -285,7 +285,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
 
   return (
     <>
-      <div className="rounded-xl border border-border bg-card shadow-2xs overflow-hidden">
+      <div className="rounded-2xl border bg-card overflow-hidden">
         <div className="max-h-[600px] overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-card z-10 border-b border-border shadow-2xs">
