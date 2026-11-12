@@ -292,6 +292,7 @@ test("one court can be booked at separate times in one checkout", async ({ page 
   await expect(basket(page).getByText("· 1 court, 2 hrs total")).toBeVisible();
   await expect(basketLine(page, "COURT 2")).toHaveCount(2);
 
+  requireQrPh(); // the rest holds the courts through checkout
   const res = await checkout(page, [["COURT 2", "11:00", "12:00"], ["COURT 2", "15:00", "16:00"]]);
   expect(res.status()).toBe(200);
   expect(

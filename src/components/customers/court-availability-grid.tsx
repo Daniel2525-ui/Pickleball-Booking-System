@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import { Clock, LoaderCircle, ChevronDown, Moon } from "lucide-react";
 import { Slot } from "./types";
 import { SlotStatus, slotTimes } from "@/lib/services/bookings/checkSlotAvailability.service";
-import { compactRange, hourRangeLabel } from "@/lib/services/bookings/quickStarts";
+import { hourRangeLabel } from "@/lib/services/bookings/quickStarts";
 
 interface CourtAvailabilityGridProps {
   selectedDate: Date;
@@ -200,19 +200,26 @@ export const CourtAvailabilityGrid = ({
                   const status = getSlotStatus(selectedDate, court, time);
                   const line = lineAt(court, time);
                   if (line) {
+                    // One booking is one block: its hours join up, only the ends are rounded, the label sits on top
                     const first = isFirst(line, time);
+                    const last = slotTimes(line.time).end === slotTimes(time).end;
+                    const hours = line.duration || 1;
                     return (
-                      <div key={court} className="border-l border-border/60 p-1">
+                      <div key={court} className={`border-l border-border/60 px-1 ${first ? "pt-1" : ""} ${last ? "pb-1" : ""}`}>
                         <button
                           type="button"
                           onClick={() => onSlotClick(court, time)}
                           aria-label={`Selected ${court} at ${time}. Click to deselect.`}
-                          className={`w-full h-full min-h-12 rounded-lg text-xs font-semibold flex flex-col items-center justify-center ${LOOK.selected} hover:bg-primary/90`}
+                          // Past the row's top border, so the block has no seam between its hours
+                          style={first ? undefined : { marginTop: -1, height: "calc(100% + 1px)" }}
+                          className={`relative w-full h-full min-h-12 text-xs font-semibold flex flex-col items-center justify-center ${LOOK.selected} hover:bg-primary/90 ${
+                            first && last ? "rounded-lg" : first ? "rounded-t-lg rounded-b-none" : last ? "rounded-b-lg rounded-t-none" : "rounded-none"
+                          }`}
                         >
                           {first ? (
                             <>
-                              <span>{compactRange([line.time], 0, 1)}</span>
-                              <span className="text-[11px] opacity-90">₱{line.price.toLocaleString()}</span>
+                              <span className="text-[13px]">{hourRangeLabel(line.time)}</span>
+                              <span className="text-[11px] opacity-90">{hours} {hours === 1 ? "hr" : "hrs"} · ₱{line.price.toLocaleString()}</span>
                             </>
                           ) : (
                             <span className="sr-only">Selected</span>
