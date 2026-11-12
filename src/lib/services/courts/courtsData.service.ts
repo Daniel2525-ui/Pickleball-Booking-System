@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Court } from "./courtsTypes";
 import { holdsCourt, isPlayingNow } from "./courtDay";
-import { formatManilaDate } from "@/lib/utils/bookingTime";
+import { fetchBusinessToday } from "@/lib/services/settings/bookingPolicy";
 
 export interface ActiveBookingSnippet {
     court_id: string | null;
@@ -88,7 +88,7 @@ export const fetchTodayCourtBookings = async () => {
     const { data, error } = await supabase
         .from("bookings")
         .select(COURT_BOOKING_COLUMNS)
-        .eq("booking_date", formatManilaDate())
+        .eq("business_date", await fetchBusinessToday(supabase))
         .not("court_id", "is", null)
         // Pending included: courtNowNext keeps those whose hold hasn't run out
         .in("status", ["pending", "confirmed", "checked_in", "in_progress"]);
@@ -102,7 +102,7 @@ export const fetchUpcomingCourtBookings = async (courtId: string) => {
         .from("bookings")
         .select(COURT_BOOKING_COLUMNS)
         .eq("court_id", courtId)
-        .gte("booking_date", formatManilaDate())
+        .gte("business_date", await fetchBusinessToday(supabase))
         .in("status", ["pending", "confirmed", "checked_in", "in_progress"])
         .order("booking_date")
         .order("start_time");

@@ -9,13 +9,14 @@ export const removeLine = <T extends Line>(lines: T[], key: string): T[] =>
 
 /**
  * One court's picked ranges as [start, end) slot indexes, sorted, with touching ranges joined into one.
+ * `breaks` are slot indexes that start after a gap in the day (late-night hours, then the morning): never joined across.
  */
-export const mergeSpans = (spans: (readonly [number, number])[]): [number, number][] =>
+export const mergeSpans = (spans: (readonly [number, number])[], breaks?: Set<number>): [number, number][] =>
   [...spans]
     .sort((a, b) => a[0] - b[0])
     .reduce<[number, number][]>((out, [s, e]) => {
       const last = out.at(-1);
-      if (last && last[1] === s) last[1] = e;
+      if (last && last[1] === s && !breaks?.has(s)) last[1] = e;
       else out.push([s, e]);
       return out;
     }, []);

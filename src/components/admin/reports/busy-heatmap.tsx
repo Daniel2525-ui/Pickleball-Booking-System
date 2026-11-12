@@ -4,7 +4,11 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // One hue, quiet to full
 const STEPS = ["bg-muted", "bg-primary/20", "bg-primary/40", "bg-primary/65", "bg-primary"];
 const step = (pct: number) => STEPS[pct <= 0 ? 0 : Math.min(4, 1 + Math.floor(pct / 25))];
-const hourLabel = (h: number) => (h === 0 || h === 24 ? "12 AM" : h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`);
+// Hours past 24 are a day's late night (25 = 1 AM, still that weekday's business)
+const hourLabel = (hour: number) => {
+  const h = hour % 24;
+  return h === 0 ? "12 AM" : h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`;
+};
 
 /** Weekday x hour: how full the courts were. Hours the venue never opened on a weekday stay blank. */
 export function BusyHeatmap({ cells }: { cells: VenueReport["heatmap"] }) {

@@ -51,6 +51,8 @@ test("the save route refuses bad hours sent directly", async ({ page }) => {
   for (const [hours, message] of [
     [[day({ open_time: "08:30" })], "Use whole hours"],
     [[day({ open_time: "22:00", close_time: "08:00" })], "later than opening"],
+    [[day({ close_time: "05:00" })], "after midnight up to 4:00 AM"],
+    [[day({ open_time: "03:00" })], "earlier than 4:00 AM"],
     [[day({ day_of_week: "Funday" })], "only once"],
     [[day(), day()], "only once"],
   ]) {
@@ -59,4 +61,52 @@ test("the save route refuses bad hours sent directly", async ({ page }) => {
     expect((await res.json()).error).toContain(message);
   }
   expect(closeTime()).not.toBe("08:00:00");
+});
+
+test("a day can close after midnight", async ({ page }) => {
+  resetBookings();
+  await login(page, account("ADMIN"));
+  await page.goto("/admin/schedules");
+  await page.getByLabel(`${weekday} opening time`).fill("22:00");
+  await page.getByLabel(`${weekday} closing time`).fill("02:00");
+  await expect(page.getByText("Closes the next day")).toBeVisible();
+  await page.getByRole("button", { name: "Save Operating Hours" }).click();
+  await expect(page.getByText("Operating hours updated successfully.")).toBeVisible();
+  expect(closeTime()).toBe("02:00:00");
+});
+
+test("checkout holds late-night hours on their real dates and never across closing", async ({ page }) => {
+  const nextDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(Date.now() + 2 * 86_400_000));
+  const court = firstCourt();
+  await login(page, account("CUSTOMER"));
+  const checkout = (booking_date, start_time, end_time) =>
+    page.request.post("/api/stripe/checkout", { data: { booking_date, lines: [{ court_id: court.id, start_time, end_time }] } });
+
+  // Tomorrow is open 10 PM to 2 AM: nothing before 10 PM, nothing past 2 AM, and 1 AM never joins the next morning
+  for (const [d, start, end] of [[date, "21:00", "22:00"], [nextDate, "01:00", "03:00"], [nextDate, "01:00", "07:00"]]) {
+    const res = await checkout(d, start, end);
+    expect(res.status()).toBe(400);
+    expect((await res.json()).error).toContain("outside venue operating hours");
+  }
+
+  const res = await checkout(date, "23:00", "24:00");
+  expect(res.status()).toBe(200);
+  expect(sql(`SELECT end_time || ' ' || status FROM public.bookings WHERE booking_date = '${date}' AND start_time = '23:00'`)).toBe("24:00:00 pending");
+});
+
+test("the booking grid lists last night's late hours under their own heading and never joins them to the morning", async ({ page }) => {
+  resetBookings();
+  const todayName = new Date().toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Manila" });
+  sql(`UPDATE public.operating_hours SET close_time = '02:00' WHERE day_of_week = '${todayName}'`);
+  const court = firstCourt();
+  await page.setViewportSize({ width: 412, height: 915 }); // the day strip with "Tmrw" is the phone layout
+  await page.goto("/#booking");
+  await page.getByRole("button", { name: /Tmrw/ }).click();
+
+  await expect(page.getByText(`${todayName} late night`)).toBeVisible();
+  await page.getByRole("button", { name: `Select ${court.name} at 1:00 AM - 2:00 AM` }).click();
+  await page.getByRole("button", { name: `Select ${court.name} at 6:00 AM - 7:00 AM` }).click();
+  // 1-2 AM and 6-7 AM sit next to each other in the list but stay two bookings
+  const lines = page.getByRole("region", { name: "Your selection" }).getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) });
+  await expect(lines).toHaveCount(2);
 });

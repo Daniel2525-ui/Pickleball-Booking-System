@@ -6,7 +6,8 @@ import { LoaderCircle, Lock, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
-import { formatManilaDate } from "@/lib/utils/bookingTime";
+import { formatManilaDate, lateNightLabel } from "@/lib/utils/bookingTime";
+import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { bookOpenPlay, fetchOpenPlaySessions, type OpenPlaySession } from "@/lib/services/openPlay/openPlayData.service";
 
@@ -25,6 +26,7 @@ export const OpenPlayContainer = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [dayEndsAt, setDayEndsAt] = useState("04:00");
 
   useEffect(() => {
     const supabase = createClient();
@@ -32,8 +34,10 @@ export const OpenPlayContainer = () => {
     Promise.all([
       fetchOpenPlaySessions(formatManilaDate(today), formatManilaDate(new Date(today.getTime() + WINDOW_DAYS * 86_400_000))),
       supabase.auth.getUser(),
+      fetchBookingPolicy(supabase),
     ])
-      .then(([res, auth]) => {
+      .then(([res, auth, policy]) => {
+        setDayEndsAt(policy.dayEndsAt);
         // A failed load must not read as "no sessions scheduled"
         if (res.error) setLoadFailed(true);
         setSessions(res.data);
@@ -85,6 +89,9 @@ export const OpenPlayContainer = () => {
               <li key={s.id} className={`rounded-2xl border bg-card p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 ${full ? "opacity-60" : ""}`}>
                 <div className="min-w-0">
                   <p className="font-bold">{dateLabel(s.session_date)} · {formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</p>
+                  {lateNightLabel(s.session_date, s.start_time, dayEndsAt) && (
+                    <p className="text-xs font-semibold text-primary">{lateNightLabel(s.session_date, s.start_time, dayEndsAt)}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">{s.court_names.join(", ")} · All levels welcome</p>
                   <p className="text-sm mt-1.5">
                     <b>{full ? "Full" : `${s.spots_left} of ${s.capacity}`}</b>{full ? "" : " spots left"}

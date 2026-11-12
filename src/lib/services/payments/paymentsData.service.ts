@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Payment, FetchPaymentsFilters, sumPayments, venueDayWindow } from "./paymentsTypes";
 import { bookingSearchFilter } from "@/lib/services/bookings/filterBookingsData.service";
+import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 
 export const PAYMENTS_PAGE_SIZE = 100;
 
@@ -59,7 +60,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
             query = query.not("status", "eq", "failed");
         }
 
-        if (filters?.date) query = query.or(dayFilter(filters.date));
+        if (filters?.date) query = query.or(await dayFilter(filters.date));
 
         const search = filters?.search?.trim() ?? "";
         if (search) {
@@ -85,8 +86,9 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
 };
 
 /** Payments whose money came in on this venue day: paid then, or created then and not paid yet. */
-const dayFilter = (date: string) => {
-    const { start, end } = venueDayWindow(date);
+const dayFilter = async (date: string) => {
+    // The business day: money taken after midnight, before the cutoff, belongs to the night before
+    const { start, end } = venueDayWindow(date, (await fetchBookingPolicy(supabase)).dayEndsAt);
     return `and(paid_at.gte."${start}",paid_at.lt."${end}"),and(paid_at.is.null,created_at.gte."${start}",created_at.lt."${end}")`;
 };
 
@@ -96,7 +98,7 @@ export const fetchPaymentTotals = async (date: string) => {
         .from("payments")
         .select("status, amount, payment_method")
         .neq("status", "failed")
-        .or(dayFilter(date));
+        .or(await dayFilter(date));
     if (error) console.error("Failed to load payment totals:", error);
     return { data: error ? null : sumPayments(data ?? []), error };
 };

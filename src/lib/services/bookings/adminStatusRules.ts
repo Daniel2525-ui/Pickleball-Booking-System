@@ -1,5 +1,5 @@
 // Relative import so node:test can load this module without the @/ alias
-import { getBookingStart, getBookingEnd, formatManilaDate } from "../../utils/bookingTime.ts";
+import { getBookingStart, getBookingEnd, businessDate, businessToday } from "../../utils/bookingTime.ts";
 import { cancelReasonFor } from "./bookingDisplayStatus.ts";
 
 /**
@@ -40,13 +40,20 @@ export const canTransition = (currentStatus: string, newStatus: string) =>
 
 /**
  * Why a game-day status can't be set yet (venue time), or null when it can.
- * Check-in and start only on the booking's day; completed also allowed later, to close a missed booking.
+ * Check-in and start only on the booking's business day (a 1 AM booking belongs to the night before, and that
+ * night runs until dayEndsAt); completed also allowed later, to close a missed booking.
  */
-export const gameDayBlockReason = (newStatus: string, booking: { booking_date: string }, now: Date = new Date()) => {
-    const today = formatManilaDate(now); // YYYY-MM-DD, so string comparison orders dates
-    if ((newStatus === "checked_in" || newStatus === "in_progress") && booking.booking_date !== today)
+export const gameDayBlockReason = (
+    newStatus: string,
+    booking: { booking_date: string; start_time?: string; business_date?: string | null },
+    now: Date = new Date(),
+    dayEndsAt = "04:00"
+) => {
+    const today = businessToday(dayEndsAt, now); // YYYY-MM-DD, so string comparison orders dates
+    const day = booking.business_date ?? businessDate(booking.booking_date, booking.start_time ?? "12:00", dayEndsAt);
+    if ((newStatus === "checked_in" || newStatus === "in_progress") && day !== today)
         return "Players can only be checked in or started on the day of their booking.";
-    if (newStatus === "completed" && booking.booking_date > today)
+    if (newStatus === "completed" && day > today)
         return "A booking can't be completed before its date.";
     return null;
 };

@@ -96,7 +96,8 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
         }
 
         if (dateTime) {
-            query = query.eq("booking_date", dateTime);
+            // One business day: Friday includes its late-night hours after midnight
+            query = query.eq("business_date", dateTime);
         }
 
         const { data, error } = await query;

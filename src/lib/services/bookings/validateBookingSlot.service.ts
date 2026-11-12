@@ -1,16 +1,11 @@
 import { getBookingStart } from "../../utils/bookingTime.ts";
 
-export interface OperatingHourInfo {
-    is_open: boolean;
-    open_time: string | null;
-    close_time: string | null;
-}
-
 export interface ValidateBookingSlotParams {
     bookingDate: string;
     startTime: string;
     endTime: string;
-    operatingHour?: OperatingHourInfo | null;
+    /** The date's bookable windows (bookableWindows in hoursRules), empty when the venue is closed. Omit to skip the hours check. */
+    windows?: { start: string; end: string }[];
     /** Admin-configured booking length limits (booking_settings) */
     limits: { min_hours: number };
     now?: Date;
@@ -48,14 +43,15 @@ export const getBookingWeekday = (bookingDate: string): string => {
 export const validateBookingSlot = (
     params: ValidateBookingSlotParams
 ): ValidateBookingSlotResult => {
-    const { bookingDate, startTime, endTime, operatingHour, limits, now = new Date() } = params;
+    const { bookingDate, startTime, endTime, windows, limits, now = new Date() } = params;
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate) || Number.isNaN(Date.parse(bookingDate))) {
         return { valid: false, error: "Invalid booking date format. Expected YYYY-MM-DD." };
     }
 
     const wholeHourRegex = /^([01]\d|2[0-3]):00(:00)?$/;
-    if (!wholeHourRegex.test(startTime) || !wholeHourRegex.test(endTime)) {
+    // A booking never crosses midnight, so the latest end is 24:00
+    if (!wholeHourRegex.test(startTime) || !(wholeHourRegex.test(endTime) || /^24:00(:00)?$/.test(endTime))) {
         return {
             valid: false,
             error: "Reservations must be booked in whole-hour increments on the hour.",
@@ -78,15 +74,13 @@ export const validateBookingSlot = (
 
     const dayOfWeek = getBookingWeekday(bookingDate);
 
-    if (operatingHour !== undefined) {
-        if (!operatingHour || !operatingHour.is_open || !operatingHour.open_time || !operatingHour.close_time) {
+    if (windows !== undefined) {
+        if (windows.length === 0) {
             return { valid: false, error: "The venue is closed on this date." };
         }
 
-        const openTimeDb = operatingHour.open_time.length === 5 ? `${operatingHour.open_time}:00` : operatingHour.open_time;
-        const closeTimeDb = operatingHour.close_time.length === 5 ? `${operatingHour.close_time}:00` : operatingHour.close_time;
-
-        if (startTimeDb < openTimeDb || endTimeDb > closeTimeDb) {
+        // One window must hold the whole slot, so late-night hours never join the morning's
+        if (!windows.some((w) => startTimeDb.slice(0, 5) >= w.start && endTimeDb.slice(0, 5) <= w.end)) {
             return {
                 valid: false,
                 error: "The selected time range falls outside venue operating hours.",
@@ -129,11 +123,11 @@ export const validateBasketLines = (params: {
     bookingDate: string;
     lines: unknown;
     courts: { id: string; name: string; status: string }[];
-    operatingHour?: OperatingHourInfo | null;
+    windows?: { start: string; end: string }[];
     limits: { min_hours: number };
     now?: Date;
 }): ValidateBasketResult => {
-    const { bookingDate, lines, courts, operatingHour, limits, now } = params;
+    const { bookingDate, lines, courts, windows, limits, now } = params;
     if (!Array.isArray(lines) || lines.length === 0) {
         return { valid: false, error: "Select at least one court and time." };
     }
@@ -149,7 +143,7 @@ export const validateBasketLines = (params: {
         if (court.status === "maintenance" || court.status === "closed") {
             return { valid: false, error: `${court.name}: This court is currently not available for reservations.` };
         }
-        const v = validateBookingSlot({ bookingDate, startTime: start_time, endTime: end_time, operatingHour, limits, now });
+        const v = validateBookingSlot({ bookingDate, startTime: start_time, endTime: end_time, windows, limits, now });
         if (!v.valid) return { valid: false, error: `${court.name}: ${v.error}` };
         // Separate times on one court are fine; overlapping ones would double-book it (times are HH:MM:SS, so they compare as strings)
         if (out.some((o) => o.courtId === court_id && v.startTimeDb < o.endTimeDb && o.startTimeDb < v.endTimeDb)) {

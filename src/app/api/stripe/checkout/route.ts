@@ -3,10 +3,8 @@ import { HOLD_MS } from "@/lib/services/bookings/bookingDisplayStatus";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
-import {
-    validateBasketLines,
-    getBookingWeekday,
-} from "@/lib/services/bookings/validateBookingSlot.service";
+import { validateBasketLines } from "@/lib/services/bookings/validateBookingSlot.service";
+import { bookableWindows } from "@/lib/services/schedule/hoursRules";
 import { openBasketCheckout } from "@/lib/services/payments/openBasketCheckout";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 
@@ -61,9 +59,9 @@ export async function POST(request: NextRequest) {
             : { data: [] };
 
         // Query operating hours for target date in Asia/Manila
-        const dayOfWeek = getBookingWeekday(booking_date);
-        const [{ data: operatingHour, error: opError }, { data: limits, error: limitsError }] = await Promise.all([
-            supabase.from("operating_hours").select("is_open, open_time, close_time").eq("day_of_week", dayOfWeek).maybeSingle(),
+        // The whole week: late-night hours on this date come from the previous day's row
+        const [{ data: weeklyHours, error: opError }, { data: limits, error: limitsError }] = await Promise.all([
+            supabase.from("operating_hours").select("day_of_week, is_open, open_time, close_time"),
             supabase.from("booking_settings").select("min_hours").maybeSingle(),
         ]);
 
@@ -80,7 +78,7 @@ export async function POST(request: NextRequest) {
             bookingDate: booking_date,
             lines,
             courts: courts ?? [],
-            operatingHour,
+            windows: bookableWindows(booking_date, weeklyHours ?? []),
             limits,
         });
 
@@ -136,6 +134,10 @@ export async function POST(request: NextRequest) {
 
             if (msg.includes("INVALID_DURATION")) {
                 return Response.json({ error: msg.replace(/^.*INVALID_DURATION:\s*/, "") }, { status: 400 });
+            }
+
+            if (msg.includes("OUTSIDE_OPERATING_HOURS")) {
+                return Response.json({ error: "The selected time range falls outside venue operating hours." }, { status: 400 });
             }
 
             if (msg.includes("VENUE_CLOSED")) {

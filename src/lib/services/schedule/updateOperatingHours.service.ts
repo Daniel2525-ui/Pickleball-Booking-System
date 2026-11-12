@@ -1,11 +1,11 @@
 import { OperatingHour } from "@/components/admin/schedules/types";
 
-export const updateOperatingHours = async (hours: OperatingHour[]) => {
+export const updateOperatingHours = async (hours: OperatingHour[], dayEndsAt?: string) => {
     try {
         const res = await fetch("/api/admin/schedules", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ hours }),
+            body: JSON.stringify({ hours, day_ends_at: dayEndsAt }),
         });
         const body = await res.json().catch(() => null);
         if (!res.ok) {

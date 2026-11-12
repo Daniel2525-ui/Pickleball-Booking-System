@@ -20,14 +20,14 @@ test("validateBookingSlot enforces the configured minimum and has no maximum len
 // 4. Server-side Time and Duration Validation (Production validateBookingSlot)
 test("validateBookingSlot accepts valid 1, 2, and 3-hour bookings", () => {
     const futureTime = new Date("2026-10-24T06:00:00+08:00");
-    const openVenue = { is_open: true, open_time: "07:00:00", close_time: "22:00:00" };
+    const openVenue = [{ start: "07:00", end: "22:00" }];
 
     const oneHour = validateBookingSlot({
         limits: { min_hours: 1, max_hours: 3 },
         bookingDate: "2026-10-25",
         startTime: "08:00",
         endTime: "09:00",
-        operatingHour: openVenue,
+        windows: openVenue,
         now: futureTime,
     });
     assert.equal(oneHour.valid, true);
@@ -42,7 +42,7 @@ test("validateBookingSlot accepts valid 1, 2, and 3-hour bookings", () => {
         bookingDate: "2026-10-25",
         startTime: "08:00:00",
         endTime: "10:00:00",
-        operatingHour: openVenue,
+        windows: openVenue,
         now: futureTime,
     });
     assert.equal(twoHours.valid, true);
@@ -55,7 +55,7 @@ test("validateBookingSlot accepts valid 1, 2, and 3-hour bookings", () => {
         bookingDate: "2026-10-25",
         startTime: "14:00",
         endTime: "17:00",
-        operatingHour: openVenue,
+        windows: openVenue,
         now: futureTime,
     });
     assert.equal(threeHours.valid, true);
@@ -119,7 +119,7 @@ test("validateBookingSlot rejects invalid durations, non-whole-hour times, and m
 // 5. Operating Hours Boundary Validation (Production validateBookingSlot)
 test("operating hours validation enforces opening and closing boundaries", () => {
     const futureTime = new Date("2026-10-24T05:00:00+08:00");
-    const venueHours = { is_open: true, open_time: "06:00:00", close_time: "22:00:00" };
+    const venueHours = [{ start: "06:00", end: "22:00" }];
 
     // Valid: right at open time
     assert.equal(
@@ -128,7 +128,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
             bookingDate: "2026-10-25",
             startTime: "06:00",
             endTime: "08:00",
-            operatingHour: venueHours,
+            windows: venueHours,
             now: futureTime,
         }).valid,
         true
@@ -141,7 +141,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
             bookingDate: "2026-10-25",
             startTime: "20:00",
             endTime: "22:00",
-            operatingHour: venueHours,
+            windows: venueHours,
             now: futureTime,
         }).valid,
         true
@@ -154,7 +154,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
             bookingDate: "2026-10-25",
             startTime: "21:00",
             endTime: "23:00",
-            operatingHour: venueHours,
+            windows: venueHours,
             now: futureTime,
         }),
         { valid: false, error: "The selected time range falls outside venue operating hours." }
@@ -167,7 +167,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
             bookingDate: "2026-10-25",
             startTime: "05:00",
             endTime: "07:00",
-            operatingHour: venueHours,
+            windows: venueHours,
             now: futureTime,
         }),
         { valid: false, error: "The selected time range falls outside venue operating hours." }
@@ -180,7 +180,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
             bookingDate: "2026-10-25",
             startTime: "08:00",
             endTime: "10:00",
-            operatingHour: { is_open: false, open_time: null, close_time: null },
+            windows: [],
             now: futureTime,
         }),
         { valid: false, error: "The venue is closed on this date." }
@@ -275,7 +275,7 @@ test("validateBasketLines validates each line and names the offending court", ()
     const now = new Date("2026-10-24T06:00:00+08:00");
     const base = {
         bookingDate: "2026-10-25",
-        operatingHour: { is_open: true, open_time: "07:00:00", close_time: "22:00:00" },
+        windows: [{ start: "07:00", end: "22:00" }],
         limits: { min_hours: 1, max_hours: 3 },
         courts: [
             { id: "c1", name: "Court 1", status: "available" },

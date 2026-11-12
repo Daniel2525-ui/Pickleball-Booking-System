@@ -32,14 +32,10 @@ const manilaDateFormatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Manila",
 });
 
-// Convert a time range into comparable 24-hour times.
-const getSlotTimes = (timeRange: string) => {
-    const [start, end] = timeRange.split(" - ");
-
-    return {
-        start: to24h(start.trim()),
-        end: to24h(end.trim()),
-    };
+/** A slot label's start and end as 24-hour times; an end at midnight is "24:00" so it sorts after its start. */
+export const slotTimes = (timeRange: string) => {
+    const [start, end] = timeRange.split(" - ").map((t) => to24h(t.trim()));
+    return { start, end: end === "00:00" ? "24:00" : end };
 };
 
 // Find all bookings that overlap the selected time slot.
@@ -48,7 +44,7 @@ const getOverlappingBookings = (
     timeRange: string,
     bookings: BookingSlot[]
 ): BookingSlot[] => {
-    const { start, end } = getSlotTimes(timeRange);
+    const { start, end } = slotTimes(timeRange);
 
     return bookings.filter((booking) => {
         if (booking.court_id !== courtId) return false;
@@ -129,7 +125,7 @@ export const checkSlotAvailability = (
             hour12: false,
         });
 
-        const { start } = getSlotTimes(timeRange);
+        const { start } = slotTimes(timeRange);
 
         if (start <= currentTime) return "passed";
     }

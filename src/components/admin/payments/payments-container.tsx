@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PaymentFilters from "./payment-filters";
 import PaymentsTable from "./payments-table";
-import { formatManilaDate } from "@/lib/utils/bookingTime";
+import { businessToday } from "@/lib/utils/bookingTime";
 
 export interface PaymentFiltersState {
   search: string;
@@ -18,7 +18,8 @@ export default function PaymentsContainer() {
   const [filters, setFilters] = useState<PaymentFiltersState>({
     search: "",
     status: statusParam || "All Statuses",
-    date: statusParam ? "" : formatManilaDate(),
+    // shortcut: assumes the default 4 AM day cutoff for the first view, read booking_settings.day_ends_at if a venue changes it
+    date: statusParam ? "" : businessToday(),
   });
 
   return (

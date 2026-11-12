@@ -31,8 +31,9 @@ import { User } from "@supabase/supabase-js";
 
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
 import { fetchUpcomingClosures, VenueClosure } from "@/lib/services/schedule/venueClosures.service";
-import { formatManilaDate } from "@/lib/utils/bookingTime";
-import { checkSlotAvailability, getSlotBooking, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
+import { formatManilaDate, lateNightLabel } from "@/lib/utils/bookingTime";
+import { formatTime12h } from "@/lib/utils/formatTime";
+import { checkSlotAvailability, getSlotBooking, slotTimes } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
@@ -161,11 +162,18 @@ export const BookingContainer = () => {
 
   const courtNames = useMemo(() => courts.map((c) => c.name), [courts]);
 
-  // A closed date (venue_closures) offers no slots; the database refuses customer bookings on it too
-  const closure = closures.find((c) => c.closed_on === formatManilaDate(selectedDate));
+  // A closed date (venue_closures) closes its business day: its own hours and the late night it would leave on
+  // the next date. The database refuses customer bookings on it too.
+  const selectedDateStr = formatManilaDate(selectedDate);
+  const closure = closures.find((c) => c.closed_on === selectedDateStr);
   const timeSlots = useMemo(
-    () => (closure ? [] : generateTimeSlots(selectedDate, operatingHours)),
-    [operatingHours, selectedDate, closure]
+    () => generateTimeSlots(selectedDate, operatingHours, closures.map((c) => c.closed_on)),
+    [operatingHours, selectedDate, closures]
+  );
+  // Slot indexes that start after a gap (late-night hours end, the morning opens): a booking never spans one
+  const breaks = useMemo(
+    () => new Set(timeSlots.flatMap((t, i) => (i > 0 && slotTimes(timeSlots[i - 1]).end !== slotTimes(t).start ? [i] : []))),
+    [timeSlots]
   );
 
   // Check if a slot is booked by comparing against real bookings
@@ -180,8 +188,7 @@ export const BookingContainer = () => {
   const minHours = pricing?.settings.min_hours ?? 1;
   const priceFor = (date: Date, startSlotTime: string, duration: number) => {
     if (!pricing) return { total: 0, hasPeak: false };
-    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date);
-    return quoteCourtPrice(pricing, day, to24h(startSlotTime.split(" - ")[0].trim()), duration);
+    return quoteCourtPrice(pricing, formatManilaDate(date), slotTimes(startSlotTime).start, duration);
   };
 
   // [first, past-last) slot indexes a basket line covers
@@ -204,12 +211,13 @@ export const BookingContainer = () => {
       for (let i = startIndex; i < timeSlots.length; i++) {
         const slot = timeSlots[i];
         if (!slot || getSlotStatus(selectedDate, courtName, slot) !== "available") break;
+        if (i > startIndex && breaks.has(i)) break;
         if (picked.some(([s, e]) => i >= s && i < e)) break;
         hours++;
       }
       return hours;
     },
-    [timeSlots, selectedDate, getSlotStatus, basket, lineSpan]
+    [timeSlots, breaks, selectedDate, getSlotStatus, basket, lineSpan]
   );
 
   // A basket line for courtName covering `duration` slots from slot index `start`
@@ -229,7 +237,7 @@ export const BookingContainer = () => {
 
   // Replaces one court's ranges; touching ranges merge into one line
   const setCourtSpans = (courtName: string, spans: (readonly [number, number])[]) => {
-    const lines = mergeSpans(spans).map(([s, e]) => makeLine(courtName, s, e - s));
+    const lines = mergeSpans(spans, breaks).map(([s, e]) => makeLine(courtName, s, e - s));
     setBasket((prev) => [...prev.filter((l) => l.court !== courtName), ...lines]);
   };
   const spansOn = (courtName: string) => basket.filter((l) => l.court === courtName).map(lineSpan);
@@ -269,7 +277,7 @@ export const BookingContainer = () => {
     }
 
     // Tapping the hour right after a range adds that hour to it
-    const before = onCourt.find((l) => lineSpan(l)[1] === clickedIndex);
+    const before = breaks.has(clickedIndex) ? undefined : onCourt.find((l) => lineSpan(l)[1] === clickedIndex);
     if (before) {
       setCourtSpans(courtName, [...spansOn(courtName), [clickedIndex, clickedIndex + 1]]);
       return;
@@ -307,7 +315,9 @@ export const BookingContainer = () => {
   );
   const isToday = selectedDate.toDateString() === new Date().toDateString();
   const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
-  const closesAt = timeSlots.at(-1)?.split(" - ")[1];
+  // The day's own closing time when it has one (2 AM for a late close, not the midnight its last slot here ends at)
+  const ownClose = operatingHours.find((h) => h.day_of_week === dayName && h.is_open)?.close_time;
+  const closesAt = timeSlots.length === 0 ? undefined : ownClose && !closure ? formatTime12h(ownClose) : timeSlots.at(-1)!.split(" - ")[1];
   const slotWord = openHours === 1 ? "slot" : "slots";
   // Warn once free slots drop to half the court count (4 courts → 2, 6 → 3)
   const goingFast = openHours > 0 && openHours <= Math.ceil(courtNames.length / 2);
@@ -540,6 +550,7 @@ export const BookingContainer = () => {
                 selectedSlots={basket}
                 isFetching={isFetchingBookings}
                 priceOf={(time) => priceFor(selectedDate, time, 1).total}
+                headingOf={(time) => lateNightLabel(selectedDateStr, slotTimes(time).start, pricing?.settings.day_ends_at) ?? dayName}
               />
 
               {pricing && (

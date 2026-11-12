@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { fetchCourtsData } from "../courts/courtsData.service";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
+import { fetchBusinessToday } from "@/lib/services/settings/bookingPolicy";
 
 // no_show is a sold booking (prepaid money is kept), so it counts toward bookings and paid revenue
 const ACTIVE_STATUSES = ["confirmed", "completed", "checked_in", "in_progress", "no_show"];
@@ -23,7 +24,8 @@ export interface DashboardCardStatsData {
  * plus parallel court availability fetch.
  */
 export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData> => {
-    const todayStr = formatManilaDate(new Date());
+    // Business days: a 1 AM booking counts on the day before, and "today" turns over at the cutoff
+    const todayStr = await fetchBusinessToday(supabase);
 
     const todayNoon = new Date(`${todayStr}T12:00:00+08:00`);
     const yesterdayDate = new Date(todayNoon);
@@ -36,9 +38,9 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
 
     const { data: bookings, error } = await supabase
         .from("bookings")
-        .select("court_id, open_play_session_id, open_play_spots, start_time, end_time, status, booking_date, total_amount, payments(status, amount)")
-        .gte("booking_date", yesterdayStr)
-        .lte("booking_date", endDateStr)
+        .select("court_id, open_play_session_id, open_play_spots, start_time, end_time, status, business_date, total_amount, payments(status, amount)")
+        .gte("business_date", yesterdayStr)
+        .lte("business_date", endDateStr)
         .in("status", ACTIVE_STATUSES);
 
     if (error) throw error;
@@ -60,15 +62,15 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
         const isPaid = payments.some((p: { status?: string }) => p.status === "paid" || p.status === "succeeded");
         const amt = isPaid ? (Number(b.total_amount) || 0) : 0;
 
-        if (b.booking_date === todayStr) {
+        if (b.business_date === todayStr) {
             todayBookingsCount++;
             revToday += amt;
         }
-        if (b.booking_date === yesterdayStr) {
+        if (b.business_date === yesterdayStr) {
             yesterdayBookingsCount++;
             revYesterday += amt;
         }
-        if (b.booking_date >= todayStr && b.booking_date <= endDateStr) {
+        if (b.business_date >= todayStr && b.business_date <= endDateStr) {
             upcomingBookingsCount++;
         }
     }

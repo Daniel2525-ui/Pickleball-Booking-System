@@ -5,12 +5,20 @@ import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason
 test("admin status transitions: game-day statuses respect the booking's date in venue time", () => {
     const booking = { booking_date: "2026-10-25" };
     const ok = (status, at) => gameDayBlockReason(status, booking, new Date(at)) === null;
+    // The business day runs from 4 AM to 4 AM (the default day_ends_at)
     for (const s of ["checked_in", "in_progress"]) {
-        assert.equal(ok(s, "2026-10-25T00:00:00+08:00"), true, s);
+        assert.equal(ok(s, "2026-10-25T04:00:00+08:00"), true, s);
         assert.equal(ok(s, "2026-10-25T23:59:00+08:00"), true, s);
-        assert.equal(ok(s, "2026-10-24T16:30:00Z"), true, s); // 00:30 on the 25th in Manila
+        assert.equal(ok(s, "2026-10-26T00:30:00+08:00"), true, s); // still the 25th's late night
+        assert.equal(ok(s, "2026-10-24T16:30:00Z"), false, s); // 00:30 on the 25th in Manila is the 24th's late night
         assert.equal(ok(s, "2026-10-24T23:59:00+08:00"), false, s);
-        assert.equal(ok(s, "2026-10-26T00:00:00+08:00"), false, s);
+        assert.equal(ok(s, "2026-10-26T04:00:00+08:00"), false, s);
+        // A 1 AM booking belongs to the night before
+        const late = { booking_date: "2026-10-26", start_time: "01:00:00" };
+        assert.equal(gameDayBlockReason(s, late, new Date("2026-10-26T00:30:00+08:00")), null, s);
+        assert.equal(gameDayBlockReason(s, late, new Date("2026-10-25T22:00:00+08:00")), null, s);
+        assert.notEqual(gameDayBlockReason(s, late, new Date("2026-10-26T10:00:00+08:00")), null, s);
+        assert.equal(gameDayBlockReason(s, { ...late, business_date: "2026-10-25" }, new Date("2026-10-26T00:30:00+08:00")), null, s);
     }
     assert.equal(ok("completed", "2026-10-24T23:59:00+08:00"), false); // future booking
     assert.equal(ok("completed", "2026-10-25T10:00:00+08:00"), true);

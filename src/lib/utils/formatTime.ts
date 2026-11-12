@@ -4,7 +4,7 @@ export const formatTime12h = (timeStr?: string) => {
     let hours = parseInt(hoursStr, 10);
     if (isNaN(hours)) return "";
     const minutes = minutesStr || "00";
-    const ampm = hours >= 12 ? "PM" : "AM";
+    const ampm = hours % 24 >= 12 ? "PM" : "AM"; // 24:00 is midnight, 12:00 AM
     hours = hours % 12 || 12;
     return `${hours}:${minutes} ${ampm}`;
 };

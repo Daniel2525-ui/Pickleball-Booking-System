@@ -57,14 +57,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const blocked = gameDayBlockReason(newStatus, booking);
+        const policy = await fetchBookingPolicy(supabase);
+        const blocked = gameDayBlockReason(newStatus, booking, new Date(), policy.dayEndsAt);
         if (blocked) {
             return Response.json({ error: `This booking is for ${booking.booking_date}. ${blocked}` }, { status: 409 });
         }
 
         // 5. No-show grace period guard
         if (newStatus === "no_show") {
-            const { noShowGraceMinutes } = await fetchBookingPolicy(supabase);
+            const { noShowGraceMinutes } = policy;
             const minutesLeft = noShowMinutesLeft(booking, new Date(), noShowGraceMinutes);
             if (minutesLeft > 0) {
                 return Response.json(

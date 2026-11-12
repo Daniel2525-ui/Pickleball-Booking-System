@@ -1,6 +1,6 @@
 import type { BookingSlot } from "./fetchBookingsForDate.service";
 import { isBookingActive } from "./checkSlotAvailability.service.ts";
-import { getBookingWeekday } from "./validateBookingSlot.service.ts";
+import { bookableWindows } from "../schedule/hoursRules.ts";
 
 export interface WalkInSlotInput {
     date: string;
@@ -16,13 +16,10 @@ export interface StartOption { time: string; taken: boolean }
 
 const hhmm = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
-// Open and close as whole hours, or null when the court can't be booked that day.
-const dayWindow = (i: WalkInSlotInput) => {
-    if (i.courtStatus === "closed" || i.courtStatus === "maintenance") return null;
-    if (i.closedDates.includes(i.date)) return null;
-    const row = i.hours.find((h) => h.day_of_week === getBookingWeekday(i.date));
-    if (!row?.is_open || !row.open_time || !row.close_time) return null;
-    return { open: Number(row.open_time.slice(0, 2)), close: Number(row.close_time.slice(0, 2)) };
+// The date's bookable windows as whole hours (late-night hours from the day before, then its own); none when the court can't be booked.
+const dayWindows = (i: WalkInSlotInput) => {
+    if (i.courtStatus === "closed" || i.courtStatus === "maintenance") return [];
+    return bookableWindows(i.date, i.hours, i.closedDates).map((w) => ({ open: Number(w.start.slice(0, 2)), close: Number(w.end.slice(0, 2)) }));
 };
 
 const hourTaken = (i: WalkInSlotInput, h: number) => {
@@ -34,17 +31,18 @@ const hourTaken = (i: WalkInSlotInput, h: number) => {
 };
 
 export function walkInStarts(input: WalkInSlotInput): StartOption[] {
-    const w = dayWindow(input);
-    if (!w) return [];
     const out: StartOption[] = [];
-    for (let h = w.open; h <= w.close - input.minHours; h++) out.push({ time: hhmm(h), taken: hourTaken(input, h) || walkInEnds(input, hhmm(h)).length === 0 });
+    for (const w of dayWindows(input)) {
+        for (let h = w.open; h <= w.close - input.minHours; h++) out.push({ time: hhmm(h), taken: hourTaken(input, h) || walkInEnds(input, hhmm(h)).length === 0 });
+    }
     return out;
 }
 
+/** End times for a start, within the same window: late-night hours never run on into the morning. An end at midnight is "24:00". */
 export function walkInEnds(input: WalkInSlotInput, start: string): string[] {
-    const w = dayWindow(input);
-    if (!w) return [];
     const s = Number(start.slice(0, 2));
+    const w = dayWindows(input).find((x) => s >= x.open && s < x.close);
+    if (!w) return [];
     const out: string[] = [];
     for (let end = s + 1; end <= w.close && !hourTaken(input, end - 1); end++) {
         if (end - s >= input.minHours) out.push(hhmm(end));

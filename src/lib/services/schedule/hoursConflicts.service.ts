@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { formatManilaDate, getBookingEnd } from "@/lib/utils/bookingTime";
 import { formatShortDate, formatTime12h } from "@/lib/utils/formatTime";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
-import { HoursInput, isOutsideHours } from "./hoursRules";
+import { HoursInput, isOutsideHours, isWithinWindows, windowsForWeekday } from "./hoursRules";
 
 /**
  * Upcoming court bookings and active open play schedules that new weekly hours would leave outside opening hours.
@@ -33,10 +33,7 @@ export const findHoursConflicts = async (hours: HoursInput[]) => {
             return `${b.customer_name || "Guest Player"} · ${b.courts?.name ?? "Court"} · ${formatShortDate(b.booking_date)} ${formatTime12h(b.start_time)}${phone ? ` · ${phone}` : ""}`;
         });
     const openPlayLines = (schedules.data ?? [])
-        .filter((s) => {
-            const day = hours.find((h) => h.day_of_week === s.day_of_week);
-            return !day?.is_open || !day.open_time || !day.close_time || s.start_time.slice(0, 5) < day.open_time || s.end_time.slice(0, 5) > day.close_time;
-        })
+        .filter((s) => !isWithinWindows(windowsForWeekday(s.day_of_week, hours), s.start_time, s.end_time))
         .map((s) => `Open play · ${s.day_of_week}s ${formatTime12h(s.start_time)}–${formatTime12h(s.end_time)}`);
 
     return { data: [...bookingLines, ...openPlayLines], error };

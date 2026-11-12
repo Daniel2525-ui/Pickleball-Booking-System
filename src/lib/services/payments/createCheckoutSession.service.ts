@@ -1,4 +1,4 @@
-import { to24h } from "../bookings/checkSlotAvailability.service";
+import { slotTimes } from "../bookings/checkSlotAvailability.service";
 
 interface CheckoutParams {
     date: Date;
@@ -14,8 +14,8 @@ export const createCheckoutSession = async ({
     }).format(date);
 
     const apiLines = lines.map(({ courtId, timeRange }) => {
-        const [startStr, endStr] = timeRange.split(" - ");
-        return { court_id: courtId, start_time: to24h(startStr.trim()), end_time: to24h(endStr.trim()) };
+        const { start, end } = slotTimes(timeRange);
+        return { court_id: courtId, start_time: start, end_time: end };
     });
 
     const res = await fetch("/api/stripe/checkout", {

@@ -3,10 +3,14 @@
  * The database is authoritative for what is charged; this copy prices slots for display.
  */
 
+import { businessDate } from "../../utils/bookingTime.ts";
+
 export interface BookingSettings {
     base_hourly_rate: number;
     min_hours: number;
     max_hours: number;
+    /** Business-day cutoff ("HH:MM[:SS]"): earlier hours are priced as the previous day's late night */
+    day_ends_at?: string;
 }
 
 export interface PeakRate {
@@ -34,9 +38,9 @@ const minutes = (time: string) => {
 const weekdayOf = (bookingDate: string) =>
     new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${bookingDate}T00:00:00Z`));
 
-/** Rate for the hour starting at `hourStart`: highest peak window containing it on that weekday, else base. */
+/** Rate for the hour starting at `hourStart`: highest peak window containing it on its business day's weekday, else base. */
 export const hourlyRate = (pricing: Pricing, bookingDate: string, hourStart: string) => {
-    const day = weekdayOf(bookingDate);
+    const day = weekdayOf(businessDate(bookingDate, hourStart, pricing.settings.day_ends_at));
     const at = minutes(hourStart);
     const peaks = pricing.peakRates
         .filter((p) => p.days.includes(day) && minutes(p.start_time) <= at && at < minutes(p.end_time))

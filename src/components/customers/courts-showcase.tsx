@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchBookingsForDate, type BookingSlot } from "@/lib/services/bookings/fetchBookingsForDate.service";
 import { courtShowcaseStatus, type ShowcaseState } from "@/lib/services/courts/courtShowcase";
 import { getBookingWeekday } from "@/lib/services/bookings/validateBookingSlot.service";
+import { windowsForWeekday } from "@/lib/services/schedule/hoursRules";
 import { formatManilaDate } from "@/lib/utils/bookingTime";
 
 export interface ShowcaseCourt { id: string; name: string; status: string | null; maintenance_note: string | null; photo_url: string | null; details: string | null }
@@ -73,7 +74,12 @@ export function CourtsShowcase({ courts, hours }: { courts: ShowcaseCourt[]; hou
 
   if (courts.length === 0) return null;
   const today = now ? formatManilaDate(now) : null;
-  const todayHours = today ? hours.find((h) => h.day_of_week === getBookingWeekday(today)) ?? null : null;
+  // After midnight the venue may still be open on last night's hours: until they end, those are "today's" hours
+  const lateNight = today ? windowsForWeekday(getBookingWeekday(today), hours).find((w) => w.lateNight) : undefined;
+  const clock = now ? now.toLocaleTimeString("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+  const todayHours = !today ? null
+    : lateNight && clock < lateNight.end ? { day_of_week: "", is_open: true, open_time: "00:00", close_time: lateNight.end }
+    : hours.find((h) => h.day_of_week === getBookingWeekday(today)) ?? null;
   const statusOf = (court: ShowcaseCourt) => (now && today ? courtShowcaseStatus(court, slots, todayHours, today, now) : null);
   const featured = courts.find((c) => c.id === selectedId) ?? courts[0];
   const featuredStatus = statusOf(featured);

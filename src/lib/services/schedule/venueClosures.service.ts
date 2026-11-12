@@ -48,7 +48,7 @@ export const fetchBookedOnDate = async (date: string) => {
         supabase
             .from("bookings")
             .select("id, booking_date, start_time, end_time, status, hold_expires_at, created_at, customer_name, courts(name), profiles(phone), customers(phone)")
-            .eq("booking_date", date)
+            .eq("business_date", date) // closing a date closes its business day, late-night hours included
             .not("court_id", "is", null)
             .is("open_play_session_id", null) // open play court blocks are listed as their session below
             .in("status", ["pending", "confirmed", "checked_in", "in_progress"])

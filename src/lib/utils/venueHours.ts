@@ -32,7 +32,8 @@ export const summarizeVenueHours = (rows: OperatingHour[]): VenueHoursSummary | 
     if (openDays.length === 0) return null;
 
     const earliest = openDays.map((d) => d.openTime).sort()[0];
-    const latest = openDays.map((d) => d.closeTime).sort().at(-1)!;
+    // A close at or before opening is after midnight, so it is later than any same-day close
+    const latest = openDays.map((d) => (d.closeTime <= d.openTime ? "1" : "0") + d.closeTime).sort().at(-1)!.slice(1);
 
     const groups: { from: string; to: string; hours: string }[] = [];
     for (const d of week) {

@@ -1,13 +1,12 @@
 import { supabase } from "@/lib/supabase";
+import { fetchBusinessToday } from "@/lib/services/settings/bookingPolicy";
 import { fetchSpotRows } from "@/lib/services/openPlay/openPlayData.service";
 import { tallySpots } from "@/lib/services/openPlay/openPlayTypes";
 
 export const todaysSchedule = async () => {
-    const today = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(new Date());
-
     try {
+        // The business day: after midnight, last night's late bookings are still "today"
+        const today = await fetchBusinessToday(supabase);
         const { data, error } = await supabase
             .from("bookings")
             .select(`
@@ -34,10 +33,11 @@ export const todaysSchedule = async () => {
                     capacity
                 )
             `)
-            .eq("booking_date", today)
+            .eq("business_date", today)
             // Spot rows have no court; the block rows are what show a court busy with open play
             .not("court_id", "is", null)
             .in("status", ["confirmed", "checked_in", "in_progress", "completed", "no_show"])
+            .order("booking_date", { ascending: true })
             .order("start_time", { ascending: true });
 
         if (error) throw error;

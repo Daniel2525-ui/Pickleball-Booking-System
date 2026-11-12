@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { formatManilaDate } from "@/lib/utils/bookingTime";
+import { businessToday } from "@/lib/utils/bookingTime";
 import BookingFilters from "./booking-filters";
 import BookingsTable from "./bookings-table";
 import { AddBookingModal } from "./addBookingModal";
@@ -24,7 +24,7 @@ export default function BookingsContainer() {
   const dateParam = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") ?? "") ? params.get("date")! : "";
   // The desk works today's list; links from the dashboard (?status=), a court (?court=) or a customer (?search=) look across
   // every date, and ?date= opens one day
-  const initialDate = dateParam || (statusParam || params.get("court") || initialSearch ? "" : formatManilaDate());
+  const initialDate = dateParam || (statusParam || params.get("court") || initialSearch ? "" : businessToday()); // shortcut: default 4 AM cutoff, read booking_settings.day_ends_at if a venue changes it
   const [filters, setFilters] = useState<BookingFiltersState>({
     search: initialSearch,
     status: initialStatus,

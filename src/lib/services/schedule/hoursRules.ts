@@ -1,4 +1,6 @@
 import { getBookingWeekday } from "../bookings/validateBookingSlot.service.ts";
+import { formatTime12h } from "../../utils/formatTime.ts";
+import { shiftDate } from "../../utils/bookingTime.ts";
 
 export const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -14,9 +16,11 @@ const WHOLE_HOUR = /^([01]\d|2[0-3]):00(:00)?$/;
 
 /**
  * Checks a weekly schedule before it is saved (page and API route share it).
+ * Closing at or before the opening time means closing after midnight, the next morning; dayEndsAt
+ * (booking_settings.day_ends_at) is the latest that can be, and the earliest a day can open.
  * Returns the first problem in staff wording, or the rows to store.
  */
-export function checkWeeklyHours(hours: unknown): { error: string } | { rows: { day_of_week: string; is_open: boolean; open_time: string | null; close_time: string | null }[] } {
+export function checkWeeklyHours(hours: unknown, dayEndsAt = "04:00"): { error: string } | { rows: { day_of_week: string; is_open: boolean; open_time: string | null; close_time: string | null }[] } {
     if (!Array.isArray(hours) || hours.length === 0) return { error: "Operating hours data is required." };
     const seen = new Set<string>();
     const rows = [];
@@ -31,7 +35,9 @@ export function checkWeeklyHours(hours: unknown): { error: string } | { rows: { 
         const open = raw.open_time ?? "";
         const close = raw.close_time ?? "";
         if (!WHOLE_HOUR.test(open) || !WHOLE_HOUR.test(close)) return { error: `${day}: Use whole hours, like 8:00 AM, for opening and closing.` };
-        if (close.slice(0, 5) <= open.slice(0, 5)) return { error: `${day}: Closing time must be later than opening time.` };
+        const cutoff = dayEndsAt.slice(0, 5);
+        if (open.slice(0, 5) < cutoff) return { error: `${day}: Opening can't be earlier than ${formatTime12h(cutoff)}, when the previous day ends.` };
+        if (close.slice(0, 5) <= open.slice(0, 5) && close.slice(0, 5) > cutoff) return { error: `${day}: Closing time must be later than opening time, or after midnight up to ${formatTime12h(cutoff)}.` };
         rows.push({ day_of_week: day, is_open: true, open_time: open.slice(0, 5), close_time: close.slice(0, 5) });
     }
     return { rows };
@@ -39,7 +45,46 @@ export function checkWeeklyHours(hours: unknown): { error: string } | { rows: { 
 
 /** True when a slot on this date falls outside the weekly hours (day closed, or before opening / after closing). */
 export function isOutsideHours(slot: { booking_date: string; start_time: string; end_time: string }, hours: HoursInput[]) {
-    const day = hours.find((h) => h.day_of_week === getBookingWeekday(slot.booking_date));
-    if (!day?.is_open || !day.open_time || !day.close_time) return true;
-    return slot.start_time.slice(0, 5) < day.open_time.slice(0, 5) || slot.end_time.slice(0, 5) > day.close_time.slice(0, 5);
+    return !isWithinWindows(bookableWindows(slot.booking_date, hours), slot.start_time, slot.end_time);
+}
+
+export interface BookableWindow {
+    start: string;
+    end: string;
+    /** The previous day's hours running past midnight */
+    lateNight?: true;
+}
+
+const hhmm = (time?: string | null) => (time ?? "").slice(0, 5);
+
+/**
+ * The times bookable on one weekday, as "HH:MM" pairs: the late-night tail of the previous day's hours
+ * (00:00 until its closing), then the day's own hours (ending "24:00" when it closes after midnight).
+ * Must match public.bookable_windows in SQL.
+ */
+export function windowsForWeekday(weekday: string, hours: HoursInput[]): BookableWindow[] {
+    const row = (day: string) => {
+        const h = hours.find((x) => x.day_of_week === day);
+        return h?.is_open && h.open_time && h.close_time ? { open: hhmm(h.open_time), close: hhmm(h.close_time) } : null;
+    };
+    const windows: BookableWindow[] = [];
+    const previous = row(WEEK_DAYS[(WEEK_DAYS.indexOf(weekday) + 6) % 7]);
+    if (previous && previous.close <= previous.open && previous.close > "00:00") windows.push({ start: "00:00", end: previous.close, lateNight: true });
+    const own = row(weekday);
+    if (own) windows.push({ start: own.open, end: own.close <= own.open ? "24:00" : own.close });
+    return windows;
+}
+
+/**
+ * The bookable windows of a calendar date (YYYY-MM-DD). A closed date (venue_closures) closes its business day:
+ * its own hours, and the late-night hours it would leave on the next date.
+ */
+export function bookableWindows(bookingDate: string, hours: HoursInput[], closedDates: string[] = []) {
+    return windowsForWeekday(getBookingWeekday(bookingDate), hours)
+        .filter((w) => !closedDates.includes(w.lateNight ? shiftDate(bookingDate, -1) : bookingDate));
+}
+
+/** One window must hold the whole slot, so 1-2 AM never joins 8-9 AM. */
+export function isWithinWindows(windows: BookableWindow[], startTime: string, endTime: string) {
+    return windows.some((w) => hhmm(startTime) >= w.start && hhmm(endTime) <= w.end);
 }

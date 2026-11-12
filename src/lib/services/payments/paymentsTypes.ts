@@ -60,9 +60,9 @@ export const bookingPaymentLabel = (
     return booking.cancel_reason === "payment_kept" ? "Payment kept" : "Refund owed";
 };
 
-/** UTC instants bounding one venue day (Asia/Manila, UTC+8, no DST). */
-export const venueDayWindow = (date: string) => {
-    const start = new Date(`${date}T00:00:00+08:00`);
+/** UTC instants bounding one venue day (Asia/Manila, UTC+8, no DST), from dayEndsAt to dayEndsAt for a business day. */
+export const venueDayWindow = (date: string, dayEndsAt = "00:00") => {
+    const start = new Date(`${date}T${dayEndsAt.slice(0, 5)}:00+08:00`);
     return { start: start.toISOString(), end: new Date(start.getTime() + 86_400_000).toISOString() };
 };
 

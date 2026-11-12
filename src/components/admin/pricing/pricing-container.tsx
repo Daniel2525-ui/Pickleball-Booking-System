@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { WEEKDAYS, hourlyRate, type PeakRate, type Pricing } from "@/lib/services/pricing/quoteCourtPrice";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { shiftDate } from "@/lib/utils/bookingTime";
 
 type Window = Omit<PeakRate, "id"> & { key: number };
 
@@ -32,7 +33,10 @@ const daysWithoutEffect = (w: Pick<PeakRate, "days" | "start_time" | "end_time">
   w.days.filter((day) => {
     const h = hours.find((x) => x.day_of_week === day);
     if (!h?.is_open || !h.open_time || !h.close_time) return true;
-    return hourOf(w.start_time) >= hourOf(h.close_time) || hourOf(w.end_time) <= hourOf(h.open_time);
+    // A day that closes after midnight keeps its late-night hours (12 AM to closing), priced as that day
+    const late = h.close_time <= h.open_time;
+    const sameDay = hourOf(w.start_time) < (late ? 24 : hourOf(h.close_time)) && hourOf(w.end_time) > hourOf(h.open_time);
+    return !sameDay && !(late && hourOf(w.start_time) < hourOf(h.close_time));
   });
 
 export function PricingContainer() {
@@ -74,7 +78,7 @@ export function PricingContainer() {
   // The form as it would be saved, for the preview, the change summary and the unsaved-changes prompt
   const form: Pricing = {
     // Bookings have no maximum length; booking_settings.max_hours is kept at its column ceiling and never read as a limit
-    settings: { base_hourly_rate: Number(baseRate), min_hours: minHours, max_hours: 12 },
+    settings: { base_hourly_rate: Number(baseRate), min_hours: minHours, max_hours: 12, day_ends_at: saved?.settings.day_ends_at },
     peakRates: windows.map(({ label, days, start_time, end_time, hourly_rate }) => ({ label, days, start_time, end_time, hourly_rate: Number(hourly_rate) })),
   };
   const changes = saved ? pricingChanges(saved, form) : [];
@@ -158,6 +162,7 @@ export function PricingContainer() {
             </CardTitle>
             <CardDescription>
               Each booked hour that starts inside a window costs that window&apos;s rate. If windows overlap, the highest rate applies.
+              Hours after midnight count as the day before: for a Friday that closes at 2 AM, a Friday window from 12 AM to 2 AM prices its late night.
             </CardDescription>
           </div>
           <Button variant="outline" onClick={addWindow} className="gap-2 self-start">
@@ -184,7 +189,7 @@ export function PricingContainer() {
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor={`peak-end-${w.key}`}>Until</Label>
                   <select id={`peak-end-${w.key}`} className={selectClass} value={w.end_time} onChange={(e) => update(w.key, { end_time: e.target.value })}>
-                    {HOURS.slice(1).map((h) => <option key={h} value={h}>{formatTime12h(h)}</option>)}
+                    {[...HOURS.slice(1), "24:00"].map((h) => <option key={h} value={h}>{formatTime12h(h)}{h === "24:00" ? " (midnight)" : ""}</option>)}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -304,7 +309,9 @@ function PricePreview({ pricing, hours }: { pricing: Pricing; hours: OperatingHo
   const open = hours.filter((h) => h.is_open && h.open_time && h.close_time);
   if (!open.length || !(pricing.settings.base_hourly_rate > 0)) return null;
   const first = Math.min(...open.map((h) => hourOf(h.open_time)));
-  const last = Math.max(...open.map((h) => hourOf(h.close_time)));
+  // A close after midnight runs past 24 on the same column: Friday 1 AM is hour 25 of Friday
+  const closeOf = (h: OperatingHour) => hourOf(h.close_time) + (h.close_time <= h.open_time ? 24 : 0);
+  const last = Math.max(...open.map(closeOf));
   const rows = Array.from({ length: last - first }, (_, i) => first + i);
   const base = pricing.settings.base_hourly_rate;
   return (
@@ -325,15 +332,15 @@ function PricePreview({ pricing, hours }: { pricing: Pricing; hours: OperatingHo
           </thead>
           <tbody>
             {rows.map((h) => {
-              const time = `${String(h).padStart(2, "0")}:00`;
+              const time = `${String(h % 24).padStart(2, "0")}:00`;
               return (
                 <tr key={h} className="border-t border-border/50">
-                  <td className="py-1 pr-2 whitespace-nowrap text-muted-foreground">{formatTime12h(time)}</td>
+                  <td className="py-1 pr-2 whitespace-nowrap text-muted-foreground">{formatTime12h(time)}{h >= 24 ? " (late night)" : ""}</td>
                   {WEEKDAYS.map((d) => {
                     const day = hours.find((x) => x.day_of_week === d);
-                    const inHours = day?.is_open && hourOf(day.open_time) <= h && h < hourOf(day.close_time);
+                    const inHours = day?.is_open && day.open_time && day.close_time && hourOf(day.open_time) <= h && h < closeOf(day);
                     if (!inHours) return <td key={d} className="py-1 px-1 text-center text-muted-foreground/50">—</td>;
-                    const rate = hourlyRate(pricing, SAMPLE_DATE[d], time);
+                    const rate = hourlyRate(pricing, h >= 24 ? shiftDate(SAMPLE_DATE[d], 1) : SAMPLE_DATE[d], time);
                     return (
                       <td key={d} className={`py-1 px-1 text-center tabular-nums ${rate !== base ? "bg-primary/10 font-semibold text-primary" : ""}`}>
                         ₱{rate.toLocaleString("en-PH")}

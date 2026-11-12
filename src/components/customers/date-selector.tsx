@@ -3,6 +3,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, X } from "l
 import { Button } from "@/components/ui/button";
 import { OperatingHour } from "@/components/admin/schedules/types";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { windowsForWeekday } from "@/lib/services/schedule/hoursRules";
 
 interface DateSelectorProps {
   selectedDate: Date;
@@ -63,9 +64,8 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
   }, [viewMonth, viewYear]);
 
   const isDayOpen = (date: Date): boolean => {
-    const dayName = fullDays[date.getDay()];
-    const schedule = operatingHours.find((hour) => hour.day_of_week === dayName);
-    return !!schedule?.is_open;
+    // Open when anything is bookable: its own hours, or late-night hours left over from the day before
+    return windowsForWeekday(fullDays[date.getDay()], operatingHours).length > 0;
   };
 
   const getScheduleForDate = (date: Date): OperatingHour | undefined => {

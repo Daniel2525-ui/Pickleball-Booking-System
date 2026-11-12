@@ -80,6 +80,11 @@ export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: Operat
               />
             </div>
           </div>
+
+          {/* A closing time at or before opening is after midnight */}
+          {hour.close_time && hour.close_time <= hour.open_time && (
+            <span className="text-xs font-medium text-muted-foreground">Closes the next day</span>
+          )}
         </div>
       ) : (
         <div className="flex items-center justify-start sm:justify-end gap-3 flex-1 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/50">

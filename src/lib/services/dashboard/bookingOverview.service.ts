@@ -22,9 +22,9 @@ export const fetchBookingOverview = async () => {
 
         const { data: bookings, error } = await supabase
             .from("bookings")
-            .select("booking_date")
-            .gte("booking_date", mondayStr)
-            .lte("booking_date", sundayStr)
+            .select("business_date")
+            .gte("business_date", mondayStr)
+            .lte("business_date", sundayStr)
             .in("status", ["confirmed", "completed", "checked_in", "in_progress", "no_show"])
             .or("open_play_session_id.is.null,open_play_spots.not.is.null");
 
@@ -40,14 +40,14 @@ export const fetchBookingOverview = async () => {
             { day: "Sunday", shortDay: "Sun", bookings: 0 },
         ];
 
-        (bookings || []).forEach((booking: { booking_date: string }) => {
-            if (!booking.booking_date)
+        (bookings || []).forEach((booking: { business_date: string }) => {
+            if (!booking.business_date)
                 return;
 
             const dayName = new Intl.DateTimeFormat("en-US", {
                 weekday: "long",
                 timeZone: "Asia/Manila",
-            }).format(new Date(`${booking.booking_date}T12:00:00+08:00`));
+            }).format(new Date(`${booking.business_date}T12:00:00+08:00`));
 
             const targetDay = weekData.find((d) => d.day === dayName);
             if (targetDay) {

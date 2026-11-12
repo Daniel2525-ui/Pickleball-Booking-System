@@ -72,7 +72,7 @@ export const OperatingHoursCard = ({ hours, errorMsg, onToggle, onTimeChange }: 
         <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground">
           <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
           <p>
-            <strong className="font-semibold text-foreground">Whole hours only:</strong> Customers book 1-hour slots, so opening and closing times are on the hour (for example 8:00 AM to 10:00 PM). The last slot ends at closing time.
+            <strong className="font-semibold text-foreground">Whole hours only:</strong> Customers book 1-hour slots, so opening and closing times are on the hour (for example 8:00 AM to 10:00 PM). The last slot ends at closing time. To stay open past midnight, set a closing time in the early morning, such as 2:00 AM.
           </p>
         </div>
       </CardContent>

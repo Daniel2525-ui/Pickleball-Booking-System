@@ -1,32 +1,22 @@
-import type { OperatingHour } from "@/components/admin/schedules/types";
-import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatTime12h } from "../../utils/formatTime.ts";
+import { formatManilaDate } from "../../utils/bookingTime.ts";
+import { bookableWindows, type HoursInput } from "./hoursRules.ts";
 
+const hhmm = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
 /*
- * Generates an array of time slot strings (e.g. "08:00 AM - 09:00 AM")
- * for a given date based on operating hours.
+ * One-hour slot labels (e.g. "8:00 AM - 9:00 AM") for a calendar date: the late-night hours left over from
+ * the day before, then the day's own hours. A slot ending at midnight reads "11:00 PM - 12:00 AM".
+ * closedDates (venue_closures) remove a business day's hours, including its late night on the next date.
  */
-export const generateTimeSlots = (selectedDate: Date, operatingHours: OperatingHour[]): string[] => {
+export const generateTimeSlots = (selectedDate: Date, operatingHours: HoursInput[], closedDates: string[] = []): string[] => {
     if (!operatingHours || !operatingHours.length) return [];
 
-    const dayName = new Intl.DateTimeFormat("en-US", {
-        weekday: "long",
-        timeZone: "Asia/Manila",
-    }).format(selectedDate);
-    const todaySchedule = operatingHours.find((hour) => hour.day_of_week === dayName);
-
-    if (!todaySchedule || !todaySchedule.is_open || !todaySchedule.open_time || !todaySchedule.close_time) {
-        return [];
-    }
-
-    const openHour = parseInt(todaySchedule.open_time.split(":")[0], 10);
-    const closeHour = parseInt(todaySchedule.close_time.split(":")[0], 10);
-
-    const slots = [];
-    for (let i = openHour; i < closeHour; i++) {
-        const start = formatTime12h(`${i < 10 ? "0" : ""}${i}:00`);
-        const end = formatTime12h(`${i + 1 < 10 ? "0" : ""}${i + 1}:00`);
-        slots.push(`${start} - ${end}`);
-    }
-    return slots;
+    return bookableWindows(formatManilaDate(selectedDate), operatingHours, closedDates).flatMap((w) => {
+        const slots = [];
+        for (let h = Number(w.start.slice(0, 2)); h < Number(w.end.slice(0, 2)); h++) {
+            slots.push(`${formatTime12h(hhmm(h))} - ${formatTime12h(hhmm(h + 1))}`);
+        }
+        return slots;
+    });
 };

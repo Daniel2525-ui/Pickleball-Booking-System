@@ -15,6 +15,8 @@ import { updateOperatingHours } from "@/lib/services/schedule/updateOperatingHou
 import { checkWeeklyHours } from "@/lib/services/schedule/hoursRules"
 import { findHoursConflicts } from "@/lib/services/schedule/hoursConflicts.service"
 import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog"
+import { supabase } from "@/lib/supabase"
+import { formatTime12h } from "@/lib/utils/formatTime"
 
 const defaultHours: OperatingHour[] = [
   { day_of_week: "Monday", is_open: true, open_time: "08:00", close_time: "22:00" },
@@ -26,6 +28,9 @@ const defaultHours: OperatingHour[] = [
   { day_of_week: "Sunday", is_open: false, open_time: "", close_time: "" },
 ]
 
+// Midnight (no late-night hours) to 6 AM
+const DAY_END_OPTIONS = Array.from({ length: 7 }, (_, h) => `0${h}:00`)
+
 const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 export const SchedulesContainer = () => {
@@ -36,7 +41,10 @@ export const SchedulesContainer = () => {
   // What was last loaded or saved, to tell whether there are unsaved edits
   const [savedHours, setSavedHours] = useState(JSON.stringify(defaultHours))
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null)
-  const dirty = JSON.stringify(hours) !== savedHours
+  // booking_settings.day_ends_at: the latest a day may close after midnight (the save route checks the real value again)
+  const [dayEndsAt, setDayEndsAt] = useState("04:00")
+  const [savedDayEndsAt, setSavedDayEndsAt] = useState("04:00")
+  const dirty = JSON.stringify(hours) !== savedHours || dayEndsAt !== savedDayEndsAt
 
   useUnsavedChangesPrompt(dirty)
 
@@ -44,7 +52,13 @@ export const SchedulesContainer = () => {
     const loadHours = async () => {
       setLoading(true)
 
-      const { data, error } = await fetchOperatingHours()
+      const [{ data, error }, { data: settings }] = await Promise.all([
+        fetchOperatingHours(),
+        supabase.from("booking_settings").select("day_ends_at").maybeSingle(),
+      ])
+      const cutoff: string = (settings?.day_ends_at ?? "04:00").slice(0, 5)
+      setDayEndsAt(cutoff)
+      setSavedDayEndsAt(cutoff)
 
       if (error) {
         toast.error("Failed to load operating hours. Showing defaults.")
@@ -61,7 +75,7 @@ export const SchedulesContainer = () => {
         setHours(merged)
         setSavedHours(JSON.stringify(merged))
         // Flag saved times the slots can't use, like 8:30
-        const checked = checkWeeklyHours(merged)
+        const checked = checkWeeklyHours(merged, cutoff)
         if ("error" in checked) setErrorMsg(checked.error)
       }
       // If data is empty, we keep the DEFAULT_HOURS already in state
@@ -95,8 +109,8 @@ export const SchedulesContainer = () => {
   }
 
   // Same checks the save route applies
-  const validateHours = (currentHours: OperatingHour[]) => {
-    const checked = checkWeeklyHours(currentHours)
+  const validateHours = (currentHours: OperatingHour[], cutoff = dayEndsAt) => {
+    const checked = checkWeeklyHours(currentHours, cutoff)
     setErrorMsg("error" in checked ? checked.error : null)
     return !("error" in checked)
   }
@@ -127,11 +141,12 @@ export const SchedulesContainer = () => {
 
   const save = async () => {
     setSaving(true)
-    const { error } = await updateOperatingHours(hours)
+    const { error } = await updateOperatingHours(hours, dayEndsAt)
     if (error) {
       toast.error(error.message || "Failed to save operating hours. Please try again.")
     } else {
       setSavedHours(JSON.stringify(hours))
+      setSavedDayEndsAt(dayEndsAt)
       toast.success("Operating hours updated successfully.")
     }
     setSaving(false)
@@ -171,6 +186,23 @@ export const SchedulesContainer = () => {
             onToggle={handleToggle}
             onTimeChange={handleTimeChange}
           />
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-card border shadow-xs">
+            <div className="text-sm">
+              <label htmlFor="day-ends-at" className="font-semibold text-foreground">Day ends at</label>
+              <p className="text-muted-foreground">
+                Hours before this time count as the night before, for prices, closed dates, today&apos;s lists and reports. It is also the latest a day can close and the earliest it can open. Only the owner can change it.
+              </p>
+            </div>
+            <select
+              id="day-ends-at"
+              className="h-10 shrink-0 rounded-md border border-input bg-background px-3 text-sm font-semibold"
+              value={dayEndsAt}
+              onChange={(e) => { setDayEndsAt(e.target.value); validateHours(hours, e.target.value) }}
+            >
+              {DAY_END_OPTIONS.map((t) => <option key={t} value={t}>{formatTime12h(t)}</option>)}
+            </select>
+          </div>
 
           <ClosedDatesCard />
 

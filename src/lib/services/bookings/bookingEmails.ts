@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { emailConfigured, sendEmail, type SendEmail } from "../../email.ts";
 import { fetchVenueContact, type VenueContact } from "../../venue.ts";
-import { formatManilaDate, getBookingStart } from "../../utils/bookingTime.ts";
+import { formatManilaDate, getBookingStart, lateNightOf } from "../../utils/bookingTime.ts";
 import { formatShortDate, formatTime12h } from "../../utils/formatTime.ts";
 
 /**
@@ -16,6 +16,8 @@ export interface EmailBooking {
   id: string;
   basket_id: string | null;
   booking_date: string;
+  /** The day the booking belongs to; the day before booking_date for hours after midnight */
+  business_date?: string | null;
   start_time: string;
   end_time: string;
   customer_name: string;
@@ -37,7 +39,7 @@ const COLUMN = { confirmation: "confirmation_sent_at", reminder: "reminder_sent_
 // shortcut: 20 bookings per kind per run (~80/hour from the cron), raise if a venue ever confirms more
 const BATCH = 20;
 const SELECT =
-  "id, basket_id, booking_date, start_time, end_time, customer_name, open_play_spots, confirmation_sent_at, profiles(email, full_name), customers(email, full_name), courts(name)";
+  "id, basket_id, booking_date, business_date, start_time, end_time, customer_name, open_play_spots, confirmation_sent_at, profiles(email, full_name), customers(email, full_name), courts(name)";
 
 /**
  * Which fetched bookings to claim, and which of those to actually email.
@@ -74,7 +76,8 @@ const escapeHtml = (s: string) =>
 
 const lineOf = (b: EmailBooking) =>
   `${b.open_play_spots ? `Open play (${b.open_play_spots} ${b.open_play_spots === 1 ? "spot" : "spots"})` : (b.courts?.name ?? "Court")} · ` +
-  `${formatShortDate(b.booking_date)} · ${formatTime12h(b.start_time)} – ${formatTime12h(b.end_time)}`;
+  `${formatShortDate(b.booking_date)} · ${formatTime12h(b.start_time)} – ${formatTime12h(b.end_time)}` +
+  (lateNightOf(b) ? ` (${lateNightOf(b)})` : "");
 
 export const renderBookingEmail = (kind: EmailKind, group: EmailGroup, contact: VenueContact) => {
   const rows = [...group.rows].sort((a, b) => getBookingStart(a).getTime() - getBookingStart(b).getTime());

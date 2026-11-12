@@ -36,7 +36,7 @@ export const validatePricingInput = (body: unknown): { ok: true; value: PricingI
         if (days.length === 0 || !days.every((d) => WEEKDAYS.includes(d as string))) {
             return { ok: false, error: `Peak window ${n}: pick at least one day.` };
         }
-        if (typeof p.start_time !== "string" || typeof p.end_time !== "string" || !WHOLE_HOUR.test(p.start_time) || !WHOLE_HOUR.test(p.end_time)) {
+        if (typeof p.start_time !== "string" || typeof p.end_time !== "string" || !WHOLE_HOUR.test(p.start_time) || !(WHOLE_HOUR.test(p.end_time) || /^24:00(:00)?$/.test(p.end_time))) { // a window can run to midnight
             return { ok: false, error: `Peak window ${n}: start and end must be on the hour.` };
         }
         if (p.end_time.slice(0, 5) <= p.start_time.slice(0, 5)) return { ok: false, error: `Peak window ${n}: end must be after start.` };

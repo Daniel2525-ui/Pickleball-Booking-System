@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Clock, Check, LoaderCircle, ChevronDown } from "lucide-react";
 import { Slot } from "./types";
-import { SlotStatus, to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
+import { SlotStatus, slotTimes } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { compactRange } from "@/lib/services/bookings/quickStarts";
 
 interface CourtAvailabilityGridProps {
@@ -16,6 +16,8 @@ interface CourtAvailabilityGridProps {
   isFetching?: boolean;
   /** One-hour price shown in open cells */
   priceOf?: (time: string) => number;
+  /** Section a slot belongs to ("Friday late night", "Saturday"); shown only when a date has more than one */
+  headingOf?: (time: string) => string;
 }
 
 export const CourtAvailabilityGrid = ({
@@ -27,7 +29,9 @@ export const CourtAvailabilityGrid = ({
   selectedSlots = [],
   isFetching,
   priceOf,
+  headingOf,
 }: CourtAvailabilityGridProps) => {
+  const showHeadings = !!headingOf && new Set(timeSlots.map(headingOf)).size > 1;
   const colCount = courts.length;
   const [showPassed, setShowPassed] = useState(false);
   // Rows already over on every court (earlier today) are collapsed so open slots show first
@@ -112,7 +116,11 @@ export const CourtAvailabilityGrid = ({
               </button>
             )}
             {visibleSlots.map((time, timeIdx) => (
-              <div key={timeIdx} className="grid grid-cols-[76px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] hover:bg-muted/30 transition-colors group">
+              <Fragment key={timeIdx}>
+              {showHeadings && headingOf!(time) !== (timeIdx > 0 ? headingOf!(visibleSlots[timeIdx - 1]) : null) && (
+                <div className="sticky left-0 bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground">{headingOf!(time)}</div>
+              )}
+              <div className="grid grid-cols-[76px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[160px_1fr] hover:bg-muted/30 transition-colors group">
                 <div className="p-2 border-r flex items-center justify-center text-xs md:text-sm text-center font-medium sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:bg-muted/30 transition-colors">
                   {compactRange([time], 0, 1)}
                 </div>
@@ -125,8 +133,8 @@ export const CourtAvailabilityGrid = ({
                     const isSelected = selectedSlots.some((selectedSlot) =>
                       selectedSlot.court === court &&
                       (selectedSlot.time === time || (() => {
-                        const [cellStart, cellEnd] = time.split(" - ").map((t) => to24h(t.trim()));
-                        const [selStart, selEnd] = selectedSlot.time.split(" - ").map((t) => to24h(t.trim()));
+                        const { start: cellStart, end: cellEnd } = slotTimes(time);
+                        const { start: selStart, end: selEnd } = slotTimes(selectedSlot.time);
                         return Boolean(cellStart && cellEnd && selStart && selEnd && cellStart >= selStart && cellEnd <= selEnd);
                       })())
                     );
@@ -183,6 +191,7 @@ export const CourtAvailabilityGrid = ({
                   })}
                 </div>
               </div>
+              </Fragment>
             ))}
           </div>
         </div>
