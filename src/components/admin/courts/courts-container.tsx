@@ -19,6 +19,7 @@ import { Court } from "@/lib/services/courts/courtsTypes";
 import { AddCourtModal } from "./addCourtModal";
 import { EditCourtModal } from "./editCourtModal";
 import { deleteCourt } from "@/lib/services/courts/deleteCourt.service";
+import { updateCourt } from "@/lib/services/courts/updateCourt.service";
 import StatCard from "@/components/admin/dashboard/stat-card";
 import { toast } from "sonner";
 import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
@@ -31,6 +32,23 @@ export default function CourtsContainer() {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [courtToEdit, setCourtToEdit] = useState<Court | null>(null);
+  // Set by a card's Maintenance / Closed button: the edit dialog opens on that status so staff see the bookings it affects
+  const [editStatus, setEditStatus] = useState<string | null>(null);
+
+  // Open applies at once (reopening clears the maintenance note); closing goes through the dialog
+  const setCourtStatus = async (court: Court, next: "active" | "maintenance" | "closed") => {
+    if (next !== "active") {
+      setEditStatus(next);
+      setCourtToEdit(court);
+      return;
+    }
+    const { error } = await updateCourt(court.id, court.name, "active");
+    if (error) toast.error(error.message);
+    else {
+      toast.success(`${court.name} is open for booking.`);
+      loadCourts();
+    }
+  };
   const [todayBookings, setTodayBookings] = useState<CourtBooking[]>([]);
 
   const loadCourts = async () => {
@@ -114,27 +132,27 @@ export default function CourtsContainer() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Courts"
+          title="Total courts"
           value={loading ? "—" : counts.total}
-          description="Total venue courts registered"
+          description="Courts at the venue"
           icon={MapPin}
         />
         <StatCard
           title="Available"
           value={loading ? "—" : counts.available}
-          description="Open for player reservations"
+          description="Players can book them"
           icon={CheckCircle2}
         />
         <StatCard
-          title="In Maintenance"
+          title="In maintenance"
           value={loading ? "—" : counts.maintenance}
-          description="Temporarily offline for repairs"
+          description="Not bookable right now"
           icon={Wrench}
         />
         <StatCard
-          title="Occupied"
+          title="In play"
           value={loading ? "—" : counts.occupied}
-          description="Active reservation in progress"
+          description="A game on court now"
           icon={Activity}
         />
       </div>
@@ -232,7 +250,11 @@ export default function CourtsContainer() {
               key={court.id}
               court={court}
               today={courtNowNext(todayBookings, court.id)}
-              onEdit={(c) => setCourtToEdit(c)}
+              onEdit={(c) => {
+                setEditStatus(null);
+                setCourtToEdit(c);
+              }}
+              onSetStatus={setCourtStatus}
               onDelete={handleDelete}
             />
           ))}
@@ -244,6 +266,7 @@ export default function CourtsContainer() {
         open={!!courtToEdit}
         onOpenChange={(open) => !open && setCourtToEdit(null)}
         onCourtUpdated={loadCourts}
+        initialStatus={editStatus}
       />
 
       <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />

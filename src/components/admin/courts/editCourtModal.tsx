@@ -39,11 +39,13 @@ interface EditCourtModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onCourtUpdated: () => void;
+    /** Status to start on (a court card's Maintenance or Closed button) instead of the court's own */
+    initialStatus?: string | null;
 }
 
-export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: EditCourtModalProps) => {
+export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated, initialStatus }: EditCourtModalProps) => {
     const [name, setName] = useState(court?.name || "");
-    const [status, setStatus] = useState(court ? ((court.status === "occupied" || court.status === "available") ? "active" : court.status) : "active");
+    const [status, setStatus] = useState(initialStatus || (court ? ((court.status === "occupied" || court.status === "available") ? "active" : court.status) : "active"));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState(court?.maintenance_note || "");
@@ -59,7 +61,7 @@ export const EditCourtModal = ({ court, open, onOpenChange, onCourtUpdated }: Ed
     if (court !== prevCourt) {
         setPrevCourt(court);
         setName(court?.name || "");
-        setStatus(court ? ((court.status === "occupied" || court.status === "available") ? "active" : court.status) : "active");
+        setStatus(initialStatus || (court ? ((court.status === "occupied" || court.status === "available") ? "active" : court.status) : "active"));
         setNote(court?.maintenance_note || "");
         setUntil(court?.maintenance_until || "");
         setUpcoming([]);

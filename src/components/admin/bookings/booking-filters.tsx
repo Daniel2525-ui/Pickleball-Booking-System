@@ -26,6 +26,15 @@ interface BookingFiltersProps {
   }) => void;
 }
 
+const QUICK_STATUSES: [string, string][] = [
+  ["All Statuses", "All"],
+  ["Confirmed", "Confirmed"],
+  ["Pending", "Waiting for payment"],
+  ["Checked In", "Checked in"],
+  ["No-Show", "No-show"],
+  ["Cancelled", "Cancelled"],
+];
+
 export default function BookingFilters({ initialStatus = "All Statuses", initialDate = "", initialCourt = "All Courts", initialSearch = "", onFilterChange }: BookingFiltersProps = {}) {
   const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState(initialStatus);
@@ -57,7 +66,8 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
   };
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border bg-card p-3">
+    <div className="rounded-2xl border bg-card p-3 flex flex-col gap-3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-1 items-center space-x-2">
         <div className="relative w-full sm:max-w-sm flex items-center">
           <Search className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -153,6 +163,27 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
             ))}
           </SelectContent>
         </Select>
+      </div>
+    </div>
+
+      {/* The statuses the desk filters by most, one tap each (the menu above has every status) */}
+      <div role="group" aria-label="Quick status filter" className="flex flex-wrap gap-1.5">
+        {QUICK_STATUSES.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={status === value}
+            onClick={() => {
+              setStatus(value);
+              updateFilters(search, value, courtId, dateTime);
+            }}
+            className={`min-h-9 rounded-lg px-3 text-xs font-semibold border transition-colors ${
+              status === value ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-muted"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );

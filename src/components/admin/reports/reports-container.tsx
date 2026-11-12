@@ -14,6 +14,7 @@ import { BreakdownBars } from "./breakdown-bars";
 import { BusyHeatmap } from "./busy-heatmap";
 import { RevenueChart, bucketLabel, peso } from "./revenue-chart";
 import { TopCustomers } from "./top-customers";
+import { AdminPageHeader } from "@/components/admin/page-header";
 
 const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: "week", label: "This week" },
@@ -71,12 +72,7 @@ export function ReportsContainer() {
 
   return (
     <>
-      <header className="sticky top-14 z-20 -mx-4 flex flex-col gap-4 border-b border-border/60 bg-background/95 px-4 pb-4 pt-6 backdrop-blur-md sm:pt-7 lg:-mx-8 lg:flex-row lg:items-end lg:justify-between lg:px-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-          <p className="mt-1 text-sm text-muted-foreground">How the venue is doing. Numbers include only money actually collected.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <AdminPageHeader title="Reports" description="How the venue is doing. Money counts only what was actually collected.">
           <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1" role="group" aria-label="Period">
             {PERIODS.map((p) => (
               <Button key={p.key} size="sm" variant={period === p.key ? "default" : "ghost"} aria-pressed={period === p.key} onClick={() => setPeriod(p.key)}>
@@ -87,8 +83,7 @@ export function ReportsContainer() {
           <Button variant="outline" size="sm" className="gap-2" onClick={downloadCsv} disabled={!report || loading || customInvalid}>
             <Download className="size-4" /> Download CSV
           </Button>
-        </div>
-      </header>
+      </AdminPageHeader>
 
       {period === "custom" && (
         <div className="flex flex-wrap items-end gap-3">

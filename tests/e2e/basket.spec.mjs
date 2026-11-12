@@ -249,13 +249,14 @@ test("removing every line closes the basket, and changing the date clears it", a
   await basket(page).getByRole("button", { name: /^Remove COURT 1 / }).click();
   await expect(basket(page).getByText("· 1 court, 1 hr total")).toBeVisible();
   await basket(page).getByRole("button", { name: /^Remove COURT 2 / }).click();
-  await expect(basket(page)).toHaveCount(0);
+  // On desktop the panel stays beside the grid, empty; on a phone it closes
+  await expect(basket(page).getByText("Nothing picked yet")).toBeVisible();
 
   await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
   await expect(basket(page)).toBeVisible();
   await page.getByRole("button", { name: "Next day" }).click();
   await expect(page.getByText("Selection cleared for the new date.")).toBeVisible();
-  await expect(basket(page)).toHaveCount(0);
+  await expect(basket(page).getByText("Nothing picked yet")).toBeVisible();
 });
 
 test("on a phone the basket keeps checkout in view without covering the last grid row @mobile", async ({ page }) => {

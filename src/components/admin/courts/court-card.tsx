@@ -68,9 +68,18 @@ interface CourtCardProps {
   today?: { current: CourtBooking | null; next: CourtBooking | null };
   onEdit?: (court: Court) => void;
   onDelete?: (court: Court) => void;
+  /** Open applies at once; Maintenance and Closed open the edit dialog on that status */
+  onSetStatus?: (court: Court, status: "active" | "maintenance" | "closed") => void;
 }
 
-export const CourtCard = ({ court, today, onEdit, onDelete }: CourtCardProps) => {
+const STATUS_BUTTONS: { value: "active" | "maintenance" | "closed"; label: string }[] = [
+  { value: "active", label: "Open" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "closed", label: "Closed" },
+];
+
+export const CourtCard = ({ court, today, onEdit, onDelete, onSetStatus }: CourtCardProps) => {
+  const current = court.status === "maintenance" || court.status === "closed" ? court.status : "active";
   const status = statusConfig[court.status?.toLowerCase()] ?? statusConfig.active;
   const { label, description, className, barColor, Icon } = status;
   const inMaintenance = court.status?.toLowerCase() === "maintenance";
@@ -138,7 +147,24 @@ export const CourtCard = ({ court, today, onEdit, onDelete }: CourtCardProps) =>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="px-4 pt-0 pb-4">
+      <CardContent className="px-4 pt-0 pb-4 flex flex-col gap-3">
+        {onSetStatus && (
+          <div role="group" aria-label={`${court.name} status`} className="flex gap-0.5 rounded-lg bg-muted p-0.5">
+            {STATUS_BUTTONS.map((b) => (
+              <button
+                key={b.value}
+                type="button"
+                aria-pressed={current === b.value}
+                onClick={() => current !== b.value && onSetStatus(court, b.value)}
+                className={`flex-1 min-h-9 rounded-md text-xs font-semibold transition-colors ${
+                  current === b.value ? "bg-card shadow-xs " + (b.value === "active" ? "text-primary" : b.value === "maintenance" ? "text-amber-800" : "text-foreground") : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        )}
         {inMaintenance ? (
           <p className="text-xs text-muted-foreground">{maintenanceLine}</p>
         ) : (

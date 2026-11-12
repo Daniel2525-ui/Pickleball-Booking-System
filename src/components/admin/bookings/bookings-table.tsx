@@ -33,7 +33,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { fetchBookings, BOOKINGS_PAGE_SIZE } from "@/lib/services/bookings/filterBookingsData.service";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,8 @@ import { MoveBookingModal, MovedBooking } from "./moveBookingModal";
 import { BookingHistoryModal } from "./bookingHistoryModal";
 import { CancelPaidModal } from "./cancelPaidModal";
 import { getBookingStart, getBookingEnd } from "@/lib/utils/bookingTime";
-import { ArrowRightLeft, History } from "lucide-react";
+import { ArrowRightLeft, History, PanelRight } from "lucide-react";
+import { BookingDetailsSheet, type BookingAction } from "./booking-details-sheet";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { groupByCheckout, checkoutTotal } from "@/lib/services/bookings/basket";
 import { bookingPaymentLabel } from "@/lib/services/payments/paymentsTypes";
@@ -122,6 +123,9 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
   const [moveBooking, setMoveBooking] = useState<Booking | null>(null);
   const [historyBooking, setHistoryBooking] = useState<Booking | null>(null);
   const [cancelPaid, setCancelPaid] = useState<Booking | null>(null);
+  // By id, so the panel shows the row as it is after an action or a live refresh
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+  const detailsBooking = bookingsData.find((b) => b.id === detailsId) ?? null;
 
   const handleMoved = (bookingId: string, moved: MovedBooking, courtName: string) =>
     setBookingsData((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...moved, courts: { name: courtName } } : b)));
@@ -263,6 +267,47 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
     setActionLoadingId(null);
   };
 
+  // What the desk can do with a booking now. The row menu and the details panel both show this list.
+  const actionsFor = (booking: Booking): BookingAction[] => {
+    const payment = firstPayment(booking);
+    const displayStatus = getBookingDisplayStatus(booking);
+    const status = booking.status?.toLowerCase();
+    // An expired online hold cannot be revived at the counter (settle_counter_payment refuses it)
+    // Spot rows are settled through the session's players (court-reserving rows are filtered out by fetchBookings)
+    const isSpot = !!booking.open_play_spots;
+    const canCollect = !isSpot && payment?.status === "pending" && displayStatus !== "hold_expired" && booking.status !== "cancelled";
+    const busy = actionLoadingId === booking.id;
+    const list: BookingAction[] = [];
+    if (canCollect) {
+      list.push({ key: "collect", label: "Collect Payment", icon: CircleDollarSign, tone: "text-emerald-600 focus:text-emerald-600",
+        onClick: () => { setSelectedBookingForSettle(booking); setSettleModalOpen(true); } });
+    }
+    if (status === "confirmed") {
+      list.push({ key: "checkin", label: "Check In Player", icon: busy ? Loader2 : UserCheck, tone: "text-blue-600 focus:text-blue-600",
+        disabled: busy || !!blockReason("checked_in", booking), title: blockReason("checked_in", booking) ?? undefined,
+        onClick: () => handleStatusChange(booking, "checked_in") });
+    }
+    // Move to another court or time before it starts (move_booking re-checks every rule)
+    if (status === "confirmed" && !isSpot && getBookingStart(booking) > new Date()) {
+      list.push({ key: "move", label: "Move Booking", icon: ArrowRightLeft, onClick: () => setMoveBooking(booking) });
+    }
+    if (status === "confirmed") {
+      list.push({ key: "noshow", label: "Mark No-Show", icon: AlertTriangle, tone: "text-orange-600 focus:text-orange-600", disabled: busy,
+        onClick: () => handleStatusChange(booking, "no_show") });
+    }
+    // Contingency: staff forgot to check in a group that played
+    if (status === "no_show") {
+      list.push({ key: "played", label: "Mark as Played", icon: busy ? Loader2 : CheckCircle2, tone: "text-emerald-600 focus:text-emerald-600",
+        disabled: busy || !!blockReason("completed", booking), title: blockReason("completed", booking) ?? undefined,
+        onClick: () => handleStatusChange(booking, "completed") });
+    }
+    if (status !== "cancelled") {
+      list.push({ key: "cancel", label: "Cancel Reservation", icon: XCircle, destructive: true, tone: "text-destructive focus:text-destructive",
+        disabled: busy, onClick: () => handleCancelBooking(booking) });
+    }
+    return list;
+  };
+
   const renderPaymentBadge = (booking: Booking) => {
     const payment = firstPayment(booking);
     if (!payment) return null;
@@ -383,12 +428,8 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
                       </TableRow>
                     ),
                     ...courts.map((booking) => {
-                  const payment = firstPayment(booking);
                   const displayStatus = getBookingDisplayStatus(booking);
-                  // An expired online hold cannot be revived at the counter (settle_counter_payment refuses it)
-                  // Spot rows are settled through the session's players (court-reserving rows are filtered out by fetchBookings)
                   const isSpot = !!booking.open_play_spots;
-                  const canCollect = !isSpot && payment?.status === "pending" && displayStatus !== "hold_expired" && booking.status !== "cancelled";
 
                   return (
                     <TableRow key={booking.id} className="group">
@@ -397,9 +438,13 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
                         {/* A grouped line's player and ref are on its header line */}
                         {grouped ? null : (
                         <div className="flex flex-col">
-                          <span className="font-semibold text-foreground text-sm">
+                          <button
+                            type="button"
+                            onClick={() => setDetailsId(booking.id)}
+                            className="w-fit text-left font-semibold text-foreground text-sm hover:text-primary hover:underline underline-offset-4"
+                          >
                             {booking.customer_name || booking.profiles?.full_name || "Guest Player"}
-                          </span>
+                          </button>
                           <span className="text-[11px] text-muted-foreground">
                             {booking.customer_id ? "Walk-In Guest" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(booking)}</span>
                             {(booking.basket_size ?? 1) > 1 && (
@@ -480,85 +525,28 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
                                 Actions
                               </DropdownMenuLabel>
 
-                              {/* Collect Payment Action if Unpaid */}
-                              {canCollect && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedBookingForSettle(booking);
-                                    setSettleModalOpen(true);
-                                  }}
-                                  className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
-                                >
-                                  <CircleDollarSign className="mr-2 h-4 w-4" />
-                                  Collect Payment
-                                </DropdownMenuItem>
-                              )}
-
+                              <DropdownMenuItem onClick={() => setDetailsId(booking.id)} className="cursor-pointer text-xs font-semibold">
+                                <PanelRight className="mr-2 h-4 w-4" />
+                                Details
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setHistoryBooking(booking)} className="cursor-pointer text-xs font-semibold">
                                 <History className="mr-2 h-4 w-4" />
                                 History
                               </DropdownMenuItem>
-
-                              {/* Move to another court or time before it starts (move_booking re-checks every rule) */}
-                              {booking.status?.toLowerCase() === "confirmed" && !isSpot && getBookingStart(booking) > new Date() && (
-                                <DropdownMenuItem
-                                  onClick={() => setMoveBooking(booking)}
-                                  className="cursor-pointer text-xs font-semibold"
-                                >
-                                  <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                  Move Booking
-                                </DropdownMenuItem>
-                              )}
-
-                              {/* Game-Day Actions */}
-                              {booking.status?.toLowerCase() === "confirmed" && (
-                                <>
+                              {actionsFor(booking).map((action) => (
+                                <Fragment key={action.key}>
+                                  {action.destructive && <DropdownMenuSeparator />}
                                   <DropdownMenuItem
-                                    onClick={() => handleStatusChange(booking, "checked_in")}
-                                    disabled={actionLoadingId === booking.id || !!blockReason("checked_in", booking)}
-                                    title={blockReason("checked_in", booking) ?? undefined}
-                                    className="cursor-pointer text-blue-600 focus:text-blue-600 text-xs font-semibold"
+                                    onClick={action.onClick}
+                                    disabled={action.disabled}
+                                    title={action.title}
+                                    className={`cursor-pointer text-xs font-semibold ${action.tone ?? ""}`}
                                   >
-                                    {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCheck className="mr-2 h-4 w-4" />}
-                                    Check In Player
+                                    <action.icon className={`mr-2 h-4 w-4 ${action.icon === Loader2 ? "animate-spin" : ""}`} />
+                                    {action.label}
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleStatusChange(booking, "no_show")}
-                                    disabled={actionLoadingId === booking.id}
-                                    className="cursor-pointer text-orange-600 focus:text-orange-600 text-xs font-semibold"
-                                  >
-                                    <AlertTriangle className="mr-2 h-4 w-4" />
-                                    Mark No-Show
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-
-                              {/* Contingency: staff forgot to check in a group that played */}
-                              {booking.status?.toLowerCase() === "no_show" && (
-                                <DropdownMenuItem
-                                  onClick={() => handleStatusChange(booking, "completed")}
-                                  disabled={actionLoadingId === booking.id || !!blockReason("completed", booking)}
-                                  title={gameDayBlockReason("completed", booking) ?? undefined}
-                                  className="cursor-pointer text-emerald-600 focus:text-emerald-600 text-xs font-semibold"
-                                >
-                                  {actionLoadingId === booking.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                                  Mark as Played
-                                </DropdownMenuItem>
-                              )}
-
-                              {booking.status?.toLowerCase() !== "cancelled" && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleCancelBooking(booking)}
-                                    disabled={actionLoadingId === booking.id}
-                                    className="cursor-pointer text-destructive focus:text-destructive text-xs font-semibold"
-                                  >
-                                    <XCircle className="mr-2 h-4 w-4" />
-                                    Cancel Reservation
-                                  </DropdownMenuItem>
-                                </>
-                              )}
+                                </Fragment>
+                              ))}
                             </DropdownMenuGroup>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -598,6 +586,14 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
       <BookingHistoryModal booking={historyBooking} onClose={() => setHistoryBooking(null)} />
 
       <MoveBookingModal booking={moveBooking} onClose={() => setMoveBooking(null)} onMoved={handleMoved} />
+
+      <BookingDetailsSheet
+        booking={detailsBooking}
+        status={detailsBooking ? capitalize(getBookingDisplayStatus(detailsBooking)) : ""}
+        statusClass={detailsBooking ? getStatusColor(getBookingDisplayStatus(detailsBooking)) : ""}
+        actions={detailsBooking ? actionsFor(detailsBooking) : []}
+        onClose={() => setDetailsId(null)}
+      />
 
     </>
   );
