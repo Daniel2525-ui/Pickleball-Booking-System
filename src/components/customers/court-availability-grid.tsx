@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { Clock, LoaderCircle, ChevronDown, Moon } from "lucide-react";
+import { Check, Clock, LoaderCircle, ChevronDown, Moon } from "lucide-react";
 import { Slot } from "./types";
 import { SlotStatus } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { hourRangeLabel } from "@/lib/services/bookings/quickStarts";
@@ -25,7 +25,8 @@ interface CourtAvailabilityGridProps {
 // Shared looks for each state (desktop cell and phone row)
 const LOOK = {
   available: "bg-card border-[1.5px] border-primary/35 text-primary hover:bg-primary/10 hover:border-primary",
-  selected: "bg-primary text-primary-foreground border border-primary",
+  // A pick is outlined, not filled: each hour stays its own cell with its own price
+  selected: "bg-card border-2 border-primary text-primary ring-2 ring-primary/25 hover:bg-primary/5",
   user_pending: "bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200",
   pending: "bg-amber-50 text-amber-900 border border-amber-200",
   booked: "bg-[repeating-linear-gradient(135deg,#EDF0EE_0_6px,#E3E7E5_6px_12px)] text-muted-foreground",
@@ -72,8 +73,7 @@ export const CourtAvailabilityGrid = ({
   const visibleSlots = showPassed ? timeSlots : timeSlots.slice(passedCount);
   const headingBefore = (i: number) => showHeadings && headingOf!(visibleSlots[i]) !== (i > 0 ? headingOf!(visibleSlots[i - 1]) : null);
 
-  // The basket line covering this cell, and whether the cell is that line's first hour (where its label goes).
-  // By slot position, not clock time: a line can run past midnight (11 PM - 1 AM).
+  // The basket line covering this cell. By slot position, not clock time: a line can run past midnight (11 PM - 1 AM).
   const spanOf = (l: Slot) => {
     const s = timeSlots.indexOf(l.startSlot || l.time);
     return [s, s + (l.duration || 1)] as const;
@@ -86,8 +86,6 @@ export const CourtAvailabilityGrid = ({
       return i >= s && i < e;
     });
   };
-  const isFirst = (line: Slot, time: string) => timeSlots.indexOf(time) === spanOf(line)[0];
-  const isLast = (line: Slot, time: string) => timeSlots.indexOf(time) === spanOf(line)[1] - 1;
 
   const passedToggle = passedCount > 0 && (
     <button
@@ -166,8 +164,9 @@ export const CourtAvailabilityGrid = ({
                       className={`w-full min-h-14 rounded-xl px-4 flex items-center justify-between gap-3 text-[15px] font-semibold transition-colors ${line ? LOOK.selected : lookOf(status)}`}
                     >
                       <span>{time}</span>
-                      <span className="text-sm">
-                        {line ? "Selected" : status === "user_pending" ? "Resume" : `₱${priceOf?.(time).toLocaleString() ?? ""}${peakOf?.(time) ? " · peak" : ""}`}
+                      <span className="text-sm inline-flex items-center gap-1.5">
+                        {line && <Check className="size-4" aria-hidden />}
+                        {status === "user_pending" && !line ? "Resume" : `₱${priceOf?.(time).toLocaleString() ?? ""}${peakOf?.(time) ? " · peak" : ""}`}
                       </span>
                     </button>
                   ) : (
@@ -206,30 +205,17 @@ export const CourtAvailabilityGrid = ({
                   const status = getSlotStatus(selectedDate, court, time);
                   const line = lineAt(court, time);
                   if (line) {
-                    // One booking is one block: its hours join up, only the ends are rounded, the label sits on top
-                    const first = isFirst(line, time);
-                    const last = isLast(line, time);
-                    const hours = line.duration || 1;
                     return (
-                      <div key={court} className={`border-l border-border/60 px-1 ${first ? "pt-1" : ""} ${last ? "pb-1" : ""}`}>
+                      <div key={court} className="border-l border-border/60 p-1">
                         <button
                           type="button"
                           onClick={() => onSlotClick(court, time)}
                           aria-label={`Selected ${court} at ${time}. Click to deselect.`}
-                          // Past the row's top border, so the block has no seam between its hours
-                          style={first ? undefined : { marginTop: -1, height: "calc(100% + 1px)" }}
-                          className={`relative w-full h-full min-h-12 text-xs font-semibold flex flex-col items-center justify-center ${LOOK.selected} hover:bg-primary/90 ${
-                            first && last ? "rounded-lg" : first ? "rounded-t-lg rounded-b-none" : last ? "rounded-b-lg rounded-t-none" : "rounded-none"
-                          }`}
+                          aria-pressed
+                          className={`w-full h-full min-h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-ring ${LOOK.selected}`}
                         >
-                          {first ? (
-                            <>
-                              <span className="text-[13px]">{hourRangeLabel(line.time)}</span>
-                              <span className="text-[11px] opacity-90">{hours} {hours === 1 ? "hr" : "hrs"} · ₱{line.price.toLocaleString()}</span>
-                            </>
-                          ) : (
-                            <span className="sr-only">Selected</span>
-                          )}
+                          <Check className="size-4" aria-hidden />
+                          {priceOf ? `₱${priceOf(time).toLocaleString()}` : "Selected"}
                         </button>
                       </div>
                     );
@@ -278,7 +264,7 @@ export function GridLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
       {item("bg-card border-[1.5px] border-primary/35", "Free · price shown")}
-      {item("bg-primary", "Your pick")}
+      {item("bg-card border-2 border-primary ring-2 ring-primary/25", "Your pick")}
       {item("bg-amber-100 border border-amber-300", "Being paid")}
       {item("bg-[repeating-linear-gradient(135deg,#EDF0EE_0_4px,#D5DBD8_4px_8px)]", "Booked")}
       {item("bg-primary/5 border-[1.5px] border-dashed border-primary", "Open play")}
