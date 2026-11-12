@@ -28,3 +28,14 @@ test("checkSlotAvailability reports open_play for a session block row", () => {
     assert.equal(checkSlotAvailability("Court 1", slot, courts, [{ ...row, open_play: true }], date), "open_play");
     assert.equal(checkSlotAvailability("Court 1", slot, courts, [row], date), "booked");
 });
+
+test("the grid keeps the running hour open until it ends", () => {
+    const courts = [{ id: "c1", name: "Court 1", status: "active" }];
+    const now = new Date("2026-11-06T08:05:00+08:00");
+    const today = new Date("2026-11-06T12:00:00+08:00");
+    assert.equal(checkSlotAvailability("Court 1", "8:00 AM - 9:00 AM", courts, [], today, null, now), "available");
+    assert.equal(checkSlotAvailability("Court 1", "7:00 AM - 8:00 AM", courts, [], today, null, now), "passed");
+    assert.equal(checkSlotAvailability("Court 1", "8:00 AM - 9:00 AM", courts, [], today, null, new Date("2026-11-06T09:00:00+08:00")), "passed");
+    // 11 PM - 12 AM runs until midnight
+    assert.equal(checkSlotAvailability("Court 1", "11:00 PM - 12:00 AM", courts, [], today, null, new Date("2026-11-06T23:40:00+08:00")), "available");
+});

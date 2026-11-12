@@ -190,7 +190,7 @@ test("operating hours validation enforces opening and closing boundaries", () =>
 });
 
 // 7. Past Dates and Times Validation (Production validateBookingSlot & getBookingStart)
-test("past date and time validation blocks slots that have already started or passed in Asia/Manila", () => {
+test("past date and time validation blocks slots whose first hour has ended in Asia/Manila", () => {
     const referenceNow = new Date("2026-10-24T10:30:00+08:00");
 
     // Past date (yesterday)
@@ -217,7 +217,7 @@ test("past date and time validation blocks slots that have already started or pa
         false
     );
 
-    // Same day, currently in-progress (10:00 vs 10:30)
+    // Same day, the running hour (10:00 vs 10:30) stays bookable until it ends
     assert.equal(
         validateBookingSlot({
         limits: { min_hours: 1, max_hours: 3 },
@@ -226,7 +226,7 @@ test("past date and time validation blocks slots that have already started or pa
             endTime: "11:00",
             now: referenceNow,
         }).valid,
-        false
+        true
     );
 
     // Same day, future time (11:00 vs 10:30)
@@ -376,4 +376,15 @@ test("heldOnTheirDates checks the database held each line on its own date", () =
     assert.equal(heldOnTheirDates(lines, [item("c1", "2026-11-06", "23:00:00"), item("c1", "2026-11-07", "00:00:00")]), true);
     assert.equal(heldOnTheirDates(lines, [item("c1", "2026-11-06", "23:00:00"), item("c1", undefined, "00:00:00")]), false);
     assert.equal(heldOnTheirDates(lines, [item("c1", "2026-11-06", "23:00:00"), item("c1", "2026-11-06", "00:00:00")]), false);
+});
+
+// An hour stays bookable until it ends: at 8:05 AM the 8-9 AM slot is still open
+test("a slot can be booked until its first hour ends", () => {
+    const at = (t) => new Date(`2026-11-06T${t}:00+08:00`);
+    const slot = { bookingDate: "2026-11-06", startTime: "08:00", endTime: "09:00", limits: { min_hours: 1 } };
+    assert.equal(validateBookingSlot({ ...slot, now: at("08:05") }).valid, true);
+    assert.equal(validateBookingSlot({ ...slot, now: at("08:59") }).valid, true);
+    assert.deepEqual(validateBookingSlot({ ...slot, now: at("09:00") }), { valid: false, error: "The requested time slot has already passed." });
+    // A longer booking that started an hour ago or more is refused even though it hasn't ended
+    assert.equal(validateBookingSlot({ ...slot, endTime: "11:00", now: at("09:30") }).valid, false);
 });

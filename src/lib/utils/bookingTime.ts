@@ -14,6 +14,13 @@ export interface BookingTimeFields {
 /**
  * Returns the booking's start as an absolute Date instant, interpreting date/time in Asia/Manila (+08:00).
  */
+/**
+ * The last moment a booking can be made or paid for: the end of its first hour (at 8:05 AM, 8-9 AM is still open).
+ * Must match hold_court_booking and reconcile_booking_payment (20261113010000_book_running_hour).
+ */
+export const bookableUntil = (booking: Pick<BookingTimeFields, "booking_date" | "start_time">): Date =>
+    new Date(getBookingStart(booking).getTime() + 60 * 60_000);
+
 export const getBookingStart = (
     booking: Pick<BookingTimeFields, "booking_date" | "start_time">
 ): Date => {

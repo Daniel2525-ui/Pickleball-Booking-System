@@ -104,14 +104,14 @@ export const checkSlotAvailability = (
     courts: Court[],
     bookings: BookingSlot[],
     date: Date,
-    currentUserId?: string | null
+    currentUserId?: string | null,
+    now: Date = new Date()
 ): SlotStatus => {
     const court = courts.find((court) => court.name === courtName);
 
     if (!court || court.status === "closed") return "closed";
     if (court.status === "maintenance") return "maintenance";
 
-    const now = new Date();
     const today = manilaDateFormatter.format(now);
     const slotDate = manilaDateFormatter.format(date);
 
@@ -125,9 +125,10 @@ export const checkSlotAvailability = (
             hour12: false,
         });
 
-        const { start } = slotTimes(timeRange);
+        // The running hour stays open until it ends (at 8:05 AM, 8-9 AM is still bookable); 12 AM ends as "24:00"
+        const { end } = slotTimes(timeRange);
 
-        if (start <= currentTime) return "passed";
+        if (end <= currentTime) return "passed";
     }
 
     const matchingBookings = getOverlappingBookings(

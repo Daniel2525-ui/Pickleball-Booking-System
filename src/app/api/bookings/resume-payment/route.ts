@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { getPaymentRequest } from "@/lib/xendit";
 import { createClient } from "@/lib/supabase/server";
-import { getBookingStart } from "@/lib/utils/bookingTime.ts";
+import { bookableUntil } from "@/lib/utils/bookingTime.ts";
 import { getServiceClient } from "@/lib/supabase/service";
 import { loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
@@ -123,8 +123,8 @@ export async function POST(request: NextRequest) {
         }
 
         for (const line of siblings) {
-            // 5. Check if the scheduled match time has already passed
-            if (getBookingStart(line) <= new Date()) {
+            // 5. Check the booking can still be paid for: its first hour hasn't ended
+            if (bookableUntil(line) <= new Date()) {
                 return Response.json(
                     { error: "The scheduled match time has already passed." },
                     { status: 409 }

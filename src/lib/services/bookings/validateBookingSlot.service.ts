@@ -1,4 +1,4 @@
-import { getBookingStart, shiftDate } from "../../utils/bookingTime.ts";
+import { bookableUntil, shiftDate } from "../../utils/bookingTime.ts";
 
 export interface ValidateBookingSlotParams {
     bookingDate: string;
@@ -88,8 +88,8 @@ export const validateBookingSlot = (
         }
     }
 
-    const startInstant = getBookingStart({ booking_date: bookingDate, start_time: startTimeDb });
-    if (Number.isNaN(startInstant.getTime()) || startInstant <= now) {
+    const closesAt = bookableUntil({ booking_date: bookingDate, start_time: startTimeDb });
+    if (Number.isNaN(closesAt.getTime()) || closesAt <= now) {
         return { valid: false, error: "The requested time slot has already passed." };
     }
 
