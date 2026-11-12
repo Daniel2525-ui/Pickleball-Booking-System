@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { lineKey, mergeSpans, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
+import { lineKey, mergeSpans, splitAtMidnight, removeLine, basketTotal, pendingBasketSize, splitTakenLines, groupByCheckout, checkoutTotal, settleHold } from "../src/lib/services/bookings/basket.ts";
 
 const a = { court: "Court 1", price: 200, hasPeak: false, startSlot: "8:00 AM - 9:00 AM" };
 const b = { court: "Court 2", price: 300, hasPeak: true, startSlot: "8:00 AM - 9:00 AM" };
@@ -63,4 +63,16 @@ test("mergeSpans joins touching ranges on a court, however long the result", () 
     // No maximum length: a whole day joins into one booking
     assert.deepEqual(mergeSpans([[0, 6], [6, 14]]), [[0, 14]]);
     assert.deepEqual(mergeSpans([]), []);
+});
+
+test("splitAtMidnight stores a run across midnight as two bookings, one on each date", () => {
+    const friday = ["10:00 PM - 11:00 PM", "11:00 PM - 12:00 AM", "12:00 AM - 1:00 AM", "1:00 AM - 2:00 AM"];
+    assert.deepEqual(splitAtMidnight(friday, [1, 3], "2026-11-06"), [
+        { booking_date: "2026-11-06", start_time: "23:00", end_time: "24:00" },
+        { booking_date: "2026-11-07", start_time: "00:00", end_time: "01:00" },
+    ]);
+    assert.deepEqual(splitAtMidnight(friday, [2, 4], "2026-11-06"), [{ booking_date: "2026-11-07", start_time: "00:00", end_time: "02:00" }]);
+    assert.deepEqual(splitAtMidnight(friday, [0, 1], "2026-11-06"), [{ booking_date: "2026-11-06", start_time: "22:00", end_time: "23:00" }]);
+    assert.deepEqual(splitAtMidnight(friday, [0, 2], "2026-11-30"), [{ booking_date: "2026-11-30", start_time: "22:00", end_time: "24:00" }]);
+    assert.deepEqual(splitAtMidnight(friday, [3, 4], "2026-12-31"), [{ booking_date: "2027-01-01", start_time: "01:00", end_time: "02:00" }]);
 });

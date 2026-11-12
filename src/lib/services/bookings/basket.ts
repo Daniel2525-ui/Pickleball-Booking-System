@@ -1,10 +1,28 @@
 /** Pure helpers for the customer's basket: one line per time range, so a court can appear several times. */
 import { slotTimes } from "./checkSlotAvailability.service.ts";
+import { shiftDate } from "../../utils/bookingTime.ts";
 
 /** Where a business day's slots go past midnight: the slot after the one ending at 12 AM, or the end of the list. */
 export const midnightIndex = (timeSlots: string[]) => {
   const i = timeSlots.findIndex((t) => slotTimes(t).end === "24:00");
   return i === -1 ? timeSlots.length : i + 1;
+};
+
+/**
+ * A picked run [start, end) of a business day's slots as stored bookings: a booking never crosses midnight,
+ * so a run over it becomes one booking ending 24:00 on `date` and one from 00:00 on the next date.
+ */
+export const splitAtMidnight = (timeSlots: string[], [start, end]: readonly [number, number], date: string) => {
+  const midnight = midnightIndex(timeSlots);
+  const part = (s: number, e: number, bookingDate: string) => ({
+    booking_date: bookingDate,
+    start_time: slotTimes(timeSlots[s]).start,
+    end_time: slotTimes(timeSlots[e - 1]).end,
+  });
+  return [
+    ...(start < midnight ? [part(start, Math.min(end, midnight), date)] : []),
+    ...(end > midnight ? [part(Math.max(start, midnight), end, shiftDate(date, 1))] : []),
+  ];
 };
 type Line = { court: string; price: number; hasPeak?: boolean; startSlot?: string; time?: string };
 
