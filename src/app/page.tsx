@@ -7,8 +7,6 @@ import { FAQSection } from "@/components/customers/faq-section";
 import { CourtsShowcase } from "@/components/customers/courts-showcase";
 import { getPublicClient } from "@/lib/supabase/public";
 import { summarizeVenueHours } from "@/lib/utils/venueHours";
-import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
-import { lowestHourlyRate } from "@/lib/services/pricing/quoteCourtPrice";
 import { VENUE_CITY, VENUE_NAME, brandInitials } from "@/lib/brand";
 import { CourtRally } from "@/components/court-lines";
 import { OpenNowBadge, OpenNowText } from "@/components/customers/open-now-badge";
@@ -19,22 +17,13 @@ export const revalidate = 300;
 export default async function Home() {
   // Anonymous read of public tables (same access the guest booking grid uses)
   const supabase = getPublicClient();
-  const [{ data: operatingHours }, { data: courtRows }, { data: pricing }] = await Promise.all([
+  const [{ data: operatingHours }, { data: courtRows }] = await Promise.all([
     supabase.from("operating_hours").select("day_of_week, is_open, open_time, close_time"),
     supabase.from("courts").select("id, name, status, maintenance_note, photo_url, details").order("name"),
-    fetchPricing(supabase),
   ]);
   const venue = await fetchVenueContact(supabase);
   const hours = summarizeVenueHours(operatingHours ?? []);
-  const fromRate = pricing ? lowestHourlyRate(pricing) : null;
   const courts = courtRows ?? [];
-  const courtCount = courts.length;
-
-  const stats = [
-    { value: courtCount ? String(courtCount) : "—", label: courtCount === 1 ? "court" : "courts" },
-    { value: fromRate ? `from ₱${fromRate.toLocaleString()}` : "—", label: "per court, per hour" },
-    { value: "15 min", label: "hold while you pay" },
-  ];
   const mapQuery = encodeURIComponent(`${VENUE_NAME}, ${venue.address}`);
 
   return (
@@ -47,10 +36,10 @@ export default async function Home() {
             <div className="flex flex-col gap-5">
               <p className="text-sm font-bold uppercase tracking-[0.12em] opacity-85">{VENUE_NAME} · {VENUE_CITY}</p>
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-[0.98] tracking-tight text-balance">
-                Dink. Drive.<br />Book in a minute.
+                Book. Pay. Play.
               </h1>
               <p className="text-lg opacity-90 max-w-[42ch] leading-relaxed">
-                See every court live, pick your hours, and pay with QR Ph using GCash, Maya or your bank app. Your booking is confirmed the moment you pay.
+                Pick a court, pay with QR Ph, and you&apos;re confirmed.
               </p>
               <div className="flex flex-wrap gap-3">
                 <a href="#booking" className="inline-flex min-h-12 items-center rounded-xl bg-primary-foreground px-6 text-base font-bold text-primary hover:opacity-90 transition-opacity">
@@ -65,14 +54,6 @@ export default async function Home() {
             <div className="flex flex-col gap-3">
               <OpenNowBadge hours={operatingHours ?? []} />
               <CourtRally className="w-full h-auto" />
-              <dl className="flex flex-wrap gap-3">
-                {stats.map((s) => (
-                  <div key={s.label} className="flex flex-col-reverse rounded-xl bg-card text-card-foreground px-4 py-2.5 shadow-lg">
-                    <dt className="text-xs text-muted-foreground">{s.label}</dt>
-                    <dd className="font-display font-bold">{s.value}</dd>
-                  </div>
-                ))}
-              </dl>
             </div>
           </div>
         </section>
