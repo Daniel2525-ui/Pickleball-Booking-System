@@ -382,8 +382,16 @@ export const BookingContainer = () => {
   // The day strip starts on the night still running: at 12:30 AM a day open till 2 AM is still "Today"
   const firstDay = dayStart(bookingToday(operatingHours, pricing?.settings.day_ends_at, new Date(), closures.map((c) => c.closed_on)));
   const isToday = selectedDate.toDateString() === firstDay.toDateString();
-  // The strip shows a week at a time and pages along with the chosen date, so any later date is in it
-  const weekStart = plusDays(firstDay, Math.max(0, Math.floor(Math.round((dayStart(selectedDateStr).getTime() - firstDay.getTime()) / 86_400_000) / 7)) * 7);
+  // The strip scrolls through four weeks from today, and stretches to a week past any later date picked
+  const selectedAhead = Math.round((dayStart(selectedDateStr).getTime() - firstDay.getTime()) / 86_400_000);
+  const stripDays = Math.max(28, selectedAhead + 7);
+  const stripRef = useRef<HTMLDivElement>(null);
+  // Keep the chosen day centred in the strip; scrolls the strip only, never the page
+  useEffect(() => {
+    const strip = stripRef.current;
+    const chip = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (strip && chip) strip.scrollTo({ left: chip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2, behavior: "smooth" });
+  }, [selectedDateStr, loading]);
   const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
   // The day's own closing time when it has one (2 AM for a late close, not the midnight its last slot here ends at)
   const ownClose = operatingHours.find((h) => h.day_of_week === dayName && h.is_open)?.close_time;
@@ -543,10 +551,10 @@ export const BookingContainer = () => {
           >
             <ChevronLeft className="size-4" />
           </button>
-          <div className="flex-1 overflow-x-auto scrollbar-none">
+          <div ref={stripRef} className="relative flex-1 overflow-x-auto scrollbar-none">
             <div className="flex gap-2 pb-1">
-              {Array.from({ length: 7 }).map((_, i) => {
-                const d = plusDays(weekStart, i);
+              {Array.from({ length: stripDays }).map((_, i) => {
+                const d = plusDays(firstDay, i);
                 const ahead = Math.round((d.getTime() - firstDay.getTime()) / 86_400_000);
                 const isSelected = d.toDateString() === selectedDate.toDateString();
                 const sub = dayNote(d);
