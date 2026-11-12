@@ -381,6 +381,8 @@ export const BookingContainer = () => {
   // The day strip starts on the night still running: at 12:30 AM a day open till 2 AM is still "Today"
   const firstDay = dayStart(bookingToday(operatingHours, pricing?.settings.day_ends_at, new Date(), closures.map((c) => c.closed_on)));
   const isToday = selectedDate.toDateString() === firstDay.toDateString();
+  // The strip shows a week at a time and pages along with the chosen date, so any later date is in it
+  const weekStart = plusDays(firstDay, Math.max(0, Math.floor(Math.round((dayStart(selectedDateStr).getTime() - firstDay.getTime()) / 86_400_000) / 7)) * 7);
   const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
   // The day's own closing time when it has one (2 AM for a late close, not the midnight its last slot here ends at)
   const ownClose = operatingHours.find((h) => h.day_of_week === dayName && h.is_open)?.close_time;
@@ -531,12 +533,13 @@ export const BookingContainer = () => {
           <div className="flex-1 overflow-x-auto scrollbar-none">
             <div className="flex gap-2 pb-1">
               {Array.from({ length: 7 }).map((_, i) => {
-                const d = plusDays(firstDay, i);
+                const d = plusDays(weekStart, i);
+                const ahead = Math.round((d.getTime() - firstDay.getTime()) / 86_400_000);
                 const isSelected = d.toDateString() === selectedDate.toDateString();
                 const sub = dayNote(d);
                 return (
                   <button
-                    key={i}
+                    key={ahead}
                     onClick={() => setSelectedDate(d)}
                     aria-pressed={isSelected}
                     className={`shrink-0 min-w-24 flex flex-col items-start px-3.5 py-2 rounded-xl text-left transition-colors border ${
@@ -544,7 +547,7 @@ export const BookingContainer = () => {
                     }`}
                   >
                     <span className="text-[11px] font-semibold opacity-85">
-                      {i === 0 ? "Today" : i === 1 ? "Tmrw" : d.toLocaleDateString("en-US", { weekday: "short" })}
+                      {ahead === 0 ? "Today" : ahead === 1 ? "Tmrw" : d.toLocaleDateString("en-US", { weekday: "short" })}
                     </span>
                     <span className="text-base font-bold">{d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                     <span className={`text-[11px] font-semibold ${isSelected ? "" : sub.closed ? "" : "text-primary"}`}>{sub.text}</span>

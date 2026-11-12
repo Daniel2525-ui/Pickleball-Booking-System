@@ -34,3 +34,16 @@ test("pages fit a phone screen without horizontal scroll @mobile", async ({ page
     expect(overflow, `${path} overflows by ${overflow}px`).toBeLessThanOrEqual(0);
   }
 });
+
+test("the day strip follows the chosen date past the first week", async ({ page }) => {
+  await page.goto("/#booking", { waitUntil: "load" });
+  const strip = page.getByRole("button", { pressed: true }).filter({ hasText: /Today|Tmrw|Mon|Tue|Wed|Thu|Fri|Sat|Sun/ });
+  await expect(strip).toHaveText(/Today/);
+  // Ten days ahead, one tap at a time: the strip moves along and still marks the chosen day
+  for (let i = 0; i < 10; i++) await page.getByRole("button", { name: "Next day" }).click();
+  const target = new Date(Date.now() + 10 * 86_400_000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "Asia/Manila" });
+  await expect(strip).toContainText(target);
+  // And back to the first week, where Today is again first
+  for (let i = 0; i < 10; i++) await page.getByRole("button", { name: "Previous day" }).click();
+  await expect(strip).toHaveText(/Today/);
+});
