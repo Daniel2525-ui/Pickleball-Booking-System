@@ -10,6 +10,9 @@ const HOLD_DATES_MISMATCH = "HOLD_DATES_MISMATCH";
 import { businessDayWindows } from "@/lib/services/schedule/hoursRules";
 import { openBasketCheckout, QR_PH_NOT_CONFIGURED } from "@/lib/services/payments/openBasketCheckout";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
+import { checkPlayerCount, maxPlayers, parseGuestDetails } from "@/lib/services/bookings/guestDetails";
+import { normaliseCode } from "@/lib/services/pricing/discounts";
+import { AUTH_LIMITS, checkRateLimit, clientIp, tooManyRequests } from "@/lib/rateLimit";
 
 interface HeldBasket {
     basket_id: string;
@@ -45,6 +48,36 @@ export async function POST(request: NextRequest) {
         const body = await request.json().catch(() => null);
         const booking_date = body?.booking_date;
         const lines: unknown = body?.lines;
+        const playerCount: unknown = body?.player_count;
+        const rawCode = typeof body?.discount_code === "string" ? body.discount_code.trim() : "";
+        const discountCode = rawCode ? normaliseCode(rawCode) : null;
+        if (rawCode && !discountCode) {
+            return Response.json({ error: "There is no such code." }, { status: 400 });
+        }
+
+        // A guest pays on an anonymous session: their details go on a guest profile (the confirmation email's
+        // address, and what the front desk sees). A signed-in player's profile is never touched here.
+        const isGuest = !!user.is_anonymous;
+        let guestEmail: string | null = null;
+        if (isGuest) {
+            const limit = await checkRateLimit(`guest-checkout:ip:${clientIp(request)}`, AUTH_LIMITS.guestCheckoutsPerIp);
+            if (!limit.allowed) return tooManyRequests("guest checkouts from this network", limit.retryAfterSeconds);
+            const guest = parseGuestDetails(body?.guest);
+            if (!guest.ok) return Response.json({ error: guest.error }, { status: 400 });
+            const admin = getServiceClient();
+            if (!admin) {
+                console.error("Guest checkout needs SUPABASE_SERVICE_ROLE_KEY to save the guest's details");
+                return Response.json({ error: "Guest checkout is not available right now. Please sign in to book." }, { status: 503 });
+            }
+            const { error: profileError } = await admin
+                .from("profiles")
+                .upsert({ id: user.id, role: "customer", is_guest: true, ...guest.value }, { onConflict: "id" });
+            if (profileError) {
+                console.error("Guest profile save failed:", profileError);
+                return Response.json({ error: "Could not save your details. Please try again." }, { status: 500 });
+            }
+            guestEmail = guest.value.email;
+        }
 
         if (typeof booking_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(booking_date) || Number.isNaN(Date.parse(booking_date))) {
             return Response.json(
@@ -64,7 +97,7 @@ export async function POST(request: NextRequest) {
         // The whole week: the business day's after-midnight hours come from its row but sit on the next date
         const [{ data: weeklyHours, error: opError }, { data: limits, error: limitsError }] = await Promise.all([
             supabase.from("operating_hours").select("day_of_week, is_open, open_time, close_time"),
-            supabase.from("booking_settings").select("min_hours").maybeSingle(),
+            supabase.from("booking_settings").select("min_hours, max_players_per_court").maybeSingle(),
         ]);
 
         if (opError || limitsError || !limits) {
@@ -91,6 +124,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // One count for the checkout, at most the per-court limit times its courts (hold_court_basket checks it too)
+        const playerError = checkPlayerCount(
+            playerCount,
+            maxPlayers(limits.max_players_per_court ?? 8, new Set(validation.lines.map((l) => l.courtId)).size)
+        );
+        if (playerError) return Response.json({ error: playerError }, { status: 400 });
+
         // Every payment id must fit in the session's metadata, which reconciliation trusts
         if (validation.lines.length > MAX_SESSION_PAYMENTS) {
             return Response.json(
@@ -114,6 +154,8 @@ export async function POST(request: NextRequest) {
                 end_time: l.endTimeDb,
             })),
             p_hold_expires_at: initialHoldExpiresAtIso,
+            p_player_count: playerCount,
+            p_discount_code: discountCode,
         });
 
         if (rpcError) {
@@ -133,6 +175,14 @@ export async function POST(request: NextRequest) {
                     { error: `${taken} was just taken. Nothing was reserved — please choose again.` },
                     { status: 409 }
                 );
+            }
+
+            if (msg.includes("DISCOUNT_INVALID")) {
+                return Response.json({ error: msg.replace(/^.*DISCOUNT_INVALID:\s*/, "") }, { status: 400 });
+            }
+
+            if (msg.includes("INVALID_PLAYER_COUNT")) {
+                return Response.json({ error: msg.replace(/^.*INVALID_PLAYER_COUNT:\s*/, "") + "." }, { status: 400 });
             }
 
             if (msg.includes("INVALID_DURATION")) {
@@ -198,7 +248,7 @@ export async function POST(request: NextRequest) {
         const { url, confirmError } = await openBasketCheckout({
             supabase,
             basketId: basket.basket_id,
-            customerEmail: user.email,
+            customerEmail: guestEmail ?? user.email,
             baseUrl: request.nextUrl.origin,
             lines: items.map((item) => ({
                 bookingId: item.booking_id,

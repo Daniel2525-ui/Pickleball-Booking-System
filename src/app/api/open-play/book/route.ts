@@ -15,6 +15,10 @@ export async function POST(request: NextRequest) {
         if (!user) {
             return Response.json({ error: "You must be logged in to book a spot." }, { status: 401 });
         }
+        // Guests (anonymous sessions) book courts only; open play needs an account
+        if (user.is_anonymous) {
+            return Response.json({ error: "Sign in or create an account to join open play." }, { status: 401 });
+        }
 
         const parsed = parseSpotRequest(await request.json().catch(() => null));
         if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });

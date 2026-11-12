@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
 
     // Pricing and Settings are the owner's; front-desk staff (role admin, not owner) use every other admin page
     const path = request.nextUrl.pathname
-    const ownerOnly = /^\/admin\/(pricing|settings|reports)(\/|$)/.test(path) || /^\/api\/admin\/pricing(\/|$)/.test(path)
+    const ownerOnly = /^\/admin\/(pricing|settings|reports|discounts)(\/|$)/.test(path) || /^\/api\/admin\/(pricing|discounts)(\/|$)/.test(path)
 
     // Protect /api/admin API routes — must be logged in + admin role
     if (request.nextUrl.pathname.startsWith('/api/admin')) {
@@ -64,8 +64,8 @@ export async function proxy(request: NextRequest) {
         }
     }
 
-    // Redirect logged-in users away from login page
-    if (request.nextUrl.pathname === '/login' && user) {
+    // Redirect logged-in users away from login page (a guest's anonymous session may still sign in)
+    if (request.nextUrl.pathname === '/login' && user && !user.is_anonymous) {
         const { data: profile } = await supabase
             .from('profiles').select('role').eq('id', user.id).single()
 
