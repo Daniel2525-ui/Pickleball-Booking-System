@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn, Calendar, Clock, QrCode, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { LoaderCircle, Calendar, Clock, QrCode, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -17,7 +17,8 @@ import { Slot } from "@/components/customers/types";
 import { DateSelector } from "@/components/customers/date-selector";
 import { CourtAvailabilityGrid, GridLegend } from "@/components/customers/court-availability-grid";
 import { VenueClosed } from "@/components/customers/venue-closed";
-import { BookingModal } from "@/components/customers/booking-modal";
+import { BookingModal, type CheckoutDetails } from "@/components/customers/booking-modal";
+import { maxPlayers } from "@/lib/services/bookings/guestDetails";
 import { BookingScheduleSkeleton } from "@/components/skeletons/booking-schedule-skeleton";
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service";
 import { OperatingHour } from "@/components/admin/schedules/types";
@@ -66,7 +67,6 @@ export const BookingContainer = () => {
   const [selectedDate, setSelectedDateRaw] = useState<Date>(new Date());
   const [basket, setBasket] = useState<Slot[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [operatingHours, setOperatingHours] = useState<OperatingHour[]>([]);
   const [closures, setClosures] = useState<VenueClosure[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
@@ -221,6 +221,9 @@ export const BookingContainer = () => {
     [statusIn, bookings, tailBookings]
   );
 
+  // No account (or a guest's anonymous session): the checkout asks for their details
+  const isGuest = !user || !!user.is_anonymous;
+
   // Admin-configured booking length (booking_settings); the database enforces the same limits
   const minHours = pricing?.settings.min_hours ?? 1;
   const priceFor = (date: Date, startSlotTime: string, duration: number) => {
@@ -335,22 +338,20 @@ export const BookingContainer = () => {
     setCourtSpans(courtName, [...spansOn(courtName), [clickedIndex, clickedIndex + minHours]]);
   };
 
-  // Guests build a basket freely and sign in only to pay
+  // Everyone checks out in the same dialog; a guest fills in their details there (an account is optional)
   const startCheckout = (lines: Slot[] = basket) => {
     setBasket(lines);
-    if (user) {
-      setIsDialogOpen(true);
-      return;
-    }
+    setIsDialogOpen(true);
+  };
+
+  // "Have an account? Sign in" from the dialog: the courts are kept for after signing in
+  const signInToPay = () => {
     try {
-      sessionStorage.setItem(
-        PENDING_BASKET_KEY,
-        JSON.stringify({ date: selectedDate.toISOString(), lines })
-      );
+      sessionStorage.setItem(PENDING_BASKET_KEY, JSON.stringify({ date: selectedDate.toISOString(), lines: basket }));
     } catch {
-      // Storage blocked (private mode): the guest just picks again after signing in
+      // Storage blocked (private mode): the player just picks again after signing in
     }
-    setShowLoginPrompt(true);
+    router.push("/login");
   };
 
   // The next day with bookable hours (within a month), for the closed-day shortcut
@@ -426,8 +427,8 @@ export const BookingContainer = () => {
     setIsCancellingGridBooking(false);
   };
 
-  const confirmBooking = async () => {
-    if (basket.length === 0 || !user) return;
+  const confirmBooking = async (details: CheckoutDetails) => {
+    if (basket.length === 0) return;
 
     setIsCheckoutLoading(true);
     setCheckoutError(null);
@@ -440,7 +441,19 @@ export const BookingContainer = () => {
         return splitAtMidnight(timeSlots, lineSpan(line), selectedDateStr).map((part) => ({ court_id: court.id, ...part }));
       });
 
-      const url = await createCheckoutSession({ bookingDate: selectedDateStr, lines });
+      // A guest pays on an anonymous session, so the hold, the QR page and My Bookings on this device are theirs
+      if (!user) {
+        const { data, error } = await createClient().auth.signInAnonymously();
+        if (error || !data.user) throw new Error("Guest checkout isn't available right now. Please sign in to book.");
+      }
+
+      const url = await createCheckoutSession({
+        bookingDate: selectedDateStr,
+        lines,
+        playerCount: details.playerCount,
+        discountCode: details.discountCode,
+        guest: isGuest ? details.guest : null,
+      });
 
       window.location.assign(url);
     } catch (err: unknown) {
@@ -657,31 +670,10 @@ export const BookingContainer = () => {
         isLoading={isCheckoutLoading}
         error={checkoutError}
         onConfirm={confirmBooking}
+        isGuest={isGuest}
+        maxPlayers={maxPlayers(pricing?.settings.max_players_per_court ?? 8, new Set(basket.map((l) => l.court)).size)}
+        onSignIn={signInToPay}
       />
-
-      {/* Login Prompt Dialog */}
-      <Dialog open={showLoginPrompt} onOpenChange={setShowLoginPrompt}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Sign in to pay</DialogTitle>
-            <DialogDescription>
-              Your {basket.length === 1 ? "court stays" : "courts stay"} selected while you sign in or create an account.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
-            <Button variant="ghost" onClick={() => setShowLoginPrompt(false)} className="w-full sm:w-auto">
-              Keep browsing
-            </Button>
-            <Button variant="outline" onClick={() => router.push("/register")} className="w-full sm:w-auto">
-              Create account
-            </Button>
-            <Button onClick={() => router.push("/login")} className="w-full sm:w-auto gap-2">
-              <LogIn className="size-4" />
-              Sign in
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Resume Pending Booking Dialog */}
       <Dialog

@@ -11,6 +11,8 @@ export interface BookingSettings {
     max_hours: number;
     /** Business-day cutoff ("HH:MM[:SS]"): earlier hours are priced as the previous day's late night */
     day_ends_at?: string;
+    /** Most players one court takes; a checkout allows this times its courts */
+    max_players_per_court?: number;
 }
 
 export interface PeakRate {

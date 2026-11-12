@@ -83,15 +83,18 @@ export function PublicHeader() {
           </div>
         ) : user ? (
           <AccountMenu
-            name={fullName}
-            email={user.email ?? ""}
+            name={fullName || (user.is_anonymous ? "Guest" : "")}
+            // A guest paid without an account: offer to create one (it keeps the same bookings)
+            email={user.is_anonymous ? "Guest · no account yet" : user.email ?? ""}
             signOutTo="/"
             links={[
               ...(isAdmin ? [{ label: isOwner ? "Admin panel" : "Staff panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
               { label: "Courts", href: "/#courts", icon: "courts", mobileOnly: true },
               { label: "Open Play", href: "/open-play", icon: "openPlay", mobileOnly: true },
               { label: "My bookings", href: "/my-bookings", icon: "bookings", mobileOnly: true },
-              { label: "My profile", href: "/profile", icon: "profile" },
+              user.is_anonymous
+                ? { label: "Create an account", href: "/register", icon: "profile" }
+                : { label: "My profile", href: "/profile", icon: "profile" },
             ]}
           />
         ) : (
@@ -112,7 +115,7 @@ export function PublicHeader() {
         { href: "/#booking", label: "Book", icon: CalendarDays, active: false },
         { href: "/open-play", label: "Open play", icon: UsersRound, active: pathname.startsWith("/open-play") },
         { href: "/my-bookings", label: "Bookings", icon: ListChecks, active: pathname.startsWith("/my-bookings") },
-        { href: user ? "/profile" : "/login", label: user ? "Account" : "Sign in", icon: UserRound, active: pathname.startsWith("/profile") },
+        { href: !user ? "/login" : user.is_anonymous ? "/register" : "/profile", label: user ? "Account" : "Sign in", icon: UserRound, active: pathname.startsWith("/profile") },
       ].map(({ href, label, icon: Icon, active }) => (
         <Link
           key={label}

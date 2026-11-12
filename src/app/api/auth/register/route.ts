@@ -25,6 +25,25 @@ export async function POST(request: NextRequest) {
         if (!limit.allowed) return tooManyRequests("sign-ups from this network", limit.retryAfterSeconds);
 
         const supabase = await createClient();
+
+        // A guest who paid without an account keeps the same user (and so their bookings): the email goes on the
+        // guest session. Supabase sets a password only once that email is confirmed: at once with "Confirm email"
+        // off, otherwise the emailed link opens the choose-a-password page.
+        const { data: { user: current } } = await supabase.auth.getUser();
+        if (current?.is_anonymous) {
+            const { data: linked, error: linkError } = await supabase.auth.updateUser(
+                { email, data: { full_name: fullName, phone } },
+                { emailRedirectTo: `${request.nextUrl.origin}/reset-password` }
+            );
+            if (linkError) return NextResponse.json({ error: linkError.message }, { status: linkError.status === 429 ? 429 : 400 });
+            if (linked.user?.email?.toLowerCase() !== email.toLowerCase()) {
+                return NextResponse.json({ success: true, signedIn: false, confirmEmail: true });
+            }
+            const { error: passwordError } = await supabase.auth.updateUser({ password });
+            if (passwordError) return NextResponse.json({ error: passwordError.message }, { status: 400 });
+            return NextResponse.json({ success: true, signedIn: true });
+        }
+
         const { data, error } = await supabase.auth.signUp({
             email,
             password,

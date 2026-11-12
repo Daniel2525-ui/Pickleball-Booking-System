@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/customers/public-header";
 import { VENUE_NAME } from "@/lib/brand";
 import { Confetti } from "@/components/customers/confetti";
+import { createClient } from "@/lib/supabase/client";
 
 function BookingSuccessContent() {
   const venue = useVenueContact();
@@ -33,6 +34,11 @@ function BookingSuccessContent() {
     lostCourts?: string[];
     openPlay?: boolean;
   }>({ success: true });
+  // Paid as a guest (no account): offer an account that keeps this booking
+  const [isGuest, setIsGuest] = useState(false);
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => setIsGuest(!!data.user?.is_anonymous));
+  }, []);
 
   useEffect(() => {
     async function verifySession() {
@@ -208,6 +214,19 @@ function BookingSuccessContent() {
               </div>
             </div>
           </div>
+
+          {isGuest && (
+            <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 text-sm flex flex-col gap-2">
+              <p className="font-semibold text-foreground">Keep track of your bookings</p>
+              <p className="text-muted-foreground">
+                You booked as a guest, so this booking is saved on this device only. Create an account to see it anywhere
+                and book faster next time.
+              </p>
+              <Link href="/register" className="font-semibold text-primary underline underline-offset-4">
+                Create an account
+              </Link>
+            </div>
+          )}
 
           {/* Primary & Secondary Actions */}
           <div className="pt-2 flex flex-col gap-2.5">
