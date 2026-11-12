@@ -84,6 +84,19 @@ export function bookableWindows(bookingDate: string, hours: HoursInput[], closed
         .filter((w) => !closedDates.includes(w.lateNight ? shiftDate(bookingDate, -1) : bookingDate));
 }
 
+/**
+ * A business day as the customer books it: the day's own hours, then the hours it runs on past midnight,
+ * which are stored on the next date (`date`). A closed date (venue_closures) closes both.
+ */
+export function businessDayWindows(bookingDate: string, hours: HoursInput[], closedDates: string[] = []) {
+    if (closedDates.includes(bookingDate)) return [];
+    const next = shiftDate(bookingDate, 1);
+    return [
+        ...windowsForWeekday(getBookingWeekday(bookingDate), hours).filter((w) => !w.lateNight).map((w) => ({ ...w, date: bookingDate })),
+        ...windowsForWeekday(getBookingWeekday(next), hours).filter((w) => w.lateNight).map((w) => ({ ...w, date: next })),
+    ];
+}
+
 /** One window must hold the whole slot, so 1-2 AM never joins 8-9 AM. */
 export function isWithinWindows(windows: BookableWindow[], startTime: string, endTime: string) {
     return windows.some((w) => hhmm(startTime) >= w.start && hhmm(endTime) <= w.end);

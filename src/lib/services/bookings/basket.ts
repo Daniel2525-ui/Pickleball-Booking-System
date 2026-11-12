@@ -1,4 +1,11 @@
 /** Pure helpers for the customer's basket: one line per time range, so a court can appear several times. */
+import { slotTimes } from "./checkSlotAvailability.service.ts";
+
+/** Where a business day's slots go past midnight: the slot after the one ending at 12 AM, or the end of the list. */
+export const midnightIndex = (timeSlots: string[]) => {
+  const i = timeSlots.findIndex((t) => slotTimes(t).end === "24:00");
+  return i === -1 ? timeSlots.length : i + 1;
+};
 type Line = { court: string; price: number; hasPeak?: boolean; startSlot?: string; time?: string };
 
 /** A line is one court from one start slot; changing its length keeps the same key. */

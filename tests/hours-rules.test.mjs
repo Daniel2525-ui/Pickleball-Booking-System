@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkWeeklyHours, isOutsideHours, bookableWindows, openNowLabel, hoursSummary } from "../src/lib/services/schedule/hoursRules.ts";
+import { checkWeeklyHours, isOutsideHours, bookableWindows, businessDayWindows, openNowLabel, hoursSummary } from "../src/lib/services/schedule/hoursRules.ts";
 import { validateBookingSlot } from "../src/lib/services/bookings/validateBookingSlot.service.ts";
 import { formatTime12h } from "../src/lib/utils/formatTime.ts";
 import { getBookingEnd, businessDate, businessToday, lateNightLabel, lateNightOf } from "../src/lib/utils/bookingTime.ts";
 import { generateTimeSlots } from "../src/lib/services/schedule/generateTimeSlots.service.ts";
 import { walkInStarts, walkInEnds } from "../src/lib/services/bookings/walkInSlots.ts";
 import { slotTimes } from "../src/lib/services/bookings/checkSlotAvailability.service.ts";
-import { mergeSpans } from "../src/lib/services/bookings/basket.ts";
+import { mergeSpans, midnightIndex } from "../src/lib/services/bookings/basket.ts";
 import { quoteCourtPrice } from "../src/lib/services/pricing/quoteCourtPrice.ts";
 import { venueDayWindow } from "../src/lib/services/payments/paymentsTypes.ts";
 import { summarizeVenueHours } from "../src/lib/utils/venueHours.ts";
@@ -99,13 +99,35 @@ test("the business day: hours before the cutoff belong to the day before", () =>
     assert.deepEqual(venueDayWindow("2026-11-06", "04:00:00"), { start: "2026-11-05T20:00:00.000Z", end: "2026-11-06T20:00:00.000Z" });
 });
 
-test("the customer grid lists late-night slots first and a slot can end at midnight", () => {
+test("a business day is its own hours, then the hours it runs on past midnight (stored on the next date)", () => {
+    assert.deepEqual(businessDayWindows("2026-11-06", lateWeek), [
+        { start: "22:00", end: "24:00", date: "2026-11-06" },
+        { start: "00:00", end: "02:00", date: "2026-11-07", lateNight: true },
+    ]);
+    assert.deepEqual(businessDayWindows("2026-11-07", lateWeek), [{ start: "08:00", end: "22:00", date: "2026-11-07" }]);
+    assert.deepEqual(businessDayWindows("2026-11-05", lateWeek), [{ start: "08:00", end: "24:00", date: "2026-11-05" }]); // closes at midnight: no tail
+    // Closing Friday closes Friday night; closing Saturday leaves it
+    assert.deepEqual(businessDayWindows("2026-11-06", lateWeek, ["2026-11-06"]), []);
+    assert.equal(businessDayWindows("2026-11-06", lateWeek, ["2026-11-07"]).length, 2);
+    assert.deepEqual(businessDayWindows("2026-11-08", lateWeek), []);
+    // A 24-hour day has no tail, and its 12 AM slot is its own
+    const allDay = [open("Monday", "00:00", "00:00")];
+    assert.deepEqual(businessDayWindows("2026-11-09", allDay), [{ start: "00:00", end: "24:00", date: "2026-11-09" }]);
+    const allDaySlots = generateTimeSlots(new Date("2026-11-09T12:00:00+08:00"), allDay);
+    assert.equal(allDaySlots.length, 24);
+    assert.equal(midnightIndex(allDaySlots), 24);
+});
+
+test("the customer grid lists a day's late-night slots last and a slot can end at midnight", () => {
     const at = (d) => new Date(`${d}T12:00:00+08:00`);
-    assert.deepEqual(generateTimeSlots(at("2026-11-06"), lateWeek), ["10:00 PM - 11:00 PM", "11:00 PM - 12:00 AM"]);
+    const friday = generateTimeSlots(at("2026-11-06"), lateWeek);
+    assert.deepEqual(friday, ["10:00 PM - 11:00 PM", "11:00 PM - 12:00 AM", "12:00 AM - 1:00 AM", "1:00 AM - 2:00 AM"]);
+    assert.equal(midnightIndex(friday), 2);
     const saturday = generateTimeSlots(at("2026-11-07"), lateWeek);
-    assert.deepEqual(saturday.slice(0, 3), ["12:00 AM - 1:00 AM", "1:00 AM - 2:00 AM", "8:00 AM - 9:00 AM"]);
-    assert.equal(saturday.length, 16);
-    assert.deepEqual(generateTimeSlots(at("2026-11-07"), lateWeek, ["2026-11-06"]).slice(0, 1), ["8:00 AM - 9:00 AM"]);
+    assert.equal(saturday[0], "8:00 AM - 9:00 AM");
+    assert.equal(saturday.length, 14);
+    assert.equal(midnightIndex(saturday), 14);
+    assert.deepEqual(generateTimeSlots(at("2026-11-06"), lateWeek, ["2026-11-06"]), []);
     assert.deepEqual(generateTimeSlots(at("2026-11-08"), lateWeek), []);
     assert.deepEqual(slotTimes("11:00 PM - 12:00 AM"), { start: "23:00", end: "24:00" });
     assert.deepEqual(slotTimes("12:00 AM - 1:00 AM"), { start: "00:00", end: "01:00" });
