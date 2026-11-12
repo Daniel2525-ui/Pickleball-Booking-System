@@ -69,7 +69,7 @@ test("a day can close after midnight", async ({ page }) => {
   await page.goto("/admin/schedules");
   await page.getByLabel(`${weekday} opening time`).fill("22:00");
   await page.getByLabel(`${weekday} closing time`).fill("02:00");
-  await expect(page.getByText("Closes the next day")).toBeVisible();
+  await expect(page.getByText(`Open 4 hours · until 2 AM`, { exact: false }).first()).toBeVisible();
   await page.getByRole("button", { name: "Save Operating Hours" }).click();
   await expect(page.getByText("Operating hours updated successfully.")).toBeVisible();
   expect(closeTime()).toBe("02:00:00");

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkWeeklyHours, isOutsideHours, bookableWindows, openNowLabel } from "../src/lib/services/schedule/hoursRules.ts";
+import { checkWeeklyHours, isOutsideHours, bookableWindows, openNowLabel, hoursSummary } from "../src/lib/services/schedule/hoursRules.ts";
 import { validateBookingSlot } from "../src/lib/services/bookings/validateBookingSlot.service.ts";
 import { formatTime12h } from "../src/lib/utils/formatTime.ts";
 import { getBookingEnd, businessDate, businessToday, lateNightLabel, lateNightOf } from "../src/lib/utils/bookingTime.ts";
@@ -144,4 +144,13 @@ test("openNowLabel: open, opening later, closed, and late-night hours", () => {
     assert.deepEqual(at("2026-11-07T03:00:00+08:00"), { open: false, text: "Opens today at 8:00 AM" });
     assert.deepEqual(at("2026-11-07T22:30:00+08:00"), { open: false, text: "Closed for today" });
     assert.deepEqual(at("2026-11-08T10:00:00+08:00"), { open: false, text: "Closed for today" });
+});
+
+test("hoursSummary: the day's hours in plain words, with the next day named after midnight", () => {
+    assert.deepEqual(hoursSummary("Friday", "07:00", "02:00"), { nextDay: true, text: "Open 19 hours · until 2 AM Saturday" });
+    assert.deepEqual(hoursSummary("Monday", "08:00", "22:00"), { nextDay: false, text: "Open 14 hours · until 10 PM" });
+    assert.deepEqual(hoursSummary("Thursday", "08:00", "00:00"), { nextDay: true, text: "Open 16 hours · until midnight" });
+    assert.deepEqual(hoursSummary("Sunday", "22:00", "01:00"), { nextDay: true, text: "Open 3 hours · until 1 AM Monday" });
+    assert.deepEqual(hoursSummary("Monday", "08:30", "10:00"), { nextDay: false, text: "Open 1 hour 30 min · until 10 AM" });
+    assert.equal(hoursSummary("Monday", "", "22:00"), null);
 });

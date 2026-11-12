@@ -2,6 +2,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { OperatingHour } from "./types"
+import { hoursSummary } from "@/lib/services/schedule/hoursRules"
 
 interface OperatingHourRowProps {
   hour: OperatingHour
@@ -23,6 +24,8 @@ const hoursBar = (open: string, close: string) => {
 export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: OperatingHourRowProps) => {
   const switchId = `toggle-${hour.day_of_week}`
   const bar = hour.is_open && hour.open_time && hour.close_time ? hoursBar(hour.open_time, hour.close_time) : null
+  const summary = hour.is_open ? hoursSummary(hour.day_of_week, hour.open_time, hour.close_time) : null
+  const summaryId = `hours-summary-${hour.day_of_week}`
 
   return (
     <div
@@ -64,44 +67,57 @@ export const OperatingHourRow = ({ hour, index, onToggle, onTimeChange }: Operat
             Open
           </span>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="flex flex-col flex-1 sm:flex-initial">
-              <span className="sr-only">Opening Time</span>
-              <Input
-                type="time"
-                step={3600}
-                value={hour.open_time}
-                onChange={(e) => onTimeChange(index, "open_time", e.target.value)}
-                aria-label={`${hour.day_of_week} opening time`}
-                className="w-full sm:w-32 h-10 text-sm font-semibold"
-              />
+          <div className="flex flex-col gap-1.5 w-full sm:w-auto">
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col flex-1 min-w-0 sm:flex-initial">
+                <span className="sr-only">Opening Time</span>
+                <Input
+                  type="time"
+                  step={3600}
+                  value={hour.open_time}
+                  onChange={(e) => onTimeChange(index, "open_time", e.target.value)}
+                  aria-label={`${hour.day_of_week} opening time`}
+                  className="w-full sm:w-32 h-10 text-sm font-semibold"
+                />
+              </div>
+
+              <span className="text-muted-foreground text-xs sm:text-sm font-medium px-1">to</span>
+
+              <div className="flex flex-col flex-1 min-w-0 sm:flex-initial">
+                <span className="sr-only">Closing Time</span>
+                <Input
+                  type="time"
+                  step={3600}
+                  value={hour.close_time}
+                  onChange={(e) => onTimeChange(index, "close_time", e.target.value)}
+                  aria-label={`${hour.day_of_week} closing time`}
+                  aria-describedby={summary ? summaryId : undefined}
+                  className="w-full sm:w-32 h-10 text-sm font-semibold"
+                />
+              </div>
+
+              {/* "next day" belongs to the closing time; the slot keeps every row's fields lined up. Phones read it in the line below */}
+              <span className={`hidden sm:inline shrink-0 w-16 text-xs font-semibold ${summary?.nextDay ? "text-primary" : "invisible"}`} aria-hidden={!summary?.nextDay}>
+                next day
+              </span>
             </div>
 
-            <span className="text-muted-foreground text-xs sm:text-sm font-medium px-1">to</span>
-
-            <div className="flex flex-col flex-1 sm:flex-initial">
-              <span className="sr-only">Closing Time</span>
-              <Input
-                type="time"
-                step={3600}
-                value={hour.close_time}
-                onChange={(e) => onTimeChange(index, "close_time", e.target.value)}
-                aria-label={`${hour.day_of_week} closing time`}
-                className="w-full sm:w-32 h-10 text-sm font-semibold"
-              />
-            </div>
+            {/* Reads the hours back in words, so 2 AM typed for 2 PM is easy to spot */}
+            {summary && (
+              <p id={summaryId} className="text-xs text-muted-foreground">{summary.text}</p>
+            )}
           </div>
-
-          {/* A closing time at or before opening is after midnight */}
-          {hour.close_time && hour.close_time <= hour.open_time && (
-            <span className="text-xs font-semibold text-primary">Closes the next day</span>
-          )}
 
           {/* The day at a glance: 6 AM on the left, midnight at the line, 6 AM next day on the right */}
           {bar && (
-            <div className="relative h-5 w-full sm:w-44 rounded-md bg-muted" aria-hidden>
-              <span className="absolute inset-y-0 left-3/4 w-px bg-border" />
-              <span className="absolute top-1 bottom-1 rounded bg-primary" style={{ left: `${bar.left}%`, width: `${bar.width}%` }} />
+            <div className="w-full sm:w-44 flex flex-col gap-1" aria-hidden>
+              <div className="relative h-5 rounded-md bg-muted">
+                <span className="absolute inset-y-0 left-3/4 w-px bg-foreground/30" />
+                <span className="absolute top-1 bottom-1 rounded bg-primary" style={{ left: `${bar.left}%`, width: `${bar.width}%` }} />
+              </div>
+              <div className="relative h-3 text-[10px] font-semibold text-muted-foreground">
+                <span className="absolute left-3/4 -translate-x-1/2">midnight</span>
+              </div>
             </div>
           )}
         </div>

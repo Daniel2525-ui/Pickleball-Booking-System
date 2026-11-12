@@ -103,3 +103,20 @@ export function openNowLabel(hours: HoursInput[], now: Date) {
   if (next) return { open: false, text: `Opens today at ${formatTime12h(next.start)}` };
   return { open: false, text: "Closed for today" };
 }
+
+/**
+ * A day's hours in plain words for the hours editor, e.g. "Open 19 hours · until 2 AM Saturday".
+ * Null while either time is missing or not "HH:MM". A close at or before opening is the next day.
+ */
+export function hoursSummary(day: string, open?: string | null, close?: string | null) {
+    if (!/^\d\d:\d\d/.test(open ?? "") || !/^\d\d:\d\d/.test(close ?? "")) return null;
+    const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+    const nextDay = close!.slice(0, 5) <= open!.slice(0, 5);
+    const length = mins(close!) + (nextDay ? 24 * 60 : 0) - mins(open!);
+    const hours = Math.floor(length / 60);
+    const rest = length % 60;
+    const duration = `${hours} ${hours === 1 ? "hour" : "hours"}${rest ? ` ${rest} min` : ""}`;
+    const until = close!.slice(0, 5) === "00:00" ? "midnight" : formatTime12h(close!).replace(":00 ", " ");
+    const tomorrow = WEEK_DAYS[(WEEK_DAYS.indexOf(day) + 1) % 7];
+    return { nextDay, text: `Open ${duration} · until ${until}${nextDay && until !== "midnight" ? ` ${tomorrow}` : ""}` };
+}
