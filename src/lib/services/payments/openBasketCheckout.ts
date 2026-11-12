@@ -44,7 +44,8 @@ async function openXenditQr({ supabase, lines, basketId }: { supabase: SupabaseC
         type: "PAY",
         country: "PH",
         currency: "PHP",
-        request_amount: lines.reduce((sum, l) => sum + l.amount, 0),
+        // Summed in centavos: adding peso decimals in floating point could send ₱180.00000000001
+        request_amount: lines.reduce((sum, l) => sum + Math.round(l.amount * 100), 0) / 100,
         capture_method: "AUTOMATIC",
         channel_code: "QRPH",
         description: `Court booking ${lines[0]?.bookingDate ?? ""}`,

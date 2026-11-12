@@ -35,7 +35,12 @@ export async function POST(request: NextRequest) {
                 { email, data: { full_name: fullName, phone } },
                 { emailRedirectTo: `${request.nextUrl.origin}/reset-password` }
             );
-            if (linkError) return NextResponse.json({ error: linkError.message }, { status: linkError.status === 429 ? 429 : 400 });
+            if (linkError) {
+                // Supabase says when the email already has an account; a neutral message keeps that private
+                if (linkError.status === 429) return NextResponse.json({ error: linkError.message }, { status: 429 });
+                console.error("Guest account conversion failed:", linkError.message);
+                return NextResponse.json({ error: "We couldn't use that email. If you already have an account, sign in instead." }, { status: 400 });
+            }
             if (linked.user?.email?.toLowerCase() !== email.toLowerCase()) {
                 return NextResponse.json({ success: true, signedIn: false, confirmEmail: true });
             }

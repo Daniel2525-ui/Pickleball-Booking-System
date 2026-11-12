@@ -43,8 +43,9 @@ test("discount codes are trimmed and upper-cased, letters, digits and dashes, 3 
 
 test("applyDiscount takes a percent off each line, or a fixed amount from the lines in order, each court keeping ₱1", () => {
     assert.deepEqual(applyDiscount([400, 200], { kind: "percent", value: 10 }), [360, 180]);
-    // Rounded to centavos per line
-    assert.deepEqual(applyDiscount([333], { kind: "percent", value: 15 }), [283.05]);
+    // Whole pesos off each court (₱49.95 off rounds to ₱50), so QR Ph and the cash drawer never see centavos
+    assert.deepEqual(applyDiscount([333], { kind: "percent", value: 15 }), [283]);
+    assert.deepEqual(applyDiscount([375, 375], { kind: "percent", value: 15 }), [319, 319]);
     assert.deepEqual(applyDiscount([200], { kind: "percent", value: 90 }), [20]);
     // A fixed amount larger than the first line spills into the next; a court never drops below ₱1
     assert.deepEqual(applyDiscount([200, 400], { kind: "fixed", value: 250 }), [1, 349]);
@@ -58,7 +59,9 @@ test("parseDiscountInput checks a new code and its limits", () => {
         ok: true,
         value: { code: "SUMMER-10", kind: "percent", value: 10, starts_on: null, ends_on: "2026-12-31", max_uses: null },
     });
-    assert.equal(parseDiscountInput({ code: "FIX", kind: "fixed", value: 150.5, max_uses: 20 }).value.max_uses, 20);
+    assert.equal(parseDiscountInput({ code: "FIX", kind: "fixed", value: 150, max_uses: 20 }).value.max_uses, 20);
+    assert.match(parseDiscountInput({ code: "FIX", kind: "fixed", value: 150.5 }).error, /whole pesos/);
+    assert.match(parseDiscountInput({ code: "PCT", kind: "percent", value: 12.5 }).error, /1 to 90/);
     const bad = (input) => parseDiscountInput({ code: "SAVE", kind: "percent", value: 10, ...input }).error;
     assert.match(bad({ code: "x" }), /3 to 20/);
     assert.match(bad({ kind: "free" }), /percent or a peso amount/);

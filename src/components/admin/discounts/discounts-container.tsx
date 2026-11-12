@@ -151,7 +151,7 @@ export function DiscountsContainer() {
                     disabled={used}
                     aria-pressed={form.kind === k}
                     onClick={() => setForm({ ...form, kind: k })}
-                    className={`min-h-9 rounded-md px-3 text-sm font-semibold ${form.kind === k ? "bg-card shadow-xs text-primary" : "text-muted-foreground"}`}
+                    className={`min-h-9 rounded-md px-3 text-sm font-semibold whitespace-nowrap ${form.kind === k ? "bg-card shadow-xs text-primary" : "text-muted-foreground"}`}
                   >
                     {k === "percent" ? "% off" : "₱ off"}
                   </button>

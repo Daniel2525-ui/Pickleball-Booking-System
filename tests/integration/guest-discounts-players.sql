@@ -101,10 +101,26 @@ BEGIN
   v_res := public.hold_court_basket(v_day, jsonb_build_array(jsonb_build_object('court_id', v_c2, 'start_time', '08:00', 'end_time', '09:00')), NULL, 1, 'ONCE');
   ASSERT (v_res->>'total')::numeric = 180, 'the given-back use works for the guest';
 
+  -- 5b. A direct call can't probe codes: a taken court is refused first, and every code refusal reads the same
+  PERFORM pg_temp.as_player(v_player);  -- the guest's hold above takes COURT 2 at 8 AM
+  PERFORM pg_temp.fails(format(v_basket, v_day, jsonb_build_array(jsonb_build_object('court_id', v_c2, 'start_time', '08:00', 'end_time', '09:00')), 1, 'NOPE'), 'SLOT_UNAVAILABLE');
+  BEGIN
+    PERFORM public.hold_court_basket(v_day, jsonb_build_array(jsonb_build_object('court_id', v_c1, 'start_time', '15:00', 'end_time', '16:00')), NULL, 1, 'OFF');
+    RAISE EXCEPTION 'a switched-off code was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM = 'DISCOUNT_INVALID: This code can''t be used for this booking.', format('same message for every refusal: %s', SQLERRM);
+  END;
+  PERFORM pg_temp.as_player(v_guest);
+  -- Codes take whole pesos off
+  PERFORM pg_temp.fails($q$INSERT INTO public.discount_codes (code, kind, value) VALUES ('CENTS', 'fixed', 10.5)$q$, 'new row for relation "discount_codes" violates check constraint');
+
   -- 6. Preview
   ASSERT public.check_discount_code('pct10', ARRAY[400]) @> '{"valid": true, "discount": 40}', format('preview %s', public.check_discount_code('pct10', ARRAY[400]));
   ASSERT public.check_discount_code('OFF', ARRAY[400])->>'valid' = 'false', 'preview refuses switched off';
   ASSERT public.check_discount_code('BIG', ARRAY[400])->>'valid' = 'false', 'preview refuses worth more than booking';
+
+  -- The admin customer list labels them
+  ASSERT (SELECT is_guest FROM public.customer_directory WHERE id = v_guest), 'customer list shows the guest';
 
   -- 7. A guest can't clear their own guest flag
   UPDATE public.profiles SET is_guest = false WHERE id = v_guest;

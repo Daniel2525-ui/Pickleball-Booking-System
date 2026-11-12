@@ -6,6 +6,8 @@ export interface Customer {
     created_at: string;
     /** registered = online member account, walk_in = record created at the desk */
     type: "registered" | "walk_in";
+    /** A registered row for a player who paid as a guest, without an account */
+    is_guest?: boolean;
     bookings_count: number;
     last_visit: string | null;
     no_shows: number;

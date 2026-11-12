@@ -15,12 +15,12 @@ const centavos = (n: number) => Math.round(n * 100) / 100;
 export const MIN_LINE_AMOUNT = 1;
 
 /**
- * Each line's amount after the code: a percent comes off every line (rounded to centavos), a fixed amount is
+ * Each line's amount after the code: a percent comes off every line in whole pesos, a fixed amount (whole pesos) is
  * taken from the lines in order until it is used up, each line keeping MIN_LINE_AMOUNT. Null when a fixed code is
  * worth more than the booking can give (the code is refused, never part-applied). Must match hold_court_basket.
  */
 export const applyDiscount = (amounts: number[], code: { kind: DiscountKind; value: number }): number[] | null => {
-    if (code.kind === "percent") return amounts.map((a) => centavos(Math.max(MIN_LINE_AMOUNT, a - centavos((a * code.value) / 100))));
+    if (code.kind === "percent") return amounts.map((a) => centavos(Math.max(MIN_LINE_AMOUNT, a - Math.round((a * code.value) / 100))));
     let left = code.value;
     const out = amounts.map((a) => {
         const off = Math.min(Math.max(0, a - MIN_LINE_AMOUNT), left);
@@ -51,12 +51,13 @@ export const parseDiscountInput = (input: unknown): { ok: true; value: DiscountI
     if (!code) return { ok: false, error: "A code is 3 to 20 letters, numbers or dashes." };
     if (raw.kind !== "percent" && raw.kind !== "fixed") return { ok: false, error: "Choose a percent or a peso amount off." };
     const value = Number(raw.value);
-    if (raw.kind === "percent" && !(Number.isFinite(value) && value >= 1 && value <= 90)) {
+    if (raw.kind === "percent" && !(Number.isInteger(value) && value >= 1 && value <= 90)) {
         return { ok: false, error: "A percent off is 1 to 90." };
     }
     if (raw.kind === "fixed" && !(Number.isFinite(value) && value > 0 && value <= 100000)) {
         return { ok: false, error: "A peso amount off must be more than ₱0." };
     }
+    if (raw.kind === "fixed" && !Number.isInteger(value)) return { ok: false, error: "A peso amount off is in whole pesos." };
     const starts_on = dateOrNull(raw.starts_on);
     const ends_on = dateOrNull(raw.ends_on);
     if (starts_on === false || ends_on === false) return { ok: false, error: "Enter dates as YYYY-MM-DD." };

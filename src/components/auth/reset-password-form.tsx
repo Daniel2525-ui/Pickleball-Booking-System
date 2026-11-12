@@ -24,7 +24,8 @@ export function ResetPasswordForm() {
   useEffect(() => {
     createClient()
       .auth.getSession()
-      .then(({ data }) => setHasSession(Boolean(data.session)));
+      // A guest's anonymous session is not the emailed link: it can't set a password
+      .then(({ data }) => setHasSession(Boolean(data.session) && !data.session?.user.is_anonymous));
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -74,7 +75,8 @@ export function ResetPasswordForm() {
             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs sm:text-sm leading-relaxed">
               <AlertCircle className="size-4.5 shrink-0 mt-0.5" />
               <p className="text-xs">
-                This reset link is invalid or has expired. Request a new one and open it in the same browser.
+                This link is invalid or has expired. Request a new one and open it in the same browser. If you just
+                confirmed your email on another device, request a link here to choose your password.
               </p>
             </div>
             <Link href="/forgot-password" className="text-center text-xs font-bold text-primary hover:underline underline-offset-4">

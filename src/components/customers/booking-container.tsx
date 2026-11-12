@@ -344,14 +344,14 @@ export const BookingContainer = () => {
     setIsDialogOpen(true);
   };
 
-  // "Have an account? Sign in" from the dialog: the courts are kept for after signing in
-  const signInToPay = () => {
+  // "Sign in" or "create one" from the dialog: the courts are kept for after signing in
+  const signInToPay = (page: "/login" | "/register") => {
     try {
       sessionStorage.setItem(PENDING_BASKET_KEY, JSON.stringify({ date: selectedDate.toISOString(), lines: basket }));
     } catch {
       // Storage blocked (private mode): the player just picks again after signing in
     }
-    router.push("/login");
+    router.push(page);
   };
 
   // The next day with bookable hours (within a month), for the closed-day shortcut
@@ -444,7 +444,7 @@ export const BookingContainer = () => {
       // A guest pays on an anonymous session, so the hold, the QR page and My Bookings on this device are theirs
       if (!user) {
         const { data, error } = await createClient().auth.signInAnonymously();
-        if (error || !data.user) throw new Error("Guest checkout isn't available right now. Please sign in to book.");
+        if (error || !data.user) throw new Error("Guest checkout isn't available right now. Please sign in or create an account to book.");
       }
 
       const url = await createCheckoutSession({
@@ -673,6 +673,15 @@ export const BookingContainer = () => {
         isGuest={isGuest}
         maxPlayers={maxPlayers(pricing?.settings.max_players_per_court ?? 8, new Set(basket.map((l) => l.court)).size)}
         onSignIn={signInToPay}
+        checkoutAmounts={
+          pricing
+            ? basket.flatMap((line) =>
+                splitAtMidnight(timeSlots, lineSpan(line), selectedDateStr).map(
+                  (p) => quoteCourtPrice(pricing, p.booking_date, p.start_time, Number(p.end_time.slice(0, 2)) - Number(p.start_time.slice(0, 2))).total
+                )
+              )
+            : undefined
+        }
       />
 
       {/* Resume Pending Booking Dialog */}

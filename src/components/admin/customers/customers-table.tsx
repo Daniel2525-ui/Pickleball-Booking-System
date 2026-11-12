@@ -128,7 +128,7 @@ export const CustomersTable = ({
                           {customer.full_name?.trim() || "Unnamed Customer"}
                         </span>
                         <Badge variant="outline" className="text-[10px] font-semibold">
-                          {customer.type === "registered" ? "Member" : "Walk-in"}
+                          {customer.is_guest ? "Online guest" : customer.type === "registered" ? "Member" : "Walk-in"}
                         </Badge>
                         {customer.note && <CustomerNote note={customer.note} />}
                       </div>

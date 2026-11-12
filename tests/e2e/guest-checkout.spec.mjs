@@ -127,3 +127,23 @@ test("a guest creates an account afterwards and keeps the booking", async ({ pag
   expect(sql(`SELECT is_guest || '|' || email FROM public.profiles WHERE id = '${guestId}'`)).toBe(`false|${email}`);
   expect(Number(sql(`SELECT count(*) FROM public.bookings WHERE user_id = '${guestId}'`))).toBeGreaterThan(0);
 });
+
+test("a guest can choose to create an account instead, and an email in use is not revealed", async ({ page }) => {
+  await openCheckout(page);
+  await dialog(page).getByRole("button", { name: "create one" }).click();
+  await expect(page).toHaveURL(/\/register$/);
+  expect(await page.evaluate(() => sessionStorage.getItem("crosshair:pending-basket"))).toContain('"lines"');
+
+  // On a guest session, an email that already has an account gets a neutral answer
+  await openCheckout(page);
+  await dialog(page).getByLabel("Full name").fill("Nora Neutral");
+  await dialog(page).getByLabel("Mobile number").fill("09191234567");
+  await dialog(page).getByLabel("Email").fill(`nora-${Date.now()}@example.com`);
+  await dialog(page).getByRole("button", { name: /^Pay ₱/ }).click();
+  await expect(dialog(page).getByRole("alert").or(page.getByText(/QR/)).first()).toBeVisible({ timeout: 30_000 });
+  const res = await page.request.post("/api/auth/register", {
+    data: { email: process.env.E2E_CUSTOMER_EMAIL, password: "whatever-123", fullName: "Nora Neutral", phone: "09191234567" },
+  });
+  expect(res.status()).toBe(400);
+  expect((await res.json()).error).toBe("We couldn't use that email. If you already have an account, sign in instead.");
+});

@@ -68,7 +68,8 @@ CREATE TABLE public.discount_codes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   code text NOT NULL UNIQUE CHECK (code ~ '^[A-Z0-9-]{3,20}$'),
   kind text NOT NULL CHECK (kind IN ('percent', 'fixed')),
-  value numeric(10,2) NOT NULL CHECK (value > 0 AND (kind = 'fixed' OR value <= 90)),
+  -- Whole numbers only: percents 1-90, pesos off in whole pesos (QR Ph and the cash drawer never see centavos)
+  value numeric(10,2) NOT NULL CHECK (value > 0 AND value = trunc(value) AND (kind = 'fixed' OR value <= 90)),
   active boolean NOT NULL DEFAULT true,
   starts_on date,
   ends_on date CHECK (ends_on IS NULL OR starts_on IS NULL OR ends_on >= starts_on),
@@ -108,7 +109,7 @@ CREATE FUNCTION public.discount_code_refusal(p_code public.discount_codes) RETUR
 $$;
 
 -- Each court's amount after the code; NULL when a fixed code is worth more than the courts can give.
--- A percent comes off every court (rounded to centavos); a fixed amount is taken from the courts in order.
+-- A percent comes off every court in whole pesos; a fixed amount is taken from the courts in order.
 -- Every court keeps at least ₱1: a payment of ₱0 could not be recorded. Must match applyDiscount (discounts.ts).
 CREATE FUNCTION public.discounted_amounts(p_kind text, p_value numeric, p_amounts numeric[]) RETURNS numeric[]
 LANGUAGE plpgsql IMMUTABLE SET search_path TO '' AS $$
@@ -120,7 +121,7 @@ DECLARE
 BEGIN
   FOREACH a IN ARRAY p_amounts LOOP
     IF p_kind = 'percent' THEN
-      v_out := v_out || greatest(1, a - round(a * p_value / 100, 2));
+      v_out := v_out || greatest(1, a - round(a * p_value / 100));
     ELSE
       v_off := least(greatest(0, a - 1), v_left);
       v_left := v_left - v_off;
@@ -175,7 +176,6 @@ DECLARE
   v_min_hours integer;
   v_max_players integer;
   v_code public.discount_codes;
-  v_reason text;
   v_before numeric[];
   v_after numeric[];
   v_item jsonb;
@@ -239,14 +239,6 @@ BEGIN
       USING ERRCODE = '22000';
   END IF;
 
-  -- The code is locked so two checkouts can't both take its last use
-  IF nullif(trim(coalesce(p_discount_code, '')), '') IS NOT NULL THEN
-    SELECT * INTO v_code FROM public.discount_codes WHERE code = upper(trim(p_discount_code)) FOR UPDATE;
-    IF NOT FOUND THEN RAISE EXCEPTION 'DISCOUNT_INVALID: There is no such code.' USING ERRCODE = 'P0001'; END IF;
-    v_reason := public.discount_code_refusal(v_code);
-    IF v_reason IS NOT NULL THEN RAISE EXCEPTION 'DISCOUNT_INVALID: %', v_reason USING ERRCODE = 'P0001'; END IF;
-  END IF;
-
   -- Lets hold_court_booking accept v_basket for this transaction only (see its p_basket_id guard)
   PERFORM set_config('app.hold_basket_id', v_basket::text, true);
 
@@ -290,12 +282,22 @@ BEGIN
     UPDATE public.bookings SET player_count = p_player_count WHERE basket_id = v_basket;
   END IF;
 
+  -- The code is checked only once the courts are held (a refused code rolls them back), with one message for every
+  -- refusal: a direct call can't tell an unknown code from a real one. The Apply preview (rate limited) gives reasons.
+  -- The row lock stops two checkouts both taking a code's last use.
+  IF nullif(trim(coalesce(p_discount_code, '')), '') IS NOT NULL THEN
+    SELECT * INTO v_code FROM public.discount_codes WHERE code = upper(trim(p_discount_code)) FOR UPDATE;
+    IF NOT FOUND OR public.discount_code_refusal(v_code) IS NOT NULL THEN
+      RAISE EXCEPTION 'DISCOUNT_INVALID: This code can''t be used for this booking.' USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
   -- The code comes off the held prices, so the QR Ph charge equals what the bookings and payments record
   IF v_code.id IS NOT NULL THEN
     SELECT array_agg((x->>'amount')::numeric ORDER BY o) INTO v_before FROM jsonb_array_elements(v_items) WITH ORDINALITY t(x, o);
     v_after := public.discounted_amounts(v_code.kind, v_code.value, v_before);
     IF v_after IS NULL THEN
-      RAISE EXCEPTION 'DISCOUNT_INVALID: This code is worth more than this booking. Ask the front desk.' USING ERRCODE = 'P0001';
+      RAISE EXCEPTION 'DISCOUNT_INVALID: This code can''t be used for this booking.' USING ERRCODE = 'P0001';
     END IF;
     v_total := 0;
     FOR i IN 1 .. jsonb_array_length(v_items) LOOP
@@ -316,5 +318,56 @@ END;
 $function$;
 REVOKE EXECUTE ON FUNCTION public.hold_court_basket(date, jsonb, timestamptz, integer, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.hold_court_basket(date, jsonb, timestamptz, integer, text) TO authenticated, service_role;
+
+-- 5. The admin customer list labels guests (type stays 'registered': a guest is a profile, booked by user id)
+CREATE OR REPLACE VIEW public.customer_directory WITH (security_invoker = true) AS
+SELECT p.id,
+    'registered'::text AS type,
+    p.full_name,
+    p.email,
+    p.phone,
+    p.created_at,
+    h.bookings_count,
+    h.last_visit,
+    h.no_shows,
+    m.total_spent,
+    n.note,
+    p.is_guest
+   FROM profiles p
+     CROSS JOIN LATERAL ( SELECT count(*) FILTER (WHERE b.status = ANY (ARRAY['confirmed'::text, 'checked_in'::text, 'in_progress'::text, 'completed'::text, 'no_show'::text]))::integer AS bookings_count,
+            max(b.booking_date) FILTER (WHERE b.status = ANY (ARRAY['checked_in'::text, 'in_progress'::text, 'completed'::text])) AS last_visit,
+            count(*) FILTER (WHERE b.status = 'no_show'::text)::integer AS no_shows
+           FROM bookings b
+          WHERE b.user_id = p.id) h
+     CROSS JOIN LATERAL ( SELECT COALESCE(sum(pay.amount) FILTER (WHERE pay.status = 'paid'::text), 0::numeric) AS total_spent
+           FROM payments pay
+             JOIN bookings b ON b.id = pay.booking_id
+          WHERE b.user_id = p.id) m
+     LEFT JOIN customer_notes n ON n.person_id = p.id
+  WHERE COALESCE(p.role, ''::text) <> 'admin'::text
+UNION ALL
+ SELECT c.id,
+    'walk_in'::text AS type,
+    c.full_name,
+    c.email,
+    c.phone,
+    c.created_at,
+    h.bookings_count,
+    h.last_visit,
+    h.no_shows,
+    m.total_spent,
+    n.note,
+    false AS is_guest
+   FROM customers c
+     CROSS JOIN LATERAL ( SELECT count(*) FILTER (WHERE b.status = ANY (ARRAY['confirmed'::text, 'checked_in'::text, 'in_progress'::text, 'completed'::text, 'no_show'::text]))::integer AS bookings_count,
+            max(b.booking_date) FILTER (WHERE b.status = ANY (ARRAY['checked_in'::text, 'in_progress'::text, 'completed'::text])) AS last_visit,
+            count(*) FILTER (WHERE b.status = 'no_show'::text)::integer AS no_shows
+           FROM bookings b
+          WHERE b.customer_id = c.id) h
+     CROSS JOIN LATERAL ( SELECT COALESCE(sum(pay.amount) FILTER (WHERE pay.status = 'paid'::text), 0::numeric) AS total_spent
+           FROM payments pay
+             JOIN bookings b ON b.id = pay.booking_id
+          WHERE b.customer_id = c.id) m
+     LEFT JOIN customer_notes n ON n.person_id = c.id;
 
 COMMIT;

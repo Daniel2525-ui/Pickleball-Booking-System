@@ -117,6 +117,57 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.hold_court_basket(date, jsonb, timestamptz) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.hold_court_basket(date, jsonb, timestamptz) TO authenticated, service_role;
 
+DROP VIEW public.customer_directory;
+CREATE VIEW public.customer_directory WITH (security_invoker = true) AS
+SELECT p.id,
+    'registered'::text AS type,
+    p.full_name,
+    p.email,
+    p.phone,
+    p.created_at,
+    h.bookings_count,
+    h.last_visit,
+    h.no_shows,
+    m.total_spent,
+    n.note
+   FROM profiles p
+     CROSS JOIN LATERAL ( SELECT count(*) FILTER (WHERE b.status = ANY (ARRAY['confirmed'::text, 'checked_in'::text, 'in_progress'::text, 'completed'::text, 'no_show'::text]))::integer AS bookings_count,
+            max(b.booking_date) FILTER (WHERE b.status = ANY (ARRAY['checked_in'::text, 'in_progress'::text, 'completed'::text])) AS last_visit,
+            count(*) FILTER (WHERE b.status = 'no_show'::text)::integer AS no_shows
+           FROM bookings b
+          WHERE b.user_id = p.id) h
+     CROSS JOIN LATERAL ( SELECT COALESCE(sum(pay.amount) FILTER (WHERE pay.status = 'paid'::text), 0::numeric) AS total_spent
+           FROM payments pay
+             JOIN bookings b ON b.id = pay.booking_id
+          WHERE b.user_id = p.id) m
+     LEFT JOIN customer_notes n ON n.person_id = p.id
+  WHERE COALESCE(p.role, ''::text) <> 'admin'::text
+UNION ALL
+ SELECT c.id,
+    'walk_in'::text AS type,
+    c.full_name,
+    c.email,
+    c.phone,
+    c.created_at,
+    h.bookings_count,
+    h.last_visit,
+    h.no_shows,
+    m.total_spent,
+    n.note
+   FROM customers c
+     CROSS JOIN LATERAL ( SELECT count(*) FILTER (WHERE b.status = ANY (ARRAY['confirmed'::text, 'checked_in'::text, 'in_progress'::text, 'completed'::text, 'no_show'::text]))::integer AS bookings_count,
+            max(b.booking_date) FILTER (WHERE b.status = ANY (ARRAY['checked_in'::text, 'in_progress'::text, 'completed'::text])) AS last_visit,
+            count(*) FILTER (WHERE b.status = 'no_show'::text)::integer AS no_shows
+           FROM bookings b
+          WHERE b.customer_id = c.id) h
+     CROSS JOIN LATERAL ( SELECT COALESCE(sum(pay.amount) FILTER (WHERE pay.status = 'paid'::text), 0::numeric) AS total_spent
+           FROM payments pay
+             JOIN bookings b ON b.id = pay.booking_id
+          WHERE b.customer_id = c.id) m
+     LEFT JOIN customer_notes n ON n.person_id = c.id;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.customer_directory TO authenticated;
+GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.customer_directory TO service_role;
+
 DROP FUNCTION public.check_discount_code(text, numeric[]);
 DROP FUNCTION public.discounted_amounts(text, numeric, numeric[]);
 DROP FUNCTION public.discount_code_refusal(public.discount_codes);

@@ -36,8 +36,10 @@ interface BookingModalProps {
   isGuest: boolean;
   /** Most players this checkout takes (per-court limit × courts) */
   maxPlayers: number;
-  /** "Have an account? Sign in": keeps the courts and goes to the sign-in page */
-  onSignIn: () => void;
+  /** Each stored booking's price, as the server holds them (a run over midnight is two); the code preview uses these */
+  checkoutAmounts?: number[];
+  /** "Sign in" or "Create an account": keeps the courts and goes to that page */
+  onSignIn: (page: "/login" | "/register") => void;
 }
 
 const hrs = (n: number) => `${n} ${n === 1 ? "hour" : "hours"}`;
@@ -46,7 +48,7 @@ const hrs = (n: number) => `${n} ${n === 1 ? "hour" : "hours"}`;
  * Checkout: what is being bought, the player's details (guests), number of players, a discount code, how QR Ph
  * payment works, the policy, and one button that names the amount.
  */
-export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, onConfirm, isGuest, maxPlayers, onSignIn }: BookingModalProps) => {
+export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, onConfirm, isGuest, maxPlayers, onSignIn, checkoutAmounts }: BookingModalProps) => {
   const venue = useVenueContact();
   const [agreed, setAgreed] = useState(true);
   const [guest, setGuest] = useState({ full_name: "", phone: "", email: "" });
@@ -59,7 +61,7 @@ export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, on
   const { total: subtotal, hasPeak } = basketTotal(lines);
   const totalHours = lines.reduce((sum, l) => sum + (l.duration || 1), 0);
   // A code is worth what it was checked against: a changed basket needs it applied again
-  const amounts = lines.map((l) => l.price);
+  const amounts = checkoutAmounts?.length ? checkoutAmounts : lines.map((l) => l.price);
   const code = applied && applied.forAmounts === amounts.join(",") ? applied : null;
   const total = code ? subtotal - code.discount : subtotal;
   const playerCount = Math.max(1, Math.min(players, maxPlayers));
@@ -149,9 +151,15 @@ export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, on
               <section aria-labelledby="guest-details-title" className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <h3 id="guest-details-title" className="font-semibold">Your details</h3>
-                  <button type="button" onClick={onSignIn} className="text-sm font-semibold text-primary hover:underline underline-offset-4">
-                    Have an account? Sign in
-                  </button>
+                  <span className="text-sm">
+                    <button type="button" onClick={() => onSignIn("/login")} className="font-semibold text-primary hover:underline underline-offset-4">
+                      Have an account? Sign in
+                    </button>
+                    <span className="text-muted-foreground"> or </span>
+                    <button type="button" onClick={() => onSignIn("/register")} className="font-semibold text-primary hover:underline underline-offset-4">
+                      create one
+                    </button>
+                  </span>
                 </div>
                 <p className="-mt-2 text-sm text-muted-foreground">For your confirmation and receipt. No account needed.</p>
                 <div className="flex flex-col gap-1.5">
