@@ -6,6 +6,7 @@ import {
     validateBasketLines,
 } from "../src/lib/services/bookings/validateBookingSlot.service.ts";
 import { getBookingStart } from "../src/lib/utils/bookingTime.ts";
+import { businessDayWindows } from "../src/lib/services/schedule/hoursRules.ts";
 
 // 3. Admin-configured duration limits are enforced (pricing itself: tests/quote-court-price.test.mjs)
 test("validateBookingSlot enforces the configured minimum and has no maximum length", () => {
@@ -289,8 +290,8 @@ test("validateBasketLines validates each line and names the offending court", ()
         { court_id: "c2", start_time: "10:00", end_time: "12:00" },
     ] });
     assert.deepEqual(ok, { valid: true, lines: [
-        { courtId: "c1", courtName: "Court 1", startTimeDb: "08:00:00", endTimeDb: "09:00:00" },
-        { courtId: "c2", courtName: "Court 2", startTimeDb: "10:00:00", endTimeDb: "12:00:00" },
+        { courtId: "c1", courtName: "Court 1", bookingDate: "2026-10-25", startTimeDb: "08:00:00", endTimeDb: "09:00:00" },
+        { courtId: "c2", courtName: "Court 2", bookingDate: "2026-10-25", startTimeDb: "10:00:00", endTimeDb: "12:00:00" },
     ] });
 
     const bad = validateBasketLines({ ...base, lines: [
@@ -324,4 +325,42 @@ test("validateBasketLines validates each line and names the offending court", ()
     assert.equal(validateBasketLines({ ...base, lines: [] }).valid, false);
     assert.equal(validateBasketLines({ ...base, lines: "x" }).valid, false);
     assert.equal(validateBasketLines({ ...base, lines: [{ court_id: "c1", start_time: 8, end_time: "09:00" }] }).valid, false);
+});
+
+// A night's after-midnight hours are booked with its day, stored on the next date
+test("validateBasketLines takes a date per line and counts the minimum across midnight", () => {
+    const open = (day, o, c) => ({ day_of_week: day, is_open: true, open_time: o, close_time: c });
+    const hours = [open("Friday", "22:00", "02:00"), open("Saturday", "08:00", "22:00")];
+    const base = {
+        bookingDate: "2026-11-06",
+        windows: businessDayWindows("2026-11-06", hours),
+        limits: { min_hours: 2 },
+        courts: [{ id: "c1", name: "Court 1", status: "active" }, { id: "c2", name: "Court 2", status: "active" }],
+        now: new Date("2026-11-05T12:00:00+08:00"),
+    };
+    const line = (court_id, booking_date, start_time, end_time) => ({ court_id, booking_date, start_time, end_time });
+
+    const run = validateBasketLines({ ...base, lines: [line("c1", "2026-11-06", "23:00", "24:00"), line("c1", "2026-11-07", "00:00", "01:00")] });
+    assert.deepEqual(run, { valid: true, lines: [
+        { courtId: "c1", courtName: "Court 1", bookingDate: "2026-11-06", startTimeDb: "23:00:00", endTimeDb: "24:00:00" },
+        { courtId: "c1", courtName: "Court 1", bookingDate: "2026-11-07", startTimeDb: "00:00:00", endTimeDb: "01:00:00" },
+    ] });
+    // Alone, one after-midnight hour is under the 2-hour minimum; so is an hour that doesn't join it on another court
+    assert.deepEqual(validateBasketLines({ ...base, lines: [line("c1", "2026-11-07", "00:00", "01:00")] }),
+        { valid: false, error: "Court 1: Bookings must be at least 2 hours long, in whole hours." });
+    assert.equal(validateBasketLines({ ...base, lines: [line("c1", "2026-11-06", "23:00", "24:00"), line("c2", "2026-11-07", "00:00", "01:00")] }).valid, false);
+    assert.equal(validateBasketLines({ ...base, lines: [line("c1", "2026-11-07", "00:00", "02:00")] }).valid, true);
+
+    const outside = "Court 1: The selected time range falls outside venue operating hours.";
+    assert.deepEqual(validateBasketLines({ ...base, lines: [line("c1", "2026-11-07", "02:00", "04:00")] }), { valid: false, error: outside });
+    assert.deepEqual(validateBasketLines({ ...base, lines: [line("c1", "2026-11-08", "00:00", "02:00")] }), { valid: false, error: outside });
+    // Saturday's own morning is not part of Friday's booking day
+    assert.deepEqual(validateBasketLines({ ...base, lines: [line("c1", "2026-11-07", "08:00", "10:00")] }), { valid: false, error: outside });
+
+    assert.deepEqual(validateBasketLines({ ...base, lines: [line("c1", "2026-11-07", "00:00", "02:00"), line("c1", "2026-11-07", "01:00", "02:00")] }),
+        { valid: false, error: "Court 1: two of your times overlap." });
+    // Same clock hours on different dates don't overlap
+    assert.equal(validateBasketLines({ ...base, limits: { min_hours: 1 }, lines: [line("c1", "2026-11-06", "23:00", "24:00"), line("c1", "2026-11-07", "00:00", "01:00")] }).valid, true);
+    assert.deepEqual(validateBasketLines({ ...base, lines: [{ court_id: "c1", booking_date: 7, start_time: "00:00", end_time: "02:00" }] }),
+        { valid: false, error: "Line 1: Missing required booking details." });
 });

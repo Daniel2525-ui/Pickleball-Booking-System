@@ -4,13 +4,13 @@ import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import { validateBasketLines } from "@/lib/services/bookings/validateBookingSlot.service";
-import { bookableWindows } from "@/lib/services/schedule/hoursRules";
+import { businessDayWindows } from "@/lib/services/schedule/hoursRules";
 import { openBasketCheckout, QR_PH_NOT_CONFIGURED } from "@/lib/services/payments/openBasketCheckout";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
 
 interface HeldBasket {
     basket_id: string;
-    items: { booking_id: string; payment_id: string; court_name: string; start_time: string; end_time: string; amount: number | string }[];
+    items: { booking_id: string; payment_id: string; court_name: string; booking_date: string; start_time: string; end_time: string; amount: number | string }[];
 }
 
 export async function POST(request: NextRequest) {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         const booking_date = body?.booking_date;
         const lines: unknown = body?.lines;
 
-        if (typeof booking_date !== "string" || !booking_date) {
+        if (typeof booking_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(booking_date) || Number.isNaN(Date.parse(booking_date))) {
             return Response.json(
                 { error: "Missing required booking details." },
                 { status: 400 }
@@ -58,8 +58,7 @@ export async function POST(request: NextRequest) {
             ? await supabase.from("courts").select("id, name, status").in("id", courtIds)
             : { data: [] };
 
-        // Query operating hours for target date in Asia/Manila
-        // The whole week: late-night hours on this date come from the previous day's row
+        // The whole week: the business day's after-midnight hours come from its row but sit on the next date
         const [{ data: weeklyHours, error: opError }, { data: limits, error: limitsError }] = await Promise.all([
             supabase.from("operating_hours").select("day_of_week, is_open, open_time, close_time"),
             supabase.from("booking_settings").select("min_hours").maybeSingle(),
@@ -72,13 +71,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Server-side validation of every line: shape, one per court, whole-hour boundaries,
-        // duration limits, operating hours, and past dates
+        // Server-side validation of every line: shape, its date within this business day, whole-hour boundaries,
+        // duration limits (a run across midnight counts as one), operating hours, and past dates
         const validation = validateBasketLines({
             bookingDate: booking_date,
             lines,
             courts: courts ?? [],
-            windows: bookableWindows(booking_date, weeklyHours ?? []),
+            windows: businessDayWindows(booking_date, weeklyHours ?? []),
             limits,
         });
 
@@ -107,6 +106,7 @@ export async function POST(request: NextRequest) {
             p_booking_date: booking_date,
             p_lines: validation.lines.map((l) => ({
                 court_id: l.courtId,
+                booking_date: l.bookingDate,
                 start_time: l.startTimeDb,
                 end_time: l.endTimeDb,
             })),
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
                 bookingId: item.booking_id,
                 paymentId: item.payment_id,
                 courtName: item.court_name,
-                bookingDate: booking_date,
+                bookingDate: item.booking_date,
                 startTime: item.start_time,
                 endTime: item.end_time,
                 amount: Number(item.amount),
