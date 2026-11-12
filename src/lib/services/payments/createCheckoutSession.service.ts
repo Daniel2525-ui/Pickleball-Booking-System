@@ -1,29 +1,17 @@
-import { slotTimes } from "../bookings/checkSlotAvailability.service";
-
 interface CheckoutParams {
-    date: Date;
-    lines: { courtId: string; timeRange: string }[];
+    /** The business day being booked (YYYY-MM-DD, Manila) */
+    bookingDate: string;
+    /** Stored bookings: its after-midnight hours carry the next date */
+    lines: { court_id: string; booking_date: string; start_time: string; end_time: string }[];
 }
 
-export const createCheckoutSession = async ({
-    date,
-    lines,
-}: CheckoutParams): Promise<string> => {
-    const dateStr = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Manila",
-    }).format(date);
-
-    const apiLines = lines.map(({ courtId, timeRange }) => {
-        const { start, end } = slotTimes(timeRange);
-        return { court_id: courtId, start_time: start, end_time: end };
-    });
-
+export const createCheckoutSession = async ({ bookingDate, lines }: CheckoutParams): Promise<string> => {
     const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            booking_date: dateStr,
-            lines: apiLines,
+            booking_date: bookingDate,
+            lines,
         }),
     });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, LogIn, Calendar, Clock, QrCode, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,21 +31,33 @@ import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
 import { generateTimeSlots } from "@/lib/services/schedule/generateTimeSlots.service";
-import { windowsForWeekday } from "@/lib/services/schedule/hoursRules";
 import { fetchUpcomingClosures, VenueClosure } from "@/lib/services/schedule/venueClosures.service";
-import { formatManilaDate, lateNightLabel } from "@/lib/utils/bookingTime";
+import { businessToday, formatManilaDate } from "@/lib/utils/bookingTime";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { checkSlotAvailability, getSlotBooking, slotTimes } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { createCheckoutSession } from "@/lib/services/payments/createCheckoutSession.service";
 import { resumeBookingPayment } from "@/lib/services/bookings/resumeBookingPayment.service";
 import { cancelBooking } from "@/lib/services/bookings/cancelBooking.service";
 import { BasketSheet, BASKET_SHEET_PADDING } from "@/components/customers/basket-sheet";
-import { lineKey, mergeSpans, removeLine, splitTakenLines } from "@/lib/services/bookings/basket";
+import { lineKey, mergeSpans, midnightIndex, removeLine, splitAtMidnight, splitTakenLines } from "@/lib/services/bookings/basket";
 import { BookingCountdown } from "@/components/customers/booking-countdown";
 import { compactRange } from "@/lib/services/bookings/quickStarts";
 
 // A guest's basket survives the trip to /login (this tab only); restored once they are signed in
 const PENDING_BASKET_KEY = "crosshair:pending-basket";
+
+// A YYYY-MM-DD date as local midnight, like the day strip's dates
+const dayStart = (ymd: string) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+const plusDays = (d: Date, days: number) => {
+  const n = new Date(d);
+  n.setDate(n.getDate() + days);
+  return n;
+};
+// A day's bookings and the next date's, where its after-midnight hours are stored
+const fetchBusinessDay = (d: Date) => Promise.all([fetchBookingsForDate(d), fetchBookingsForDate(plusDays(d, 1))]);
 
 export const BookingContainer = () => {
   const router = useRouter();
@@ -59,6 +71,10 @@ export const BookingContainer = () => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [pricing, setPricing] = useState<Pricing | null>(null);
   const [bookings, setBookings] = useState<BookingSlot[]>([]);
+  // The next date's bookings: they hold this day's after-midnight hours
+  const [tailBookings, setTailBookings] = useState<BookingSlot[]>([]);
+  // Set when a saved basket picks the date, so the business-day default below doesn't move it
+  const restoredDate = useRef(false);
   const [loading, setLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -82,10 +98,12 @@ export const BookingContainer = () => {
       }
       if (!saved?.lines?.length) return;
       const date = new Date(saved.date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (isNaN(date.getTime()) || new Date(date).setHours(0, 0, 0, 0) < today.getTime()) return;
+      // Yesterday may still be the business day (after midnight); the checkout API refuses hours already past
+      const yesterday = plusDays(new Date(), -1);
+      yesterday.setHours(0, 0, 0, 0);
+      if (isNaN(date.getTime()) || new Date(date).setHours(0, 0, 0, 0) < yesterday.getTime()) return;
       // Availability is re-checked by the checkout API; a taken court is dropped from the basket there
+      restoredDate.current = true;
       setSelectedDateRaw(date);
       setBasket(saved.lines.map((line) => ({ ...line, date })));
       setIsDialogOpen(true);
@@ -111,7 +129,12 @@ export const BookingContainer = () => {
       ]);
       setClosures(closuresRes.data);
       if (hoursRes.data) setOperatingHours(hoursRes.data);
-      if (pricingRes.data) setPricing(pricingRes.data);
+      if (pricingRes.data) {
+        setPricing(pricingRes.data);
+        // Past midnight the day can still be running (open till 2 AM): open on it, not on the calendar date
+        const day = businessToday(pricingRes.data.settings.day_ends_at);
+        if (!restoredDate.current && day !== formatManilaDate(new Date())) setSelectedDateRaw(dayStart(day));
+      }
       if (courtsRes.data) {
         setCourts(courtsRes.data);
       }
@@ -133,16 +156,18 @@ export const BookingContainer = () => {
   // Load bookings when selected date changes
   const refreshBookings = useCallback(async () => {
     setIsFetchingBookings(true);
-    const { data } = await fetchBookingsForDate(selectedDate);
-    setBookings(data);
+    const [own, tail] = await fetchBusinessDay(selectedDate);
+    setBookings(own.data);
+    setTailBookings(tail.data);
     setIsFetchingBookings(false);
   }, [selectedDate]);
 
   useEffect(() => {
     let ignore = false;
-    fetchBookingsForDate(selectedDate).then(({ data }) => {
+    fetchBusinessDay(selectedDate).then(([own, tail]) => {
       if (!ignore) {
-        setBookings(data);
+        setBookings(own.data);
+        setTailBookings(tail.data);
         setIsFetchingBookings(false);
       }
     });
@@ -171,18 +196,28 @@ export const BookingContainer = () => {
     () => generateTimeSlots(selectedDate, operatingHours, closures.map((c) => c.closed_on)),
     [operatingHours, selectedDate, closures]
   );
-  // Slot indexes that start after a gap (late-night hours end, the morning opens): a booking never spans one
+  // Slots from here on are the day's after-midnight hours, stored on the next date
+  const tailFrom = useMemo(() => midnightIndex(timeSlots), [timeSlots]);
+  const nextDate = useMemo(() => plusDays(selectedDate, 1), [selectedDate]);
+  const isTail = useCallback((time: string) => timeSlots.indexOf(time) >= tailFrom, [timeSlots, tailFrom]);
+  // Slot indexes that start after a gap in the day: a picked run never spans one. Midnight is not a gap:
+  // a run over it is split into two stored bookings at checkout (splitAtMidnight).
   const breaks = useMemo(
-    () => new Set(timeSlots.flatMap((t, i) => (i > 0 && slotTimes(timeSlots[i - 1]).end !== slotTimes(t).start ? [i] : []))),
-    [timeSlots]
+    () => new Set(timeSlots.flatMap((t, i) => (i > 0 && i !== tailFrom && slotTimes(timeSlots[i - 1]).end !== slotTimes(t).start ? [i] : []))),
+    [timeSlots, tailFrom]
   );
 
-  // Check if a slot is booked by comparing against real bookings
+  // A slot's status against its own date's bookings: after-midnight slots against the next date's
+  const statusIn = useCallback(
+    (own: BookingSlot[], tail: BookingSlot[], courtName: string, timeRange: string) =>
+      isTail(timeRange)
+        ? checkSlotAvailability(courtName, timeRange, courts, tail, nextDate, user?.id)
+        : checkSlotAvailability(courtName, timeRange, courts, own, selectedDate, user?.id),
+    [isTail, courts, nextDate, selectedDate, user?.id]
+  );
   const getSlotStatus = useCallback(
-    (_date: Date, courtName: string, timeRange: string) => {
-      return checkSlotAvailability(courtName, timeRange, courts, bookings, _date, user?.id);
-    },
-    [courts, bookings, user?.id]
+    (_date: Date, courtName: string, timeRange: string) => statusIn(bookings, tailBookings, courtName, timeRange),
+    [statusIn, bookings, tailBookings]
   );
 
   // Admin-configured booking length (booking_settings); the database enforces the same limits
@@ -224,7 +259,14 @@ export const BookingContainer = () => {
   // A basket line for courtName covering `duration` slots from slot index `start`
   const makeLine = (courtName: string, start: number, duration: number): Slot => {
     const startSlot = timeSlots[start];
-    const { total: price, hasPeak } = priceFor(selectedDate, startSlot, duration);
+    // Each stored part is priced on its own date (a 12 AM hour on the next date is still this day's rate)
+    const quotes = pricing
+      ? splitAtMidnight(timeSlots, [start, start + duration], selectedDateStr).map((p) =>
+          quoteCourtPrice(pricing, p.booking_date, p.start_time, Number(p.end_time.slice(0, 2)) - Number(p.start_time.slice(0, 2)))
+        )
+      : [];
+    const price = quotes.reduce((sum, q) => sum + q.total, 0);
+    const hasPeak = quotes.some((q) => q.hasPeak);
     return {
       date: selectedDate,
       court: courtName,
@@ -248,13 +290,13 @@ export const BookingContainer = () => {
 
     // If user clicked their own pending slot, allow them to resume or cancel
     if (status === "user_pending") {
-      const slotBooking = getSlotBooking(courtName, time, courts, bookings);
+      const slotBooking = getSlotBooking(courtName, time, courts, isTail(time) ? tailBookings : bookings);
       if (slotBooking?.id) {
         setPendingBookingToResume({
           bookingId: slotBooking.id,
           courtName,
           time,
-          date: selectedDate,
+          date: isTail(time) ? nextDate : selectedDate,
           holdExpiresAt: slotBooking.hold_expires_at,
         });
         return;
@@ -325,7 +367,7 @@ export const BookingContainer = () => {
   const dayNote = (d: Date) => {
     const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
     const own = operatingHours.find((h) => h.day_of_week === weekday && h.is_open);
-    if (closures.some((c) => c.closed_on === formatManilaDate(d)) || windowsForWeekday(weekday, operatingHours).length === 0 || !own) {
+    if (!own || generateTimeSlots(d, operatingHours, closures.map((c) => c.closed_on)).length === 0) {
       return { closed: true, text: "Closed" };
     }
     return { closed: false, text: `till ${formatTime12h(own.close_time).replace(":00 ", " ")}` };
@@ -335,7 +377,9 @@ export const BookingContainer = () => {
     (n, court) => n + timeSlots.filter((time) => getSlotStatus(selectedDate, court, time) === "available").length,
     0
   );
-  const isToday = selectedDate.toDateString() === new Date().toDateString();
+  // The day strip starts on the business day: at 12:30 AM a day open till 2 AM is still "Today"
+  const firstDay = dayStart(businessToday(pricing?.settings.day_ends_at));
+  const isToday = selectedDate.toDateString() === firstDay.toDateString();
   const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
   // The day's own closing time when it has one (2 AM for a late close, not the midnight its last slot here ends at)
   const ownClose = operatingHours.find((h) => h.day_of_week === dayName && h.is_open)?.close_time;
@@ -386,25 +430,27 @@ export const BookingContainer = () => {
     setCheckoutError(null);
 
     try {
-      const lines = basket.map((line) => {
+      // A run over midnight is stored as two bookings, one on each date
+      const lines = basket.flatMap((line) => {
         const court = courts.find((c) => c.name === line.court);
         if (!court) throw new Error("Court not found");
-        return { courtId: court.id, timeRange: line.time };
+        return splitAtMidnight(timeSlots, lineSpan(line), selectedDateStr).map((part) => ({ court_id: court.id, ...part }));
       });
 
-      const url = await createCheckoutSession({ date: basket[0].date, lines });
+      const url = await createCheckoutSession({ bookingDate: selectedDateStr, lines });
 
       window.location.assign(url);
     } catch (err: unknown) {
       setCheckoutError((err as Error).message || "An unexpected error occurred");
       setIsCheckoutLoading(false);
       // Drop courts someone else took meanwhile, or every retry fails with the same 409
-      const { data: fresh } = await fetchBookingsForDate(selectedDate);
-      setBookings(fresh);
+      const [fresh, freshTail] = await fetchBusinessDay(selectedDate);
+      setBookings(fresh.data);
+      setTailBookings(freshTail.data);
       const { kept, dropped } = splitTakenLines(basket, (line) => {
         const start = timeSlots.indexOf(line.startSlot || line.time);
         return Array.from({ length: line.duration || 1 }, (_, i) => timeSlots[start + i]).every(
-          (slot) => slot && checkSlotAvailability(line.court, slot, courts, fresh, selectedDate, user.id) === "available"
+          (slot) => slot && statusIn(fresh.data, freshTail.data, line.court, slot) === "available"
         );
       });
       if (dropped.length > 0) {
@@ -474,8 +520,7 @@ export const BookingContainer = () => {
             onClick={() => {
               const d = new Date(selectedDate);
               d.setDate(d.getDate() - 1);
-              const today = new Date(); today.setHours(0, 0, 0, 0);
-              if (d >= today) setSelectedDate(d);
+              if (d >= firstDay) setSelectedDate(d);
             }}
             className="size-11 shrink-0 rounded-xl border bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
             aria-label="Previous day"
@@ -485,9 +530,7 @@ export const BookingContainer = () => {
           <div className="flex-1 overflow-x-auto scrollbar-none">
             <div className="flex gap-2 pb-1">
               {Array.from({ length: 7 }).map((_, i) => {
-                const d = new Date();
-                d.setHours(0, 0, 0, 0);
-                d.setDate(d.getDate() + i);
+                const d = plusDays(firstDay, i);
                 const isSelected = d.toDateString() === selectedDate.toDateString();
                 const sub = dayNote(d);
                 return (
@@ -566,9 +609,9 @@ export const BookingContainer = () => {
                 getSlotStatus={getSlotStatus}
                 selectedSlots={basket}
                 isFetching={isFetchingBookings}
-                priceOf={(time) => priceFor(selectedDate, time, 1).total}
-                peakOf={(time) => priceFor(selectedDate, time, 1).hasPeak}
-                headingOf={(time) => lateNightLabel(selectedDateStr, slotTimes(time).start, pricing?.settings.day_ends_at) ?? dayName}
+                priceOf={(time) => priceFor(isTail(time) ? nextDate : selectedDate, time, 1).total}
+                peakOf={(time) => priceFor(isTail(time) ? nextDate : selectedDate, time, 1).hasPeak}
+                headingOf={(time) => (isTail(time) ? "After midnight" : dayName)}
               />
 
             </div>

@@ -2,7 +2,6 @@ import { Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Pricing } from "@/lib/services/pricing/quoteCourtPrice";
 import { basketTotal, lineKey } from "@/lib/services/bookings/basket";
-import { to24h } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { Slot } from "./types";
 
 /** Below lg the panel floats over the page bottom: the page pads by this much (keep in step with max-h below). */
@@ -19,7 +18,6 @@ interface BasketSheetProps {
 }
 
 const hrs = (n: number) => `${n} ${n === 1 ? "hr" : "hrs"}`;
-const startOf = (line: Slot) => to24h(line.time.split(" - ")[0].trim());
 
 /**
  * "Your selection": a sticky panel beside the grid from lg up (with an empty state), and below lg a panel over
@@ -42,9 +40,9 @@ export const BasketSheet = ({ lines, pricing, getMaxDuration, onDuration, onRemo
   const { min_hours: minHours } = pricing.settings;
   const totalHours = lines.reduce((sum, l) => sum + (l.duration || 1), 0);
 
-  // One block per court, courts in name order and times in clock order, whatever order they were tapped in
+  // One block per court, courts in name order; a court's lines are already in grid order (12 AM after 11 PM)
   const courts = [...new Set(lines.map((l) => l.court))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  const timesOn = (court: string) => lines.filter((l) => l.court === court).sort((a, b) => startOf(a).localeCompare(startOf(b)));
+  const timesOn = (court: string) => lines.filter((l) => l.court === court);
 
   return (
     <section

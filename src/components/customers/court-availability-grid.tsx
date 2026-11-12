@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import { Clock, LoaderCircle, ChevronDown, Moon } from "lucide-react";
 import { Slot } from "./types";
-import { SlotStatus, slotTimes } from "@/lib/services/bookings/checkSlotAvailability.service";
+import { SlotStatus } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { hourRangeLabel } from "@/lib/services/bookings/quickStarts";
 
 interface CourtAvailabilityGridProps {
@@ -72,16 +72,22 @@ export const CourtAvailabilityGrid = ({
   const visibleSlots = showPassed ? timeSlots : timeSlots.slice(passedCount);
   const headingBefore = (i: number) => showHeadings && headingOf!(visibleSlots[i]) !== (i > 0 ? headingOf!(visibleSlots[i - 1]) : null);
 
-  // The basket line covering this cell, and whether the cell is that line's first hour (where its label goes)
+  // The basket line covering this cell, and whether the cell is that line's first hour (where its label goes).
+  // By slot position, not clock time: a line can run past midnight (11 PM - 1 AM).
+  const spanOf = (l: Slot) => {
+    const s = timeSlots.indexOf(l.startSlot || l.time);
+    return [s, s + (l.duration || 1)] as const;
+  };
   const lineAt = (court: string, time: string) => {
-    const { start, end } = slotTimes(time);
+    const i = timeSlots.indexOf(time);
     return selectedSlots.find((l) => {
       if (l.court !== court) return false;
-      const sel = slotTimes(l.time);
-      return start >= sel.start && end <= sel.end;
+      const [s, e] = spanOf(l);
+      return i >= s && i < e;
     });
   };
-  const isFirst = (line: Slot, time: string) => slotTimes(line.time).start === slotTimes(time).start;
+  const isFirst = (line: Slot, time: string) => timeSlots.indexOf(time) === spanOf(line)[0];
+  const isLast = (line: Slot, time: string) => timeSlots.indexOf(time) === spanOf(line)[1] - 1;
 
   const passedToggle = passedCount > 0 && (
     <button
@@ -202,7 +208,7 @@ export const CourtAvailabilityGrid = ({
                   if (line) {
                     // One booking is one block: its hours join up, only the ends are rounded, the label sits on top
                     const first = isFirst(line, time);
-                    const last = slotTimes(line.time).end === slotTimes(time).end;
+                    const last = isLast(line, time);
                     const hours = line.duration || 1;
                     return (
                       <div key={court} className={`border-l border-border/60 px-1 ${first ? "pt-1" : ""} ${last ? "pb-1" : ""}`}>

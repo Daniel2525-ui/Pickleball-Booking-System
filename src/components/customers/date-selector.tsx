@@ -64,8 +64,8 @@ export const DateSelector = ({ selectedDate, onSelectDate, operatingHours }: Dat
   }, [viewMonth, viewYear]);
 
   const isDayOpen = (date: Date): boolean => {
-    // Open when anything is bookable: its own hours, or late-night hours left over from the day before
-    return windowsForWeekday(fullDays[date.getDay()], operatingHours).length > 0;
+    // Open when the day has its own hours (the night before's after-midnight hours belong to that day)
+    return windowsForWeekday(fullDays[date.getDay()], operatingHours).some((w) => !w.lateNight);
   };
 
   const getScheduleForDate = (date: Date): OperatingHour | undefined => {
