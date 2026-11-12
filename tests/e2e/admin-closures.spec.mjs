@@ -28,13 +28,13 @@ test("staff close a date and see the booking already on it", async ({ page }) =>
 
   await login(page, account("ADMIN"));
   await page.goto("/admin/schedules");
-  await page.getByLabel("Date", { exact: true }).fill(date);
+  await page.locator("#closure-date").fill(date); // the court blocks card has a "Date" field too
   const warning = page.getByRole("status").filter({ hasText: "already on" });
   await expect(warning.getByText(`1 booking is already on ${shortDate}`)).toBeVisible();
   await expect(warning.getByText(/E2E Booked Before/)).toBeVisible();
   await expect(warning.getByRole("link", { name: "09170000001" })).toBeVisible();
 
-  await page.getByLabel("Reason (optional)").fill("E2E Holiday");
+  await page.locator("#closure-reason").fill("E2E Holiday");
   await page.getByRole("button", { name: "Close this date" }).click();
   await expect(page.getByText(`Closed on ${shortDate}. Customers can no longer book it.`)).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "E2E Holiday" })).toContainText(shortDate);
@@ -47,7 +47,7 @@ test("customers see the date closed and cannot book it, even through checkout", 
   await login(page, account("CUSTOMER"));
   await page.goto("/#booking");
   await page.getByRole("button", { name: /Tmrw/ }).click();
-  await expect(page.getByText("The venue is closed on this date (E2E Holiday). Please select another date.")).toBeVisible();
+  await expect(page.getByText("The venue is closed on this date for E2E Holiday.")).toBeVisible();
 
   // A page opened before the closure would still offer slots: the database refuses the hold
   const res = await page.request.post("/api/stripe/checkout", {

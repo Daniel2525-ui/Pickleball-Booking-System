@@ -16,6 +16,7 @@ import {
 import { Slot } from "@/components/customers/types";
 import { DateSelector } from "@/components/customers/date-selector";
 import { CourtAvailabilityGrid, GridLegend } from "@/components/customers/court-availability-grid";
+import { VenueClosed } from "@/components/customers/venue-closed";
 import { BookingModal } from "@/components/customers/booking-modal";
 import { BookingScheduleSkeleton } from "@/components/skeletons/booking-schedule-skeleton";
 import { fetchOperatingHours } from "@/lib/services/schedule/fetchOperatingHours.service";
@@ -309,6 +310,18 @@ export const BookingContainer = () => {
     setShowLoginPrompt(true);
   };
 
+  // The next day with bookable hours (within a month), for the closed-day shortcut
+  const nextOpenDate = useMemo(() => {
+    if (timeSlots.length > 0) return null;
+    const closedDates = closures.map((c) => c.closed_on);
+    for (let i = 1; i <= 31; i++) {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() + i);
+      if (generateTimeSlots(d, operatingHours, closedDates).length > 0) return d;
+    }
+    return null;
+  }, [timeSlots, selectedDate, operatingHours, closures]);
+
   const dayNote = (d: Date) => {
     const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
     const own = operatingHours.find((h) => h.day_of_week === weekday && h.is_open);
@@ -560,11 +573,14 @@ export const BookingContainer = () => {
 
             </div>
           ) : (
-            <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed text-muted-foreground text-sm">
-              {closure?.reason
-                ? `The venue is closed on this date (${closure.reason}). Please select another date.`
-                : "The venue is closed on this date. Please select another date."}
-            </div>
+            <VenueClosed
+              date={selectedDate}
+              closedDate={!!closure}
+              reason={closure?.reason}
+              nextOpen={nextOpenDate}
+              onPick={setSelectedDate}
+              onPickAnother={() => setShowMobileCalendar(true)}
+            />
           )}
         </div>
         {pricing && (
