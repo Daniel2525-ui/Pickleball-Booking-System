@@ -51,7 +51,7 @@ export function BookingDetailsSheet({
             <SheetHeader className="border-b">
               <SheetTitle className="text-xl font-bold">{booking.customer_name || booking.profiles?.full_name || "Guest Player"}</SheetTitle>
               <SheetDescription>
-                {booking.customer_id ? "Walk-in guest" : "Registered player"} · Ref {bookingRef(booking)}
+                {booking.customer_id ? "Walk-in guest" : booking.profiles?.is_guest ? "Online guest (no account)" : "Registered player"} · Ref {bookingRef(booking)}
               </SheetDescription>
             </SheetHeader>
 
@@ -87,6 +87,13 @@ export function BookingDetailsSheet({
                   <Badge variant="outline" className={`capitalize ${statusClass}`}>{status}</Badge>
                   {payment && <Badge variant="outline">{bookingPaymentLabel(booking, payment)}</Badge>}
                 </div>
+                {(booking.player_count || booking.discount_codes?.code) && (
+                  <p className="text-xs text-muted-foreground">
+                    {booking.player_count ? `${booking.player_count} ${booking.player_count === 1 ? "player" : "players"}` : ""}
+                    {booking.player_count && booking.discount_codes?.code ? " · " : ""}
+                    {booking.discount_codes?.code ? `Code ${booking.discount_codes.code} · −₱${Number(booking.discount_amount ?? 0).toLocaleString()}` : ""}
+                  </p>
+                )}
                 {payment?.payment_reference && (
                   <p className="text-xs text-muted-foreground">
                     {paymentMethodLabel(payment)} reference <span className="font-mono">{payment.payment_reference}</span>

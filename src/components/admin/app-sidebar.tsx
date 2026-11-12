@@ -18,7 +18,7 @@ import {
     Layers,
     Users,
     Clock,
-    Tag,
+    Tag, TicketPercent,
     Wallet,
     Settings,
     UsersRound,
@@ -54,6 +54,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
             { title: "Hours & schedules", url: "/admin/schedules", icon: Clock },
             { title: "Open play", url: "/admin/open-play", icon: UsersRound },
             { title: "Prices", url: "/admin/pricing", ownerOnly: true, icon: Tag },
+            { title: "Discount codes", url: "/admin/discounts", ownerOnly: true, icon: TicketPercent },
         ],
     },
     {

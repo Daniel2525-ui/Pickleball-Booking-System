@@ -36,9 +36,17 @@ export interface Booking {
     /** Why a cancelled booking was cancelled (bookings_cancel_reason_check); null when unknown */
     cancel_reason?: string | null;
 
+    /** Players the checkout said are coming (one count per checkout); null for walk-ins and older bookings */
+    player_count?: number | null;
+    /** Pesos a discount code took off this booking */
+    discount_amount?: number | string | null;
+    discount_codes?: { code: string } | null;
+
     profiles?: {
         full_name: string;
         phone?: string | null;
+        /** Paid without an account (a guest checkout) */
+        is_guest?: boolean | null;
     } | null;
     customers?: {
         full_name: string;

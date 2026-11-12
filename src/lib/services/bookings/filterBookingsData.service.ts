@@ -60,8 +60,9 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
             .select(`
                 *,
                 ${courtsJoin},
-                profiles(full_name, phone),
+                profiles(full_name, phone, is_guest),
                 customers(full_name, phone, email),
+                discount_codes(code),
                 payments(id, status, amount, payment_method, payment_reference, paid_at)
             `)
             .order("booking_date", { ascending: false })

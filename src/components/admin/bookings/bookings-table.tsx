@@ -446,7 +446,9 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
                             {booking.customer_name || booking.profiles?.full_name || "Guest Player"}
                           </button>
                           <span className="text-[11px] text-muted-foreground">
-                            {booking.customer_id ? "Walk-In Guest" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(booking)}</span>
+                            {booking.customer_id ? "Walk-In Guest" : booking.profiles?.is_guest ? "Online guest (no account)" : "Registered Member"} · <span className="font-mono">Ref {bookingRef(booking)}</span>
+                            {booking.player_count ? <> · {booking.player_count} {booking.player_count === 1 ? "player" : "players"}</> : null}
+                            {booking.discount_codes?.code && <> · Code {booking.discount_codes.code}</>}
                             {(booking.basket_size ?? 1) > 1 && (
                               <span className="ml-1.5 rounded bg-muted px-1.5 py-px font-semibold text-foreground">Group · {booking.basket_size} bookings</span>
                             )}

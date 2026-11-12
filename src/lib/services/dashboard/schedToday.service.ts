@@ -20,6 +20,7 @@ export const todaysSchedule = async () => {
                 open_play_session_id,
                 open_play_spots,
                 customer_name,
+                player_count,
                 courts (
                     name
                 ),

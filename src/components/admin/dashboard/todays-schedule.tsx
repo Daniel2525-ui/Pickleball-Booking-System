@@ -53,6 +53,7 @@ interface ScheduleItem {
   court_id: string;
   open_play_session_id?: string | null;
   customer_name?: string | null;
+  player_count?: number | null;
   courts?: { name: string } | null;
   profiles?: { full_name: string } | null;
   customers?: { full_name: string } | null;
@@ -166,7 +167,10 @@ export default function TodaysSchedule({
                         </span>
                       )}
                       {!booking.open_play_session_id && (
-                        <span className="block font-mono text-[11px] font-normal text-muted-foreground">Ref {bookingRef(booking)}</span>
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          <span className="font-mono">Ref {bookingRef(booking)}</span>
+                          {booking.player_count ? ` · ${booking.player_count} ${booking.player_count === 1 ? "player" : "players"}` : ""}
+                        </span>
                       )}
                     </td>
 

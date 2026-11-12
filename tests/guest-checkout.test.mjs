@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseGuestDetails, checkPlayerCount, maxPlayers } from "../src/lib/services/bookings/guestDetails.ts";
-import { applyDiscount, normaliseCode } from "../src/lib/services/pricing/discounts.ts";
+import { applyDiscount, normaliseCode, parseDiscountInput } from "../src/lib/services/pricing/discounts.ts";
 
 test("guest details: name, a Philippine mobile number and an email, cleaned up", () => {
     assert.deepEqual(parseGuestDetails({ full_name: "  Juan Dela Cruz ", phone: "0917-123-4567", email: " Juan@Example.com " }), {
@@ -51,4 +51,21 @@ test("applyDiscount takes a percent off each line, or a fixed amount from the li
     assert.deepEqual(applyDiscount([200, 400], { kind: "fixed", value: 598 }), [1, 1]);
     // Worth more than the booking can give: refused, never part-applied
     assert.equal(applyDiscount([200, 400], { kind: "fixed", value: 599 }), null);
+});
+
+test("parseDiscountInput checks a new code and its limits", () => {
+    assert.deepEqual(parseDiscountInput({ code: " summer-10 ", kind: "percent", value: 10, starts_on: "", ends_on: "2026-12-31", max_uses: "" }), {
+        ok: true,
+        value: { code: "SUMMER-10", kind: "percent", value: 10, starts_on: null, ends_on: "2026-12-31", max_uses: null },
+    });
+    assert.equal(parseDiscountInput({ code: "FIX", kind: "fixed", value: 150.5, max_uses: 20 }).value.max_uses, 20);
+    const bad = (input) => parseDiscountInput({ code: "SAVE", kind: "percent", value: 10, ...input }).error;
+    assert.match(bad({ code: "x" }), /3 to 20/);
+    assert.match(bad({ kind: "free" }), /percent or a peso amount/);
+    assert.match(bad({ value: 95 }), /1 to 90/);
+    assert.match(bad({ value: 0 }), /1 to 90/);
+    assert.match(bad({ kind: "fixed", value: -5 }), /more than ₱0/);
+    assert.match(bad({ max_uses: 0 }), /whole number/);
+    assert.match(bad({ starts_on: "2026-12-10", ends_on: "2026-12-01" }), /end after it starts/);
+    assert.match(bad({ ends_on: "31/12/2026" }), /date/);
 });
