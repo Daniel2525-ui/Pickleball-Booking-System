@@ -73,7 +73,7 @@ test("the dashboard schedule shows how full today's open play session is", async
   }
 });
 
-test("staff add a walk-up and cancel the session, and payments land in Refund Owed", async ({ page }) => {
+test("staff add a walk-up and cancel the session, and paid players can be refunded", async ({ page }) => {
   await login(page, account("ADMIN"));
   await page.goto("/admin/open-play");
   await page.getByRole("row").filter({ hasText: shortDate }).getByRole("button", { name: "Actions" }).click();
@@ -93,9 +93,8 @@ test("staff add a walk-up and cancel the session, and payments land in Refund Ow
   expect(sql(`SELECT string_agg(DISTINCT status, ',') FROM public.bookings WHERE open_play_session_id = '${sessionId()}'`)).toBe("cancelled");
   expect(sql(`SELECT status FROM public.open_play_sessions WHERE session_date = '${date}'`)).toBe("cancelled");
 
-  await page.goto(`/admin/payments?status=${encodeURIComponent("Refund Owed")}`);
-  await expect(page.getByRole("row").filter({ hasText: "E2E Walkup Wendy" })).toHaveCount(1);
-  await expect(page.getByRole("row").filter({ hasText: "₱" })).toHaveCount(2);
+  await page.goto("/admin/payments");
+  await expect(page.getByRole("row").filter({ hasText: "E2E Walkup Wendy" }).getByRole("button", { name: "Refund" })).toHaveCount(1);
   expect(sql(`SELECT count(*) FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.open_play_session_id = '${sessionId()}' AND p.status = 'paid'`)).toBe("2");
 
   await openTomorrow(page);

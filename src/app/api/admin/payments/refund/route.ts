@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         const linked = ([] as { status: string; cancel_reason: string | null }[]).concat(payment.bookings ?? [])[0];
         const bookingStatus = linked?.status;
         if (linked?.cancel_reason === "payment_kept") {
-            return NextResponse.json({ error: "This payment was kept when the booking was cancelled, so it is not owed back." }, { status: 409 });
+            return NextResponse.json({ error: "This payment was kept when the booking was cancelled, so it is not refunded." }, { status: 409 });
         }
         if (payment.status !== "paid") {
             return NextResponse.json({ error: "Only paid payments can be refunded." }, { status: 409 });

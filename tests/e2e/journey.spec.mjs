@@ -130,7 +130,7 @@ test("4. the player sees it confirmed and non-refundable; staff cancel it with a
 
 test("5. staff pay the GCash refund back and the player sees it", async ({ page }) => {
   await login(page, account("ADMIN"));
-  await page.goto(`/admin/payments?status=${encodeURIComponent("Refund Owed")}`);
+  await page.goto("/admin/payments");
   const row = page.getByRole("row").filter({ hasText: player.name });
   await row.getByRole("button", { name: "Refund" }).click();
   const dialog = page.getByRole("dialog");

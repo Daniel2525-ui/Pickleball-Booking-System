@@ -304,7 +304,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
     if (!payment) return null;
     const label = bookingPaymentLabel(booking, payment);
     const paid = label.startsWith("Paid");
-    const waiting = label === "Unpaid" || label === "Refund owed";
+    const waiting = label === "Unpaid";
     const Icon = paid ? (payment.payment_method?.toLowerCase() === "cash" ? Banknote : Smartphone) : waiting ? Clock : null;
     const tone = paid
       ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"

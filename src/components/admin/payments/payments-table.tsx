@@ -81,11 +81,11 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const [totalsVersion, setTotalsVersion] = useState(0);
   const date = filters?.date ?? "";
 
-  // Paid payments on cancelled bookings are owed back to the customer
+  // Paid payments on cancelled bookings (not kept) can be refunded
   const needsRefund = (payment: Payment) =>
     payment.status === "paid" && payment.bookings?.status === "cancelled" && payment.bookings?.cancel_reason !== "payment_kept";
 
-  // Where the latest online refund for an owed payment stands. The app cannot send a QR Ph refund itself, so every state asks staff to do it
+  // Where the latest online refund for a cancelled payment stands. The app cannot send a QR Ph refund itself, so every state asks staff to do it
   const cardRefundState = (payment: Payment) => {
     const latest = [...(payment.refund_requests ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     switch (latest?.status) {

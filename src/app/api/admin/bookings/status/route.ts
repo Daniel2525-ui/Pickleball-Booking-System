@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
         const body = await request.json().catch(() => null);
         const bookingId = typeof body?.bookingId === "string" ? body.bookingId.trim() : "";
         const newStatus = typeof body?.status === "string" ? body.status.trim().toLowerCase() : "";
-        // Case by case: staff may cancel a paid booking and keep the payment (no refund owed), with a reason
+        // Case by case: staff may cancel a paid booking and keep the payment (no refund), with a reason
         const keepPayment = newStatus === "cancelled" && body?.keepPayment === true;
         const cancelNote = typeof body?.note === "string" ? body.note.trim() : "";
         if (keepPayment && (!cancelNote || cancelNote.length > 200)) {

@@ -22,7 +22,7 @@ export function PastSessionsTable({ sessions, loading, onPlayers }: { sessions: 
       <CardHeader>
         <CardTitle className="text-base font-bold">Past sessions (last 28 days)</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Money held counts payments still in hand: kept payments, and refunds owed until they are refunded.
+          Money held counts payments still in hand: kept payments, and paid ones not refunded yet.
         </p>
       </CardHeader>
       {/* Edge-to-edge table: its cell padding lines the text up with the card title */}

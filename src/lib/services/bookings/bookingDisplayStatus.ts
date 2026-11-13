@@ -41,7 +41,7 @@ export const cancellationNote = (booking: {
     if (booking.cancel_reason === "payment_kept") return { text: "Cancelled by the venue · Payment kept under the venue's cancellation policy", charged: true };
     const payments = booking.payments ?? [];
     const outstanding = payments.find((p) => p.status === "paid");
-    // A paid row on a cancelled booking is money still owed back: online refunds are sent by the venue, cash at the counter
+    // A paid row on a cancelled booking is money not refunded yet: online refunds are sent by the venue, cash at the counter
     const cardRefund =
         booking.refund_status === "failed" ? "Refund failed · The venue will contact you"
         : booking.refund_status === "requires_admin_review" ? "Refund delayed · The venue is checking it"

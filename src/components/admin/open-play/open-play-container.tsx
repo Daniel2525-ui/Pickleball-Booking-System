@@ -125,7 +125,7 @@ export function OpenPlayContainer() {
   const askCancel = (session: OpenPlayAdminSession) =>
     setConfirmRequest({
       title: "Cancel this session?",
-      description: "Everyone who booked is cancelled. Payments are not refunded automatically: they show as Refund Owed on Payments for players who ask. This cannot be undone.",
+      description: "Everyone who booked is cancelled. Payments are not refunded automatically: refund players who ask from the Payments page. This cannot be undone.",
       confirmLabel: "Cancel session",
       onConfirm: async () => {
         const res = await fetch("/api/admin/open-play/sessions/cancel", {

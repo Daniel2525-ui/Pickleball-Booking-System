@@ -77,7 +77,7 @@ test("staff cancel one player with a refund and another keeping the payment; the
   await dialog.getByLabel(/Cancel and refund/).check();
   await dialog.getByRole("button", { name: "Cancel Reservation" }).click();
   await expect(page.getByText("Player cancelled. Their spots are free again.")).toBeVisible();
-  await expect(playerRow(page, "E2E Customer")).toContainText("Cancelled · refund owed");
+  await expect(playerRow(page, "E2E Customer")).toContainText("Cancelled · paid");
 
   // Keep the walk-up's payment
   await page.getByRole("button", { name: "Actions for E2E Walkup Wally" }).click();

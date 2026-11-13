@@ -42,7 +42,7 @@ const METHODS: Record<string, string> = { cash: "Cash", gcash: "QR Ph" };
 const statusLabel = (r: SpotRow) => {
   const p = r.payments[0];
   if (r.status === "cancelled" && r.cancel_reason === "payment_kept") return "Cancelled · payment kept";
-  if (r.status === "cancelled") return p?.status === "refunded" ? "Cancelled · refunded" : p?.status === "paid" || p?.status === "succeeded" ? "Cancelled · refund owed" : "Cancelled";
+  if (r.status === "cancelled") return p?.status === "refunded" ? "Cancelled · refunded" : p?.status === "paid" || p?.status === "succeeded" ? "Cancelled · paid" : "Cancelled";
   if (r.status === "pending") return "Unpaid (holding)";
   return p?.status === "paid" || p?.status === "succeeded" ? "Paid" : "Unpaid";
 };

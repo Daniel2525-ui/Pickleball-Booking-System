@@ -1,5 +1,5 @@
 // Staff refund a cancelled cash booking at the counter: the payment is marked refunded, the handover is recorded,
-// and it leaves Refund Owed. Local Supabase stack only.
+// and its Refund button goes away. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
 import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt } from "./local-db.mjs";
 
@@ -18,9 +18,9 @@ test.beforeAll(() => {
 test.afterAll(() => { if (writesAllowed) resetBookings(); });
 test.beforeEach(() => requireLocalDb());
 
-test("staff refund a cash payment with a receipt number, and it leaves Refund Owed", async ({ page }) => {
+test("staff refund a cash payment with a receipt number, and the Refund button goes away", async ({ page }) => {
   await login(page, account("ADMIN"));
-  await page.goto(`/admin/payments?status=${encodeURIComponent("Refund Owed")}`);
+  await page.goto("/admin/payments");
   const row = page.getByRole("row").filter({ hasText: `Ref ${bookingId.slice(0, 6).toUpperCase()}` });
   await row.getByRole("button", { name: "Refund" }).click();
 
@@ -36,7 +36,7 @@ test("staff refund a cash payment with a receipt number, and it leaves Refund Ow
     .toBe(`cash_refunded|RCPT-0042|${account("ADMIN").email}`);
 
   await page.reload();
-  await expect(row).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "Refund" })).toHaveCount(0);
   // A second refund of the same payment is refused
   const again = await page.request.post("/api/admin/payments/refund", { data: { paymentId, receiptReference: "RCPT-0043" } });
   expect(again.status()).toBe(409);

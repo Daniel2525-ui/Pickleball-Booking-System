@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function PaymentsPage() {
   return (
     <div className="flex flex-col gap-6 px-4 lg:px-8 pb-4 lg:pb-8 pt-0 w-full max-w-6xl mx-auto">
-      <AdminPageHeader title="Payments" description="Today's close-out: money taken by QR Ph and at the desk, refunds owed, and every payment." />
+      <AdminPageHeader title="Payments" description="Today's close-out: money taken by QR Ph and at the desk, and every payment." />
 
       <Suspense>
         <PaymentsContainer />

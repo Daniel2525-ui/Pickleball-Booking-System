@@ -10,7 +10,7 @@ export interface Payment {
     payment_reference?: string | null;
     paid_at: string | null;
     created_at: string;
-    // Refund ledger rows for this payment (admins only, newest decides what Refund Owed says)
+    // Refund ledger rows for this payment (admins only, newest decides the refund note)
     refund_requests?: { status: string; created_at: string }[] | null;
     // Joined fields
     bookings?: {
@@ -52,7 +52,7 @@ export const paymentMethodLabel = (p: { status: string; payment_method?: string 
     return "QR Ph"; // 'stripe', or null on older online payments
 };
 
-/** Payment badge text on a booking row. A paid payment on a cancelled booking is money still held: kept, or owed back. */
+/** Payment badge text on a booking row. A paid payment on a cancelled booking is money still held: kept, or not refunded yet. */
 export const bookingPaymentLabel = (
     booking: { status: string; cancel_reason?: string | null },
     p: { status: string; payment_method?: string | null }
@@ -60,7 +60,7 @@ export const bookingPaymentLabel = (
     if (p.status === "pending") return "Unpaid";
     if (p.status !== "paid") return p.status;
     if (booking.status !== "cancelled") return `Paid • ${paymentMethodLabel(p)}`;
-    return booking.cancel_reason === "payment_kept" ? "Payment kept" : "Refund owed";
+    return booking.cancel_reason === "payment_kept" ? "Payment kept" : "Paid · cancelled";
 };
 
 /** UTC instants bounding one venue day (Asia/Manila, UTC+8, no DST), from dayEndsAt to dayEndsAt for a business day. */

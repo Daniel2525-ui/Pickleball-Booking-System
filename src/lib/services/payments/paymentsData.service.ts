@@ -5,17 +5,12 @@ import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 
 export const PAYMENTS_PAGE_SIZE = 100;
 
-// A cancelled booking whose payment staff chose to keep owes nothing back
-const NOT_KEPT = "cancel_reason.is.null,cancel_reason.neq.payment_kept";
-
 // Pay-at-counter money: a pending payment on a booking that is going ahead. Online holds stay 'pending' bookings
 const COLLECTABLE_BOOKING_STATUSES = ["confirmed", "checked_in", "completed"];
 
 export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) => {
     try {
         const status = filters?.status?.trim().toLowerCase() ?? "";
-        // Paid payments on cancelled bookings are owed back to the customer
-        const refundOwed = status === "refund owed";
         const toCollect = status === "to collect";
 
         let query = supabase
@@ -23,7 +18,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
             .select(`
                 *,
                 refund_requests ( status, created_at ),
-                bookings${refundOwed || toCollect ? "!inner" : ""} (
+                bookings${toCollect ? "!inner" : ""} (
                     basket_id,
                     status,
                     cancel_reason,
@@ -46,12 +41,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
             .order("created_at", { ascending: false })
             .range(offset, offset + PAYMENTS_PAGE_SIZE - 1);
 
-        if (refundOwed) {
-            query = query
-                .in("status", ["succeeded", "paid"])
-                .eq("bookings.status", "cancelled")
-                .or(NOT_KEPT, { referencedTable: "bookings" });
-        } else if (toCollect) {
+        if (toCollect) {
             query = query.eq("status", "pending").in("bookings.status", COLLECTABLE_BOOKING_STATUSES);
         } else if (status !== "" && status !== "all statuses" && status !== "all") {
             if (status === "succeeded" || status === "paid") {
@@ -114,17 +104,5 @@ export const countToCollect = async () => {
         .eq("status", "pending")
         .in("bookings.status", COLLECTABLE_BOOKING_STATUSES);
     if (error) console.error("Failed to count payments to collect:", error);
-    return count ?? 0;
-};
-
-/** Number of paid payments whose booking was cancelled, i.e. money owed back to customers. */
-export const countRefundsOwed = async () => {
-    const { count, error } = await supabase
-        .from("payments")
-        .select("id, bookings!inner(status, cancel_reason)", { count: "exact", head: true })
-        .in("status", ["succeeded", "paid"])
-        .eq("bookings.status", "cancelled")
-        .or(NOT_KEPT, { referencedTable: "bookings" });
-    if (error) console.error("Failed to count refunds owed:", error);
     return count ?? 0;
 };

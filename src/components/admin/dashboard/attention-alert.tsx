@@ -3,17 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { countRefundsOwed, countToCollect } from "@/lib/services/payments/paymentsData.service";
+import { countToCollect } from "@/lib/services/payments/paymentsData.service";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 
 // Keyed by name because the dashboard is a server component and cannot pass functions down
 const ALERTS = {
-  refunds: {
-    load: countRefundsOwed,
-    href: `/admin/payments?status=${encodeURIComponent("Refund Owed")}`,
-    label: (n: number) => `${n} ${n === 1 ? "payment needs" : "payments need"} a refund`,
-    detail: "Paid bookings that were cancelled.",
-  },
   collect: {
     load: countToCollect,
     href: `/admin/payments?status=${encodeURIComponent("To Collect")}`,

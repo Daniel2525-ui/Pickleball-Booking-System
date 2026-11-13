@@ -62,23 +62,18 @@ test("staff cancel one paid booking with a refund and keep another's payment", a
   expect(sql(`SELECT status FROM public.payments WHERE id = '${ids["E2E Keep Me"]}'`)).toBe("paid");
 });
 
-test("only the refunded one is owed back; both still count as collected today", async ({ page }) => {
+test("only the refunded one can be refunded; both still count as collected today", async ({ page }) => {
   await login(page, account("ADMIN"));
-  await expect(page.getByRole("link", { name: /1 payment needs a refund/ })).toBeVisible();
-
-  await page.goto(`/admin/payments?status=${encodeURIComponent("Refund Owed")}`);
   const ref = (name) => `Ref ${ids[`${name} booking`].slice(0, 6).toUpperCase()}`;
-  await expect(page.getByRole("row").filter({ hasText: ref("E2E Refund Me") })).toHaveCount(1);
-  await expect(page.getByRole("row").filter({ hasText: ref("E2E Keep Me") })).toHaveCount(0);
-
   await page.goto("/admin/payments");
+  await expect(page.getByRole("row").filter({ hasText: ref("E2E Refund Me") }).getByRole("button", { name: "Refund" })).toHaveCount(1);
   await expect(page.locator('[data-slot="card"]').filter({ has: page.getByText("Collected", { exact: true }) }).getByText("₱400.00")).toBeVisible();
   await expect(page.getByRole("row").filter({ hasText: ref("E2E Keep Me") }).getByRole("button", { name: "Refund" })).toHaveCount(0);
 
   // The refund route refuses a kept payment even when asked directly
   const res = await page.request.post("/api/admin/payments/refund", { data: { paymentId: ids["E2E Keep Me"], receiptReference: "X1" } });
   expect(res.status()).toBe(409);
-  expect((await res.json()).error).toBe("This payment was kept when the booking was cancelled, so it is not owed back.");
+  expect((await res.json()).error).toBe("This payment was kept when the booking was cancelled, so it is not refunded.");
 });
 
 test("the history and the player's card say the payment was kept", async ({ page }) => {
