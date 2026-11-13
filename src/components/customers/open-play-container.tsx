@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, Lock, Minus, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CalendarDays, Check, LoaderCircle, Lock, Minus, Plus } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import { formatManilaDate, lateNightLabel } from "@/lib/utils/bookingTime";
 import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { calculateDuration } from "@/lib/helpers/totalDuration";
 import { bookOpenPlay, fetchOpenPlaySessions, type OpenPlaySession } from "@/lib/services/openPlay/openPlayData.service";
 
 const WINDOW_DAYS = 27;
 
-const dateLabel = (d: string) =>
-  new Date(`${d}T00:00:00+08:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "Asia/Manila" });
+const dayOf = (d: string, opts: Intl.DateTimeFormatOptions) =>
+  new Date(`${d}T00:00:00+08:00`).toLocaleDateString("en-US", { ...opts, timeZone: "Asia/Manila" });
+const dateLabel = (d: string) => dayOf(d, { weekday: "short", month: "short", day: "numeric" });
 
 export const OpenPlayContainer = () => {
   const router = useRouter();
@@ -28,6 +32,7 @@ export const OpenPlayContainer = () => {
   const [loadFailed, setLoadFailed] = useState(false);
   const [dayEndsAt, setDayEndsAt] = useState("00:00");
   const [spotLimit, setSpotLimit] = useState(4);
+  const [day, setDay] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -50,6 +55,10 @@ export const OpenPlayContainer = () => {
   }, []);
 
   const maxSpots = active ? Math.min(spotLimit - active.my_spots, active.spots_left) : 0;
+  const today = formatManilaDate(new Date());
+  // Only days that have sessions get a chip, so every session in the window stays reachable
+  const days = [...new Set(sessions.map((s) => s.session_date))];
+  const shown = day ? sessions.filter((s) => s.session_date === day) : sessions;
 
   const open = (s: OpenPlaySession) => {
     if (!signedIn) return router.push("/login");
@@ -68,11 +77,42 @@ export const OpenPlayContainer = () => {
     setSubmitting(false);
   };
 
+  const chip = (on: boolean) =>
+    `shrink-0 min-w-[72px] min-h-[68px] rounded-[14px] border-[1.5px] px-3 py-2 text-center transition-colors ${on ? "bg-primary border-primary text-primary-foreground" : "bg-card hover:border-primary/50"}`;
+
+  const howItWorks = (
+    <section className="rounded-2xl border bg-card p-5 space-y-3.5">
+      <h2 className="font-display text-lg font-bold">How it works</h2>
+      <ol className="space-y-3 text-sm">
+        {[
+          `Pick a session and how many spots, up to ${spotLimit}.`,
+          "Pay with QR Ph. Your spots are held while you pay.",
+          "Just turn up. No check-in, games rotate on the courts listed.",
+        ].map((text, i) => (
+          <li key={text} className="flex gap-3">
+            <span className="size-[26px] shrink-0 rounded-lg bg-primary/10 text-primary grid place-items-center text-[13px] font-bold">{i + 1}</span>
+            <span>{text}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+
   return (
-    <div className="max-w-3xl mx-auto px-4 space-y-4">
-      <div>
-        <h1 className="text-3xl sm:text-4xl font-bold">Open play</h1>
-        <p className="text-sm text-muted-foreground mt-1">Join a scheduled session. Book up to {spotLimit} {spotLimit === 1 ? "spot" : "spots"}, no court needed.</p>
+    <div className="max-w-6xl mx-auto px-4 space-y-7">
+      <div className="space-y-3.5">
+        <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">Open play</h1>
+        <p className="max-w-2xl text-muted-foreground">
+          Drop in and play with others. Pay per player, rotate in and out between games, and meet new partners. No need to book a whole court.
+        </p>
+        <ul aria-label="About open play" className="flex flex-wrap gap-2">
+          {["Pay per player", "Rotate in and out", "All levels welcome", `Up to ${spotLimit} ${spotLimit === 1 ? "spot" : "spots"} per booking`].map((fact) => (
+            <li key={fact} className="inline-flex items-center gap-2 rounded-full border bg-card px-3.5 py-2 text-[13px] font-semibold">
+              <Check className="size-4 text-primary" aria-hidden />
+              {fact}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {loading ? (
@@ -80,44 +120,111 @@ export const OpenPlayContainer = () => {
       ) : loadFailed ? (
         <p role="alert" className="rounded-2xl border border-destructive/40 bg-destructive/5 p-6 text-sm">Couldn&apos;t load open play sessions. Please refresh the page.</p>
       ) : sessions.length === 0 ? (
-        <p className="rounded-2xl border bg-card p-6 text-sm text-muted-foreground">No open play sessions are scheduled in the next four weeks. Check back soon.</p>
+        <div className="flex flex-wrap gap-7">
+          <section className="flex-[999_1_560px] min-w-0 rounded-[20px] border bg-card px-8 py-12 flex flex-col items-center text-center gap-3.5">
+            <span className="size-16 rounded-[18px] bg-primary/10 grid place-items-center">
+              <CalendarDays className="size-8 text-primary" aria-hidden />
+            </span>
+            <h2 className="font-display text-2xl font-bold">No sessions in the next four weeks</h2>
+            <p className="max-w-md text-[15px] text-muted-foreground">
+              New open play sessions show up here as soon as they are scheduled. In the meantime, you can book a court for your own group.
+            </p>
+            <Link href="/book" className={cn(buttonVariants(), "mt-1.5 min-h-11 px-4 font-bold")}>Book a court</Link>
+          </section>
+          <div className="flex-[1_1_300px]">{howItWorks}</div>
+        </div>
       ) : (
-        <ul className="space-y-3">
-          {sessions.map((s) => {
-            const full = s.spots_left <= 0;
-            const limit = s.my_spots >= spotLimit;
-            const pct = Math.round(((s.capacity - s.spots_left) / s.capacity) * 100);
-            return (
-              <li key={s.id} className={`rounded-2xl border bg-card p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 ${full ? "opacity-60" : ""}`}>
-                <div className="min-w-0">
-                  <p className="font-bold">{dateLabel(s.session_date)} · {formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</p>
-                  {lateNightLabel(s.session_date, s.start_time, dayEndsAt) && (
-                    <p className="text-xs font-semibold text-primary">{lateNightLabel(s.session_date, s.start_time, dayEndsAt)}</p>
-                  )}
-                  <p className="text-sm text-muted-foreground">{s.court_names.join(", ")} · All levels welcome</p>
-                  <p className="text-sm mt-1.5">
-                    <b>{full ? "Full" : `${s.spots_left} of ${s.capacity}`}</b>{full ? "" : " spots left"}
-                    {s.my_spots > 0 && <span className="text-primary font-semibold"> · You have {s.my_spots}</span>}
-                  </p>
-                  <div role="progressbar" aria-label="Spots taken" aria-valuemin={0} aria-valuemax={s.capacity} aria-valuenow={s.capacity - s.spots_left} className="h-1.5 w-44 rounded bg-muted mt-1.5">
-                    <div className={`h-1.5 rounded ${pct >= 80 ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-extrabold">₱{Number(s.price_per_spot).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ player</span></p>
-                  <Button
-                    onClick={() => open(s)}
-                    disabled={full || limit}
-                    aria-label={full ? `Full: ${dateLabel(s.session_date)}` : `Book a spot on ${dateLabel(s.session_date)}`}
-                    className="mt-2 min-h-[44px] font-bold"
-                  >
-                    {full ? "Full" : limit ? `${s.my_spots} booked` : "Book a spot"}
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div role="group" aria-label="Pick a day" className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+            <button type="button" aria-pressed={day === null} onClick={() => setDay(null)} className={chip(day === null)}>
+              <span className="block text-xs font-semibold opacity-85">All</span>
+              <span className="block font-display text-xl font-bold">{sessions.length}</span>
+              <span className="block text-[11px] font-semibold">{sessions.length === 1 ? "session" : "sessions"}</span>
+            </button>
+            {days.map((d) => {
+              const count = sessions.filter((s) => s.session_date === d).length;
+              return (
+                <button key={d} type="button" aria-pressed={day === d} aria-label={`${dateLabel(d)}, ${count} ${count === 1 ? "session" : "sessions"}`} onClick={() => setDay(d)} className={chip(day === d)}>
+                  <span className="block text-xs font-semibold opacity-85">{d === today ? "Today" : dayOf(d, { weekday: "short" })}</span>
+                  <span className="block font-display text-xl font-bold">{dayOf(d, { day: "numeric" })}</span>
+                  <span className="block text-[11px] font-semibold">{dayOf(d, { month: "short" })}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-start gap-7">
+            <div className="flex-[999_1_560px] min-w-0 space-y-7">
+              {[...new Set(shown.map((s) => s.session_date))].map((d) => (
+                <section key={d} className="space-y-3">
+                  <h2 className="text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {d === today ? "Today · " : ""}{dayOf(d, { weekday: "long", month: "short", day: "numeric" })}
+                  </h2>
+                  <ul className="space-y-3">
+                    {shown.filter((s) => s.session_date === d).map((s) => {
+                      const full = s.spots_left <= 0;
+                      const limit = s.my_spots >= spotLimit;
+                      const taken = s.capacity - s.spots_left;
+                      const fast = !full && taken / s.capacity >= 0.8;
+                      const late = lateNightLabel(s.session_date, s.start_time, dayEndsAt);
+                      return (
+                        <li key={s.id} className={`rounded-2xl border bg-card px-5 py-5 sm:px-6 flex flex-wrap items-center gap-x-7 gap-y-4 ${s.my_spots > 0 ? "border-amber-300" : ""} ${full ? "opacity-60" : ""}`}>
+                          <div className="min-w-[150px] space-y-1">
+                            <p className="font-display text-2xl font-bold tracking-tight">{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</p>
+                            {late && <p className="text-xs font-semibold text-primary">{late}</p>}
+                            <p className="text-sm text-muted-foreground">{calculateDuration(s.start_time, s.end_time)} · {s.court_names.join(", ")}</p>
+                          </div>
+                          <div className="flex-[1_1_220px] min-w-0 space-y-2">
+                            <p className="flex flex-wrap items-center gap-2 text-sm font-bold">
+                              {full ? "Full" : `${s.spots_left} of ${s.capacity} spots left`}
+                              {s.my_spots > 0 ? (
+                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">You have {s.my_spots}</span>
+                              ) : fast ? (
+                                <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-bold text-red-800">Filling fast</span>
+                              ) : null}
+                            </p>
+                            {/* One dot per spot; yours are amber */}
+                            <div role="img" aria-label={`${taken} of ${s.capacity} spots taken`} className="flex flex-wrap gap-1 max-w-[260px]">
+                              {Array.from({ length: s.capacity }, (_, i) => (
+                                <span
+                                  key={i}
+                                  className={`size-3.5 rounded-full border-[1.5px] ${i >= taken ? "bg-card border-border" : i >= taken - s.my_spots ? "bg-amber-500 border-amber-500" : "bg-primary border-primary"}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="ml-auto flex flex-col items-end gap-2">
+                            <p className="font-display text-[22px] font-bold">
+                              ₱{Number(s.price_per_spot).toLocaleString()} <span className="font-sans text-xs font-medium text-muted-foreground">/ player</span>
+                            </p>
+                            <Button
+                              onClick={() => open(s)}
+                              disabled={full || limit}
+                              variant={s.my_spots > 0 ? "outline" : "default"}
+                              aria-label={full ? `Full: ${dateLabel(s.session_date)}` : `Book a spot on ${dateLabel(s.session_date)} at ${formatTime12h(s.start_time)}`}
+                              className={`min-h-11 px-5 font-bold ${s.my_spots > 0 ? "border-primary text-primary" : ""}`}
+                            >
+                              {full ? "Full" : limit ? `${s.my_spots} booked` : s.my_spots > 0 ? "Add a spot" : "Join"}
+                            </Button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
+
+            <aside className="flex-[1_1_300px] space-y-4">
+              {howItWorks}
+              <section className="rounded-2xl border bg-card p-5 space-y-2.5">
+                <h2 className="font-display text-lg font-bold">Playing with your own group?</h2>
+                <p className="text-sm text-muted-foreground">Book a whole court by the hour instead.</p>
+                <Link href="/book" className={cn(buttonVariants({ variant: "outline" }), "min-h-11 px-4 font-bold border-primary text-primary")}>Book a court</Link>
+              </section>
+            </aside>
+          </div>
+        </>
       )}
 
       <Dialog open={active !== null} onOpenChange={(o) => !o && !submitting && setActive(null)}>

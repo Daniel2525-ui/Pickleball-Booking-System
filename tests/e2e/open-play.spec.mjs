@@ -52,7 +52,8 @@ test("admin schedules open play and the court grid shows it", async ({ page }) =
   await expect(page.locator("#booking").getByLabel("COURT 1 at 9:00 PM - 10:00 PM is open play")).toHaveCount(0);
 
   await page.goto("/open-play");
-  const item = page.getByRole("listitem").filter({ hasText: shortDate });
+  // The date sits in the day heading, so find the card by its button's label
+  const item = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: new RegExp(shortDate) }) });
   await expect(item.getByText("6 of 6")).toBeVisible();
   await expect(item).toContainText("spots left");
 });

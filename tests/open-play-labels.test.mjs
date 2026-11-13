@@ -39,3 +39,12 @@ test("the grid keeps the running hour open until it ends", () => {
     // 11 PM - 12 AM runs until midnight
     assert.equal(checkSlotAvailability("Court 1", "11:00 PM - 12:00 AM", courts, [], today, null, new Date("2026-11-06T23:40:00+08:00")), "available");
 });
+
+test("calculateDuration counts hours, including sessions past midnight", async () => {
+    const { calculateDuration } = await import("../src/lib/helpers/totalDuration.ts");
+    assert.equal(calculateDuration("18:00:00", "21:00:00"), "3 hours");
+    assert.equal(calculateDuration("09:00", "10:00"), "1 hour");
+    assert.equal(calculateDuration("22:00", "01:00"), "3 hours");
+    assert.equal(calculateDuration("22:00", "24:00"), "2 hours");
+    assert.equal(calculateDuration("", "10:00"), "");
+});
