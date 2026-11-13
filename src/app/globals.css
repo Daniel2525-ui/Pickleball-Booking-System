@@ -295,6 +295,18 @@
     8%, 25% { background: var(--primary); color: var(--primary-foreground); transform: scale(1.12); }
     33% { background: var(--muted); color: var(--muted-foreground); transform: scale(1); }
 }
+/* The connector after a step fills toward the next one just as that one lights */
+.step-line {
+    transform: scaleX(0);
+    animation: step-line 3.6s ease-in-out infinite;
+    animation-delay: var(--step-delay, 0s);
+}
+@keyframes step-line {
+    0%, 15% { transform: scaleX(0); opacity: 1; }
+    33% { transform: scaleX(1); opacity: 1; }
+    55% { transform: scaleX(1); opacity: 0; }
+    100% { transform: scaleX(0); opacity: 0; }
+}
 
 /* Booking confirmed: the tick pops in and confetti falls once (the global reduced-motion rule ends both at once) */
 .pop-in {

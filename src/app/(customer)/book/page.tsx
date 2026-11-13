@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { PublicHeader } from "@/components/customers/public-header";
+import { PublicFooter } from "@/components/customers/public-footer";
 import { BookingContainer } from "@/components/customers/booking-container";
 import { VENUE_NAME, VENUE_CITY } from "@/lib/brand";
 
@@ -21,17 +22,20 @@ export default function BookPage() {
                 ["Your details", "Sign in or book as a guest"],
                 ["Pay with QR Ph", "Confirmed once payment is received"],
               ].map(([title, hint], i) => (
-                <li key={title} className="flex items-center gap-3">
-                  <span
-                    className="step-light size-9 shrink-0 rounded-[10px] grid place-items-center font-display font-bold text-sm bg-muted text-muted-foreground"
-                    style={{ "--step-delay": `${i * 1.2}s` } as React.CSSProperties}
-                  >
+                <li key={title} className="flex items-center gap-3" style={{ "--step-delay": `${i * 1.2}s` } as React.CSSProperties}>
+                  <span className="step-light size-9 shrink-0 rounded-[10px] grid place-items-center font-display font-bold text-sm bg-muted text-muted-foreground">
                     {i + 1}
                   </span>
-                  <span>
+                  <span className="min-w-0">
                     <span className="block text-sm font-semibold text-foreground">{title}</span>
                     <span className="block text-xs text-muted-foreground">{hint}</span>
                   </span>
+                  {/* Connector to the next step; it fills as the light passes along */}
+                  {i < 2 && (
+                    <span aria-hidden className="hidden sm:block h-0.5 min-w-6 flex-1 overflow-hidden rounded-full bg-muted">
+                      <span className="step-line block h-full origin-left bg-primary" />
+                    </span>
+                  )}
                 </li>
               ))}
             </ol>
@@ -39,6 +43,7 @@ export default function BookPage() {
           </div>
         </section>
       </main>
+      <PublicFooter />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { PublicHeader } from "@/components/customers/public-header";
+import { PublicFooter } from "@/components/customers/public-footer";
 import { OpenPlayContainer } from "@/components/customers/open-play-container";
 import { Metadata } from "next";
 import { VENUE_NAME, VENUE_CITY } from "@/lib/brand";
@@ -15,6 +16,7 @@ export default function OpenPlayPage() {
       <main className="flex-1 py-8 sm:py-12">
         <OpenPlayContainer />
       </main>
+      <PublicFooter />
     </div>
   );
 }
