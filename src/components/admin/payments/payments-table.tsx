@@ -91,11 +91,9 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
     switch (latest?.status) {
       case "pending":
       case "processing":
-      case "pending":
-      case "processing":
       case "requires_admin_review":
       case "failed":
-        return { label: "Refund not sent yet: send it from Xendit, then record it", tone: "text-amber-700 dark:text-amber-400", retry: false };
+        return { label: "Refund not sent yet: send it from Xendit, then record it", tone: "text-amber-700 dark:text-amber-400" };
       default:
         return null;
     }
@@ -161,11 +159,9 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase() || "";
-    const key = s === "paid" ? "succeeded" : s;
-
     const config = {
-      succeeded: {
-        label: "Succeeded",
+      paid: {
+        label: "Paid",
         icon: CheckCircle2,
         className:
           "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
@@ -178,7 +174,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
           "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
         iconClassName: "text-amber-600 dark:text-amber-400",
       },
-    }[key];
+    }[s];
 
     if (!config) {
       return (
@@ -398,7 +394,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                         return (
                           <div className="flex flex-col items-end gap-1">
                             <Button size="sm" variant="outline" className="text-xs" onClick={() => setRefundTarget(payment)}>
-                              {refundState?.retry ? "Retry refund" : "Refund"}
+                              Refund
                             </Button>
                             {refundState && (
                               <span className={`text-[11px] font-semibold ${refundState.tone}`}>{refundState.label}</span>

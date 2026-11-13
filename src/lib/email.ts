@@ -32,8 +32,9 @@ export const sendEmail = async (message: EmailMessage, deps: Deps = {}): Promise
     });
     if (res.ok) return "sent";
     console.error(`Resend refused an email (${res.status}):`, await res.text().catch(() => ""));
-    // 429 (rate limit) and 5xx are temporary; any other 4xx will fail the same way every time
-    return res.status === 429 || res.status >= 500 ? "retry" : "rejected";
+    // 429 (rate limit) and 5xx are temporary; 401/403 is the sender's key or unverified domain, which staff fix,
+    // so those emails wait too. Any other 4xx is this message and will fail the same way every time
+    return [401, 403, 429].includes(res.status) || res.status >= 500 ? "retry" : "rejected";
   } catch (err) {
     console.error("Resend request failed:", err);
     return "retry";

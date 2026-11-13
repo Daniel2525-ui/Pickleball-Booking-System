@@ -157,8 +157,10 @@ export async function POST(request: NextRequest) {
         if (sharedSessionId?.startsWith("pr-")) {
             // Demo: the QR already issued is reused while it can still be paid, so the 15 minute hold is not restarted
             const pr = await getPaymentRequest(sharedSessionId).catch(() => null);
-            if (pr?.status === "REQUIRES_ACTION") return Response.json({ url: `/book/qr?pr=${encodeURIComponent(sharedSessionId)}` });
-            if (!pr || pr.status === "SUCCEEDED") {
+            // Unknown is not paid: a failed lookup must not tell the player they already paid
+            if (!pr) return Response.json({ error: "Could not reach the payment service. Please try again." }, { status: 502 });
+            if (pr.status === "REQUIRES_ACTION") return Response.json({ url: `/book/qr?pr=${encodeURIComponent(sharedSessionId)}` });
+            if (pr.status === "SUCCEEDED") {
                 return Response.json(
                     { error: "Payment for this booking has already been received and is being processed. Please refresh the page in a moment." },
                     { status: 409 }

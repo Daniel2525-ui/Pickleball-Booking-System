@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import { openBasketCheckout, QR_PH_NOT_CONFIGURED } from "@/lib/services/payments/openBasketCheckout";
 import { parseSpotRequest, sessionErrorResponse } from "@/lib/services/openPlay/openPlayTypes";
+import { xenditRefused } from "@/lib/xendit";
 
 export async function POST(request: NextRequest) {
     let hold: { booking_id: string; payment_id: string } | null = null;
@@ -85,7 +86,8 @@ export async function POST(request: NextRequest) {
             error instanceof Stripe.errors.StripeInvalidRequestError ||
             error instanceof Stripe.errors.StripeAuthenticationError ||
             error instanceof Stripe.errors.StripePermissionError ||
-            (error as Error)?.message === QR_PH_NOT_CONFIGURED;
+            (error as Error)?.message === QR_PH_NOT_CONFIGURED ||
+            xenditRefused(error);
         const admin = definite && hold ? getServiceClient() : null;
         if (admin && hold) {
             await admin.from("payments").update({ status: "failed" }).eq("id", hold.payment_id).eq("status", "pending");

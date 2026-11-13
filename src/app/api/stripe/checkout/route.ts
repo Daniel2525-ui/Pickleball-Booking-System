@@ -13,6 +13,7 @@ import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutS
 import { checkPlayerCount, maxPlayers, parseGuestDetails } from "@/lib/services/bookings/guestDetails";
 import { normaliseCode } from "@/lib/services/pricing/discounts";
 import { AUTH_LIMITS, checkRateLimit, clientIp, tooManyRequests } from "@/lib/rateLimit";
+import { xenditRefused } from "@/lib/xendit";
 
 interface HeldBasket {
     basket_id: string;
@@ -285,7 +286,8 @@ export async function POST(request: NextRequest) {
             error instanceof Stripe.errors.StripePermissionError ||
             Boolean((error as Error)?.message?.includes("Stripe is not configured")) ||
             (error as Error)?.message === QR_PH_NOT_CONFIGURED ||
-            (error as Error)?.message === HOLD_DATES_MISMATCH;
+            (error as Error)?.message === HOLD_DATES_MISMATCH ||
+            xenditRefused(error);
 
         // Only release records on definite pre-creation failure where no session could exist at Stripe.
         // For network timeouts or connection drops, preserve pending records so payment resumption,

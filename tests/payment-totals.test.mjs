@@ -6,7 +6,7 @@ test("sumPayments splits collected money by method and keeps refunds apart", () 
     const totals = sumPayments([
         { status: "paid", amount: "200.00", payment_method: "cash" },
         { status: "paid", amount: 300, payment_method: "gcash" },
-        { status: "succeeded", amount: 400, payment_method: "stripe" },
+        { status: "paid", amount: 400, payment_method: "stripe" },
         { status: "paid", amount: 100, payment_method: null }, // older online payment
         { status: "refunded", amount: 250, payment_method: "stripe" },
         { status: "pending", amount: 999, payment_method: null },
@@ -18,7 +18,7 @@ test("sumPayments splits collected money by method and keeps refunds apart", () 
 test("paymentMethodLabel names the method staff recognise", () => {
     assert.equal(paymentMethodLabel({ status: "paid", payment_method: "cash" }), "Cash");
     assert.equal(paymentMethodLabel({ status: "paid", payment_method: "gcash", payment_reference: "7741" }), "QR Ph");
-    assert.equal(paymentMethodLabel({ status: "succeeded", payment_method: null }), "QR Ph");
+    assert.equal(paymentMethodLabel({ status: "paid", payment_method: null }), "QR Ph");
     assert.equal(paymentMethodLabel({ status: "pending", payment_method: null }), "Not paid yet");
 });
 

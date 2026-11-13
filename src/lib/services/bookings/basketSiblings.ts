@@ -39,7 +39,7 @@ export async function loadPendingSiblings(
 }
 
 /** Distinct Stripe sessions of the siblings' original payments (one for a basket). */
-export const siblingSessionIds = (siblings: Pick<BasketSibling, "payments">[]) => [
+export const siblingSessionIds = (siblings: { payments: { stripe_session_id: string | null }[] }[]) => [
     ...new Set(siblings.map((s) => s.payments[0]?.stripe_session_id).filter((id): id is string => Boolean(id))),
 ];
 

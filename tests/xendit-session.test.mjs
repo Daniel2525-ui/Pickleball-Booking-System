@@ -1,7 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { toStripeSession, qrExpiresAt, isXenditId } = await import("../src/lib/xendit.ts");
+const { toStripeSession, qrExpiresAt, isXenditId, xenditRefused } = await import("../src/lib/xendit.ts");
+
+test("xenditRefused: only a definite 4xx releases holds", () => {
+    const err = (status) => Object.assign(new Error("x"), { status });
+    assert.equal(xenditRefused(err(400)), true);
+    assert.equal(xenditRefused(err(401)), true);
+    assert.equal(xenditRefused(err(409)), false);
+    assert.equal(xenditRefused(err(429)), false);
+    assert.equal(xenditRefused(err(503)), false);
+    assert.equal(xenditRefused(new Error("socket hang up")), false);
+});
 
 const pr = (status, extra = {}) => ({ payment_request_id: "pr-1", reference_id: "b", status, request_amount: 255, currency: "PHP", ...extra });
 

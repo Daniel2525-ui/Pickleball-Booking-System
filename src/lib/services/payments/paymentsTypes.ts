@@ -42,8 +42,6 @@ export interface FetchPaymentsFilters {
     date?: string;
 }
 
-const isPaid = (status: string) => status === "paid" || status === "succeeded";
-
 /** How a payment was made, as staff say it: "Cash", "QR Ph", or "Not paid yet". */
 export const paymentMethodLabel = (p: { status: string; payment_method?: string | null; payment_reference?: string | null }) => {
     if (p.status === "pending") return "Not paid yet";
@@ -74,7 +72,7 @@ export const sumPayments = (rows: { status: string; amount: number | string | nu
     const totals = { collected: 0, cash: 0, gcash: 0, card: 0, collectedCount: 0, refunded: 0, refundedCount: 0 };
     for (const r of rows) {
         const amount = Number(r.amount) || 0;
-        if (isPaid(r.status)) {
+        if (r.status === "paid") {
             totals.collected += amount;
             totals.collectedCount++;
             if (r.payment_method === "cash") totals.cash += amount;

@@ -44,11 +44,7 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
         if (toCollect) {
             query = query.eq("status", "pending").in("bookings.status", COLLECTABLE_BOOKING_STATUSES);
         } else if (status !== "" && status !== "all statuses" && status !== "all") {
-            if (status === "succeeded" || status === "paid") {
-                query = query.in("status", ["succeeded", "paid"]);
-            } else {
-                query = query.eq("status", status);
-            }
+            query = query.eq("status", status);
         } else {
             query = query.not("status", "eq", "failed");
         }

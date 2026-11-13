@@ -109,6 +109,9 @@ test("resend client: maps status codes to sent / retry / rejected", async () => 
   assert.equal(await at(200), "sent");
   assert.equal(await at(429), "retry");
   assert.equal(await at(503), "retry");
+  // A bad key or unverified sending domain must not use up every booking's confirmation
+  assert.equal(await at(401), "retry");
+  assert.equal(await at(403), "retry");
   assert.equal(await at(422), "rejected");
   assert.equal(await sendEmail(msg, { fetch: async () => { throw new Error("offline"); } }), "retry");
 });

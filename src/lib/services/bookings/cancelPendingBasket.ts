@@ -9,7 +9,7 @@ import { type BasketSibling, pendingPaymentIds, siblingSessionIds } from "./bask
  * Closes the open payment of an unpaid basket (QR Ph, or an older Stripe Checkout) so nobody pays for a
  * cancelled booking. "paid" when it was already paid (the webhook will confirm it); throws when it can't be closed.
  */
-export async function closeSiblingSessions(siblings: Pick<BasketSibling, "payments">[]): Promise<"closed" | "paid"> {
+export async function closeSiblingSessions(siblings: { payments: { stripe_session_id: string | null }[] }[]): Promise<"closed" | "paid"> {
     for (const sessionId of siblingSessionIds(siblings)) {
         // QR Ph payments (Xendit pr- ids) live in the same column as the older Stripe sessions
         if (isXenditId(sessionId)) {

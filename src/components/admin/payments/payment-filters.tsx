@@ -70,7 +70,7 @@ export default function PaymentFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Statuses">All Statuses</SelectItem>
-            <SelectItem value="Succeeded">Succeeded (Paid)</SelectItem>
+            <SelectItem value="Paid">Paid</SelectItem>
             <SelectItem value="Pending">Pending</SelectItem>
             <SelectItem value="Refunded">Refunded</SelectItem>
             <SelectItem value="To Collect">To Collect</SelectItem>

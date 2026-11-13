@@ -42,9 +42,9 @@ const METHODS: Record<string, string> = { cash: "Cash", gcash: "QR Ph" };
 const statusLabel = (r: SpotRow) => {
   const p = r.payments[0];
   if (r.status === "cancelled" && r.cancel_reason === "payment_kept") return "Cancelled · payment kept";
-  if (r.status === "cancelled") return p?.status === "refunded" ? "Cancelled · refunded" : p?.status === "paid" || p?.status === "succeeded" ? "Cancelled · paid" : "Cancelled";
+  if (r.status === "cancelled") return p?.status === "refunded" ? "Cancelled · refunded" : p?.status === "paid" ? "Cancelled · paid" : "Cancelled";
   if (r.status === "pending") return "Unpaid (holding)";
-  return p?.status === "paid" || p?.status === "succeeded" ? "Paid" : "Unpaid";
+  return p?.status === "paid" ? "Paid" : "Unpaid";
 };
 
 interface Props {
@@ -92,7 +92,7 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
   };
 
   const askCancelPlayer = (r: SpotRow) => {
-    const paid = r.payments.some((p) => p.status === "paid" || p.status === "succeeded");
+    const paid = r.payments.some((p) => p.status === "paid");
     if (paid) return setCancelPaid(asBooking(r));
     setConfirmRequest({
       title: "Cancel this player?",
@@ -102,7 +102,7 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
     });
   };
 
-  const collected = (rows ?? []).flatMap((r) => r.payments).filter((p) => p.status === "paid" || p.status === "succeeded").reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const collected = (rows ?? []).flatMap((r) => r.payments).filter((p) => p.status === "paid").reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const date = new Date(`${session.session_date}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric" });
 
   return (

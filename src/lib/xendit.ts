@@ -28,9 +28,15 @@ export async function xendit<T>(path: string, body?: unknown): Promise<T> {
         cache: "no-store",
     });
     const json = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(`Xendit ${path} ${res.status}: ${JSON.stringify(json)}`);
+    if (!res.ok) throw Object.assign(new Error(`Xendit ${path} ${res.status}: ${JSON.stringify(json)}`), { status: res.status });
     return json as T;
 }
+
+/** Xendit refused the request for good (bad key, invalid amount): nothing was created, so holds can be released. */
+export const xenditRefused = (error: unknown) => {
+    const status = (error as { status?: unknown })?.status;
+    return typeof status === "number" && status >= 400 && status < 500 && status !== 409 && status !== 429;
+};
 
 export const getPaymentRequest = (id: string) =>
     xendit<XenditPaymentRequest>(`/v3/payment_requests/${encodeURIComponent(id)}`);

@@ -167,7 +167,10 @@ export const sendBookingEmails = async (
   supabase: SupabaseClient,
   { now = Date.now(), send = sendEmail }: { now?: number; send?: SendEmail } = {},
 ) => {
-  if (send === sendEmail && !emailConfigured()) return { confirmations: 0, reminders: 0 };
+  if (send === sendEmail && !emailConfigured()) {
+    console.warn("Booking emails skipped: RESEND_API_KEY or EMAIL_FROM is not set");
+    return { confirmations: 0, reminders: 0 };
+  }
   let venue: Promise<VenueContact> | null = null;
   const contact = () => (venue ??= fetchVenueContact(supabase));
   try {

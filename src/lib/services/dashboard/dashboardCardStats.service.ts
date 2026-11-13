@@ -59,7 +59,7 @@ export const fetchDashboardCardStats = async (): Promise<DashboardCardStatsData>
         // Block rows reserve courts but are not bookings; spot rows count (their revenue is in total_amount)
         if (b.open_play_session_id && !b.open_play_spots) continue;
         const payments = Array.isArray(b.payments) ? b.payments : (b.payments ? [b.payments] : []);
-        const isPaid = payments.some((p: { status?: string }) => p.status === "paid" || p.status === "succeeded");
+        const isPaid = payments.some((p: { status?: string }) => p.status === "paid");
         const amt = isPaid ? (Number(b.total_amount) || 0) : 0;
 
         if (b.business_date === todayStr) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
-import { stripe } from "@/lib/stripe";
+import { closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 import { sameCentavo } from "@/lib/services/bookings/basketSiblings";
 
 export async function POST(request: NextRequest) {
@@ -79,18 +79,15 @@ export async function POST(request: NextRequest) {
 
         if (payment?.stripe_session_id) {
             try {
-                const session = await stripe.checkout.sessions.retrieve(payment.stripe_session_id);
-                if (session.status === "complete") {
+                // The QR Ph code (or an older Stripe Checkout); a basket's courts share it
+                if ((await closeSiblingSessions([{ payments: [payment] }])) === "paid") {
                     return NextResponse.json(
                         { error: "The customer has already paid online for this booking. Refresh to see the confirmed booking." },
                         { status: 409 }
                     );
                 }
-                if (session.status === "open") {
-                    await stripe.checkout.sessions.expire(payment.stripe_session_id);
-                }
-            } catch (stripeError) {
-                console.error("Counter settlement: failed to close Stripe session:", stripeError);
+            } catch (closeError) {
+                console.error("Counter settlement: failed to close the online payment:", closeError);
                 return NextResponse.json(
                     { error: "Could not close the customer's online payment session. Please try again." },
                     { status: 502 }
