@@ -62,10 +62,12 @@ export function PublicHeader() {
       </Link>
 
       <nav aria-label="Main" className="flex items-center gap-1 lg:gap-2 shrink-0">
-        <Link href="/book" className={navLink}>Book a court</Link>
-        <Link href="/#courts" className={navLink}>Courts</Link>
-        <Link href="/open-play" className={navLink}>Open play</Link>
+        {/* Home page sections in scroll order, then the separate pages */}
+        <Link href="/" className={navLink}>Home</Link>
         <Link href="/#location" className={navLink}>Find us</Link>
+        <Link href="/#courts" className={navLink}>Courts</Link>
+        <Link href="/book" className={navLink}>Book a court</Link>
+        <Link href="/open-play" className={navLink}>Open play</Link>
         {user && isAdmin && (
           <Link href="/admin/dashboard" className="hidden md:inline-flex px-3 py-2 rounded-lg text-sm font-semibold text-primary hover:bg-muted transition-colors">
             {isOwner ? "Admin panel" : "Staff panel"}
