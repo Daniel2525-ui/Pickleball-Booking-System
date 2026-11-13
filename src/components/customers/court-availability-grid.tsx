@@ -25,8 +25,8 @@ interface CourtAvailabilityGridProps {
 // Shared looks for each state (desktop cell and phone row)
 const LOOK = {
   available: "bg-card border-[1.5px] border-primary/35 text-primary hover:bg-primary/10 hover:border-primary",
-  // A pick is outlined, not filled: each hour stays its own cell with its own price
-  selected: "bg-card border-2 border-primary text-primary ring-2 ring-primary/25 hover:bg-primary/5",
+  // Filled solid so a pick stands out from the outlined free cells; each hour keeps its own price
+  selected: "bg-primary border-2 border-primary text-primary-foreground shadow-md ring-2 ring-primary/30 ring-offset-1 ring-offset-card hover:bg-primary/90",
   user_pending: "bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200",
   pending: "bg-amber-50 text-amber-900 border border-amber-200",
   booked: "bg-[repeating-linear-gradient(135deg,#EDF0EE_0_6px,#E3E7E5_6px_12px)] text-muted-foreground",
@@ -263,12 +263,10 @@ export function GridLegend() {
   );
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
-      {item("bg-card border-[1.5px] border-primary/35", "Free · price shown")}
-      {item("bg-card border-2 border-primary ring-2 ring-primary/25", "Your pick")}
-      {item("bg-amber-100 border border-amber-300", "Being paid")}
-      {item("bg-[repeating-linear-gradient(135deg,#EDF0EE_0_4px,#D5DBD8_4px_8px)]", "Booked")}
-      {item("bg-primary/5 border-[1.5px] border-dashed border-primary", "Open play")}
-      {item("bg-muted", "Closed or passed")}
+      {item("bg-card border-[1.5px] border-primary/35", "Available")}
+      {item("bg-primary border-2 border-primary", "Selected")}
+      {/* Taken cells say why (Booked, Open play...), so one grey key covers them all */}
+      {item("bg-muted", "Unavailable")}
     </div>
   );
 }
