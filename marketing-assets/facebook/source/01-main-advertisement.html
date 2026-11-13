@@ -1,0 +1,57 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Main advertisement</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1080px; height: 1350px; overflow: hidden; position: relative; background: #060d1a; color: #e8edf5;
+  font-family: Manrope, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: absolute; inset: 0; z-index: 0;
+  background: radial-gradient(900px 600px at 92% -6%, rgba(191,245,56,.17), transparent 60%),
+              radial-gradient(700px 500px at -10% 105%, rgba(56,120,245,.14), transparent 60%); }
+body > * { position: relative; z-index: 1; }
+header { position: absolute; left: 72px; right: 72px; top: 64px; display: flex; align-items: center; gap: 16px; }
+.brand { font: 800 38px/1 "Big Shoulders", Arial; text-transform: uppercase; letter-spacing: 1px; }
+.brand b { color: #bff538; font-weight: 800; }
+.tag { margin-left: auto; font: 700 17px/1 Manrope; letter-spacing: 3px; text-transform: uppercase; color: #9fb0c8;
+  border: 1.5px solid #24324a; border-radius: 999px; padding: 12px 20px; }
+.copy { position: absolute; left: 72px; right: 72px; top: 160px; }
+h1 { font: 800 var(--hs, 104px)/.92 "Big Shoulders", Arial; text-transform: uppercase; letter-spacing: .5px; color: #fff; }
+h1 em { font-style: normal; color: #bff538; }
+.sub { margin-top: 26px; font: 500 var(--ps, 32px)/1.38 Manrope; color: #b6c2d6; }
+.sub b { color: #fff; font-weight: 700; }
+.crop { position: relative; overflow: hidden; }
+.crop img { position: absolute; display: block; max-width: none; }
+.browser { background: #0f1828; border: 1px solid #26344d; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 50px 100px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.03); }
+.bar { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: #131e30; border-bottom: 1px solid #22304a; }
+.bar i { width: 11px; height: 11px; border-radius: 50%; background: #2c3a52; }
+.phone { padding: 14px; background: #1a2333; border-radius: 60px; box-shadow: 0 50px 90px rgba(0,0,0,.6), 0 0 0 2px #2b3649 inset; }
+.screen { border-radius: 47px; overflow: hidden; }
+.card { background: #0f1828; border: 1px solid #2a3a55; border-radius: 22px; overflow: hidden;
+  box-shadow: 0 30px 70px rgba(0,0,0,.55); }
+.label svg { width: 26px; height: 26px; vertical-align: -7px; margin-right: 6px; }
+.label { font: 800 17px/1 Manrope; letter-spacing: 2.5px; text-transform: uppercase; color: #bff538; }
+.photo { position: absolute; left: 0; right: 0; overflow: hidden; z-index: 0; }
+.photo img { position: absolute; max-width: none; opacity: .5; filter: saturate(.8); }
+.photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(#060d1a 0%, rgba(6,13,26,.5) 40%, #060d1a 100%); }
+.pill { display: inline-flex; align-items: center; gap: 14px; background: #bff538; color: #060d1a; font: 800 29px/1 Manrope;
+  padding: 22px 32px; border-radius: 999px; box-shadow: 0 16px 40px rgba(191,245,56,.25); }
+.steps { list-style: none; display: flex; flex-direction: column; gap: 22px; }
+.steps li { display: flex; align-items: center; gap: 18px; font: 700 29px/1.15 Manrope; color: #fff; }
+.steps li span { flex: none; width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center;
+  border: 2px solid #bff538; color: #bff538; font: 800 24px/1 "Big Shoulders"; }
+.chips { display: flex; flex-wrap: wrap; gap: 12px; }
+.chips span { font: 700 23px/1 Manrope; color: #dfe7f3; background: #111c2e; border: 1.5px solid #27364f; border-radius: 999px; padding: 13px 20px; }
+.chips span::before { content: "●"; color: #bff538; margin-right: 10px; font-size: 14px; vertical-align: 3px; }
+.feat { display: flex; align-items: center; gap: 14px; font: 700 var(--fs, 27px)/1.2 Manrope; color: #fff; }
+.feat svg { flex: none; }
+.fade { position: absolute; left: 0; right: 0; bottom: 0; height: 260px; background: linear-gradient(transparent, #060d1a 70%); z-index: 2; }
+.note { font: 500 22px/1.4 Manrope; color: #8696ae; }
+ :root{--hs:98px}</style></head><body><header><svg width="58" height="58" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#0c1626"/>
+  <g fill="none" stroke="#bff538" stroke-width="2.5" stroke-linecap="round"><circle cx="16" cy="16" r="9"/>
+  <path d="M16 3.5v5M16 23.5v5M3.5 16h5M23.5 16h5"/></g><circle cx="16" cy="16" r="2.5" fill="#bff538"/></svg><span class="brand">Crosshair <b>Dinkers</b></span><span class="tag">Court Booking System</span></header>
+    <div class="copy"><h1>Run your pickleball<br>court business<br><em>smarter.</em></h1><p class="sub" style="max-width:900px">Meet <b>Crosshair Dinkers</b> – a smarter way to manage court bookings and daily operations.</p></div>
+    <div class="photo" style="top:620px;height:730px"><img src="screens/court-venue.jpg" style="width:2600px;left:-760px;top:-720px"></div>
+    <div style="position:absolute;left:250px;top:610px;"><div class="browser" style="width:760px"><div class="bar"><i></i><i></i><i></i></div><div class="crop" style="width:758px;height:474px"><img src="screens/admin-dashboard.png" style="width:758px;left:0px;top:0px"></div></div></div>
+    <div style="position:absolute;left:64px;top:740px;"><div class="phone" style="width:300px"><div class="screen"><div class="crop" style="width:272px;height:589px"><img src="screens/home.png" style="width:272px;left:0px;top:0px"></div></div></div></div>
+    <div style="position:absolute;left:0px;top:1196px;left:auto;right:72px"><span class="pill" style="font-size:27px">Upgrade Your Court Booking Experience. <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#060d1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+  </body></html>

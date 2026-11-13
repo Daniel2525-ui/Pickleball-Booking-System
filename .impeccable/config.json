@@ -9,6 +9,15 @@
         "value": "arial",
         "createdAt": "2026-10-31T03:56:31.312Z",
         "reason": "email templates need email-client-safe fonts; user approved the plain-built-in-fonts call in the email design playback"
+      },
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/4199-1793896881/content/crosshair-magicui.html"
+        ],
+        "createdAt": "2026-11-05T16:42:43.063Z",
+        "reason": "Claude: mockup demonstrating Magic UI's AnimatedShinyText badge, which the user asked to see; not shipped code"
       }
     ]
   }
