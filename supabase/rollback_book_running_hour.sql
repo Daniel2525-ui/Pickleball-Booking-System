@@ -1,4 +1,4 @@
--- Rollback for 20261113010000_book_running_hour: a slot closes again the moment it starts.
+-- Rollback for 20261112135357_book_running_hour: a slot closes again the moment it starts.
 -- Revert the app (bookableUntil, the grid's "passed" rule) first, or the grid offers hours checkout refuses.
 BEGIN;
 

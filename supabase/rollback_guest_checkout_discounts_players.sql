@@ -1,4 +1,4 @@
--- Rollback for 20261113020000_guest_checkout_discounts_players. Revert the app first: the new checkout sends
+-- Rollback for 20261112173834_guest_checkout_discounts_players. Revert the app first: the new checkout sends
 -- player_count and discount_code, which the old hold_court_basket does not take.
 -- Guest profiles (is_guest) stay as ordinary customer profiles; their bookings are kept. Discounts already applied
 -- stay in bookings.total_amount and payments.amount (the codes themselves are dropped).

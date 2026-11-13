@@ -1,4 +1,4 @@
--- Follow-ups to guest checkout and discount codes (20261113020000):
+-- Follow-ups to guest checkout and discount codes (20261112173834):
 --   * a code's use is held only while the checkout's 15-minute hold is live (it was 35 minutes, with the grace period)
 --   * a late payment whose code ran out meanwhile is refunded instead of taking the code past its limit
 --   * the admin customer list shows one row per guest email (one guest on several devices)

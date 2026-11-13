@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!heldOnTheirDates(validation.lines, items)) {
-            console.error("hold_court_basket ignored line dates: apply migration 20261112140000_late_night_basket");
+            console.error("hold_court_basket ignored line dates: apply migration 20261112133703_late_night_basket");
             throw new Error(HOLD_DATES_MISMATCH);
         }
 

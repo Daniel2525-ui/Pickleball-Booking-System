@@ -1,4 +1,4 @@
--- Rollback for 20261113030000_guest_followups: back to 20261113020000 (codes held through the grace period, late
+-- Rollback for 20261112174753_guest_followups: back to 20261112173834 (codes held through the grace period, late
 -- payments over a code's limit confirmed, one customer row per guest profile).
 -- Bookings already cancelled with reason 'discount_used_up' are relabelled 'slot_conflict' (also a refunded lapsed hold).
 BEGIN;
