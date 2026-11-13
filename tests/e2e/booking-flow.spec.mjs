@@ -1,9 +1,8 @@
 // Creates real holds, QR Ph test-mode payments and payments: local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, requireQrPh, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, payWithQrPh } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, requireQrPh, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, payWithQrPh, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
-// Phone width shows the quick-date strip ("Tmrw"), the simplest stable way to pick tomorrow
 // Desktop layout: the grid shows every court at once (phones show one court at a time)
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -19,7 +18,7 @@ test.beforeEach(() => requireLocalDb());
 
 async function openTomorrow(page) {
   await page.goto("/#booking");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
 }
 
 const slot = (page, time) => page.locator("#booking").getByRole("button", { name: `Select ${court.name} at ${time}` });

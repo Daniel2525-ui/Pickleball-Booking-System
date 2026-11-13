@@ -39,6 +39,15 @@ export function tomorrowManila() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(Date.now() + 86_400_000));
 }
 
+// Picks a day `daysAhead` from today in the booking calendar, turning to next month when needed
+export async function pickDay(page, daysAhead) {
+  const label = new Date(Date.now() + daysAhead * 86_400_000).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "Asia/Manila" });
+  const day = page.getByRole("button", { name: new RegExp(`^${label}`) });
+  await page.getByRole("button", { name: "Next month" }).waitFor();
+  if (!(await day.isVisible())) await page.getByRole("button", { name: "Next month" }).click();
+  await day.click();
+}
+
 export function resetBookings() {
   sql(`
     DELETE FROM public.refund_requests;

@@ -1,6 +1,6 @@
 // Open play end to end: local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { requireLocalDb, writesAllowed, sql, account, login, tomorrowManila, resetBookings, openAllBookings } from "./local-db.mjs";
+import { requireLocalDb, writesAllowed, sql, account, login, tomorrowManila, resetBookings, openAllBookings, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 // Desktop layout: the grid shows every court at once (phones show one court at a time)
@@ -24,7 +24,7 @@ test.beforeEach(() => requireLocalDb());
 
 async function openTomorrow(page) {
   await page.goto("/#booking");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
 }
 
 const sessionId = () => sql(`SELECT id FROM public.open_play_sessions WHERE session_date = '${date}'`);

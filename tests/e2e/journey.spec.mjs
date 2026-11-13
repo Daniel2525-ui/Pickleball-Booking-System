@@ -1,7 +1,7 @@
 // One player's whole life through the UI, then the staff side: sign up, book, pay by GCash, staff verify,
 // the player can't cancel a paid booking, so staff cancel and refund it. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 // Desktop layout: the grid shows every court at once (phones show one court at a time)
@@ -62,7 +62,7 @@ test("1. a new player signs up through the site", async ({ page }) => {
 test("2. the player books two hours tomorrow and pays by GCash", async ({ page }) => {
   await login(page, player);
   await page.goto("/#booking");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
   await page.locator("#booking").getByRole("button", { name: `Select ${court.name} at 3:00 PM - 4:00 PM` }).click();
   await page.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) }).getByRole("button", { name: "One hour longer" }).click();
   await expect(page.getByRole("region", { name: "Your selection" }).getByText("₱400", { exact: true }).last()).toBeVisible();

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, Calendar, Clock, QrCode, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { LoaderCircle, Calendar, Clock, QrCode, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -80,7 +80,6 @@ export const BookingContainer = () => {
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isFetchingBookings, setIsFetchingBookings] = useState(false);
-  const [showMobileCalendar, setShowMobileCalendar] = useState(false);
   // Check auth state on mount
   useEffect(() => {
     const supabase = createClient();
@@ -369,32 +368,15 @@ export const BookingContainer = () => {
     return null;
   }, [timeSlots, selectedDate, operatingHours, closures]);
 
-  const dayNote = (d: Date) => {
-    const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
-    const own = operatingHours.find((h) => h.day_of_week === weekday && h.is_open);
-    if (!own || generateTimeSlots(d, operatingHours, closures.map((c) => c.closed_on)).length === 0) {
-      return { closed: true, text: "Closed" };
-    }
-    return { closed: false, text: `till ${formatTime12h(own.close_time).replace(":00 ", " ")}` };
-  };
+  const closedDates = closures.map((c) => c.closed_on);
 
   const openHours = courtNames.reduce(
     (n, court) => n + timeSlots.filter((time) => getSlotStatus(selectedDate, court, time) === "available").length,
     0
   );
   // The day strip starts on the night still running: at 12:30 AM a day open till 2 AM is still "Today"
-  const firstDay = dayStart(bookingToday(operatingHours, pricing?.settings.day_ends_at, new Date(), closures.map((c) => c.closed_on)));
+  const firstDay = dayStart(bookingToday(operatingHours, pricing?.settings.day_ends_at, new Date(), closedDates));
   const isToday = selectedDate.toDateString() === firstDay.toDateString();
-  // The strip scrolls through four weeks from today, and stretches to a week past any later date picked
-  const selectedAhead = Math.round((dayStart(selectedDateStr).getTime() - firstDay.getTime()) / 86_400_000);
-  const stripDays = Math.max(28, selectedAhead + 7);
-  const stripRef = useRef<HTMLDivElement>(null);
-  // Keep the chosen day centred in the strip; scrolls the strip only, never the page
-  useEffect(() => {
-    const strip = stripRef.current;
-    const chip = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    if (strip && chip) strip.scrollTo({ left: chip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2, behavior: "smooth" });
-  }, [selectedDateStr, loading]);
   const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
   // The day's own closing time when it has one (2 AM for a late close, not the midnight its last slot here ends at)
   const ownClose = operatingHours.find((h) => h.day_of_week === dayName && h.is_open)?.close_time;
@@ -548,92 +530,33 @@ export const BookingContainer = () => {
               </Button>
             </div>
           )}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              const d = new Date(selectedDate);
-              d.setDate(d.getDate() - 1);
-              if (d >= firstDay) setSelectedDate(d);
-            }}
-            className="size-11 shrink-0 rounded-xl border bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-            aria-label="Previous day"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          <div ref={stripRef} className="relative flex-1 overflow-x-auto scrollbar-none">
-            <div className="flex gap-2 pb-1">
-              {Array.from({ length: stripDays }).map((_, i) => {
-                const d = plusDays(firstDay, i);
-                const ahead = Math.round((d.getTime() - firstDay.getTime()) / 86_400_000);
-                const isSelected = d.toDateString() === selectedDate.toDateString();
-                const sub = dayNote(d);
-                return (
-                  <button
-                    key={ahead}
-                    onClick={() => setSelectedDate(d)}
-                    aria-pressed={isSelected}
-                    className={`shrink-0 min-w-24 flex flex-col items-start px-3.5 py-2 rounded-xl text-left transition-colors border ${
-                      isSelected ? "bg-primary text-primary-foreground border-primary" : sub.closed ? "bg-muted text-muted-foreground" : "bg-card hover:border-primary/40"
-                    }`}
-                  >
-                    <span className="text-[11px] font-semibold opacity-85">
-                      {ahead === 0 ? "Today" : ahead === 1 ? "Tmrw" : d.toLocaleDateString("en-US", { weekday: "short" })}
-                    </span>
-                    <span className="text-base font-bold">{d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                    <span className={`text-[11px] font-semibold ${isSelected ? "" : sub.closed ? "" : "text-primary"}`}>{sub.text}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              const d = new Date(selectedDate);
-              d.setDate(d.getDate() + 1);
-              setSelectedDate(d);
-            }}
-            className="size-11 shrink-0 rounded-xl border bg-card flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-            aria-label="Next day"
-          >
-            <ChevronRight className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowMobileCalendar((prev) => !prev)}
-            aria-expanded={showMobileCalendar}
-            className="hidden sm:inline-flex shrink-0 min-h-11 items-center gap-2 rounded-xl border bg-card px-3.5 text-sm font-semibold hover:bg-muted"
-          >
-            <Calendar className="size-4" />
-            Pick another date
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowMobileCalendar((prev) => !prev)}
-          aria-expanded={showMobileCalendar}
-          className="sm:hidden self-start text-primary font-semibold text-sm flex items-center gap-1.5 py-1 px-1"
-        >
-          <Calendar className="size-3.5" />
-          {showMobileCalendar ? "Hide calendar" : "Pick another date"}
-        </button>
-        {showMobileCalendar && (
-          <div className="max-w-md animate-in fade-in slide-in-from-top-2 duration-200">
-            <DateSelector
-              selectedDate={selectedDate}
-              onSelectDate={(d) => {
-                setSelectedDate(d);
-                setShowMobileCalendar(false);
-              }}
-              operatingHours={operatingHours}
-            />
-          </div>
-        )}
-        <GridLegend />
-      </div>
-
+      {/* From lg the right column holds "Your selection" then the calendar and stays in view, so checkout never scrolls away */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
-        <div className="min-w-0">
+        <div className="flex flex-col gap-6 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-20">
+        {pricing && (
+                <BasketSheet
+                  lines={basket}
+                  pricing={pricing}
+                  getMaxDuration={(line) => getMaxAvailableDuration(line.court, line.startSlot || line.time, lineKey(line))}
+                  onDuration={(line, hours) => {
+                    const [start] = lineSpan(line);
+                    setCourtSpans(line.court, [...basket.filter((l) => l.court === line.court && lineKey(l) !== lineKey(line)).map(lineSpan), [start, start + hours]]);
+                  }}
+                  onRemove={(line) => setBasket((prev) => removeLine(prev, lineKey(line)))}
+                  onCheckout={() => startCheckout()}
+                />
+              )}
+          <DateSelector
+            // Remount on a month change from outside (the closed-day shortcut) so the calendar shows it
+            key={`${selectedDate.getFullYear()}-${selectedDate.getMonth()}`}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            today={firstDay}
+            isOpen={(d) => generateTimeSlots(d, operatingHours, closedDates).length > 0}
+          />
+        </div>
+        <div className="min-w-0 flex flex-col gap-3 lg:col-start-1 lg:row-start-1">
+          <GridLegend />
           {timeSlots.length > 0 ? (
             <div className={basket.length > 0 ? BASKET_SHEET_PADDING : ""}>
               <CourtAvailabilityGrid
@@ -657,23 +580,9 @@ export const BookingContainer = () => {
               reason={closure?.reason}
               nextOpen={nextOpenDate}
               onPick={setSelectedDate}
-              onPickAnother={() => setShowMobileCalendar(true)}
             />
           )}
         </div>
-        {pricing && (
-                <BasketSheet
-                  lines={basket}
-                  pricing={pricing}
-                  getMaxDuration={(line) => getMaxAvailableDuration(line.court, line.startSlot || line.time, lineKey(line))}
-                  onDuration={(line, hours) => {
-                    const [start] = lineSpan(line);
-                    setCourtSpans(line.court, [...basket.filter((l) => l.court === line.court && lineKey(l) !== lineKey(line)).map(lineSpan), [start, start + hours]]);
-                  }}
-                  onRemove={(line) => setBasket((prev) => removeLine(prev, lineKey(line)))}
-                  onCheckout={() => startCheckout()}
-                />
-              )}
       </div>
       </div>
       )}

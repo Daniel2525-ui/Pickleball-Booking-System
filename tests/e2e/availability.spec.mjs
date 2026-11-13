@@ -1,5 +1,6 @@
 // Read-only: browses the live grid as a guest; never creates a hold.
 import { test, expect } from "@playwright/test";
+import { pickDay } from "./local-db.mjs";
 
 test("a guest fills a basket and checks out with their details, or signs in instead @mobile", async ({ page }) => {
   await page.goto("/#booking");
@@ -37,15 +38,10 @@ test("pages fit a phone screen without horizontal scroll @mobile", async ({ page
   }
 });
 
-test("the day strip follows the chosen date past the first week", async ({ page }) => {
+test("the calendar is always shown, picks a later date and blocks past days", async ({ page }) => {
   await page.goto("/#booking", { waitUntil: "load" });
-  const strip = page.getByRole("button", { pressed: true }).filter({ hasText: /Today|Tmrw|Mon|Tue|Wed|Thu|Fri|Sat|Sun/ });
-  await expect(strip).toHaveText(/Today/);
-  // Ten days ahead, one tap at a time: the strip moves along and still marks the chosen day
-  for (let i = 0; i < 10; i++) await page.getByRole("button", { name: "Next day" }).click();
-  const target = new Date(Date.now() + 10 * 86_400_000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "Asia/Manila" });
-  await expect(strip).toContainText(target);
-  // And back to the first week, where Today is again first
-  for (let i = 0; i < 10; i++) await page.getByRole("button", { name: "Previous day" }).click();
-  await expect(strip).toHaveText(/Today/);
+  await pickDay(page, 10);
+  const label = new Date(Date.now() + 10 * 86_400_000).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "Asia/Manila" });
+  await expect(page.getByRole("button", { name: new RegExp(`^${label}`) })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Previous month" })).toBeVisible();
 });

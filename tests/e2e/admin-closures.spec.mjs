@@ -1,6 +1,6 @@
 // One-off closed dates: staff close a day, customers can't book it, staff still can. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, openAllBookings } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, openAllBookings, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -46,7 +46,7 @@ test("staff close a date and see the booking already on it", async ({ page }) =>
 test("customers see the date closed and cannot book it, even through checkout", async ({ page }) => {
   await login(page, account("CUSTOMER"));
   await page.goto("/#booking");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
   await expect(page.getByText("The venue is closed on this date for E2E Holiday.")).toBeVisible();
 
   // A page opened before the closure would still offer slots: the database refuses the hold
@@ -87,6 +87,6 @@ test("reopening the date lets customers book it again", async ({ page }) => {
   await page.context().clearCookies();
   await login(page, account("CUSTOMER"));
   await page.goto("/#booking");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
   await expect(page.getByText(/The venue is closed on this date/)).toHaveCount(0);
 });

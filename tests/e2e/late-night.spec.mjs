@@ -1,7 +1,7 @@
 // A day open past midnight: its after-midnight hours are booked from that day's grid, stored on the next date.
 // Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, payWithQrPh, requireQrPh } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, payWithQrPh, requireQrPh, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 test.use({ viewport: { width: 1280, height: 900 } });
@@ -33,7 +33,7 @@ const basket = (page) => page.getByRole("region", { name: "Your selection" });
 
 async function openTomorrow(page) {
   await page.goto("/#booking", { waitUntil: "load" });
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
 }
 
 test("the after-midnight hours sit at the bottom of their own day, and not on the next date", async ({ page }) => {
@@ -44,7 +44,7 @@ test("the after-midnight hours sit at the bottom of their own day, and not on th
   await expect(slot(page, "COURT 1", "1:00 AM - 2:00 AM")).toBeVisible();
   await expect(grid(page).getByText(/open till 2:00 AM/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Next day" }).click();
+  await pickDay(page, 2);
   await expect(slot(page, "COURT 1", "6:00 AM - 7:00 AM")).toBeVisible();
   await expect(slot(page, "COURT 1", "12:00 AM - 1:00 AM")).toHaveCount(0);
   await expect(grid(page).getByText("After midnight", { exact: true })).toHaveCount(0);

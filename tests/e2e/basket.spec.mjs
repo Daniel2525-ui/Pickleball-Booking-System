@@ -1,9 +1,8 @@
 // Multi-court basket: real holds, QR Ph test-mode payments, refunds and counter settlement. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, payWithQrPh, openAllBookings, requireQrPh } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, payWithQrPh, openAllBookings, requireQrPh, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
-// Phone width shows the quick-date strip ("Tmrw"), the simplest stable way to pick tomorrow
 // Desktop layout: the grid shows every court at once (phones show one court at a time)
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -24,7 +23,7 @@ const slot = (page, court, time) => page.locator("#booking").getByRole("button",
 
 async function openTomorrow(page) {
   await page.goto("/#booking");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
 }
 
 // lines: [courtName, "HH:MM", "HH:MM"][]
@@ -254,7 +253,7 @@ test("removing every line closes the basket, and changing the date clears it", a
 
   await slot(page, "COURT 1", "7:00 AM - 8:00 AM").click();
   await expect(basket(page)).toBeVisible();
-  await page.getByRole("button", { name: "Next day" }).click();
+  await pickDay(page, 2);
   await expect(page.getByText("Selection cleared for the new date.")).toBeVisible();
   await expect(basket(page).getByText("Nothing picked yet")).toBeVisible();
 });

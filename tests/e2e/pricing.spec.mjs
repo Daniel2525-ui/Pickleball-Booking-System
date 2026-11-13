@@ -1,10 +1,9 @@
 // Changes venue pricing and creates holds: local Supabase stack only.
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, requireQrPh } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, requireQrPh, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
-// Phone width shows the quick-date strip ("Tmrw")
 // Desktop layout: the grid shows every court at once (phones show one court at a time)
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -98,7 +97,7 @@ test("customers see the configured prices, and the hold is charged what the data
   requireQrPh();
   await login(page, account("CUSTOMER"));
   await page.goto("/#booking");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
   await page.locator("#booking").getByRole("button", { name: `Select ${court.name} at 4:00 PM - 5:00 PM` }).click();
 
   // Grid cells show prices too, so read totals from the basket

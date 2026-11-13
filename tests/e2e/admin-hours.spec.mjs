@@ -1,6 +1,6 @@
 // Weekly operating hours: warning before hours drop existing bookings, whole-hour times, server checks. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, requireQrPh, sql, account, login, tomorrowManila, resetBookings, firstCourt } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, requireQrPh, sql, account, login, tomorrowManila, resetBookings, firstCourt, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -101,7 +101,7 @@ test("the booking grid lists a day's late hours at its bottom under their own he
   sql(`UPDATE public.operating_hours SET close_time = '02:00' WHERE day_of_week = '${tomorrowName}'`);
   const court = firstCourt();
   await page.goto("/#booking");
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
 
   await expect(page.getByText("After midnight", { exact: true }).filter({ visible: true })).toBeVisible();
   await page.getByRole("button", { name: `Select ${court.name} at 1:00 AM - 2:00 AM` }).filter({ visible: true }).click();
@@ -111,7 +111,7 @@ test("the booking grid lists a day's late hours at its bottom under their own he
   await expect(lines).toHaveCount(2);
 
   // The next date starts at its own opening: the 1-2 AM hour belongs to the night before
-  await page.getByRole("button", { name: "Next day" }).click();
+  await pickDay(page, 2);
   await expect(page.getByRole("button", { name: `Select ${court.name} at 6:00 AM - 7:00 AM` }).filter({ visible: true })).toBeVisible();
   await expect(page.getByRole("button", { name: `Select ${court.name} at 1:00 AM - 2:00 AM` })).toHaveCount(0);
 });

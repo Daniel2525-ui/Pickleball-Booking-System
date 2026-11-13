@@ -1,7 +1,7 @@
 // Guest checkout (no account), number of players and discount codes. Local Supabase stack only, with anonymous
 // sign-ins switched on (Supabase Auth: "Allow anonymous sign-ins").
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, tomorrowManila, resetBookings } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, tomorrowManila, resetBookings, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 test.use({ viewport: { width: 1280, height: 900 } });
@@ -30,7 +30,7 @@ const dialog = (page) => page.getByRole("dialog");
 
 async function openCheckout(page) {
   await page.goto("/#booking", { waitUntil: "load" });
-  await page.getByRole("button", { name: /Tmrw/ }).click();
+  await pickDay(page, 1);
   await slot(page, "COURT 1", "6:00 PM - 7:00 PM").click();
   await page.getByRole("region", { name: "Your selection" }).getByRole("button", { name: "Continue to Checkout" }).click();
   await expect(dialog(page).getByRole("heading", { name: "Review and pay" })).toBeVisible();

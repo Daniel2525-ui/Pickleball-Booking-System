@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarX2, ArrowRight } from "lucide-react";
+import { CalendarX2, ArrowRight } from "lucide-react";
 
 const dayLabel = (d: Date) => d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
@@ -12,7 +12,6 @@ export function VenueClosed({
   reason,
   nextOpen,
   onPick,
-  onPickAnother,
 }: {
   date: Date;
   /** A one-off closed date (holiday, event); otherwise the weekday is simply not open */
@@ -21,7 +20,6 @@ export function VenueClosed({
   /** The next day with bookable hours, if one is coming up */
   nextOpen: Date | null;
   onPick: (d: Date) => void;
-  onPickAnother: () => void;
 }) {
   const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
   return (
@@ -55,14 +53,6 @@ export function VenueClosed({
             <ArrowRight className="size-4" aria-hidden />
           </button>
         )}
-        <button
-          type="button"
-          onClick={onPickAnother}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-card px-4 text-sm font-semibold hover:bg-muted"
-        >
-          <CalendarDays className="size-4" aria-hidden />
-          Pick another date
-        </button>
       </div>
     </section>
   );
