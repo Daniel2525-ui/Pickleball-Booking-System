@@ -266,7 +266,7 @@ export function GridLegend() {
       {item("bg-card border-[1.5px] border-primary/35", "Available")}
       {item("bg-primary border-2 border-primary", "Selected")}
       {/* Taken cells say why (Booked, Open play...), so one grey key covers them all */}
-      {item("bg-muted", "Unavailable")}
+      {item("bg-foreground/10 border border-foreground/20", "Unavailable")}
     </div>
   );
 }
