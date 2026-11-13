@@ -23,6 +23,9 @@ export interface Payment {
         customer_name?: string;
         open_play_spots?: number | null;
         open_play_session_id?: string | null;
+        court_id?: string | null;
+        hold_expires_at?: string | null;
+        created_at?: string;
         profiles?: {
             full_name: string;
         };

@@ -32,6 +32,9 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
                     end_time,
                     customer_name,
                     open_play_spots,
+                    court_id,
+                    hold_expires_at,
+                    created_at,
                     profiles (
                         full_name
                     ),

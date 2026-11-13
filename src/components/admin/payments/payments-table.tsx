@@ -29,6 +29,28 @@ import { formatTime12h, formatDate } from "@/lib/utils/formatTime";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
 import { RefundPaymentModal } from "./refundPaymentModal";
 import { groupByCheckout } from "@/lib/services/bookings/basket";
+import { SettlePaymentModal } from "@/components/admin/bookings/settlePaymentModal";
+import { isHoldExpired } from "@/lib/services/bookings/bookingDisplayStatus";
+import type { Booking } from "@/lib/services/bookings/bookingsTypes";
+
+// Same rule as the bookings page's Collect Payment: unpaid, not cancelled, not an expired hold, not an open play spot
+const collectable = (p: Payment) =>
+  p.status === "pending" && !!p.bookings && p.bookings.status !== "cancelled" && !p.bookings.open_play_spots &&
+  !isHoldExpired({ status: p.bookings.status ?? "", hold_expires_at: p.bookings.hold_expires_at, created_at: p.bookings.created_at });
+
+// The settle dialog reads a booking; build one from the payment rows it collects (several = one unpaid checkout)
+const toSettle = (rows: Payment[]) => {
+  const head = rows[0];
+  const total = rows.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const booking = {
+    ...head.bookings,
+    id: head.booking_id,
+    customer_name: head.bookings?.profiles?.full_name || head.bookings?.customer_name || "Customer",
+    total_amount: total,
+    payments: [{ id: head.id, status: head.status, amount: head.amount }],
+  } as unknown as Booking;
+  return { booking, due: { ids: rows.map((p) => p.booking_id), total }, paymentIds: rows.map((p) => p.id) };
+};
 
 interface PaymentsTableProps {
   filters?: {
@@ -51,6 +73,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refundTarget, setRefundTarget] = useState<Payment | null>(null);
+  const [collectTarget, setCollectTarget] = useState<ReturnType<typeof toSettle> | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totals, setTotals] = useState<ReturnType<typeof sumPayments> | null>(null);
@@ -270,6 +293,13 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                   const sameMethod = new Set(group.map(paymentMethodLabel)).size === 1;
                   const sameDate = group.every((p) => p.bookings?.booking_date === head.bookings?.booking_date);
                   const headName = head.bookings?.profiles?.full_name || head.bookings?.customer_name || "Unknown Customer";
+                  // An unpaid online checkout (booking still pending) is collected as one; the server settles the whole basket
+                  const basketDue = grouped ? group.filter((p) => collectable(p) && p.bookings?.status === "pending") : [];
+                  const collectButton = (rows: Payment[]) => (
+                    <Button size="sm" className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setCollectTarget(toSettle(rows))}>
+                      <Banknote className="size-3.5" /> Collect {formatCurrency(rows.reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}
+                    </Button>
+                  );
                   return [
                     grouped && (
                       <TableRow key={`group-${head.basket_id}`} className="bg-muted/40 hover:bg-muted/40">
@@ -300,7 +330,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                         <TableCell>
                           <span className="text-xs text-muted-foreground">{formatDate(head.paid_at || head.created_at, true)}</span>
                         </TableCell>
-                        <TableCell />
+                        <TableCell className="text-right">{basketDue.length > 0 && collectButton(basketDue)}</TableCell>
                       </TableRow>
                     ),
                     ...group.map((payment) => (
@@ -362,6 +392,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
                     {/* Action */}
                     <TableCell className="text-right">
+                      {collectable(payment) && !basketDue.includes(payment) && collectButton([payment])}
                       {needsRefund(payment) && (() => {
                         const refundState = cardRefundState(payment);
                         return (
@@ -393,6 +424,25 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
           </Button>
         </div>
       )}
+
+      <SettlePaymentModal
+        booking={collectTarget?.booking ?? null}
+        due={collectTarget?.due ?? null}
+        open={collectTarget !== null}
+        onOpenChange={(open) => !open && setCollectTarget(null)}
+        onSettled={(_, method) => {
+          const ids = collectTarget?.paymentIds ?? [];
+          const now = new Date().toISOString();
+          setPayments((prev) =>
+            prev.map((p) =>
+              ids.includes(p.id)
+                ? { ...p, status: "paid", payment_method: method, paid_at: now, bookings: p.bookings && { ...p.bookings, status: "confirmed" } }
+                : p
+            )
+          );
+          setTotalsVersion((v) => v + 1);
+        }}
+      />
 
       <RefundPaymentModal
         payment={refundTarget}
