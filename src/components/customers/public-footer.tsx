@@ -1,27 +1,5 @@
 import Link from "next/link";
-import { Phone } from "lucide-react";
 import { VENUE_CITY, VENUE_NAME, brandInitials } from "@/lib/brand";
-
-// Edit these directly; leave one as "" to hide it.
-const VENUE_PHONE: string = "0938 210 6550";
-
-// lucide dropped brand icons, so these are drawn in its stroke style
-const SOCIALS = [
-  // shortcut: points home until the venue has a Facebook page; swap in its https:// URL then
-  { label: "Facebook", href: "/", icon: <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /> },
-  {
-    label: "Instagram",
-    href: "",
-    icon: (
-      <>
-        <rect x="2" y="2" width="20" height="20" rx="5" />
-        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-        <path d="M17.5 6.5h.01" />
-      </>
-    ),
-  },
-  { label: "TikTok", href: "", icon: <path d="M9 12a4 4 0 1 0 4 4V2a5 5 0 0 0 5 5" /> },
-].filter((s) => s.href);
 
 export function PublicFooter() {
   return (
@@ -36,30 +14,6 @@ export function PublicFooter() {
             <p className="text-xs">{VENUE_CITY}&apos;s pickleball courts</p>
           </div>
         </div>
-        {(VENUE_PHONE || SOCIALS.length > 0) && (
-          <div className="flex items-center gap-4">
-            {VENUE_PHONE && (
-              <a href={`tel:${VENUE_PHONE.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
-                <Phone className="size-4" aria-hidden />
-                {VENUE_PHONE}
-              </a>
-            )}
-            {SOCIALS.map((s) => (
-              <a
-                key={s.label}
-                href={s.href}
-                target={s.href.startsWith("http") ? "_blank" : undefined}
-                rel="noopener noreferrer"
-                aria-label={`${VENUE_NAME} on ${s.label}`}
-                className="grid place-items-center size-9 rounded-full border hover:text-foreground hover:border-foreground/40 transition-colors"
-              >
-                <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  {s.icon}
-                </svg>
-              </a>
-            ))}
-          </div>
-        )}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
           <Link href="/#faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/terms#cancellation" className="hover:text-foreground transition-colors">Cancellation policy</Link>
