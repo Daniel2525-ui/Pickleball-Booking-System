@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useVenueContact } from "@/hooks/use-venue-contact";
-import { AlertCircle, LoaderCircle, MapPin, Minus, Plus, QrCode, Tag } from "lucide-react";
+import { AlertCircle, LoaderCircle, MapPin, QrCode, Tag } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +52,7 @@ export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, on
   const venue = useVenueContact();
   const [agreed, setAgreed] = useState(true);
   const [guest, setGuest] = useState({ full_name: "", phone: "", email: "" });
-  const [players, setPlayers] = useState(4);
+  const [players, setPlayers] = useState("");
   const [codeInput, setCodeInput] = useState("");
   const [applied, setApplied] = useState<{ code: string; discount: number; forAmounts: string } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -64,7 +64,8 @@ export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, on
   const amounts = checkoutAmounts?.length ? checkoutAmounts : lines.map((l) => l.price);
   const code = applied && applied.forAmounts === amounts.join(",") ? applied : null;
   const total = code ? subtotal - code.discount : subtotal;
-  const playerCount = Math.max(1, Math.min(players, maxPlayers));
+  // Typed, not clamped: checkPlayerCount explains a blank, decimal or too-high number on Pay
+  const playerCount = players.trim() === "" ? NaN : Number(players);
 
   const applyCode = async () => {
     setCodeError(null);
@@ -181,18 +182,21 @@ export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, on
 
             <section aria-label="Players" className="flex items-center justify-between gap-3 rounded-xl border p-3.5">
               <div>
-                <p id="players-label" className="font-semibold">Number of players</p>
-                <p className="text-xs text-muted-foreground">Up to {maxPlayers}</p>
+                <Label htmlFor="player-count" className="font-semibold">Number of players</Label>
+                <p id="player-count-hint" className="text-xs text-muted-foreground">Up to {maxPlayers}</p>
               </div>
-              <div role="group" aria-labelledby="players-label" className="flex items-center gap-1">
-                <Button type="button" variant="outline" size="icon" className="size-10" aria-label="One player fewer" disabled={playerCount <= 1} onClick={() => setPlayers(playerCount - 1)}>
-                  <Minus className="size-4" />
-                </Button>
-                <output aria-live="polite" className="w-10 text-center text-lg font-bold tabular-nums">{playerCount}</output>
-                <Button type="button" variant="outline" size="icon" className="size-10" aria-label="One player more" disabled={playerCount >= maxPlayers} onClick={() => setPlayers(playerCount + 1)}>
-                  <Plus className="size-4" />
-                </Button>
-              </div>
+              <Input
+                id="player-count"
+                // Text, not number: no browser up/down arrows; the phone keypad is still numeric
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={players}
+                onChange={(e) => setPlayers(e.target.value)}
+                placeholder="0"
+                aria-describedby="player-count-hint"
+                className="h-11 w-20 text-center text-lg font-bold tabular-nums"
+              />
             </section>
 
             <section aria-label="Discount code" className="flex flex-col gap-1.5">

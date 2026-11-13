@@ -48,11 +48,14 @@ test("a guest checks out with a details form, a player count and a code, without
   await dialog(page).getByLabel("Mobile number").fill("0917 123 4567");
   await dialog(page).getByLabel("Email").fill(guestEmail);
 
-  // Players: the stepper stops at the venue's limit for one court
-  // It starts at 4, the limit here
-  await expect(dialog(page).getByRole("button", { name: "One player more" })).toBeDisabled();
+  // Players are typed: blank and over the venue's limit (4 for one court here) are refused on Pay
   await expect(dialog(page).getByText("Up to 4")).toBeVisible();
-  await dialog(page).getByRole("button", { name: "One player fewer" }).click();
+  await dialog(page).getByRole("button", { name: /^Pay ₱/ }).click();
+  await expect(dialog(page).getByRole("alert")).toContainText("Enter the number of players.");
+  await dialog(page).getByLabel("Number of players").fill("5");
+  await dialog(page).getByRole("button", { name: /^Pay ₱/ }).click();
+  await expect(dialog(page).getByRole("alert")).toContainText("at most 4 players");
+  await dialog(page).getByLabel("Number of players").fill("3");
 
   // Codes: switched off, unknown, then a good one
   await dialog(page).getByRole("textbox", { name: "Discount code" }).fill("shut");
