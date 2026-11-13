@@ -285,6 +285,17 @@
     to { transform: scale(3); opacity: 0; }
 }
 
+/* /book how-to steps: each number lights up in turn (1 → 2 → 3); set --step-delay per step */
+.step-light {
+    animation: step-light 3.6s ease-in-out infinite;
+    animation-delay: var(--step-delay, 0s);
+}
+@keyframes step-light {
+    0%, 100% { background: var(--muted); color: var(--muted-foreground); transform: scale(1); }
+    8%, 25% { background: var(--primary); color: var(--primary-foreground); transform: scale(1.12); }
+    33% { background: var(--muted); color: var(--muted-foreground); transform: scale(1); }
+}
+
 /* Booking confirmed: the tick pops in and confetti falls once (the global reduced-motion rule ends both at once) */
 .pop-in {
     animation: pop-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;

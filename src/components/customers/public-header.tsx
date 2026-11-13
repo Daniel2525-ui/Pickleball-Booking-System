@@ -10,7 +10,14 @@ import { AccountMenu } from "@/components/account-menu";
 import { VENUE_NAME, brandInitials } from "@/lib/brand";
 
 const initials = brandInitials(VENUE_NAME);
-const navLink = "hidden md:inline-flex px-3 py-2 rounded-lg text-sm font-semibold text-foreground hover:bg-muted transition-colors";
+const navLink = "px-3 py-2 rounded-lg text-sm font-semibold text-foreground hover:bg-muted transition-colors";
+const PAGES = [
+  { href: "/", label: "Home", icon: "home" },
+  { href: "/#courts", label: "Courts", icon: "courts" },
+  { href: "/open-play", label: "Open play", icon: "openPlay" },
+  { href: "/book", label: "Book a court", icon: "book" },
+  { href: "/#location", label: "Find us", icon: "location" },
+] as const;
 
 export function PublicHeader() {
   const [user, setUser] = useState<User | null>(null);
@@ -62,19 +69,17 @@ export function PublicHeader() {
       </Link>
 
       <nav aria-label="Main" className="flex items-center gap-1 lg:gap-2 shrink-0">
-        {/* Home page sections in scroll order, then the separate pages */}
-        <Link href="/" className={navLink}>Home</Link>
-        <Link href="/#location" className={navLink}>Find us</Link>
-        <Link href="/#courts" className={navLink}>Courts</Link>
-        <Link href="/book" className={navLink}>Book a court</Link>
-        <Link href="/open-play" className={navLink}>Open play</Link>
+        {PAGES.map(({ href, label }) => (
+          // Signed in, the extra links crowd the bar, so below xl these move into the account menu
+          <Link key={href} href={href} className={`${navLink} ${user ? "hidden xl:inline-flex" : "hidden md:inline-flex"}`}>{label}</Link>
+        ))}
         {user && isAdmin && (
-          <Link href="/admin/dashboard" className="hidden md:inline-flex px-3 py-2 rounded-lg text-sm font-semibold text-primary hover:bg-muted transition-colors">
+          <Link href="/admin/dashboard" className="hidden xl:inline-flex px-3 py-2 rounded-lg text-sm font-semibold text-primary hover:bg-muted transition-colors">
             {isOwner ? "Admin panel" : "Staff panel"}
           </Link>
         )}
         {user && (
-          <Link href="/my-bookings" className="hidden sm:inline-flex px-3.5 min-h-10 items-center rounded-xl border border-input bg-card text-sm font-semibold text-foreground hover:bg-muted transition-colors">
+          <Link href="/my-bookings" className="hidden xl:inline-flex px-3.5 min-h-10 items-center rounded-xl border border-input bg-card text-sm font-semibold text-foreground hover:bg-muted transition-colors">
             My bookings
           </Link>
         )}
@@ -92,8 +97,7 @@ export function PublicHeader() {
             signOutTo="/"
             links={[
               ...(isAdmin ? [{ label: isOwner ? "Admin panel" : "Staff panel", href: "/admin/dashboard", icon: "admin" as const }] : []),
-              { label: "Courts", href: "/#courts", icon: "courts", mobileOnly: true },
-              { label: "Open Play", href: "/open-play", icon: "openPlay", mobileOnly: true },
+              ...PAGES.map((p) => ({ ...p, mobileOnly: true })),
               { label: "My bookings", href: "/my-bookings", icon: "bookings", mobileOnly: true },
               user.is_anonymous
                 ? { label: "Create an account", href: "/register", icon: "profile" }
@@ -108,6 +112,7 @@ export function PublicHeader() {
             Sign in
           </Link>
         )}
+
       </nav>
     </header>
 

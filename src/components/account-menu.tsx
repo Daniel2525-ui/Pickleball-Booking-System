@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog, type ConfirmRequest } from "@/components/ui/confirm-dialog";
-import { CalendarDays, ChevronDown, House, Layers, LayoutDashboard, LogOut, UserRound, UsersRound } from "lucide-react";
+import { CalendarDays, CalendarPlus, ChevronDown, House, Layers, LayoutDashboard, LogOut, MapPin, UserRound, UsersRound } from "lucide-react";
 import { logout } from "@/lib/services/auth.service";
 import {
   DropdownMenu,
@@ -20,7 +20,7 @@ interface AccountMenuProps {
   name: string;
   email: string;
   /** Icons are named so a Server Component (the admin layout) can pass links */
-  /** mobileOnly: hidden from sm up, where the header already shows the same link */
+  /** mobileOnly: hidden from xl up, where the header already shows the same link */
   links: { label: string; href: string; icon: keyof typeof ICONS; mobileOnly?: boolean }[];
   /** Where to land after signing out */
   signOutTo: string;
@@ -31,7 +31,7 @@ interface AccountMenuProps {
 }
 
 // Same icons as the staff sidebar uses for these pages
-const ICONS = { bookings: CalendarDays, courts: Layers, openPlay: UsersRound, profile: UserRound, home: House, admin: LayoutDashboard };
+const ICONS = { bookings: CalendarDays, book: CalendarPlus, location: MapPin, courts: Layers, openPlay: UsersRound, profile: UserRound, home: House, admin: LayoutDashboard };
 
 /** Signed-in account menu (initials button + dropdown), shared by the customer and admin headers. */
 export function AccountMenu({ name, email, links, signOutTo, inSidebar = false, guest = false }: AccountMenuProps) {
@@ -87,7 +87,7 @@ export function AccountMenu({ name, email, links, signOutTo, inSidebar = false, 
           {links.map(({ label, href, icon, mobileOnly }) => {
             const Icon = ICONS[icon];
             return (
-            <DropdownMenuItem key={href} onClick={() => router.push(href)} className={`gap-2 min-h-[40px]${mobileOnly ? " sm:hidden" : ""}`}>
+            <DropdownMenuItem key={href} onClick={() => router.push(href)} className={`gap-2 min-h-[40px]${mobileOnly ? " xl:hidden" : ""}`}>
               <Icon className="size-4" />
               {label}
             </DropdownMenuItem>
