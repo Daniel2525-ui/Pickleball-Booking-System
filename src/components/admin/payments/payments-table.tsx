@@ -28,6 +28,7 @@ import { Payment, paymentMethodLabel, sumPayments } from "@/lib/services/payment
 import { formatTime12h, formatDate } from "@/lib/utils/formatTime";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
 import { RefundPaymentModal } from "./refundPaymentModal";
+import { groupByCheckout } from "@/lib/services/bookings/basket";
 
 interface PaymentsTableProps {
   filters?: {
@@ -260,11 +261,53 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((payment) => (
+                // One block per checkout (one QR Ph scan): a header line with the total paid, then a line per court.
+                // shortcut: a checkout split across "Load more" pages shows as two blocks; fetch by basket if that confuses staff.
+                groupByCheckout(filtered.map((p) => ({ ...p, basket_id: p.bookings?.basket_id, booking_date: p.bookings?.booking_date, start_time: p.bookings?.start_time }))).flatMap((group) => {
+                  const grouped = group.length > 1;
+                  const head = group[0];
+                  const sameStatus = new Set(group.map((p) => p.status)).size === 1;
+                  const sameMethod = new Set(group.map(paymentMethodLabel)).size === 1;
+                  const sameDate = group.every((p) => p.bookings?.booking_date === head.bookings?.booking_date);
+                  const headName = head.bookings?.profiles?.full_name || head.bookings?.customer_name || "Unknown Customer";
+                  return [
+                    grouped && (
+                      <TableRow key={`group-${head.basket_id}`} className="bg-muted/40 hover:bg-muted/40">
+                        <TableCell>
+                          <div className="flex items-center gap-2.5">
+                            <div className="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                              {headName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-sm text-foreground">{headName}</span>
+                              <span className="font-mono text-[11px] text-muted-foreground">Ref {bookingRef({ id: head.booking_id, basket_id: head.basket_id })}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-1 text-sm">
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-foreground whitespace-nowrap">{group.length} bookings</span>
+                            {sameDate && <span className="text-xs text-muted-foreground">{formatDate(head.bookings?.booking_date)}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-col items-end">
+                            <span className="font-bold text-foreground text-sm">{formatCurrency(group.reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}</span>
+                            {sameMethod && <span className="text-[11px] text-muted-foreground">{paymentMethodLabel(head)}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell>{sameStatus && getStatusBadge(head.status)}</TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">{formatDate(head.paid_at || head.created_at, true)}</span>
+                        </TableCell>
+                        <TableCell />
+                      </TableRow>
+                    ),
+                    ...group.map((payment) => (
                   <TableRow key={payment.id} className="group">
-                    {/* Customer */}
+                    {/* Customer: a grouped line's player and ref are on its header line */}
                     <TableCell>
-                      {(() => {
+                      {grouped ? null : (() => {
                         const displayName = payment.bookings?.profiles?.full_name || payment.bookings?.customer_name || "Unknown Customer";
                         return (
                           <div className="flex items-center gap-2.5">
@@ -287,9 +330,9 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                           {bookingTitle(payment.bookings ?? {})}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {formatDate(payment.bookings?.booking_date)}
+                          {(!grouped || !sameDate) && formatDate(payment.bookings?.booking_date)}
                           {payment.bookings?.start_time && (
-                            <> • {formatTime12h(payment.bookings.start_time)} - {formatTime12h(payment.bookings.end_time)}</>
+                            <>{(!grouped || !sameDate) && " • "}{formatTime12h(payment.bookings.start_time)} - {formatTime12h(payment.bookings.end_time)}</>
                           )}
                         </span>
                       </div>
@@ -298,21 +341,23 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                     {/* Amount */}
                     <TableCell className="text-right">
                       <div className="flex flex-col items-end">
-                        <span className="font-bold text-foreground text-sm">{formatCurrency(payment.amount)}</span>
-                        <span className="text-[11px] text-muted-foreground">{paymentMethodLabel(payment)}</span>
+                        <span className={grouped ? "text-xs text-muted-foreground" : "font-bold text-foreground text-sm"}>{formatCurrency(payment.amount)}</span>
+                        {(!grouped || !sameMethod) && <span className="text-[11px] text-muted-foreground">{paymentMethodLabel(payment)}</span>}
                       </div>
                     </TableCell>
 
                     {/* Status */}
                     <TableCell>
-                      {getStatusBadge(payment.status)}
+                      {(!grouped || !sameStatus) && getStatusBadge(payment.status)}
                     </TableCell>
 
                     {/* Paid At */}
                     <TableCell>
-                      <div className="flex flex-col text-xs text-muted-foreground">
-                        <span>{formatDate(payment.paid_at || payment.created_at, true)}</span>
-                      </div>
+                      {!grouped && (
+                        <div className="flex flex-col text-xs text-muted-foreground">
+                          <span>{formatDate(payment.paid_at || payment.created_at, true)}</span>
+                        </div>
+                      )}
                     </TableCell>
 
                     {/* Action */}
@@ -332,7 +377,9 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                       })()}
                     </TableCell>
                   </TableRow>
-                ))
+                    )),
+                  ];
+                })
               )}
             </TableBody>
           </Table>
