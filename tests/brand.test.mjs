@@ -2,15 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { brandName, splitBrandName, brandInitials, brandColor, onBrandColor, httpsUrl } from "../src/lib/brand.ts";
-
-test("httpsUrl: only https links reach the footer", () => {
-  assert.equal(httpsUrl(" https://facebook.com/venue "), "https://facebook.com/venue");
-  assert.equal(httpsUrl("javascript:alert(1)"), undefined);
-  assert.equal(httpsUrl("facebook.com/venue"), undefined);
-  assert.equal(httpsUrl(""), undefined);
-  assert.equal(httpsUrl(undefined), undefined);
-});
+import { brandName, splitBrandName, brandInitials, brandColor, onBrandColor } from "../src/lib/brand.ts";
 
 test("brand colour: only a #RRGGBB value is used, and text on it stays readable", () => {
   assert.equal(brandColor("#1d4ed8"), "#1d4ed8");

@@ -1,21 +1,17 @@
 import Link from "next/link";
 import { Phone } from "lucide-react";
-import {
-  VENUE_CITY,
-  VENUE_NAME,
-  VENUE_PHONE,
-  VENUE_FACEBOOK_URL,
-  VENUE_INSTAGRAM_URL,
-  VENUE_TIKTOK_URL,
-  brandInitials,
-} from "@/lib/brand";
+import { VENUE_CITY, VENUE_NAME, brandInitials } from "@/lib/brand";
+
+// Edit these directly; leave one as "" to hide it.
+const VENUE_PHONE: string = "0938 210 6550";
 
 // lucide dropped brand icons, so these are drawn in its stroke style
 const SOCIALS = [
-  { label: "Facebook", href: VENUE_FACEBOOK_URL, icon: <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /> },
+  // shortcut: points home until the venue has a Facebook page; swap in its https:// URL then
+  { label: "Facebook", href: "/", icon: <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /> },
   {
     label: "Instagram",
-    href: VENUE_INSTAGRAM_URL,
+    href: "",
     icon: (
       <>
         <rect x="2" y="2" width="20" height="20" rx="5" />
@@ -24,7 +20,7 @@ const SOCIALS = [
       </>
     ),
   },
-  { label: "TikTok", href: VENUE_TIKTOK_URL, icon: <path d="M9 12a4 4 0 1 0 4 4V2a5 5 0 0 0 5 5" /> },
+  { label: "TikTok", href: "", icon: <path d="M9 12a4 4 0 1 0 4 4V2a5 5 0 0 0 5 5" /> },
 ].filter((s) => s.href);
 
 export function PublicFooter() {
@@ -52,7 +48,7 @@ export function PublicFooter() {
               <a
                 key={s.label}
                 href={s.href}
-                target="_blank"
+                target={s.href.startsWith("http") ? "_blank" : undefined}
                 rel="noopener noreferrer"
                 aria-label={`${VENUE_NAME} on ${s.label}`}
                 className="grid place-items-center size-9 rounded-full border hover:text-foreground hover:border-foreground/40 transition-colors"

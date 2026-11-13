@@ -37,14 +37,5 @@ export const BRAND_COLOR = brandColor(process.env.NEXT_PUBLIC_BRAND_COLOR);
 /** "night" keeps the dark navy-and-lime customer theme (NEXT_PUBLIC_THEME); anything else is the light theme */
 export const THEME: "club" | "night" = process.env.NEXT_PUBLIC_THEME?.trim() === "night" ? "night" : "club";
 
-/** The setting when it's an https:// link, otherwise undefined so the footer hides it */
-export const httpsUrl = (raw: string | undefined) => (/^https:\/\/\S+$/i.test(raw?.trim() ?? "") ? raw!.trim() : undefined);
-
-/** Footer contact and social links, per deployment; each one is hidden when its setting is blank */
-export const VENUE_PHONE = process.env.NEXT_PUBLIC_VENUE_PHONE?.trim() || undefined;
-export const VENUE_FACEBOOK_URL = httpsUrl(process.env.NEXT_PUBLIC_VENUE_FACEBOOK_URL);
-export const VENUE_INSTAGRAM_URL = httpsUrl(process.env.NEXT_PUBLIC_VENUE_INSTAGRAM_URL);
-export const VENUE_TIKTOK_URL = httpsUrl(process.env.NEXT_PUBLIC_VENUE_TIKTOK_URL);
-
 /** The live site's address, for absolute link-preview URLs; unset locally */
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.trim() || undefined;
