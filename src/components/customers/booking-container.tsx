@@ -313,13 +313,16 @@ export const BookingContainer = () => {
     const onCourt = basket.filter((l) => l.court === courtName);
     const clickedIndex = timeSlots.indexOf(time);
 
-    // Tapping inside a picked range removes that range
+    // Tapping inside a picked range removes just that hour, splitting the range
     const inside = onCourt.find((l) => {
       const [s, e] = lineSpan(l);
       return clickedIndex >= s && clickedIndex < e;
     });
     if (inside) {
-      setBasket((prev) => removeLine(prev, lineKey(inside)));
+      const [s, e] = lineSpan(inside);
+      // A leftover piece shorter than the minimum booking can't be booked on its own, so it goes too
+      const pieces = ([[s, clickedIndex], [clickedIndex + 1, e]] as const).filter(([a, b]) => b - a >= Math.max(minHours, 1));
+      setCourtSpans(courtName, [...spansOn(courtName).filter(([a]) => a !== s), ...pieces]);
       return;
     }
 
