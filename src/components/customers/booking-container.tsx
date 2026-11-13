@@ -517,7 +517,7 @@ export const BookingContainer = () => {
             )}
           </h2>
           <p className="mt-2 text-muted-foreground max-w-md">
-            Tap a free slot on any court, tap the next hour to make it longer, then check out.
+            Pick a date, choose your court and time slot, add more hours if you like, then check out.
           </p>
         </div>
         {!loading && timeSlots.length > 0 && goingFast && (
