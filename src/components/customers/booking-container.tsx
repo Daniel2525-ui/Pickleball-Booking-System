@@ -438,6 +438,13 @@ export const BookingContainer = () => {
     setIsCancellingGridBooking(false);
   };
 
+  // Back from the QR page restores this page from the browser cache with the Pay button still loading
+  useEffect(() => {
+    const reset = (e: PageTransitionEvent) => e.persisted && setIsCheckoutLoading(false);
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
+
   const confirmBooking = async (details: CheckoutDetails) => {
     if (basket.length === 0) return;
 
@@ -675,7 +682,11 @@ export const BookingContainer = () => {
         isOpen={isDialogOpen}
         onOpenChange={(open) => {
           setIsDialogOpen(open);
-          if (!open) setCheckoutError(null);
+          // Closing while the QR page loads must not leave the Pay button spinning when the modal is reopened
+          if (!open) {
+            setCheckoutError(null);
+            setIsCheckoutLoading(false);
+          }
         }}
         lines={basket}
         isLoading={isCheckoutLoading}
