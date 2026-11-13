@@ -4,10 +4,10 @@ import { parseSpotRequest } from "../src/lib/services/openPlay/openPlayTypes.ts"
 import { bookingTitle } from "../src/lib/services/openPlay/bookingTitle.ts";
 import { checkSlotAvailability } from "../src/lib/services/bookings/checkSlotAvailability.service.ts";
 
-test("parseSpotRequest accepts 1-4 spots and online payment only", () => {
+test("parseSpotRequest accepts 1-30 spots and online payment only", () => {
     assert.ok("error" in parseSpotRequest({ sessionId: "s", spots: 2, payment_method: "gcash" }));
     assert.deepEqual(parseSpotRequest({ sessionId: "s", spots: 4 }), { sessionId: "s", spots: 4, method: "stripe" });
-    for (const spots of [0, 5, 2.5, "2", undefined]) assert.ok("error" in parseSpotRequest({ sessionId: "s", spots }), String(spots));
+    for (const spots of [0, 31, 2.5, "2", undefined]) assert.ok("error" in parseSpotRequest({ sessionId: "s", spots }), String(spots));
     assert.ok("error" in parseSpotRequest({ sessionId: "s", spots: 2, payment_method: "cash" }));
     assert.ok("error" in parseSpotRequest({ spots: 2 }));
     assert.ok("error" in parseSpotRequest(null));

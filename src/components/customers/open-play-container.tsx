@@ -27,6 +27,7 @@ export const OpenPlayContainer = () => {
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [dayEndsAt, setDayEndsAt] = useState("00:00");
+  const [spotLimit, setSpotLimit] = useState(4);
 
   useEffect(() => {
     const supabase = createClient();
@@ -38,6 +39,7 @@ export const OpenPlayContainer = () => {
     ])
       .then(([res, auth, policy]) => {
         setDayEndsAt(policy.dayEndsAt);
+        setSpotLimit(policy.maxOpenPlaySpots);
         // A failed load must not read as "no sessions scheduled"
         if (res.error) setLoadFailed(true);
         setSessions(res.data);
@@ -47,7 +49,7 @@ export const OpenPlayContainer = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const maxSpots = active ? Math.min(4 - active.my_spots, active.spots_left) : 0;
+  const maxSpots = active ? Math.min(spotLimit - active.my_spots, active.spots_left) : 0;
 
   const open = (s: OpenPlaySession) => {
     if (!signedIn) return router.push("/login");
@@ -70,7 +72,7 @@ export const OpenPlayContainer = () => {
     <div className="max-w-3xl mx-auto px-4 space-y-4">
       <div>
         <h1 className="text-3xl sm:text-4xl font-bold">Open play</h1>
-        <p className="text-sm text-muted-foreground mt-1">Join a scheduled session. Book 1 to 4 spots, no court needed.</p>
+        <p className="text-sm text-muted-foreground mt-1">Join a scheduled session. Book up to {spotLimit} {spotLimit === 1 ? "spot" : "spots"}, no court needed.</p>
       </div>
 
       {loading ? (
@@ -83,7 +85,7 @@ export const OpenPlayContainer = () => {
         <ul className="space-y-3">
           {sessions.map((s) => {
             const full = s.spots_left <= 0;
-            const limit = s.my_spots >= 4;
+            const limit = s.my_spots >= spotLimit;
             const pct = Math.round(((s.capacity - s.spots_left) / s.capacity) * 100);
             return (
               <li key={s.id} className={`rounded-2xl border bg-card p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 ${full ? "opacity-60" : ""}`}>
@@ -109,7 +111,7 @@ export const OpenPlayContainer = () => {
                     aria-label={full ? `Full: ${dateLabel(s.session_date)}` : `Book a spot on ${dateLabel(s.session_date)}`}
                     className="mt-2 min-h-[44px] font-bold"
                   >
-                    {full ? "Full" : limit ? "4 booked" : "Book a spot"}
+                    {full ? "Full" : limit ? `${s.my_spots} booked` : "Book a spot"}
                   </Button>
                 </div>
               </li>

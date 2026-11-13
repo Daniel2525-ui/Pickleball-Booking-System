@@ -41,8 +41,9 @@ export function parseSpotRequest(body: unknown): { sessionId: string; spots: num
     const b = (body ?? {}) as Record<string, unknown>;
     const sessionId = typeof b.sessionId === "string" ? b.sessionId.trim() : "";
     if (!sessionId) return { error: "Missing session." };
-    if (typeof b.spots !== "number" || !Number.isInteger(b.spots) || b.spots < 1 || b.spots > 4) {
-        return { error: "Choose 1 to 4 spots." };
+    if (typeof b.spots !== "number" || !Number.isInteger(b.spots) || b.spots < 1 || b.spots > 30) {
+        // The venue's per-player limit is checked in hold_open_play_spots; 30 is the setting's ceiling
+        return { error: "Choose how many spots you need." };
     }
     const method = b.payment_method ?? "stripe";
     if (method !== "stripe") return { error: "Invalid payment method." };
@@ -54,7 +55,7 @@ export function sessionErrorResponse(message: string | undefined): { error: stri
     const msg = message ?? "";
     if (msg.includes("VENUE_CLOSED")) return { error: "The venue is closed on this date." };
     if (msg.includes("SESSION_FULL")) return { error: "This session is full." };
-    if (msg.includes("PLAYER_LIMIT")) return { error: "You can book at most 4 spots in one session." };
+    if (msg.includes("PLAYER_LIMIT")) return { error: "That is more spots than one player can book in this session." };
     if (msg.includes("SESSION_UNAVAILABLE") || msg.includes("NOT_FOUND")) return { error: "This session is no longer available." };
     if (msg.includes("OPEN_HOLD_EXISTS")) return { error: "You already have spots awaiting payment in this session. Resume or cancel them in My Bookings." };
     return null;

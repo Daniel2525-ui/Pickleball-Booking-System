@@ -4161,11 +4161,11 @@ async function main() {
        INSERT INTO public.open_play_sessions (id, schedule_id, session_date, start_time, end_time, court_ids, capacity, price_per_spot, status)
        VALUES ('${sessId}', '${schedId}', '${opDay}', '10:00', '12:00', ARRAY['${activeCourtId}']::uuid[], 6, 150, 'open');`);
 
-    await runTest("Open play: a spot row needs a session and 1-4 spots, and has no court", () => {
+    await runTest("Open play: a spot row needs a session and at least 1 spot, and has no court", () => {
       const withCourt = spot({ court: `'${activeCourtId}'`, cols: "open_play_spots, user_id", vals: `2, '${aliceUid}'` });
       assert.ok(withCourt.stderr.includes("bookings_court_or_open_play"), withCourt.stderr);
-      const five = spot({ cols: "open_play_spots, user_id", vals: `5, '${aliceUid}'` });
-      assert.ok(five.stderr.includes("bookings_court_or_open_play"), five.stderr);
+      const zero = spot({ cols: "open_play_spots, user_id", vals: `0, '${aliceUid}'` });
+      assert.ok(zero.stderr.includes("bookings_court_or_open_play"), zero.stderr);
       const ok = spot({ cols: "open_play_spots, user_id", vals: `2, '${aliceUid}'` });
       assert.equal(ok.status, 0, ok.stderr);
     });
@@ -4307,6 +4307,7 @@ async function main() {
     if (opStaffFile) runPsqlFile(path.join(dir, opStaffFile));
     const opOneHoldFile = fs.readdirSync(dir).find((f) => f.includes("open_play_one_hold_per_player"));
     if (opOneHoldFile) runPsqlFile(path.join(dir, opOneHoldFile));
+    runPsqlFile(path.join(dir, fs.readdirSync(dir).find((f) => f.includes("open_play_spot_limit"))));
     let dayN = 0;
     const mkSession = (capacity, status = "open", price = 150) => {
       const id = q(`SELECT gen_random_uuid();`);
@@ -4352,6 +4353,10 @@ async function main() {
       // Paid spots still count toward the 4-spot limit: 3 + 1 held, so 1 more is over
       q(`UPDATE public.bookings SET status = 'confirmed', hold_expires_at = NULL WHERE id = '${second.booking_id}';`);
       assert.ok(hold(sid2, aliceUid, 1).stderr.includes("PLAYER_LIMIT"));
+      // The limit is the venue setting: raised to 5, that 5th spot fits
+      q(`UPDATE public.booking_settings SET max_open_play_spots_per_player = 5;`);
+      q(`UPDATE public.bookings SET status = 'cancelled' WHERE id = '${holdOk(sid2, aliceUid, 1).booking_id}';`);
+      q(`UPDATE public.booking_settings SET max_open_play_spots_per_player = 4;`);
       for (const n of [0, 5]) assert.ok(hold(sid2, aliceUid, n).stderr.includes("INVALID_ARGUMENT"), `spots ${n}`);
       assert.ok(hold(sid2, aliceUid, 1, "cash").stderr.includes("INVALID_ARGUMENT"));
       const sid3 = mkSession(6, "cancelled");

@@ -150,8 +150,8 @@ export function AddWalkupModal({ session, onClose, onAdded }: Props) {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="walkup-spots" className="text-xs font-semibold">Spots (1 to 4)</Label>
-            <Input id="walkup-spots" type="number" min={1} max={4} step={1} value={spots} onChange={(e) => setSpots(e.target.value)} required />
+            <Label htmlFor="walkup-spots" className="text-xs font-semibold">Spots</Label>
+            <Input id="walkup-spots" type="number" min={1} step={1} value={spots} onChange={(e) => setSpots(e.target.value)} required />
           </div>
 
           <fieldset className="flex flex-col gap-2">
