@@ -10,6 +10,7 @@ const base = {
     closedDates: [],
     bookings: [],
     minHours: 1,
+    now: new Date("2026-11-01T00:00:00+08:00"), // before the date, so no hour has passed
 };
 const booking = (over) => ({ id: null, court_id: "c1", start_time: "09:00:00", end_time: "10:00:00", status: "confirmed", ...over });
 
@@ -63,7 +64,10 @@ test("no starts when closed", () => {
         assert.deepEqual(walkInEnds(b, "08:00"), []);
     }
 });
-test("past starts today stay selectable", () => {
-    const b = { ...base, now: new Date("2026-11-09T10:30:00+08:00") };
-    assert.equal(walkInStarts(b).find((s) => s.time === "08:00").taken, false);
+test("like the customer side, the running hour is offered until it ends and earlier hours are gone", () => {
+    const at = (t) => walkInStarts({ ...base, now: new Date(`2026-11-09T${t}+08:00`) }).map((s) => s.time);
+    assert.deepEqual(at("10:05:00"), ["10:00", "11:00"]);
+    assert.deepEqual(at("10:59:59"), ["10:00", "11:00"]);
+    assert.deepEqual(at("11:00:00"), ["11:00"]);
+    assert.deepEqual(at("12:00:00"), []);
 });

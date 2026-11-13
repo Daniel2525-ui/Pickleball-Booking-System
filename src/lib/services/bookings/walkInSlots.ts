@@ -1,6 +1,7 @@
 import type { BookingSlot } from "./fetchBookingsForDate.service";
 import { isBookingActive } from "./checkSlotAvailability.service.ts";
 import { bookableWindows } from "../schedule/hoursRules.ts";
+import { bookableUntil } from "../../utils/bookingTime.ts";
 
 export interface WalkInSlotInput {
     date: string;
@@ -30,10 +31,15 @@ const hourTaken = (i: WalkInSlotInput, h: number) => {
     );
 };
 
+/** Start times staff can pick: like the customer grid, a slot stays open until its first hour ends (8:05 AM still offers 8 AM). */
 export function walkInStarts(input: WalkInSlotInput): StartOption[] {
+    const now = input.now ?? new Date();
     const out: StartOption[] = [];
     for (const w of dayWindows(input)) {
-        for (let h = w.open; h <= w.close - input.minHours; h++) out.push({ time: hhmm(h), taken: hourTaken(input, h) || walkInEnds(input, hhmm(h)).length === 0 });
+        for (let h = w.open; h <= w.close - input.minHours; h++) {
+            if (bookableUntil({ booking_date: input.date, start_time: hhmm(h) }) <= now) continue;
+            out.push({ time: hhmm(h), taken: hourTaken(input, h) || walkInEnds(input, hhmm(h)).length === 0 });
+        }
     }
     return out;
 }

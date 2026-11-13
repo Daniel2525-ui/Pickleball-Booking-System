@@ -137,7 +137,7 @@ test("the customer grid lists a day's late-night slots last and a slot can end a
 });
 
 test("the walk-in picker offers late-night starts and keeps ends inside their window", () => {
-    const input = { date: "2026-11-07", courtId: "c1", courtStatus: "active", hours: lateWeek, closedDates: [], bookings: [], minHours: 1 };
+    const input = { date: "2026-11-07", courtId: "c1", courtStatus: "active", hours: lateWeek, closedDates: [], bookings: [], minHours: 1, now: new Date("2026-11-01T00:00:00+08:00") };
     assert.deepEqual(walkInStarts(input).map((s) => s.time).slice(0, 3), ["00:00", "01:00", "08:00"]);
     assert.deepEqual(walkInEnds(input, "00:00"), ["01:00", "02:00"]);
     assert.deepEqual(walkInEnds({ ...input, date: "2026-11-06" }, "22:00"), ["23:00", "24:00"]);

@@ -162,13 +162,9 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
   const endTime = ends.includes(pickedEnd) ? pickedEnd : "";
   // Tell staff why a pick vanished instead of letting save fail with "complete all details"
   const pickLost = Boolean((pickedStart && !startTime) || (pickedEnd && startTime && !endTime));
-  // Past hours today stay pickable (late entries), but are labelled so they aren't booked by mistake
+  // The hour under way is still offered (as on the customer side); say it has started
   const clock = date === formatManilaDate() ? manilaClock() : "";
-  const pastLabel = (time: string) => {
-    if (!clock) return "";
-    const nextHour = `${String(Number(time.slice(0, 2)) + 1).padStart(2, "0")}:00`;
-    return nextHour <= clock ? " · Ended" : time <= clock ? " · Started" : "";
-  };
+  const startedLabel = (time: string) => (clock && time <= clock ? " · Started" : "");
 
   // Debounced search for existing players
   useEffect(() => {
@@ -550,7 +546,7 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
                 <SelectContent>
                   {starts.map((s) => (
                     <SelectItem key={s.time} value={s.time} disabled={s.taken} className="text-xs sm:text-sm">
-                      {formatTime12h(s.time)}{s.taken ? " · Booked" : pastLabel(s.time)}
+                      {formatTime12h(s.time)}{s.taken ? " · Booked" : startedLabel(s.time)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -583,13 +579,6 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
           {pickLost && (
             <p role="status" className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-200">
               The time you picked is no longer available. Pick another.
-            </p>
-          )}
-
-          {/* A slot that ended earlier today is saved as already played */}
-          {date === formatManilaDate() && endTime.length >= 5 && endTime !== "00:00" && endTime <= manilaClock() && (
-            <p role="status" className="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-900 dark:text-blue-200">
-              This game already ended. It will be saved as played, not as an upcoming booking.
             </p>
           )}
 
