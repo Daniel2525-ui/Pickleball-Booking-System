@@ -4,6 +4,8 @@ import { emailConfigured, sendEmail, type SendEmail } from "../../email.ts";
 import { fetchVenueContact, type VenueContact } from "../../venue.ts";
 import { formatManilaDate, getBookingStart, lateNightOf } from "../../utils/bookingTime.ts";
 import { formatShortDate, formatTime12h } from "../../utils/formatTime.ts";
+import { bookingRef } from "../openPlay/bookingTitle.ts";
+import { SITE_URL } from "../../brand.ts";
 
 /**
  * Booking confirmation and 24-hour reminder emails.
@@ -79,7 +81,7 @@ const lineOf = (b: EmailBooking) =>
   `${formatShortDate(b.booking_date)} · ${formatTime12h(b.start_time)} – ${formatTime12h(b.end_time)}` +
   (lateNightOf(b) ? ` (${lateNightOf(b)})` : "");
 
-export const renderBookingEmail = (kind: EmailKind, group: EmailGroup, contact: VenueContact) => {
+export const renderBookingEmail = (kind: EmailKind, group: EmailGroup, contact: VenueContact, siteUrl = SITE_URL) => {
   const rows = [...group.rows].sort((a, b) => getBookingStart(a).getTime() - getBookingStart(b).getTime());
   const first = rows[0];
   const subject =
@@ -87,11 +89,20 @@ export const renderBookingEmail = (kind: EmailKind, group: EmailGroup, contact: 
       ? `Booking confirmed: ${formatShortDate(first.booking_date)}`
       : `Reminder: you play ${formatShortDate(first.booking_date)} at ${formatTime12h(first.start_time)}`;
   const intro = kind === "confirmation" ? "Your booking is confirmed." : "A reminder that you're booked to play soon.";
+  // One email per checkout, so every row shares the ref; a guest who lost their session gives it at the desk
+  const ref = `Booking reference: ${bookingRef(first)} (show this at the front desk)`;
+  const pass = siteUrl ? `${siteUrl.replace(/\/$/, "")}/my-bookings` : null;
   const lines = rows.map(lineOf);
   const footer = `${contact.address} · ${contact.phone} · ${contact.email}`;
-  const text = [`Hi ${group.name},`, "", intro, "", ...lines.map((l) => `- ${l}`), "", `Questions? Contact us: ${footer}`].join("\n");
+  const text = [
+    `Hi ${group.name},`, "", intro, "", ref, "", ...lines.map((l) => `- ${l}`), "",
+    ...(pass ? [`View your booking: ${pass}`, ""] : []),
+    `Questions? Contact us: ${footer}`,
+  ].join("\n");
   const html =
-    `<p>Hi ${escapeHtml(group.name)},</p><p>${intro}</p><ul>${lines.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}</ul>` +
+    `<p>Hi ${escapeHtml(group.name)},</p><p>${intro}</p><p><strong>${escapeHtml(ref)}</strong></p>` +
+    `<ul>${lines.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}</ul>` +
+    (pass ? `<p><a href="${escapeHtml(pass)}">View your booking</a></p>` : "") +
     `<p style="color:#666;font-size:13px">Questions? Contact us: ${escapeHtml(footer)}</p>`;
   return { subject, html, text };
 };

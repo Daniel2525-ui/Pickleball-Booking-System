@@ -60,6 +60,11 @@ test("render: escapes names, lists courts and open play spots", () => {
   assert.ok(html.includes("&lt;b&gt;Ana&lt;/b&gt;") && !html.includes("<b>Ana"));
   assert.ok(text.indexOf("Court 1 · Tue, Nov 10 · 5:00 PM") < text.indexOf("Open play (2 spots)"));
   assert.match(renderBookingEmail("reminder", group, contact).subject, /^Reminder: you play Tue, Nov 10 at 5:00 PM$/);
+  // The desk's search ref, plus a My bookings link only when the site URL is known
+  assert.ok(text.includes("Booking reference: B2 ") && html.includes("Booking reference: B2 "));
+  assert.ok(!text.includes("View your booking"));
+  const linked = renderBookingEmail("confirmation", group, contact, "https://club.ph/");
+  assert.ok(linked.text.includes("View your booking: https://club.ph/my-bookings") && linked.html.includes('href="https://club.ph/my-bookings"'));
 });
 
 // Minimal PostgREST stand-in: records updates, returns the given rows for selects
