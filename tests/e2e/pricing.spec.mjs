@@ -96,7 +96,7 @@ test("a peak window outside opening hours is flagged, and an unchanged form has 
 test("customers see the configured prices, and the hold is charged what the database quotes", async ({ page }) => {
   requireQrPh();
   await login(page, account("CUSTOMER"));
-  await page.goto("/#booking");
+  await page.goto("/book");
   await pickDay(page, 1);
   await page.locator("#booking").getByRole("button", { name: `Select ${court.name} at 4:00 PM - 5:00 PM` }).click();
 

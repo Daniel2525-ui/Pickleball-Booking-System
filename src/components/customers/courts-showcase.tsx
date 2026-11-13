@@ -117,7 +117,7 @@ export function CourtsShowcase({ courts, hours }: { courts: ShowcaseCourt[]; hou
               </div>
               {featuredStatus?.state !== "off" && (
                 <a
-                  href="#booking"
+                  href="/book"
                   className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-md hover:bg-primary/90"
                 >
                   Book {featured.name}

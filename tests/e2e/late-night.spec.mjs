@@ -32,7 +32,7 @@ const slot = (page, court, time) => grid(page).getByRole("button", { name: `Sele
 const basket = (page) => page.getByRole("region", { name: "Your selection" });
 
 async function openTomorrow(page) {
-  await page.goto("/#booking", { waitUntil: "load" });
+  await page.goto("/book", { waitUntil: "load" });
   await pickDay(page, 1);
 }
 

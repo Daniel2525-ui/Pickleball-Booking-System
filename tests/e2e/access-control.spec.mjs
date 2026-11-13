@@ -36,9 +36,13 @@ test.describe("unauthenticated page access", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Privacy Policy" })).toBeVisible();
   });
 
-  test("/book redirects to the booking section", async ({ page }) => {
+  test("/book is its own booking page and the home page has no grid", async ({ page }) => {
     await page.goto("/book");
-    await expect(page).toHaveURL(/\/#booking$/);
+    await expect(page.getByRole("button", { name: "Next month" })).toBeVisible();
+    await page.goto("/");
+    await expect(page.locator("#booking")).toHaveCount(0);
+    await page.getByRole("link", { name: "Book a court" }).first().click();
+    await expect(page).toHaveURL(/\/book$/);
   });
 });
 

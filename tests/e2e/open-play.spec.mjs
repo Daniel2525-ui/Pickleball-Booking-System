@@ -23,7 +23,7 @@ test.afterAll(() => { if (writesAllowed) wipe(); });
 test.beforeEach(() => requireLocalDb());
 
 async function openTomorrow(page) {
-  await page.goto("/#booking");
+  await page.goto("/book");
   await pickDay(page, 1);
 }
 

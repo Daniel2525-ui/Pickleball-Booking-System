@@ -22,7 +22,7 @@ const basketLine = (page, court) => basket(page).getByRole("group", { name: new 
 const slot = (page, court, time) => page.locator("#booking").getByRole("button", { name: `Select ${court} at ${time}` });
 
 async function openTomorrow(page) {
-  await page.goto("/#booking");
+  await page.goto("/book");
   await pickDay(page, 1);
 }
 

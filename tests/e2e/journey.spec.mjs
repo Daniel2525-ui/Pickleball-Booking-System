@@ -61,7 +61,7 @@ test("1. a new player signs up through the site", async ({ page }) => {
 
 test("2. the player books two hours tomorrow and pays by GCash", async ({ page }) => {
   await login(page, player);
-  await page.goto("/#booking");
+  await page.goto("/book");
   await pickDay(page, 1);
   await page.locator("#booking").getByRole("button", { name: `Select ${court.name} at 3:00 PM - 4:00 PM` }).click();
   await page.getByRole("group", { name: new RegExp(`^${court.name} .+ selection line$`) }).getByRole("button", { name: "One hour longer" }).click();

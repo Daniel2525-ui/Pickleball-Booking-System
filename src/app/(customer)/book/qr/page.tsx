@@ -38,7 +38,7 @@ export default async function QrPaymentPage({ searchParams }: { searchParams: Pr
                 <p className="text-sm text-muted-foreground">
                   {expired ? "This QR code has expired and your court hold was released. No payment was taken." : "This payment could not be loaded. Check My Bookings for your reservation."}
                 </p>
-                <Link href={expired ? "/#booking" : "/my-bookings"} className={buttonVariants({ className: "w-full h-11 font-semibold" })}>{expired ? "Book again" : "My Bookings"}</Link>
+                <Link href={expired ? "/book" : "/my-bookings"} className={buttonVariants({ className: "w-full h-11 font-semibold" })}>{expired ? "Book again" : "My Bookings"}</Link>
               </>
             )}
           </div>

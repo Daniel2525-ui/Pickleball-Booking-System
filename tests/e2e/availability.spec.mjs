@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 import { pickDay } from "./local-db.mjs";
 
 test("a guest fills a basket and checks out with their details, or signs in instead @mobile", async ({ page }) => {
-  await page.goto("/#booking");
+  await page.goto("/book");
   const grid = page.locator("#booking");
   const open = grid.getByRole("button", { name: /^Select .+ at / });
   // Wait for the grid to finish loading; today may have no open slot (closed, late, or fully booked).
@@ -39,7 +39,7 @@ test("pages fit a phone screen without horizontal scroll @mobile", async ({ page
 });
 
 test("the calendar is always shown, picks a later date and blocks past days", async ({ page }) => {
-  await page.goto("/#booking", { waitUntil: "load" });
+  await page.goto("/book", { waitUntil: "load" });
   await pickDay(page, 10);
   const label = new Date(Date.now() + 10 * 86_400_000).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "Asia/Manila" });
   await expect(page.getByRole("button", { name: new RegExp(`^${label}`) })).toHaveAttribute("aria-pressed", "true");

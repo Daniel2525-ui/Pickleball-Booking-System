@@ -1,7 +1,6 @@
 import { fetchVenueContact } from "@/lib/venue";
 import Link from "next/link";
 import { Clock, MapPin, Phone, Mail } from "lucide-react";
-import { BookingContainer } from "@/components/customers/booking-container";
 import { PublicHeader } from "@/components/customers/public-header";
 import { FAQSection } from "@/components/customers/faq-section";
 import { CourtsShowcase } from "@/components/customers/courts-showcase";
@@ -42,9 +41,9 @@ export default async function Home() {
                 Pick a court, pay with QR Ph, and you&apos;re confirmed.
               </p>
               <div className="flex flex-wrap gap-3">
-                <a href="#booking" className="inline-flex min-h-12 items-center rounded-xl bg-primary-foreground px-6 text-base font-bold text-primary hover:opacity-90 transition-opacity">
+                <Link href="/book" className="inline-flex min-h-12 items-center rounded-xl bg-primary-foreground px-6 text-base font-bold text-primary hover:opacity-90 transition-opacity">
                   Book a court
-                </a>
+                </Link>
                 <Link href="/open-play" className="inline-flex min-h-12 items-center rounded-xl border-[1.5px] border-current/60 px-5 text-base font-semibold hover:bg-primary-foreground/10 transition-colors">
                   Join open play
                 </Link>
@@ -57,14 +56,6 @@ export default async function Home() {
             </div>
           </div>
         </section>
-
-        <section id="booking" aria-label="Book a court" className="scroll-mt-20 w-full py-10 md:py-12">
-          <div className="container mx-auto px-4 max-w-7xl w-full">
-            <BookingContainer />
-          </div>
-        </section>
-
-        <CourtsShowcase courts={courts} hours={operatingHours ?? []} />
 
         <section id="location" aria-labelledby="find-us" className="w-full scroll-mt-20 border-t py-12 md:py-16">
           <div className="container mx-auto px-4 max-w-6xl">
@@ -138,6 +129,8 @@ export default async function Home() {
             </div>
           </div>
         </section>
+
+        <CourtsShowcase courts={courts} hours={operatingHours ?? []} />
 
         <FAQSection />
       </main>

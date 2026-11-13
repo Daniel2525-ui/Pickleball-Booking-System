@@ -62,7 +62,7 @@ export function PublicHeader() {
       </Link>
 
       <nav aria-label="Main" className="flex items-center gap-1 lg:gap-2 shrink-0">
-        <Link href="/#booking" className={navLink}>Book a court</Link>
+        <Link href="/book" className={navLink}>Book a court</Link>
         <Link href="/#courts" className={navLink}>Courts</Link>
         <Link href="/open-play" className={navLink}>Open play</Link>
         <Link href="/#location" className={navLink}>Find us</Link>
@@ -113,7 +113,7 @@ export function PublicHeader() {
     <nav aria-label="Sections" className="mobile-tabbar md:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t flex px-1 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       {[
         { href: "/", label: "Home", icon: House, active: pathname === "/" },
-        { href: "/#booking", label: "Book", icon: CalendarDays, active: false },
+        { href: "/book", label: "Book", icon: CalendarDays, active: pathname.startsWith("/book") },
         { href: "/open-play", label: "Open play", icon: UsersRound, active: pathname.startsWith("/open-play") },
         { href: "/my-bookings", label: "Bookings", icon: ListChecks, active: pathname.startsWith("/my-bookings") },
         { href: !user ? "/login" : user.is_anonymous ? "/register" : "/profile", label: user ? "Account" : "Sign in", icon: UserRound, active: pathname.startsWith("/profile") },

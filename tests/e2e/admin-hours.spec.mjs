@@ -100,7 +100,7 @@ test("the booking grid lists a day's late hours at its bottom under their own he
   const tomorrowName = new Date(Date.now() + 86_400_000).toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Manila" });
   sql(`UPDATE public.operating_hours SET close_time = '02:00' WHERE day_of_week = '${tomorrowName}'`);
   const court = firstCourt();
-  await page.goto("/#booking");
+  await page.goto("/book");
   await pickDay(page, 1);
 
   await expect(page.getByText("After midnight", { exact: true }).filter({ visible: true })).toBeVisible();

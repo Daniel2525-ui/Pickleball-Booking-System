@@ -49,7 +49,7 @@ test("guests see every court with its status and can switch the featured court",
 
   await row(first.name).click();
   await expect(featured).toContainText("Free from 11:00 AM");
-  await expect(featured.getByRole("link", { name: `Book ${first.name}` })).toHaveAttribute("href", "#booking");
+  await expect(featured.getByRole("link", { name: `Book ${first.name}` })).toHaveAttribute("href", "/book");
 });
 
 test("the Courts link in the navbar scrolls to the section", async ({ page }) => {

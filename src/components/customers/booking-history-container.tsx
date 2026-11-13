@@ -255,7 +255,7 @@ export const BookingHistoryContainer = () => {
                 : "Completed matches and past session records will be archived here."}
             </p>
             {activeTab === "upcoming" && (
-              <Link href="/#booking" className={buttonVariants({ className: "mt-6 rounded-xl shadow-md hover:shadow-lg font-bold gap-2" })}>
+              <Link href="/book" className={buttonVariants({ className: "mt-6 rounded-xl shadow-md hover:shadow-lg font-bold gap-2" })}>
                 <CalendarDays className="size-4" />
                 Reserve a Court Now
               </Link>

@@ -43,7 +43,7 @@ export default async function DashboardPage() {
         title={<><span className="sr-only">{roleWord} Dashboard · </span>{currentDate.replace(/, \d{4}$/, "")}</>}
         description={<DashboardClock date={currentDate} timeOnly />}
       >
-        <Link href="/#booking" target="_blank" className={buttonVariants({ variant: "outline", className: "h-10 font-semibold" })}>
+        <Link href="/book" target="_blank" className={buttonVariants({ variant: "outline", className: "h-10 font-semibold" })}>
           Open booking page<span className="sr-only"> (opens in a new tab)</span>
         </Link>
         <Link href="/admin/bookings?new=walkin" className={buttonVariants({ className: "h-10 gap-1.5 font-semibold" })}>

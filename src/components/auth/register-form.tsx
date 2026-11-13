@@ -64,7 +64,7 @@ export function RegisterForm() {
       }
 
       if (result.signedIn) {
-        router.push("/");
+        router.push("/book");
         router.refresh();
       } else {
         router.push("/login?registered=true");

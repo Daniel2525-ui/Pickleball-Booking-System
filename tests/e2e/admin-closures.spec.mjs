@@ -45,7 +45,7 @@ test("staff close a date and see the booking already on it", async ({ page }) =>
 
 test("customers see the date closed and cannot book it, even through checkout", async ({ page }) => {
   await login(page, account("CUSTOMER"));
-  await page.goto("/#booking");
+  await page.goto("/book");
   await pickDay(page, 1);
   await expect(page.getByText("The venue is closed on this date for E2E Holiday.")).toBeVisible();
 
@@ -86,7 +86,7 @@ test("reopening the date lets customers book it again", async ({ page }) => {
 
   await page.context().clearCookies();
   await login(page, account("CUSTOMER"));
-  await page.goto("/#booking");
+  await page.goto("/book");
   await pickDay(page, 1);
   await expect(page.getByText(/The venue is closed on this date/)).toHaveCount(0);
 });

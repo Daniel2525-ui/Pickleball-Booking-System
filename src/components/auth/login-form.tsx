@@ -44,7 +44,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push(result.role === "admin" ? "/admin/dashboard" : "/");
+    router.push(result.role === "admin" ? "/admin/dashboard" : "/book");
     router.refresh();
   }
 

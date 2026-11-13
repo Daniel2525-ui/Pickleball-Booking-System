@@ -29,7 +29,7 @@ const slot = (page, court, time) => grid(page).getByRole("button", { name: `Sele
 const dialog = (page) => page.getByRole("dialog");
 
 async function openCheckout(page) {
-  await page.goto("/#booking", { waitUntil: "load" });
+  await page.goto("/book", { waitUntil: "load" });
   await pickDay(page, 1);
   await slot(page, "COURT 1", "6:00 PM - 7:00 PM").click();
   await page.getByRole("region", { name: "Your selection" }).getByRole("button", { name: "Continue to Checkout" }).click();

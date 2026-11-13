@@ -126,7 +126,7 @@ function BookingSuccessContent() {
                   </Button>
                 </Link>
               )}
-              <Link href="/#booking" className="w-full">
+              <Link href="/book" className="w-full">
                 <Button variant={!verifyResult.conflict ? "outline" : "default"} className="w-full h-11 font-bold text-sm shadow-sm gap-2">
                   <CalendarDays className="size-4" />
                   Select Another Time Slot
@@ -237,7 +237,7 @@ function BookingSuccessContent() {
               </Button>
             </Link>
 
-            <Link href="/#booking" className="w-full">
+            <Link href="/book" className="w-full">
               <Button variant="outline" className="w-full h-11 font-semibold text-sm">
                 Reserve Another Court
               </Button>
