@@ -41,11 +41,10 @@ import { ConfirmDialog, ConfirmRequest } from "@/components/ui/confirm-dialog";
 import { Booking, BookingPayment } from "@/lib/services/bookings/bookingsTypes";
 import { formatTime12h, formatDate } from "@/lib/utils/formatTime";
 import { SettlePaymentModal } from "./settlePaymentModal";
-import { MoveBookingModal, MovedBooking } from "./moveBookingModal";
 import { BookingHistoryModal } from "./bookingHistoryModal";
 import { CancelPaidModal } from "./cancelPaidModal";
 import { getBookingStart, getBookingEnd } from "@/lib/utils/bookingTime";
-import { ArrowRightLeft, History, PanelRight } from "lucide-react";
+import { History, PanelRight } from "lucide-react";
 import { BookingDetailsSheet, type BookingAction } from "./booking-details-sheet";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { groupByCheckout, checkoutTotal } from "@/lib/services/bookings/basket";
@@ -120,15 +119,11 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
   const [settleModalOpen, setSettleModalOpen] = useState(false);
   const [selectedBookingForSettle, setSelectedBookingForSettle] = useState<Booking | null>(null);
 
-  const [moveBooking, setMoveBooking] = useState<Booking | null>(null);
   const [historyBooking, setHistoryBooking] = useState<Booking | null>(null);
   const [cancelPaid, setCancelPaid] = useState<Booking | null>(null);
   // By id, so the panel shows the row as it is after an action or a live refresh
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const detailsBooking = bookingsData.find((b) => b.id === detailsId) ?? null;
-
-  const handleMoved = (bookingId: string, moved: MovedBooking, courtName: string) =>
-    setBookingsData((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...moved, courts: { name: courtName } } : b)));
 
   useEffect(() => {
     // A slower answer for an older filter must not replace the newer one
@@ -286,10 +281,6 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
       list.push({ key: "checkin", label: "Check In Player", icon: busy ? Loader2 : UserCheck, tone: "text-blue-600 focus:text-blue-600",
         disabled: busy || !!blockReason("checked_in", booking), title: blockReason("checked_in", booking) ?? undefined,
         onClick: () => handleStatusChange(booking, "checked_in") });
-    }
-    // Move to another court or time before it starts (move_booking re-checks every rule)
-    if (status === "confirmed" && !isSpot && getBookingStart(booking) > new Date()) {
-      list.push({ key: "move", label: "Move Booking", icon: ArrowRightLeft, onClick: () => setMoveBooking(booking) });
     }
     if (status === "confirmed") {
       list.push({ key: "noshow", label: "Mark No-Show", icon: AlertTriangle, tone: "text-orange-600 focus:text-orange-600", disabled: busy,
@@ -587,7 +578,6 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
 
       <BookingHistoryModal booking={historyBooking} onClose={() => setHistoryBooking(null)} />
 
-      <MoveBookingModal booking={moveBooking} onClose={() => setMoveBooking(null)} onMoved={handleMoved} />
 
       <BookingDetailsSheet
         booking={detailsBooking}

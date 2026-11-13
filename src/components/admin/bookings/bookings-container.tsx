@@ -43,7 +43,7 @@ function Reservations({ dayEndsAt }: { dayEndsAt: string }) {
   return (
     <div className="flex flex-col gap-6">
       {/* Page Header */}
-      <AdminPageHeader title="Bookings" description="Every court booking: check players in, collect payments, move or cancel.">
+      <AdminPageHeader title="Bookings" description="Every court booking: check players in, collect payments, cancel.">
         {/* A new filters object makes the table reload, so the recorded booking appears. ?new=walkin (dashboard) opens it */}
         <AddBookingModal defaultOpen={params.get("new") === "walkin"} onBookingAdded={() => setFilters((current) => ({ ...current }))} />
       </AdminPageHeader>

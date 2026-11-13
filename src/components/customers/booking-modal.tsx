@@ -242,7 +242,7 @@ export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, on
             </section>
 
             <section aria-label="Before you pay" className="text-sm flex flex-col gap-2">
-              <p><b>Paid bookings can&apos;t be cancelled online.</b> To move one, call {venue.phone}.</p>
+              <p><b>Paid bookings can&apos;t be cancelled online.</b> Questions? Call {venue.phone}.</p>
               <p className="text-muted-foreground">Your courts are held for 15 minutes while you pay. Please arrive 10 minutes early.</p>
               <label className="flex items-center gap-2.5 min-h-11 cursor-pointer">
                 <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="size-5 accent-[var(--primary)]" />
