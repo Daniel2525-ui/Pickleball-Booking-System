@@ -1,6 +1,7 @@
 "use client";
 
 import { Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +46,10 @@ export function PastSessionsTable({ sessions, loading, onPlayers }: { sessions: 
             ) : (
               sessions.map((s) => (
                 <TableRow key={s.id} className={s.status === "cancelled" ? "opacity-60" : ""}>
-                  <TableCell className="font-semibold">{formatShortDate(s.session_date)}</TableCell>
+                  <TableCell className="font-semibold">
+                    {formatShortDate(s.session_date)}
+                    {!s.schedule_id && <Badge variant="secondary" className="ml-2 text-[11px] font-semibold">One-time</Badge>}
+                  </TableCell>
                   <TableCell>{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</TableCell>
                   <TableCell className="text-right">{s.status === "cancelled" ? "Cancelled" : `${s.booked} / ${s.capacity}`}</TableCell>
                   <TableCell className="text-right">{s.status === "cancelled" ? "—" : s.played}</TableCell>

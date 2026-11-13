@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Court } from "@/lib/services/courts/courtsTypes";
 import { formatTime12h } from "@/lib/utils/formatTime";
+import { formatManilaDate } from "@/lib/utils/bookingTime";
 import type { OpenPlaySchedule } from "./open-play-container";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -28,6 +29,7 @@ interface Props {
 export function ScheduleTable({ schedules, courts, loading, onChanged }: Props) {
   // null = closed, {} = new, a schedule = editing it
   const [editing, setEditing] = useState<Partial<OpenPlaySchedule> | null>(null);
+  const [addingOneTime, setAddingOneTime] = useState(false);
   const courtName = (id: string) => courts.find((c) => c.id === id)?.name ?? "Court";
 
   const remove = async (s: OpenPlaySchedule) => {
@@ -45,10 +47,16 @@ export function ScheduleTable({ schedules, courts, loading, onChanged }: Props) 
     <Card className="border border-border shadow-2xs">
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base font-bold">Weekly schedule</CardTitle>
-        <Button size="sm" className="gap-2 font-bold" onClick={() => setEditing({})}>
-          <Plus className="h-4 w-4" />
-          Add weekly session
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button size="sm" variant="outline" className="gap-2 font-bold" onClick={() => setAddingOneTime(true)}>
+            <Plus className="h-4 w-4" />
+            Add one-time session
+          </Button>
+          <Button size="sm" className="gap-2 font-bold" onClick={() => setEditing({})}>
+            <Plus className="h-4 w-4" />
+            Add weekly session
+          </Button>
+        </div>
       </CardHeader>
       {/* Edge-to-edge table: its cell padding lines the text up with the card title */}
       <CardContent className="px-0">
@@ -113,12 +121,18 @@ export function ScheduleTable({ schedules, courts, loading, onChanged }: Props) 
       {editing && (
         <ScheduleModal key={editing.id ?? "new"} initial={editing} courts={courts} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onChanged(); }} />
       )}
+      {addingOneTime && (
+        <ScheduleModal oneTime initial={{}} courts={courts} onClose={() => setAddingOneTime(false)} onSaved={() => { setAddingOneTime(false); onChanged(); }} />
+      )}
     </Card>
   );
 }
 
-function ScheduleModal({ initial, courts, onClose, onSaved }: { initial: Partial<OpenPlaySchedule>; courts: Court[]; onClose: () => void; onSaved: () => void }) {
+/** Adds or edits a weekly session; with `oneTime`, adds a single session on a picked date instead. */
+function ScheduleModal({ initial, courts, onClose, onSaved, oneTime = false }: { initial: Partial<OpenPlaySchedule>; courts: Court[]; onClose: () => void; onSaved: () => void; oneTime?: boolean }) {
   const [day, setDay] = useState(initial.day_of_week ?? "Tuesday");
+  const today = formatManilaDate(new Date());
+  const [date, setDate] = useState(today);
   const [start, setStart] = useState(initial.start_time?.slice(0, 5) ?? "18:00");
   const [end, setEnd] = useState(initial.end_time?.slice(0, 5) ?? "21:00");
   const [courtIds, setCourtIds] = useState<string[]>(initial.court_ids ?? []);
@@ -132,12 +146,11 @@ function ScheduleModal({ initial, courts, onClose, onSaved }: { initial: Partial
     setError(null);
     if (courtIds.length === 0) return setError("Choose at least one court.");
     setSaving(true);
-    const res = await fetch("/api/admin/open-play/schedules", {
+    const res = await fetch(oneTime ? "/api/admin/open-play/sessions" : "/api/admin/open-play/schedules", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        id: initial.id,
-        day_of_week: day,
+        ...(oneTime ? { session_date: date } : { id: initial.id, day_of_week: day }),
         start_time: start,
         end_time: end,
         court_ids: courtIds,
@@ -146,8 +159,8 @@ function ScheduleModal({ initial, courts, onClose, onSaved }: { initial: Partial
       }),
     });
     setSaving(false);
-    if (!res.ok) return setError((await res.json().catch(() => ({}))).error ?? "Could not save the schedule.");
-    toast.success("Schedule saved.");
+    if (!res.ok) return setError((await res.json().catch(() => ({}))).error ?? (oneTime ? "Could not add the session." : "Could not save the schedule."));
+    toast.success(oneTime ? "Session added. Players can book it now." : "Schedule saved.");
     onSaved();
   };
 
@@ -155,7 +168,7 @@ function ScheduleModal({ initial, courts, onClose, onSaved }: { initial: Partial
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[460px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initial.id ? "Edit weekly session" : "Add weekly session"}</DialogTitle>
+          <DialogTitle>{oneTime ? "Add one-time session" : initial.id ? "Edit weekly session" : "Add weekly session"}</DialogTitle>
           <DialogDescription>Hours must start and end on the hour. Courts are held for the whole session.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4">
@@ -165,13 +178,21 @@ function ScheduleModal({ initial, courts, onClose, onSaved }: { initial: Partial
               <p>{error}</p>
             </div>
           )}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="op-day" className="text-xs font-semibold">Day</Label>
-            <Select value={day} onValueChange={(v) => setDay(v as string)}>
-              <SelectTrigger id="op-day" className="h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>{DAYS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+          {oneTime ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="op-date" className="text-xs font-semibold">Date</Label>
+              <Input id="op-date" type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} required />
+              <p className="text-xs text-muted-foreground">Happens once on this date and does not repeat.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="op-day" className="text-xs font-semibold">Day</Label>
+              <Select value={day} onValueChange={(v) => setDay(v as string)}>
+                <SelectTrigger id="op-day" className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>{DAYS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="op-start" className="text-xs font-semibold">Start</Label>
@@ -208,7 +229,7 @@ function ScheduleModal({ initial, courts, onClose, onSaved }: { initial: Partial
           <DialogFooter>
             <Button type="submit" disabled={saving} className="gap-2 font-bold">
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? "Saving..." : "Save schedule"}
+              {saving ? "Saving..." : oneTime ? "Add session" : "Save schedule"}
             </Button>
           </DialogFooter>
         </form>

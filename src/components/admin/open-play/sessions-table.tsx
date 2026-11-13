@@ -48,7 +48,10 @@ export function SessionsTable({ sessions, loading, selectedId, onPlayers, onCanc
                 const cancelled = s.status === "cancelled";
                 return (
                   <TableRow key={s.id} className={cancelled ? "opacity-60" : flagged ? "bg-amber-500/10" : s.id === selectedId ? "bg-primary/5" : ""}>
-                    <TableCell className="font-semibold">{formatShortDate(s.session_date)}</TableCell>
+                    <TableCell className="font-semibold">
+                      {formatShortDate(s.session_date)}
+                      {!s.schedule_id && <Badge variant="secondary" className="ml-2 text-[11px] font-semibold">One-time</Badge>}
+                    </TableCell>
                     <TableCell>{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</TableCell>
                     <TableCell className="text-right">{flagged ? "—" : `${s.booked} / ${s.capacity}`}</TableCell>
                     <TableCell>
