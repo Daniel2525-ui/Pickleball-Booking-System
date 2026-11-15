@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { Check, Clock, LoaderCircle, ChevronDown, Moon } from "lucide-react";
+import { Check, Clock, LoaderCircle, ChevronDown } from "lucide-react";
 import { Slot } from "./types";
 import { SlotStatus } from "@/lib/services/bookings/checkSlotAvailability.service";
 import { hourRangeLabel } from "@/lib/services/bookings/quickStarts";
@@ -18,8 +18,6 @@ interface CourtAvailabilityGridProps {
   priceOf?: (time: string) => number;
   /** The hour is charged at a peak rate */
   peakOf?: (time: string) => boolean;
-  /** Section a slot belongs to ("Friday late night", "Saturday"); shown only when a date has more than one */
-  headingOf?: (time: string) => string;
 }
 
 // Shared looks for each state (desktop cell and phone row)
@@ -61,18 +59,14 @@ export const CourtAvailabilityGrid = ({
   isFetching,
   priceOf,
   peakOf,
-  headingOf,
 }: CourtAvailabilityGridProps) => {
   const colCount = courts.length;
   const [showPassed, setShowPassed] = useState(false);
   const [phoneCourt, setPhoneCourt] = useState(0);
   const activeCourt = courts[Math.min(phoneCourt, colCount - 1)] ?? courts[0];
-  const showHeadings = !!headingOf && new Set(timeSlots.map(headingOf)).size > 1;
   // Rows already over on every court (earlier today) are collapsed so open slots show first
   const passedCount = timeSlots.filter((time) => courts.length > 0 && courts.every((court) => getSlotStatus(selectedDate, court, time) === "passed")).length;
   const visibleSlots = showPassed ? timeSlots : timeSlots.slice(passedCount);
-  // The date's own section (first one) gets no heading; only later sections like "After midnight" do
-  const headingBefore = (i: number) => showHeadings && headingOf!(visibleSlots[i]) !== headingOf!(i > 0 ? visibleSlots[i - 1] : timeSlots[0]);
 
   // The basket line covering this cell. By slot position, not clock time: a line can run past midnight (11 PM - 1 AM).
   const spanOf = (l: Slot) => {
@@ -98,12 +92,6 @@ export const CourtAvailabilityGrid = ({
       <ChevronDown className={`size-3.5 transition-transform ${showPassed ? "rotate-180" : ""}`} />
       {showPassed ? "Hide" : "Show"} {passedCount} earlier time {passedCount === 1 ? "slot" : "slots"}
     </button>
-  );
-  const heading = (time: string) => (
-    <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border-y border-primary/25 text-xs font-semibold text-primary">
-      <Moon className="size-3.5" aria-hidden />
-      {headingOf!(time)}
-    </div>
   );
 
   return (
@@ -148,13 +136,12 @@ export const CourtAvailabilityGrid = ({
         </div>
         {passedToggle}
         <ul className="flex flex-col gap-2 p-3">
-          {visibleSlots.map((time, i) => {
+          {visibleSlots.map((time) => {
             const status = getSlotStatus(selectedDate, activeCourt, time);
             const line = lineAt(activeCourt, time);
             const clickable = status === "available" || status === "user_pending" || !!line;
             return (
               <Fragment key={time}>
-                {headingBefore(i) && <li className="-mx-3">{heading(time)}</li>}
                 <li>
                   {clickable ? (
                     <button
@@ -194,9 +181,8 @@ export const CourtAvailabilityGrid = ({
           </div>
 
           {passedToggle}
-          {visibleSlots.map((time, timeIdx) => (
+          {visibleSlots.map((time) => (
             <Fragment key={time}>
-              {headingBefore(timeIdx) && heading(time)}
               <div className="grid border-t border-border/60" style={{ gridTemplateColumns: `112px repeat(${colCount}, minmax(0, 1fr))` }}>
                 <div className="px-3 flex flex-col justify-center min-h-14 sticky left-0 z-10 bg-card">
                   <span className="text-sm font-bold whitespace-nowrap">{hourRangeLabel(time)}</span>

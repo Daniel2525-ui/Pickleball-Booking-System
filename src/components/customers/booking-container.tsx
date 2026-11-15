@@ -569,7 +569,6 @@ export const BookingContainer = () => {
                 isFetching={isFetchingBookings}
                 priceOf={(time) => priceFor(isTail(time) ? nextDate : selectedDate, time, 1).total}
                 peakOf={(time) => priceFor(isTail(time) ? nextDate : selectedDate, time, 1).hasPeak}
-                headingOf={(time) => (isTail(time) ? "After midnight" : dayName)}
               />
 
             </div>
