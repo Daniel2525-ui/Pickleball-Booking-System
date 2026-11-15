@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 // shortcut: demo-only Xendit test-mode QR Ph client, no refunds or expiry sync; replace with the PayMongo branch for launch
 /** True for a Xendit payment request (pr-) or payment (py-) id, as stored in the stripe_* columns. */
 export const isXenditId = (id: string | null | undefined) => /^p[ry]-/.test(id ?? "");
@@ -96,4 +97,24 @@ export async function closeQrPayment(
     if (now.status === "SUCCEEDED") return "paid";
     if (DEAD.includes(now.status)) return "closed";
     throw new Error(`Xendit payment request ${id} is still ${now.status} after cancelling`);
+}
+
+/** Why a front-desk QR Ph code can't pay `amount`, or null when it can (pure part of checkCounterQr). */
+export const counterQrProblem = (pr: Pick<XenditPaymentRequest, "status" | "reference_id" | "request_amount">, amount: number) => {
+    if (!pr.reference_id?.startsWith("counter-")) return "That QR Ph code was not made at the front desk.";
+    if (pr.status !== "SUCCEEDED") return "That QR Ph code has not been paid yet.";
+    if (Math.round(Number(pr.request_amount) * 100) !== Math.round(amount * 100)) {
+        return `That QR Ph code was for ₱${Number(pr.request_amount).toLocaleString()}, not ₱${amount.toLocaleString()}.`;
+    }
+    return null;
+};
+
+/** A front-desk QR Ph payment is real, paid, for this amount, and not already recorded on another payment. */
+export async function checkCounterQr(supabase: SupabaseClient, reference: string, amount: number): Promise<string | null> {
+    if (!/^pr-/.test(reference)) return "The QR Ph payment reference is not valid.";
+    // shortcut: check-then-settle, so two desks recording the same code in the same instant could both pass; fine for trusted staff
+    const { count, error } = await supabase.from("payments").select("id", { count: "exact", head: true }).eq("payment_reference", reference);
+    if (error) throw error;
+    if (count) return "That QR Ph payment is already recorded on another booking.";
+    return counterQrProblem(await getPaymentRequest(reference), amount);
 }

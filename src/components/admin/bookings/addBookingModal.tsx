@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { flushSync } from "react-dom";
+import { useState, useEffect } from "react";
 import { Loader2, Plus, AlertCircle, Search, UserCheck, UserPlus, Banknote, Smartphone, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { CounterQr } from "@/components/admin/payments/counter-qr";
@@ -30,6 +29,7 @@ import { searchCustomers } from "@/lib/services/customers/searchCustomers.servic
 import { CustomerNote } from "@/components/admin/customers/customers-table";
 import { createWalkInCustomer } from "@/lib/services/customers/createWalkInCustomer.service";
 import { createWalkInBooking } from "@/lib/services/bookings/createWalkInBooking.service";
+import { settleCounterPayment } from "@/lib/services/payments/settleCounterPayment.service";
 import { supabase as browserSupabase } from "@/lib/supabase";
 import { fetchPricing } from "@/lib/services/pricing/fetchPricing.service";
 import { quoteCourtPrice, type Pricing } from "@/lib/services/pricing/quoteCourtPrice";
@@ -89,9 +89,8 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
 
   // Payment details
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash" | "unpaid">("cash");
-  // For QR Ph this is the paid code's Xendit id, set when the customer has paid
-  const [paymentReference, setPaymentReference] = useState("");
-  const formRef = useRef<HTMLFormElement>(null);
+  // QR Ph: the reservation is saved unpaid first (so the slot is held), then collected here like "Collect Payment"
+  const [awaitingQr, setAwaitingQr] = useState<{ bookingId: string; paymentId: string; amount: number } | null>(null);
 
   const resetForm = () => {
     setPlayerMode("existing");
@@ -104,10 +103,12 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
     setDuplicateWarning(null);
     setError(null);
     setPaymentMethod("cash");
-    setPaymentReference("");
+    setAwaitingQr(null);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
+    // Closed before the QR was paid: the reservation stays as Pay Later, so the list must show it
+    if (!nextOpen && awaitingQr) onBookingAdded?.();
     setOpen(nextOpen);
     if (nextOpen) {
       resetForm();
@@ -278,9 +279,22 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
       startTime,
       endTime,
       amount: Number(amount),
-      paymentMethod,
-      paymentReference: paymentMethod === "gcash" ? paymentReference : undefined,
+      paymentMethod: paymentMethod === "gcash" ? "unpaid" : paymentMethod,
     });
+
+    if (!bookingErr && bookingId && paymentMethod === "gcash") {
+      const { data: payment } = await browserSupabase.from("payments").select("id").eq("booking_id", bookingId).eq("status", "pending").maybeSingle();
+      setLoading(false);
+      if (!payment) {
+        // Saved but not collectable here: it is a Pay Later booking now, collected from its row
+        toast.warning("Reservation saved as Pay Later. Collect the QR Ph payment from its row in the list.");
+        setOpen(false);
+        onBookingAdded?.();
+        return;
+      }
+      setAwaitingQr({ bookingId, paymentId: payment.id, amount: Number(amount) });
+      return;
+    }
 
     setLoading(false);
 
@@ -291,6 +305,25 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
       setOpen(false);
       onBookingAdded?.();
     }
+  };
+
+  const collectQr = async (reference: string) => {
+    if (!awaitingQr) return;
+    setLoading(true);
+    setError(null);
+    const { success, error: settleErr } = await settleCounterPayment({
+      paymentId: awaitingQr.paymentId,
+      bookingId: awaitingQr.bookingId,
+      paymentMethod: "gcash",
+      paymentReference: reference,
+      expectedAmount: awaitingQr.amount,
+    });
+    setLoading(false);
+    if (!success) return setError(settleErr?.message || "The QR Ph payment could not be recorded. Collect it from the booking's row.");
+    toast.success(`Reservation recorded. ₱${awaitingQr.amount.toLocaleString()} received via QR Ph.`);
+    setAwaitingQr(null);
+    setOpen(false);
+    onBookingAdded?.();
   };
 
   return (
@@ -311,7 +344,27 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
           </DialogDescription>
         </DialogHeader>
 
-        <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
+        {awaitingQr ? (
+          <div className="flex flex-col gap-4 py-2">
+            <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+              The court is reserved and marked unpaid. Once the customer pays, it is recorded as paid. If they don&apos;t pay, close this and collect later from the booking&apos;s row.
+            </p>
+            {error && (
+              <div role="alert" className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs leading-relaxed">
+                <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                <p>{error}</p>
+              </div>
+            )}
+            <CounterQr amount={awaitingQr.amount} disabled={loading} onPaid={(ref) => void collectQr(ref)} />
+            {loading && <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3.5 animate-spin" />Recording payment...</p>}
+            <DialogFooter className="pt-2 border-t">
+              <Button type="button" variant="outline" disabled={loading} onClick={() => handleOpenChange(false)} className="w-full sm:w-auto font-semibold text-xs sm:text-sm">
+                Collect later
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
           {error && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs leading-relaxed">
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
@@ -637,21 +690,11 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
               </button>
             </div>
 
-            {/* shortcut: the QR is paid before the reservation is saved, so a slot taken meanwhile leaves a payment to refund by hand; save as unpaid first before launch */}
             {paymentMethod === "gcash" && (
-              <CounterQr
-                key={amount}
-                amount={Number(amount)}
-                disabled={!startTime || !endTime || !(Number(amount) > 0) || loading}
-                onPaid={(ref) => {
-                  flushSync(() => setPaymentReference(ref));
-                  formRef.current?.requestSubmit();
-                }}
-              />
+              <p className="text-xs text-muted-foreground">The court is reserved first, then the QR Ph code is shown.</p>
             )}
           </div>
 
-          {(paymentMethod !== "gcash" || paymentReference) && (
           <DialogFooter className="mt-4 pt-2 border-t">
             <Button
               type="submit"
@@ -663,13 +706,15 @@ export const AddBookingModal = ({ onBookingAdded, defaultOpen = false }: AddBook
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Recording...
                 </>
+              ) : paymentMethod === "gcash" ? (
+                "Reserve & Show QR Ph"
               ) : (
                 "Record Reservation"
               )}
             </Button>
           </DialogFooter>
-          )}
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
 import { closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 import { sameCentavo } from "@/lib/services/bookings/basketSiblings";
+import { checkCounterQr } from "@/lib/xendit";
 
 export async function POST(request: NextRequest) {
     try {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
         //    and be charged twice for a booking settled at the counter.
         const { data: payment, error: paymentError } = await supabase
             .from("payments")
-            .select("stripe_session_id, bookings(basket_id, status, court_id, open_play_session_id)")
+            .select("amount, stripe_session_id, bookings(basket_id, status, court_id, open_play_session_id)")
             .eq("id", paymentId)
             .eq("booking_id", bookingId)
             .maybeSingle();
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
             console.error("Counter settlement: failed to load payment:", paymentError);
             return NextResponse.json({ error: "Could not load the payment. Please try again." }, { status: 500 });
         }
+
+        if (!payment) return NextResponse.json({ error: "Payment not found for this booking." }, { status: 404 });
 
         // An unpaid basket is settled as one unit; the basket id comes from the DB row, never the client
         const owner = payment?.bookings as
@@ -74,6 +77,18 @@ export async function POST(request: NextRequest) {
             const basketTotal = (due ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
             if (!sameCentavo(basketTotal, expectedAmount)) {
                 return NextResponse.json({ error: "This booking has more courts than shown. Refresh and try again." }, { status: 409 });
+            }
+        }
+
+        // A QR Ph payment must be a front-desk code Xendit reports paid, for what this settle records
+        if (paymentMethod === "gcash" && paymentReference) {
+            const amount = basketId ? expectedAmount : Number(payment?.amount);
+            try {
+                const problem = await checkCounterQr(supabase, paymentReference, amount);
+                if (problem) return NextResponse.json({ error: problem }, { status: 409 });
+            } catch (qrError) {
+                console.error("Counter settlement: failed to check the QR Ph payment:", qrError);
+                return NextResponse.json({ error: "Could not confirm the QR Ph payment with Xendit. Please try again." }, { status: 502 });
             }
         }
 

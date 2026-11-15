@@ -5,7 +5,8 @@ import { qrExpiresAt, xendit, xenditEnabled, type XenditPaymentRequest } from "@
 import { qrImage } from "@/lib/xenditQr";
 
 // Demo: a QR Ph code the front desk shows a walk-in. Staff record the payment once Xendit reports it paid.
-// shortcut: the paid QR is not tied to the booking on the server (staff are trusted); verify it in the settle RPCs before launch
+// The settle and open play walk-up routes check the paid code against the amount they record (checkCounterQr).
+// shortcut: create_walk_in_booking still accepts a QR reference if called directly; the app no longer sends one
 export async function POST(request: NextRequest) {
     try {
         const { denied } = await requireAdmin();

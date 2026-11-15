@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { toStripeSession, qrExpiresAt, isXenditId, xenditRefused } = await import("../src/lib/xendit.ts");
+const { toStripeSession, qrExpiresAt, isXenditId, xenditRefused, counterQrProblem } = await import("../src/lib/xendit.ts");
 
 test("xenditRefused: only a definite 4xx releases holds", () => {
     const err = (status) => Object.assign(new Error("x"), { status });
@@ -54,4 +54,13 @@ test("closeQrPayment: paid stays paid, a payable QR is cancelled, a QR that won'
     assert.equal(await closeQrPayment("pr-1", api(["REQUIRES_ACTION", "SUCCEEDED"], async () => { throw new Error("400"); })), "paid");
     // Still payable and Xendit won't cancel it: the booking must not be cancelled
     await assert.rejects(closeQrPayment("pr-1", api(["REQUIRES_ACTION"], async () => { throw new Error("503"); })));
+});
+
+test("counterQrProblem: only a paid front-desk code for the exact amount passes", () => {
+    const pr = { reference_id: "counter-abc", status: "SUCCEEDED", request_amount: 400 };
+    assert.equal(counterQrProblem(pr, 400), null);
+    assert.equal(counterQrProblem({ ...pr, request_amount: 400.004 }, 400), null);
+    assert.match(counterQrProblem({ ...pr, status: "PENDING" }, 400), /not been paid/);
+    assert.match(counterQrProblem({ ...pr, request_amount: 200 }, 400), /₱200/);
+    assert.match(counterQrProblem({ ...pr, reference_id: "booking-xyz" }, 400), /front desk/);
 });

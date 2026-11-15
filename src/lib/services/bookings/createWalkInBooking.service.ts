@@ -9,8 +9,8 @@ export interface CreateWalkInBookingParams {
     startTime: string;
     endTime: string;
     amount: number;
-    paymentMethod: "cash" | "gcash" | "unpaid";
-    paymentReference?: string;
+    /** QR Ph is collected after saving (settle route checks the code), so a walk-in is saved as cash or unpaid */
+    paymentMethod: "cash" | "unpaid";
 }
 
 /** Staff wording for the refusals create_walk_in_booking raises; null for anything else. */
@@ -41,7 +41,6 @@ export const createWalkInBooking = async (
             endTime,
             amount,
             paymentMethod,
-            paymentReference,
         } = params;
 
         if (!courtId || !bookingDate || !startTime || !endTime || !amount) {
@@ -73,7 +72,7 @@ export const createWalkInBooking = async (
             p_customer_id: customerId || null,
             p_user_id: userId || null,
             p_payment_method: methodParam,
-            p_payment_reference: paymentReference?.trim() || null,
+            p_payment_reference: null,
         });
 
         if (!rpcError && rpcResult) {
