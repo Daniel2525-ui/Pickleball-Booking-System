@@ -49,7 +49,7 @@ function Reservations({ dayEndsAt }: { dayEndsAt: string }) {
       </AdminPageHeader>
 
       <div className="flex flex-col gap-4">
-        <BookingFilters initialStatus={initialStatus} initialDate={initialDate} initialCourt={initialCourt} initialSearch={initialSearch} onFilterChange={setFilters} />
+        <BookingFilters today={businessToday(dayEndsAt)} initialStatus={initialStatus} initialDate={initialDate} initialCourt={initialCourt} initialSearch={initialSearch} onFilterChange={setFilters} />
         <BookingsTable filters={filters} dayEndsAt={dayEndsAt} />
       </div>
     </div>

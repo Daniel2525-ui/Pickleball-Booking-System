@@ -14,6 +14,8 @@ import { fetchCourtsData } from "@/lib/services/courts/courtsData.service";
 import { CourtOption } from "@/lib/services/bookings/bookingsTypes";
 
 interface BookingFiltersProps {
+  /** Today's business day, for the "Today" shortcut */
+  today: string;
   initialStatus?: string;
   initialDate?: string;
   initialCourt?: string;
@@ -26,16 +28,20 @@ interface BookingFiltersProps {
   }) => void;
 }
 
+// Filter value → what staff read (the menu, its closed state and the quick buttons say the same thing)
+const STATUS_TEXT: Record<string, string> = { Pending: "Waiting for payment", Expired: "Expired holds" };
+const statusText = (value: string) => STATUS_TEXT[value] ?? value;
+
 const QUICK_STATUSES: [string, string][] = [
   ["All Statuses", "All"],
   ["Confirmed", "Confirmed"],
-  ["Pending", "Waiting for payment"],
+  ["Pending", statusText("Pending")],
   ["Checked In", "Checked in"],
   ["No-Show", "No-show"],
   ["Cancelled", "Cancelled"],
 ];
 
-export default function BookingFilters({ initialStatus = "All Statuses", initialDate = "", initialCourt = "All Courts", initialSearch = "", onFilterChange }: BookingFiltersProps = {}) {
+export default function BookingFilters({ today, initialStatus = "All Statuses", initialDate = "", initialCourt = "All Courts", initialSearch = "", onFilterChange }: BookingFiltersProps) {
   const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState(initialStatus);
   const [courtId, setCourtId] = useState(initialCourt);
@@ -79,7 +85,7 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
               setSearch(value);
               updateFilters(value, status, courtId, dateTime);
             }}
-            placeholder="Search by name or reference number"
+            placeholder="Search by name, reference or mobile number"
             className="w-full pl-9 bg-background h-10 text-sm"
           />
         </div>
@@ -96,17 +102,17 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
           defaultValue="All Statuses"
         >
           <SelectTrigger className="flex-1 sm:w-[140px] bg-background h-10 text-xs sm:text-sm font-medium">
-            <SelectValue placeholder="Status Filter" />
+            <SelectValue placeholder="Status Filter">{(value) => statusText(value || "All Statuses")}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Statuses">All Statuses</SelectItem>
             <SelectItem value="Confirmed">Confirmed</SelectItem>
-            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Pending">{statusText("Pending")}</SelectItem>
             <SelectItem value="Checked In">Checked In</SelectItem>
             <SelectItem value="Completed">Completed</SelectItem>
             <SelectItem value="No-Show">No-Show</SelectItem>
             <SelectItem value="Cancelled">Cancelled</SelectItem>
-            <SelectItem value="Expired">Expired Holds</SelectItem>
+            <SelectItem value="Expired">{statusText("Expired")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -121,6 +127,18 @@ export default function BookingFilters({ initialStatus = "All Statuses", initial
             }}
             className="w-full sm:w-[150px] bg-background h-10 text-xs sm:text-sm"
           />
+          {dateTime !== today && (
+            <button
+              type="button"
+              onClick={() => {
+                setDateTime(today);
+                updateFilters(search, status, courtId, today);
+              }}
+              className="h-10 shrink-0 rounded-md border px-3 text-xs font-semibold hover:bg-muted"
+            >
+              Today
+            </button>
+          )}
           {dateTime && (
             <button
               type="button"

@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
             }
             if (updateError.code === "23514" || updateError.message?.includes("check constraint")) {
                 return Response.json(
-                    { error: `Status "${newStatus}" is not permitted by database check constraints until Stage 2 migration is applied.` },
+                    { error: "The database refused this status change. Refresh and try again." },
                     { status: 422 }
                 );
             }

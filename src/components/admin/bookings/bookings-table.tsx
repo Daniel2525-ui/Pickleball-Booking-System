@@ -74,7 +74,7 @@ const getStatusColor = (status: string) => statusStyles[status?.toLowerCase()] ?
 
 const STATUS_LABELS: Record<string, string> = {
   confirmed: "Confirmed",
-  pending: "Pending",
+  pending: "Waiting for payment",
   cancelled: "Cancelled",
   checked_in: "Checked In",
   in_progress: "In Progress",
