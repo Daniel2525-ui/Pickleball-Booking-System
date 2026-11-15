@@ -33,6 +33,7 @@ export const OpenPlayContainer = () => {
   const [dayEndsAt, setDayEndsAt] = useState("00:00");
   const [spotLimit, setSpotLimit] = useState(4);
   const [day, setDay] = useState<string | null>(null);
+  const [courtCount, setCourtCount] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -41,8 +42,11 @@ export const OpenPlayContainer = () => {
       fetchOpenPlaySessions(formatManilaDate(today), formatManilaDate(new Date(today.getTime() + WINDOW_DAYS * 86_400_000))),
       supabase.auth.getUser(),
       fetchBookingPolicy(supabase),
+      supabase.from("courts").select("id", { count: "exact", head: true }),
     ])
-      .then(([res, auth, policy]) => {
+      .then(([res, auth, policy, courts]) => {
+        // A failed count leaves 0, so cards fall back to listing court names
+        setCourtCount(courts.count ?? 0);
         setDayEndsAt(policy.dayEndsAt);
         setSpotLimit(policy.maxOpenPlaySpots);
         // A failed load must not read as "no sessions scheduled"
@@ -165,7 +169,7 @@ export const OpenPlayContainer = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                       <h2 className="font-display text-[22px] font-bold leading-tight text-balance">{s.name ?? `Open play · ${dayOf(s.session_date, { weekday: "long" })}`}</h2>
-                      <p className="text-sm text-muted-foreground">{s.court_names.join(", ")}</p>
+                      <p className="text-sm text-muted-foreground">{courtCount > 1 && s.court_names.length >= courtCount ? "All courts" : s.court_names.join(", ")}</p>
                     </div>
                     {s.my_spots > 0 ? (
                       <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900">You have {s.my_spots}</span>
