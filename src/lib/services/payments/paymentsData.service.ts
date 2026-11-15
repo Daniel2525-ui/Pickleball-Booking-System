@@ -10,6 +10,9 @@ const COLLECTABLE_BOOKING_STATUSES = ["confirmed", "checked_in", "completed"];
 // A cancelled booking still owes its refund unless staff kept the payment (cancel_reason 'payment_kept')
 const NOT_KEPT = "cancel_reason.is.null,cancel_reason.neq.payment_kept";
 
+/** Status filters that list money still to collect or refund, across every date */
+export const isOutstanding = (status: string | undefined) => ["to collect", "refund owed"].includes(status?.trim().toLowerCase() ?? "");
+
 export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) => {
     try {
         const status = filters?.status?.trim().toLowerCase() ?? "";
@@ -54,7 +57,8 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
             query = query.not("status", "eq", "failed");
         }
 
-        if (filters?.date) query = query.or(await dayFilter(filters.date));
+        // Money still outstanding is listed whatever day it was created on (a Pay Later booking made yesterday for today)
+        if (filters?.date && !isOutstanding(status)) query = query.or(await dayFilter(filters.date));
 
         const search = filters?.search?.trim() ?? "";
         if (search) {

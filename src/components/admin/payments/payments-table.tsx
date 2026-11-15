@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { fetchPayments, fetchPaymentTotals, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/paymentsData.service";
+import { fetchPayments, fetchPaymentTotals, isOutstanding, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/paymentsData.service";
 import { toast } from "sonner";
 import { Payment, paymentMethodLabel, sumPayments } from "@/lib/services/payments/paymentsTypes";
 import { formatTime12h, formatDate } from "@/lib/utils/formatTime";
@@ -250,7 +250,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
           <div>
             <h2 className="text-base font-semibold text-foreground">Transaction Records</h2>
             <p className="text-xs text-muted-foreground">
-              {filtered.length} {filtered.length === 1 ? "transaction" : "transactions"}{dayLabel ? ` · ${dayLabel}` : " · all dates"}
+              {filtered.length} {filtered.length === 1 ? "transaction" : "transactions"}{dayLabel && !isOutstanding(filters?.status) ? ` · ${dayLabel}` : " · all dates"}
             </p>
           </div>
         </div>
