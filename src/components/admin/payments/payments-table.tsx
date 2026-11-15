@@ -159,9 +159,30 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
     { title: "Refunded", value: money(totals?.refunded), note: totals ? `${totals.refundedCount} returned today, whenever paid` : "", icon: Undo2, tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
   ];
 
+  // What staff must know about the money: a paid payment on a cancelled booking is owed back, or was kept
+  const moneyState = (p: Payment) => (needsRefund(p) ? "refund_owed" : p.status === "paid" && p.bookings?.cancel_reason === "payment_kept" ? "kept" : p.status);
+
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase() || "";
     const config = {
+      refund_owed: {
+        label: "Refund owed",
+        icon: Undo2,
+        className: "bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30",
+        iconClassName: "text-amber-700 dark:text-amber-400",
+      },
+      kept: {
+        label: "Payment kept",
+        icon: CheckCircle2,
+        className: "bg-muted text-muted-foreground border-border",
+        iconClassName: "text-muted-foreground",
+      },
+      refunded: {
+        label: "Refunded",
+        icon: Undo2,
+        className: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20",
+        iconClassName: "text-sky-600 dark:text-sky-400",
+      },
       paid: {
         label: "Paid",
         icon: CheckCircle2,
@@ -170,7 +191,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
         iconClassName: "text-emerald-600 dark:text-emerald-400",
       },
       pending: {
-        label: "Pending",
+        label: "Waiting for payment",
         icon: Clock,
         className:
           "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
@@ -287,7 +308,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                 groupByCheckout(filtered.map((p) => ({ ...p, basket_id: p.bookings?.basket_id, booking_date: p.bookings?.booking_date, start_time: p.bookings?.start_time }))).flatMap((group) => {
                   const grouped = group.length > 1;
                   const head = group[0];
-                  const sameStatus = new Set(group.map((p) => p.status)).size === 1;
+                  const sameStatus = new Set(group.map(moneyState)).size === 1;
                   const sameMethod = new Set(group.map(paymentMethodLabel)).size === 1;
                   const sameDate = group.every((p) => p.bookings?.booking_date === head.bookings?.booking_date);
                   const headName = head.bookings?.profiles?.full_name || head.bookings?.customer_name || "Unknown Customer";
@@ -324,7 +345,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                             {sameMethod && <span className="text-[11px] text-muted-foreground">{paymentMethodLabel(head)}</span>}
                           </div>
                         </TableCell>
-                        <TableCell>{sameStatus && getStatusBadge(head.status)}</TableCell>
+                        <TableCell>{sameStatus && getStatusBadge(moneyState(head))}</TableCell>
                         <TableCell>
                           <span className="text-xs text-muted-foreground">{formatDate(head.paid_at || head.created_at, true)}</span>
                         </TableCell>
@@ -376,7 +397,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
                     {/* Status */}
                     <TableCell>
-                      {(!grouped || !sameStatus) && getStatusBadge(payment.status)}
+                      {(!grouped || !sameStatus) && getStatusBadge(moneyState(payment))}
                     </TableCell>
 
                     {/* Paid At */}

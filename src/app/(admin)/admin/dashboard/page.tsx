@@ -61,7 +61,8 @@ export default async function DashboardPage() {
         <section aria-labelledby="needs-you" className="rounded-2xl border bg-card p-5 flex flex-col gap-3">
           <h2 id="needs-you" className="text-lg font-bold">Needs you</h2>
           <AttentionAlert kind="collect" />
-          <p className="text-sm text-muted-foreground">Money to collect at the desk shows up here as it happens.</p>
+          <AttentionAlert kind="refund" />
+          <p className="text-sm text-muted-foreground">Money to collect or refund shows up here as it happens.</p>
         </section>
       </div>
 
