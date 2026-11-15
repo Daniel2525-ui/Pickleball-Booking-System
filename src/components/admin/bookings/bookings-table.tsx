@@ -44,7 +44,7 @@ import { SettlePaymentModal } from "./settlePaymentModal";
 import { BookingHistoryModal } from "./bookingHistoryModal";
 import { CancelPaidModal } from "./cancelPaidModal";
 import { getBookingStart, getBookingEnd } from "@/lib/utils/bookingTime";
-import { History, PanelRight, Undo2 } from "lucide-react";
+import { History, PanelRight, Undo2, RotateCcw } from "lucide-react";
 import { RefundPaymentModal } from "@/components/admin/payments/refundPaymentModal";
 import type { Payment } from "@/lib/services/payments/paymentsTypes";
 import { BookingDetailsSheet, type BookingAction } from "./booking-details-sheet";
@@ -212,6 +212,16 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
   const handleStatusChange = (booking: Booking, newStatus: GameDayStatus) => {
     if (actionLoadingId) return;
 
+    if (booking.status === "cancelled" && newStatus === "confirmed") {
+      setConfirmRequest({
+        title: "Restore this booking?",
+        description: `${booking.customer_name || "This player"}'s booking goes back to confirmed, with its payment as it was. This fails if the court has been booked since.`,
+        confirmLabel: "Restore Booking",
+        onConfirm: () => changeStatus(booking, newStatus),
+      });
+      return;
+    }
+
     if (newStatus === "no_show") {
       setConfirmRequest({
         title: "Mark as no-show?",
@@ -232,7 +242,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
       toast.error(error);
     } else {
       const label: Record<GameDayStatus, string> = {
-        confirmed: "Check-in undone. The booking is confirmed again.",
+        confirmed: booking.status === "cancelled" ? "Booking restored." : "Check-in undone. The booking is confirmed again.",
         checked_in: "Player checked in.",
         in_progress: "Match started.",
         completed: "Booking marked as played.",
@@ -241,7 +251,9 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
       };
       setBookingsData((prev) =>
         prev.map((b) =>
-          b.id === booking.id || (newStatus === "cancelled" && cancelsWith(b, booking)) ? { ...b, status: newStatus } : b
+          b.id === booking.id || (newStatus === "cancelled" && cancelsWith(b, booking))
+            ? { ...b, status: newStatus, ...(booking.status === "cancelled" && { cancel_reason: null }) }
+            : b
         )
       );
       toast.success(label[newStatus]);
@@ -316,6 +328,12 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
     if (status === "cancelled" && payment?.status === "paid" && booking.cancel_reason !== "payment_kept") {
       list.push({ key: "refund", label: "Refund Payment", icon: Undo2, tone: "text-emerald-600 focus:text-emerald-600",
         onClick: () => setRefundFor(booking) });
+    }
+    // A staff cancel by mistake, before the game's end (the server checks the money and the slot)
+    if (status === "cancelled" && (booking.cancel_reason === "admin" || booking.cancel_reason === "payment_kept") && booking.court_id
+      && !booking.open_play_session_id && (payment?.status === "paid" || payment?.status === "pending") && getBookingEnd(booking) > new Date()) {
+      list.push({ key: "restore", label: "Restore Booking", icon: busy ? Loader2 : RotateCcw, disabled: busy,
+        onClick: () => handleStatusChange(booking, "confirmed") });
     }
     if (status !== "cancelled") {
       list.push({ key: "cancel", label: "Cancel Reservation", icon: XCircle, destructive: true, tone: "text-destructive focus:text-destructive",

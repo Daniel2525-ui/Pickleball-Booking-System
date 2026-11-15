@@ -13,6 +13,27 @@ export const ALLOWED_TRANSITIONS: Record<string, string[]> = {
     checked_in: ["confirmed", "cancelled"], // "Undo Check-in": the wrong group was checked in
     in_progress: ["completed", "cancelled"],
     no_show: ["completed"], // "Mark as Played": staff forgot to check the group in
+    cancelled: ["confirmed"], // "Restore Booking": a staff cancel by mistake (restoreBlockReason decides)
+};
+
+/**
+ * Why a cancelled booking can't be restored, or null when it can. Only a staff cancel of a court booking that
+ * hasn't ended, whose money is still held (no refund started) or was never taken at the counter.
+ * The court overlap constraint refuses it separately if the slot was booked since.
+ */
+export const restoreBlockReason = (
+    booking: { status: string; cancel_reason?: string | null; court_id?: string | null; open_play_session_id?: string | null; booking_date: string; start_time: string; end_time: string },
+    payment: { status: string; stripe_session_id?: string | null; refunds: number } | null,
+    now: Date = new Date()
+) => {
+    if (booking.status !== "cancelled") return "Only a cancelled booking can be restored.";
+    if (booking.cancel_reason !== "admin" && booking.cancel_reason !== "payment_kept") return "Only a booking cancelled by staff can be restored.";
+    if (!booking.court_id || booking.open_play_session_id) return "Open play bookings can't be restored. Add the player again from Open Play.";
+    if (getBookingEnd(booking) <= now) return "This booking's time has passed.";
+    if (payment?.status === "paid" && payment.refunds === 0) return null;
+    if (payment?.status === "pending" && !payment.stripe_session_id) return null;
+    if (payment?.status === "pending") return "An online booking that was never paid can't be restored. Record a new booking instead.";
+    return "Its payment was refunded or failed. Record a new booking instead.";
 };
 
 /** Status the cron moves a court booking to once its slot has ended, or null to leave it alone. */

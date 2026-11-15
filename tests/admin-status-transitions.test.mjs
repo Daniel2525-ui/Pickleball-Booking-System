@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason, autoCloseStatus, openPlayCloseStatus } from "../src/lib/services/bookings/adminStatusRules.ts";
+import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason, autoCloseStatus, openPlayCloseStatus, restoreBlockReason } from "../src/lib/services/bookings/adminStatusRules.ts";
 
 test("admin status transitions: game-day statuses respect the booking's date in venue time", () => {
     const booking = { booking_date: "2026-10-25" };
@@ -41,7 +41,7 @@ test("admin status transitions: validates allowed and disallowed state machine p
 
     // Pending cannot jump to game-day statuses; terminal and backward moves are refused
     for (const next of ["checked_in", "in_progress", "completed"]) assert.equal(canTransition("pending", next), false);
-    for (const [from, to] of [["completed", "confirmed"], ["completed", "in_progress"], ["cancelled", "confirmed"],
+    for (const [from, to] of [["completed", "confirmed"], ["completed", "in_progress"], 
         ["no_show", "confirmed"], ["no_show", "in_progress"], ["pending", "confirmed"], ["in_progress", "checked_in"]]) {
         assert.equal(canTransition(from, to), false, `${from} -> ${to}`);
     }
@@ -97,4 +97,22 @@ test("openPlayCloseStatus: open play players are recorded as played once the ses
     assert.equal(openPlayCloseStatus({ ...spot, status: "checked_in" }, at("2026-10-26T08:00:00+08:00")), "completed");
     assert.equal(openPlayCloseStatus({ ...spot, status: "cancelled" }, at("2026-10-26T08:00:00+08:00")), null);
     assert.equal(openPlayCloseStatus({ ...spot, status: "pending" }, at("2026-10-26T08:00:00+08:00")), null);
+});
+
+test("restoreBlockReason: only a staff cancel, before the end, with the money still held", () => {
+    const now = new Date("2026-11-16T15:00:00+08:00");
+    const b = { status: "cancelled", cancel_reason: "admin", court_id: "c1", open_play_session_id: null, booking_date: "2026-11-16", start_time: "18:00:00", end_time: "20:00:00" };
+    const paid = { status: "paid", stripe_session_id: "pr-1", refunds: 0 };
+    assert.equal(canTransition("cancelled", "confirmed"), true);
+    assert.equal(restoreBlockReason(b, paid, now), null);
+    assert.equal(restoreBlockReason({ ...b, cancel_reason: "payment_kept" }, paid, now), null);
+    assert.equal(restoreBlockReason(b, { status: "pending", stripe_session_id: null, refunds: 0 }, now), null); // Pay Later walk-in
+    assert.notEqual(restoreBlockReason(b, { status: "pending", stripe_session_id: "pr-1", refunds: 0 }, now), null); // online hold
+    assert.notEqual(restoreBlockReason(b, { ...paid, refunds: 1 }, now), null);
+    assert.notEqual(restoreBlockReason(b, { status: "refunded", refunds: 1 }, now), null);
+    assert.notEqual(restoreBlockReason(b, null, now), null);
+    for (const reason of ["expired", "customer", null]) assert.notEqual(restoreBlockReason({ ...b, cancel_reason: reason }, paid, now), null, String(reason));
+    assert.notEqual(restoreBlockReason({ ...b, court_id: null, open_play_session_id: "s1" }, paid, now), null);
+    assert.notEqual(restoreBlockReason(b, paid, new Date("2026-11-16T20:00:00+08:00")), null); // ended
+    assert.notEqual(restoreBlockReason({ ...b, status: "confirmed" }, paid, now), null);
 });

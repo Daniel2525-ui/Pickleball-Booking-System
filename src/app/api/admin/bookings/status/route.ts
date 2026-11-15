@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
 import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
-import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason } from "@/lib/services/bookings/adminStatusRules";
+import { canTransition, noShowMinutesLeft, buildStatusUpdate, gameDayBlockReason, restoreBlockReason } from "@/lib/services/bookings/adminStatusRules";
 import { type BasketSibling, loadPendingSiblings } from "@/lib/services/bookings/basketSiblings";
 import { cancelRestOfBasket, closeSiblingSessions } from "@/lib/services/bookings/cancelPendingBasket";
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         // 3. Load current booking
         const { data: booking, error: fetchError } = await supabase
             .from("bookings")
-            .select("id, status, booking_date, start_time, hold_expires_at, created_at, basket_id, court_id, open_play_session_id")
+            .select("id, status, booking_date, start_time, end_time, hold_expires_at, created_at, basket_id, court_id, open_play_session_id, cancel_reason")
             .eq("id", bookingId)
             .maybeSingle();
 
@@ -55,6 +55,24 @@ export async function POST(request: NextRequest) {
                 { error: `Cannot transition from "${currentStatus}" to "${newStatus}".` },
                 { status: 409 }
             );
+        }
+
+        // Restoring a mistaken cancel: only while the money is still held (or never taken at the counter)
+        const restoring = currentStatus === "cancelled";
+        if (restoring) {
+            const { data: payments, error: payError } = await supabase
+                .from("payments")
+                .select("status, stripe_session_id, refund_requests(id)")
+                .eq("booking_id", bookingId)
+                .order("created_at", { ascending: true })
+                .limit(1);
+            if (payError) {
+                console.error("Restore: failed to load payment:", payError);
+                return Response.json({ error: "Could not check this booking's payment." }, { status: 500 });
+            }
+            const p = payments?.[0];
+            const blockedRestore = restoreBlockReason(booking, p ? { status: p.status, stripe_session_id: p.stripe_session_id, refunds: p.refund_requests?.length ?? 0 } : null);
+            if (blockedRestore) return Response.json({ error: blockedRestore }, { status: 409 });
         }
 
         const policy = await fetchBookingPolicy(supabase);
@@ -121,6 +139,7 @@ export async function POST(request: NextRequest) {
         // 7. Conditional update (optimistic lock on current status) with Stage 2 audit timestamps
         const updatePayload = buildStatusUpdate(newStatus, booking);
         if (keepPayment) Object.assign(updatePayload, { cancel_reason: "payment_kept", cancel_note: cancelNote });
+        if (restoring) Object.assign(updatePayload, { cancel_reason: null, cancel_note: null });
 
         const { data: updated, error: updateError } = await supabase
             .from("bookings")
@@ -132,6 +151,13 @@ export async function POST(request: NextRequest) {
 
         if (updateError) {
             console.error("Status update error:", updateError);
+            // no_overlapping_active_court_bookings: someone took the slot after the cancel
+            if (restoring && updateError.code === "23P01") {
+                return Response.json({ error: "That court and time has been booked since. Record a new booking instead." }, { status: 409 });
+            }
+            if (restoring && updateError.message?.includes("VENUE_CLOSED")) {
+                return Response.json({ error: "The venue is closed on that date now." }, { status: 409 });
+            }
             if (updateError.code === "23514" || updateError.message?.includes("check constraint")) {
                 return Response.json(
                     { error: `Status "${newStatus}" is not permitted by database check constraints until Stage 2 migration is applied.` },
