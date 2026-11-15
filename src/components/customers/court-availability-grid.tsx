@@ -71,7 +71,8 @@ export const CourtAvailabilityGrid = ({
   // Rows already over on every court (earlier today) are collapsed so open slots show first
   const passedCount = timeSlots.filter((time) => courts.length > 0 && courts.every((court) => getSlotStatus(selectedDate, court, time) === "passed")).length;
   const visibleSlots = showPassed ? timeSlots : timeSlots.slice(passedCount);
-  const headingBefore = (i: number) => showHeadings && headingOf!(visibleSlots[i]) !== (i > 0 ? headingOf!(visibleSlots[i - 1]) : null);
+  // The date's own section (first one) gets no heading; only later sections like "After midnight" do
+  const headingBefore = (i: number) => showHeadings && headingOf!(visibleSlots[i]) !== headingOf!(i > 0 ? visibleSlots[i - 1] : timeSlots[0]);
 
   // The basket line covering this cell. By slot position, not clock time: a line can run past midnight (11 PM - 1 AM).
   const spanOf = (l: Slot) => {
