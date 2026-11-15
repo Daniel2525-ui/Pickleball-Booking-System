@@ -10,7 +10,7 @@ import { cancelReasonFor } from "./bookingDisplayStatus.ts";
 export const ALLOWED_TRANSITIONS: Record<string, string[]> = {
     pending: ["cancelled"],
     confirmed: ["checked_in", "no_show", "cancelled"],
-    checked_in: ["cancelled"],
+    checked_in: ["confirmed", "cancelled"], // "Undo Check-in": the wrong group was checked in
     in_progress: ["completed", "cancelled"],
     no_show: ["completed"], // "Mark as Played": staff forgot to check the group in
 };
@@ -78,6 +78,7 @@ export const buildStatusUpdate = (
     const at = now.toISOString();
     const update: Record<string, unknown> = { status: newStatus };
     if (newStatus === "checked_in") update.checked_in_at = at;
+    if (newStatus === "confirmed") update.checked_in_at = null;
     if (newStatus === "in_progress") update.started_at = at;
     if (newStatus === "completed") update.completed_at = at;
     if (newStatus === "no_show") update.no_show_at = at;

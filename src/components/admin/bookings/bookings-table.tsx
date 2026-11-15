@@ -232,6 +232,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
       toast.error(error);
     } else {
       const label: Record<GameDayStatus, string> = {
+        confirmed: "Check-in undone. The booking is confirmed again.",
         checked_in: "Player checked in.",
         in_progress: "Match started.",
         completed: "Booking marked as played.",
@@ -300,6 +301,10 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
     if (status === "confirmed") {
       list.push({ key: "noshow", label: "Mark No-Show", icon: AlertTriangle, tone: "text-orange-600 focus:text-orange-600", disabled: busy,
         onClick: () => handleStatusChange(booking, "no_show") });
+    }
+    if (status === "checked_in") {
+      list.push({ key: "undo-checkin", label: "Undo Check-in", icon: busy ? Loader2 : Undo2, disabled: busy,
+        onClick: () => handleStatusChange(booking, "confirmed") });
     }
     // Contingency: staff forgot to check in a group that played
     if (status === "no_show") {

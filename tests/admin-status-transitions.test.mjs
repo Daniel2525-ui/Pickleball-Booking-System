@@ -29,6 +29,8 @@ test("admin status transitions: game-day statuses respect the booking's date in 
 test("admin status transitions: validates allowed and disallowed state machine paths", () => {
     for (const next of ["checked_in", "no_show", "cancelled"]) assert.equal(canTransition("confirmed", next), true);
     assert.equal(canTransition("checked_in", "cancelled"), true);
+    assert.equal(canTransition("checked_in", "confirmed"), true); // Undo Check-in
+    assert.equal(buildStatusUpdate("confirmed").checked_in_at, null);
     assert.equal(canTransition("no_show", "completed"), true); // Mark as Played
     // Start and complete are automatic now: staff only check in
     for (const [from, to] of [["confirmed", "completed"], ["checked_in", "in_progress"], ["checked_in", "completed"]]) {
@@ -40,7 +42,7 @@ test("admin status transitions: validates allowed and disallowed state machine p
     // Pending cannot jump to game-day statuses; terminal and backward moves are refused
     for (const next of ["checked_in", "in_progress", "completed"]) assert.equal(canTransition("pending", next), false);
     for (const [from, to] of [["completed", "confirmed"], ["completed", "in_progress"], ["cancelled", "confirmed"],
-        ["no_show", "confirmed"], ["no_show", "in_progress"], ["checked_in", "confirmed"], ["in_progress", "checked_in"]]) {
+        ["no_show", "confirmed"], ["no_show", "in_progress"], ["pending", "confirmed"], ["in_progress", "checked_in"]]) {
         assert.equal(canTransition(from, to), false, `${from} -> ${to}`);
     }
 });
