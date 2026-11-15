@@ -152,9 +152,11 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const money = (n: number | undefined) => (!date ? "—" : totals ? formatCurrency(n) : null);
   const summaryCards = [
     { title: "Collected", value: money(totals?.collected), note: totals ? `${totals.collectedCount} ${totals.collectedCount === 1 ? "payment" : "payments"} · ${dayLabel}` : dayLabel, icon: DollarSign, tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-    { title: "Cash", value: money(totals?.cash), note: "Should be in the drawer", icon: Banknote, tone: "bg-lime-500/10 text-lime-700 dark:text-lime-400" },
+    // Cash taken minus cash handed back today: what the drawer should hold
+    { title: "Cash in drawer", value: money(totals ? totals.cash - totals.refundedCash : undefined),
+      note: totals?.refundedCash ? `${formatCurrency(totals.cash)} taken · ${formatCurrency(totals.refundedCash)} handed back` : "Should be in the drawer", icon: Banknote, tone: "bg-lime-500/10 text-lime-700 dark:text-lime-400" },
     { title: "QR Ph", value: money(totals ? totals.gcash + totals.card : undefined), note: "Online and front desk. Check against Xendit", icon: CreditCard, tone: "bg-primary/10 text-primary" },
-    { title: "Refunded", value: money(totals?.refunded), note: totals ? `${totals.refundedCount} returned to customers` : "", icon: Undo2, tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+    { title: "Refunded", value: money(totals?.refunded), note: totals ? `${totals.refundedCount} returned today, whenever paid` : "", icon: Undo2, tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
   ];
 
   const getStatusBadge = (status: string) => {

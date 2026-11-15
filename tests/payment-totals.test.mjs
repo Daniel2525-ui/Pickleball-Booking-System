@@ -2,17 +2,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { sumPayments, paymentMethodLabel, venueDayWindow } from "../src/lib/services/payments/paymentsTypes.ts";
 
-test("sumPayments splits collected money by method and keeps refunds apart", () => {
-    const totals = sumPayments([
-        { status: "paid", amount: "200.00", payment_method: "cash" },
-        { status: "paid", amount: 300, payment_method: "gcash" },
-        { status: "paid", amount: 400, payment_method: "stripe" },
-        { status: "paid", amount: 100, payment_method: null }, // older online payment
-        { status: "refunded", amount: 250, payment_method: "stripe" },
-        { status: "pending", amount: 999, payment_method: null },
-        { status: "failed", amount: 999, payment_method: "stripe" },
-    ]);
-    assert.deepEqual(totals, { collected: 1000, cash: 200, gcash: 300, card: 500, collectedCount: 4, refunded: 250, refundedCount: 1 });
+test("sumPayments counts money in when paid and refunds when returned", () => {
+    const totals = sumPayments(
+        [
+            { status: "paid", amount: "200.00", payment_method: "cash" },
+            { status: "paid", amount: 300, payment_method: "gcash" },
+            { status: "paid", amount: 400, payment_method: "stripe" },
+            { status: "paid", amount: 100, payment_method: null }, // older online payment
+            { status: "refunded", amount: 250, payment_method: "stripe" }, // paid this day, refunded later: still came in
+            { status: "pending", amount: 999, payment_method: null },
+            { status: "failed", amount: 999, payment_method: "stripe" },
+        ],
+        [
+            { amount: 150, payment_method: "cash" }, // handed back from the drawer this day
+            { amount: "80", payment_method: "gcash" },
+        ]
+    );
+    assert.deepEqual(totals, { collected: 1250, cash: 200, gcash: 300, card: 750, collectedCount: 5, refunded: 230, refundedCount: 2, refundedCash: 150 });
 });
 
 test("paymentMethodLabel names the method staff recognise", () => {

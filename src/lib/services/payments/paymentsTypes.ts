@@ -67,21 +67,31 @@ export const venueDayWindow = (date: string, dayEndsAt = "00:00") => {
     return { start: start.toISOString(), end: new Date(start.getTime() + 86_400_000).toISOString() };
 };
 
-/** The day's money: collected (split by method) and refunded. Failed and pending payments add nothing. */
-export const sumPayments = (rows: { status: string; amount: number | string | null; payment_method?: string | null }[]) => {
-    const totals = { collected: 0, cash: 0, gcash: 0, card: 0, collectedCount: 0, refunded: 0, refundedCount: 0 };
-    for (const r of rows) {
+type MoneyRow = { amount: number | string | null; payment_method?: string | null };
+
+/**
+ * One day's money, the way the drawer sees it. `paid`: payments paid that day (a later refund doesn't undo the
+ * money coming in). `refunds`: refunds completed that day, whenever their payment was taken.
+ */
+export const sumPayments = (paid: (MoneyRow & { status: string })[], refunds: MoneyRow[] = []) => {
+    const totals = { collected: 0, cash: 0, gcash: 0, card: 0, collectedCount: 0, refunded: 0, refundedCount: 0, refundedCash: 0 };
+    for (const r of paid) {
+        if (r.status !== "paid" && r.status !== "refunded") continue;
         const amount = Number(r.amount) || 0;
-        if (r.status === "paid") {
-            totals.collected += amount;
-            totals.collectedCount++;
-            if (r.payment_method === "cash") totals.cash += amount;
-            else if (r.payment_method === "gcash") totals.gcash += amount;
-            else totals.card += amount;
-        } else if (r.status === "refunded") {
-            totals.refunded += amount;
-            totals.refundedCount++;
-        }
+        totals.collected += amount;
+        totals.collectedCount++;
+        if (r.payment_method === "cash") totals.cash += amount;
+        else if (r.payment_method === "gcash") totals.gcash += amount;
+        else totals.card += amount;
+    }
+    for (const r of refunds) {
+        const amount = Number(r.amount) || 0;
+        totals.refunded += amount;
+        totals.refundedCount++;
+        if (r.payment_method === "cash") totals.refundedCash += amount;
     }
     return totals;
 };
+
+/** refund_requests statuses for money actually returned: card refunds and recorded cash / front-desk QR Ph handbacks */
+export const DONE_REFUND_STATUSES = ["succeeded", "cash_refunded"];

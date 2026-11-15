@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { Payment, FetchPaymentsFilters, sumPayments, venueDayWindow } from "./paymentsTypes";
+import { Payment, FetchPaymentsFilters, sumPayments, venueDayWindow, DONE_REFUND_STATUSES } from "./paymentsTypes";
 import { bookingSearchFilter } from "@/lib/services/bookings/filterBookingsData.service";
 import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 
@@ -74,22 +74,45 @@ export const fetchPayments = async (filters?: FetchPaymentsFilters, offset = 0) 
     }
 };
 
-/** Payments whose money came in on this venue day: paid then, or created then and not paid yet. */
+/** The business day's window: money taken after midnight, before the cutoff, belongs to the night before */
+const dayWindow = async (date: string) => venueDayWindow(date, (await fetchBookingPolicy(supabase)).dayEndsAt);
+
+/** Refunds completed in this window, with their payment's method (cash or not decides the drawer). */
+const refundsIn = ({ start, end }: { start: string; end: string }) =>
+    supabase
+        .from("refund_requests")
+        .select("payment_id, amount, payments(payment_method)")
+        .in("status", DONE_REFUND_STATUSES)
+        .gte("processed_at", start)
+        .lt("processed_at", end);
+
+/** Payments touching this venue day: paid then, created then and not paid yet, or refunded then. */
 const dayFilter = async (date: string) => {
-    // The business day: money taken after midnight, before the cutoff, belongs to the night before
-    const { start, end } = venueDayWindow(date, (await fetchBookingPolicy(supabase)).dayEndsAt);
-    return `and(paid_at.gte."${start}",paid_at.lt."${end}"),and(paid_at.is.null,created_at.gte."${start}",created_at.lt."${end}")`;
+    const window = await dayWindow(date);
+    const { start, end } = window;
+    const { data: refunds, error } = await refundsIn(window);
+    if (error) throw error;
+    const refunded = [...new Set((refunds ?? []).map((r) => r.payment_id))];
+    return [
+        `and(paid_at.gte."${start}",paid_at.lt."${end}")`,
+        `and(paid_at.is.null,created_at.gte."${start}",created_at.lt."${end}")`,
+        ...(refunded.length ? [`id.in.(${refunded.join(",")})`] : []),
+    ].join(",");
 };
 
-/** The day's collected (by method) and refunded totals, independent of paging and search. */
+/** The day's money in (by method, counted when paid) and refunds (counted when returned), independent of paging and search. */
 export const fetchPaymentTotals = async (date: string) => {
-    const { data, error } = await supabase
-        .from("payments")
-        .select("status, amount, payment_method")
-        .neq("status", "failed")
-        .or(await dayFilter(date));
+    const window = await dayWindow(date);
+    const [paid, refunds] = await Promise.all([
+        supabase.from("payments").select("status, amount, payment_method").in("status", ["paid", "refunded"])
+            .gte("paid_at", window.start).lt("paid_at", window.end),
+        refundsIn(window),
+    ]);
+    const error = paid.error || refunds.error;
     if (error) console.error("Failed to load payment totals:", error);
-    return { data: error ? null : sumPayments(data ?? []), error };
+    // One payment per refund (payment_id is a foreign key), so the embed is an object
+    const refundRows = (refunds.data ?? []).map((r) => ({ amount: r.amount, payment_method: (r.payments as { payment_method?: string | null } | null)?.payment_method }));
+    return { data: error ? null : sumPayments(paid.data ?? [], refundRows), error };
 };
 
 /** Number of pending payments staff still have to collect at the counter. */
