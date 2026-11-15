@@ -58,7 +58,7 @@ export const bookingPaymentLabel = (
     if (p.status === "pending") return "Unpaid";
     if (p.status !== "paid") return p.status;
     if (booking.status !== "cancelled") return `Paid • ${paymentMethodLabel(p)}`;
-    return booking.cancel_reason === "payment_kept" ? "Payment kept" : "Paid · cancelled";
+    return booking.cancel_reason === "payment_kept" ? "Payment kept" : "Refund owed";
 };
 
 /** UTC instants bounding one venue day (Asia/Manila, UTC+8, no DST), from dayEndsAt to dayEndsAt for a business day. */

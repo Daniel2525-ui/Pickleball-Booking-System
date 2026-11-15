@@ -44,7 +44,9 @@ import { SettlePaymentModal } from "./settlePaymentModal";
 import { BookingHistoryModal } from "./bookingHistoryModal";
 import { CancelPaidModal } from "./cancelPaidModal";
 import { getBookingStart, getBookingEnd } from "@/lib/utils/bookingTime";
-import { History, PanelRight } from "lucide-react";
+import { History, PanelRight, Undo2 } from "lucide-react";
+import { RefundPaymentModal } from "@/components/admin/payments/refundPaymentModal";
+import type { Payment } from "@/lib/services/payments/paymentsTypes";
 import { BookingDetailsSheet, type BookingAction } from "./booking-details-sheet";
 import { counterSettlementDue } from "@/lib/services/bookings/basketSiblings";
 import { groupByCheckout, checkoutTotal } from "@/lib/services/bookings/basket";
@@ -85,6 +87,16 @@ const capitalize = (status: string) => STATUS_LABELS[status?.toLowerCase()] ?? (
 const columnCount = 6;
 
 const firstPayment = (b: Booking) => (Array.isArray(b.payments) ? b.payments[0] : b.payments) ?? null;
+/** The booking's payment in the shape the Payments page's refund window takes */
+const refundablePayment = (b: Booking): Payment | null => {
+  const p = firstPayment(b);
+  return p && {
+    id: p.id, booking_id: b.id, stripe_session_id: null, stripe_payment_id: p.stripe_payment_id ?? null,
+    amount: Number(p.amount) || 0, currency: "PHP", status: p.status, payment_method: p.payment_method,
+    payment_reference: p.payment_reference, paid_at: p.paid_at ?? null, created_at: b.created_at,
+    bookings: { booking_date: b.booking_date, start_time: b.start_time, end_time: b.end_time, customer_name: b.customer_name ?? undefined, profiles: b.profiles?.full_name ? { full_name: b.profiles.full_name } : undefined },
+  };
+};
 const paymentLabel = (b: Booking) => {
   const payment = firstPayment(b);
   return payment ? bookingPaymentLabel(b, payment) : null;
@@ -121,6 +133,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
 
   const [historyBooking, setHistoryBooking] = useState<Booking | null>(null);
   const [cancelPaid, setCancelPaid] = useState<Booking | null>(null);
+  const [refundFor, setRefundFor] = useState<Booking | null>(null);
   // By id, so the panel shows the row as it is after an action or a live refresh
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const detailsBooking = bookingsData.find((b) => b.id === detailsId) ?? null;
@@ -189,6 +202,8 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
         )
       );
       toast.success(keep ? "Reservation cancelled. The payment was kept." : "Reservation cancelled successfully.");
+      // "Cancel and refund": go straight to recording the refund, so it isn't left owed
+      if (!keep && firstPayment(booking)?.status === "paid") setRefundFor({ ...booking, status: "cancelled" });
     }
     setActionLoadingId(null);
     return !error;
@@ -292,6 +307,11 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
         disabled: busy || !!blockReason("completed", booking), title: blockReason("completed", booking) ?? undefined,
         onClick: () => handleStatusChange(booking, "completed") });
     }
+    // Cancelled with "refund" chosen (not kept): the money still has to go back
+    if (status === "cancelled" && payment?.status === "paid" && booking.cancel_reason !== "payment_kept") {
+      list.push({ key: "refund", label: "Refund Payment", icon: Undo2, tone: "text-emerald-600 focus:text-emerald-600",
+        onClick: () => setRefundFor(booking) });
+    }
     if (status !== "cancelled") {
       list.push({ key: "cancel", label: "Cancel Reservation", icon: XCircle, destructive: true, tone: "text-destructive focus:text-destructive",
         disabled: busy, onClick: () => handleCancelBooking(booking) });
@@ -304,7 +324,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
     if (!payment) return null;
     const label = bookingPaymentLabel(booking, payment);
     const paid = label.startsWith("Paid");
-    const waiting = label === "Unpaid";
+    const waiting = label === "Unpaid" || label === "Refund owed";
     const Icon = paid ? (payment.payment_method?.toLowerCase() === "cash" ? Banknote : Smartphone) : waiting ? Clock : null;
     const tone = paid
       ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
@@ -575,6 +595,20 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
       />
 
       <CancelPaidModal booking={cancelPaid} onClose={() => setCancelPaid(null)} onConfirm={cancelBooking} />
+
+      <RefundPaymentModal
+        payment={refundFor ? refundablePayment(refundFor) : null}
+        open={!!refundFor}
+        onOpenChange={(o) => !o && setRefundFor(null)}
+        onRefunded={(paymentId, status) =>
+          setBookingsData((prev) =>
+            prev.map((b) => {
+              const p = firstPayment(b);
+              return p?.id === paymentId ? { ...b, payments: [{ ...p, status }] } : b;
+            })
+          )
+        }
+      />
 
       <BookingHistoryModal booking={historyBooking} onClose={() => setHistoryBooking(null)} />
 

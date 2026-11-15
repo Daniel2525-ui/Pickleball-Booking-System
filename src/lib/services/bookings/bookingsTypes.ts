@@ -3,7 +3,9 @@ export interface BookingPayment {
     status: string;
     payment_method?: string | null;
     payment_reference?: string | null;
+    stripe_payment_id?: string | null;
     amount?: number;
+    paid_at?: string | null;
 }
 
 export interface Booking {

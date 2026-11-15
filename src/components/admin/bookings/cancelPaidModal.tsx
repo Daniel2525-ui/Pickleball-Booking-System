@@ -72,7 +72,7 @@ export const CancelPaidModal = ({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-3 py-1">
-          {option("refund", "Cancel and refund", "Then refund it from the Payments page.")}
+          {option("refund", "Cancel and refund", "Then record the refund in the next step.")}
           {option("keep", "Cancel and keep the payment", "No refund, for example a late cancellation.")}
           {choice === "keep" && (
             <div className="flex flex-col gap-2">
