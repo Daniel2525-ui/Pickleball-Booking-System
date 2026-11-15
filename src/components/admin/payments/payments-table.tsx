@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { fetchPayments, fetchPaymentTotals, isOutstanding, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/paymentsData.service";
 import { toast } from "sonner";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { Payment, paymentMethodLabel, sumPayments } from "@/lib/services/payments/paymentsTypes";
 import { formatTime12h, formatDate } from "@/lib/utils/formatTime";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
@@ -125,6 +126,16 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
       ignore = true;
     };
   }, [date, totalsVersion]);
+
+  // An online QR Ph payment or another desk's collection reloads the first page and the day's totals quietly.
+  // Rows loaded with "load more" are dropped, as on the bookings page
+  useLiveRefresh(async () => {
+    const { data, error } = await fetchPayments(filters);
+    if (error) return;
+    setPayments(data);
+    setHasMore(data.length === PAYMENTS_PAGE_SIZE);
+    setTotalsVersion((v) => v + 1);
+  });
 
   const loadMore = async () => {
     setLoadingMore(true);
