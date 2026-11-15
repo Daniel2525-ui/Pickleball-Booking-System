@@ -63,6 +63,7 @@ export const fetchBookings = async (filters?: FetchBookingsFilters, offset = 0) 
                 profiles(full_name, phone, is_guest),
                 customers(full_name, phone, email),
                 discount_codes(code),
+                booking_notes(note),
                 payments(id, status, amount, payment_method, payment_reference, stripe_payment_id, paid_at)
             `)
             .order("booking_date", { ascending: false })

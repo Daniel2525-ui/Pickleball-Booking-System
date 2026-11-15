@@ -37,6 +37,8 @@ export interface Booking {
     basket_id?: string | null;
     /** Why a cancelled booking was cancelled (bookings_cancel_reason_check); null when unknown */
     cancel_reason?: string | null;
+    /** Staff-only note (booking_notes); one-to-one, so PostgREST embeds an object */
+    booking_notes?: { note: string } | null;
 
     /** Players the checkout said are coming (one count per checkout); null for walk-ins and older bookings */
     player_count?: number | null;

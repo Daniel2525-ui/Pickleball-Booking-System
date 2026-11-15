@@ -1,6 +1,8 @@
 "use client";
 
-import { Phone, Mail } from "lucide-react";
+import { useState } from "react";
+import { Phone, Mail, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,7 @@ export function BookingDetailsSheet({
   statusClass,
   actions,
   onClose,
+  onNoteSaved,
 }: {
   booking: Booking | null;
   /** Display status ("confirmed", "hold expired") and its badge colour, as the table shows them */
@@ -39,6 +42,7 @@ export function BookingDetailsSheet({
   statusClass: string;
   actions: BookingAction[];
   onClose: () => void;
+  onNoteSaved: (bookingId: string, note: string | null) => void;
 }) {
   const payment = booking ? firstPayment(booking) : null;
   const phone = booking?.customers?.phone || booking?.profiles?.phone;
@@ -120,6 +124,8 @@ export function BookingDetailsSheet({
                 </section>
               )}
 
+              <BookingNote key={booking.id} booking={booking} onSaved={onNoteSaved} />
+
               <section aria-label="History">
                 <h3 className="text-xs font-bold text-muted-foreground mb-1">History</h3>
                 <BookingHistoryList booking={booking} />
@@ -129,5 +135,54 @@ export function BookingDetailsSheet({
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Staff-only note on this booking (deposit taken, bringing a coach...). Empty removes it. */
+function BookingNote({ booking, onSaved }: { booking: Booking; onSaved: (bookingId: string, note: string | null) => void }) {
+  const saved = booking.booking_notes?.note ?? "";
+  const [note, setNote] = useState(saved);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    const res = await fetch("/api/admin/bookings/note", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: booking.id, note }),
+    }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    setSaving(false);
+    if (!res?.ok) return setError(body?.error ?? "Could not save the note. Check your connection and try again.");
+    toast.success(body.note ? "Note saved." : "Note removed.");
+    onSaved(booking.id, body.note);
+  };
+
+  return (
+    <form onSubmit={save} aria-label="Staff note" className="flex flex-col gap-2">
+      <label htmlFor="booking-note" className="text-xs font-bold text-muted-foreground">Staff note <span className="font-normal">(only staff see this)</span></label>
+      <textarea
+        id="booking-note"
+        maxLength={300}
+        rows={2}
+        value={note}
+        onChange={(e) => {
+          setNote(e.target.value);
+          setError(null);
+        }}
+        placeholder="e.g. ₱500 deposit taken · Bringing a coach"
+        className="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      {error && <p role="alert" className="text-xs font-medium text-destructive">{error}</p>}
+      {note.trim() !== saved && (
+        <Button type="submit" size="sm" disabled={saving} className="self-end gap-2 font-semibold">
+          {saving && <Loader2 className="size-3.5 animate-spin" />}
+          {note.trim() ? "Save note" : "Remove note"}
+        </Button>
+      )}
+    </form>
   );
 }

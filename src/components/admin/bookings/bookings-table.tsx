@@ -525,6 +525,11 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
                               <span className="ml-1.5 rounded bg-muted px-1.5 py-px font-semibold text-foreground">Group · {booking.basket_size} bookings</span>
                             )}
                           </span>
+                          {booking.booking_notes?.note && (
+                            <span title={booking.booking_notes.note} className="max-w-[220px] truncate text-[11px] italic text-amber-800 dark:text-amber-300">
+                              Note: {booking.booking_notes.note}
+                            </span>
+                          )}
                           {(booking.customers?.phone || booking.profiles?.phone) && (
                             <a
                               href={`tel:${booking.customers?.phone || booking.profiles?.phone}`}
@@ -686,6 +691,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
         statusClass={detailsBooking ? getStatusColor(getBookingDisplayStatus(detailsBooking)) : ""}
         actions={detailsBooking ? actionsFor(detailsBooking) : []}
         onClose={() => setDetailsId(null)}
+        onNoteSaved={(id, note) => setBookingsData((prev) => prev.map((b) => (b.id === id ? { ...b, booking_notes: note ? { note } : null } : b)))}
       />
 
     </>
