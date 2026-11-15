@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { fetchPayments, fetchPaymentTotals, isOutstanding, PAYMENTS_PAGE_SIZE } from "@/lib/services/payments/paymentsData.service";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { Payment, paymentMethodLabel, sumPayments } from "@/lib/services/payments/paymentsTypes";
@@ -61,6 +62,13 @@ interface PaymentsTableProps {
   };
 }
 
+
+/** The Bookings page searching this payment's booking ref (it opens across every date) */
+const bookingHref = (ref: string) => `/admin/bookings?search=${encodeURIComponent(ref)}`;
+const linkClass = "hover:text-primary hover:underline underline-offset-4";
+
+/** When the money moved: paid, or (still unpaid) when the payment was created */
+const whenLabel = (p: Payment) => (p.paid_at ? `Paid ${formatDate(p.paid_at, true)}` : `Created ${formatDate(p.created_at, true)}`);
 
 const formatCurrency = (amount: number | null | undefined) => {
   const value = Number(amount) || 0;
@@ -275,7 +283,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                 <TableHead>Court & Slot</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Processed At</TableHead>
+                <TableHead>Paid / Created</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -342,7 +350,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                               {headName.charAt(0).toUpperCase()}
                             </div>
                             <div className="flex flex-col">
-                              <span className="font-semibold text-sm text-foreground">{headName}</span>
+                              <Link href={bookingHref(bookingRef({ id: head.booking_id, basket_id: head.basket_id }))} className={`font-semibold text-sm text-foreground ${linkClass}`}>{headName}</Link>
                               <span className="font-mono text-[11px] text-muted-foreground">Ref {bookingRef({ id: head.booking_id, basket_id: head.basket_id })}</span>
                             </div>
                           </div>
@@ -361,7 +369,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                         </TableCell>
                         <TableCell>{sameStatus && getStatusBadge(moneyState(head))}</TableCell>
                         <TableCell>
-                          <span className="text-xs text-muted-foreground">{formatDate(head.paid_at || head.created_at, true)}</span>
+                          <span className="text-xs text-muted-foreground">{whenLabel(head)}</span>
                         </TableCell>
                         <TableCell className="text-right">
                           {basketDue.length > 0 && collectButton(basketDue)}
@@ -385,7 +393,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                               {displayName.charAt(0).toUpperCase()}
                             </div>
                             <div className="flex flex-col">
-                              <span className="font-medium text-sm text-foreground">{displayName}</span>
+                              <Link href={bookingHref(bookingRef({ id: payment.booking_id, basket_id: payment.bookings?.basket_id }))} className={`font-medium text-sm text-foreground ${linkClass}`}>{displayName}</Link>
                               <span className="font-mono text-[11px] text-muted-foreground">Ref {bookingRef({ id: payment.booking_id, basket_id: payment.bookings?.basket_id })}</span>
                             </div>
                           </div>
@@ -425,7 +433,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                     <TableCell>
                       {!grouped && (
                         <div className="flex flex-col text-xs text-muted-foreground">
-                          <span>{formatDate(payment.paid_at || payment.created_at, true)}</span>
+                          <span>{whenLabel(payment)}</span>
                         </div>
                       )}
                     </TableCell>
