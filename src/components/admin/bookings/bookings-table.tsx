@@ -53,7 +53,9 @@ import { groupByCheckout, checkoutTotal } from "@/lib/services/bookings/basket";
 import { bookingPaymentLabel } from "@/lib/services/payments/paymentsTypes";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
-import { gameDayBlockReason } from "@/lib/services/bookings/adminStatusRules";
+import { gameDayBlockReason, noShowMinutesLeft, NO_SHOW_GRACE_MINUTES } from "@/lib/services/bookings/adminStatusRules";
+import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
+import { createClient } from "@/lib/supabase/client";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
 
 const statusStyles: Record<string, string> = {
@@ -134,6 +136,11 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
   const [historyBooking, setHistoryBooking] = useState<Booking | null>(null);
   const [cancelPaid, setCancelPaid] = useState<Booking | null>(null);
   const [refundFor, setRefundFor] = useState<Booking | null>(null);
+  // Settings' no-show grace period: Mark No-Show stays greyed out until it has passed (the server checks it too)
+  const [graceMinutes, setGraceMinutes] = useState(NO_SHOW_GRACE_MINUTES);
+  useEffect(() => {
+    fetchBookingPolicy(createClient()).then((p) => setGraceMinutes(p.noShowGraceMinutes));
+  }, []);
   // By id, so the panel shows the row as it is after an action or a live refresh
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const detailsBooking = bookingsData.find((b) => b.id === detailsId) ?? null;
@@ -310,8 +317,12 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
         disabled: busy || !!blockReason("checked_in", booking), title: blockReason("checked_in", booking) ?? undefined,
         onClick: () => handleStatusChange(booking, "checked_in") });
     }
-    if (status === "confirmed") {
-      list.push({ key: "noshow", label: "Mark No-Show", icon: AlertTriangle, tone: "text-orange-600 focus:text-orange-600", disabled: busy,
+    // Shown from an hour before the grace period ends; earlier there is nothing to mark yet
+    const wait = noShowMinutesLeft(booking, new Date(), graceMinutes);
+    if (status === "confirmed" && wait <= 60) {
+      list.push({ key: "noshow", label: wait > 0 ? `Mark No-Show (in ${wait} min)` : "Mark No-Show", icon: AlertTriangle,
+        tone: "text-orange-600 focus:text-orange-600", disabled: busy || wait > 0,
+        title: wait > 0 ? `Players get ${graceMinutes} minutes after the start time before a no-show can be marked.` : undefined,
         onClick: () => handleStatusChange(booking, "no_show") });
     }
     if (status === "checked_in") {
