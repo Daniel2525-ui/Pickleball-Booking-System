@@ -102,6 +102,24 @@ export async function POST(request: NextRequest) {
             const admin = getServiceClient();
             if (!admin) return NextResponse.json({ error: "Could not record the refund. Please try again." }, { status: 500 });
 
+            // One Xendit refund can cover every court paid with the same QR scan (same stripe_payment_id), so the
+            // reference is stored per payment; it is refused only when another QR scan's payment already has it
+            const escaped = receiptReference.replace(/[\\%_]/g, (c: string) => `\\${c}`);
+            const { data: uses, error: usesErr } = await admin
+                .from("refund_requests")
+                .select("payments(stripe_payment_id)")
+                .like("stripe_refund_id", `xendit:${escaped}#%`);
+            if (usesErr) {
+                console.error("Refund: failed to check the Xendit reference:", usesErr);
+                return NextResponse.json({ error: "Could not record the refund. Please try again." }, { status: 500 });
+            }
+            const elsewhere = (uses ?? []).some(
+                (u) => (u.payments as { stripe_payment_id?: string | null } | null)?.stripe_payment_id !== payment.stripe_payment_id
+            );
+            if (elsewhere) {
+                return NextResponse.json({ error: "That refund reference is already recorded on another customer's payment." }, { status: 409 });
+            }
+
             // An automatic refund the app could not send (court lost after payment) is reused, not duplicated
             const { data: open } = await admin
                 .from("refund_requests")
@@ -132,7 +150,7 @@ export async function POST(request: NextRequest) {
 
             const { error: settleErr } = await admin.rpc("settle_stripe_refund", {
                 p_refund_request_id: refundRequestId,
-                p_stripe_refund_id: `xendit:${receiptReference}`,
+                p_stripe_refund_id: `xendit:${receiptReference}#${payment.id}`,
                 p_stripe_status: "succeeded",
                 p_stripe_payment_intent: payment.stripe_payment_id,
                 p_amount: payment.amount,

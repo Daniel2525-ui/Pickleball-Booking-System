@@ -74,6 +74,7 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refundTarget, setRefundTarget] = useState<Payment | null>(null);
+  const [refundGroup, setRefundGroup] = useState<Payment[] | null>(null);
   const [collectTarget, setCollectTarget] = useState<ReturnType<typeof toSettle> | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -325,6 +326,8 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                   const headName = head.bookings?.profiles?.full_name || head.bookings?.customer_name || "Unknown Customer";
                   // An unpaid online checkout (booking still pending) is collected as one; the server settles the whole basket
                   const basketDue = grouped ? group.filter((p) => collectable(p) && p.bookings?.status === "pending") : [];
+                  // Every court owed back and paid the same way (one QR scan or one cash payment): refund them together
+                  const refundAll = grouped && sameMethod && group.every(needsRefund);
                   const collectButton = (rows: Payment[]) => (
                     <Button size="sm" className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setCollectTarget(toSettle(rows))}>
                       <Banknote className="size-3.5" /> Collect {formatCurrency(rows.reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}
@@ -360,7 +363,14 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
                         <TableCell>
                           <span className="text-xs text-muted-foreground">{formatDate(head.paid_at || head.created_at, true)}</span>
                         </TableCell>
-                        <TableCell className="text-right">{basketDue.length > 0 && collectButton(basketDue)}</TableCell>
+                        <TableCell className="text-right">
+                          {basketDue.length > 0 && collectButton(basketDue)}
+                          {refundAll && (
+                            <Button size="sm" variant="outline" className="text-xs" onClick={() => { setRefundGroup(group); setRefundTarget(head); }}>
+                              Refund all {formatCurrency(group.reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ),
                     ...group.map((payment) => (
@@ -476,8 +486,13 @@ export default function PaymentsTable({ filters }: PaymentsTableProps) {
 
       <RefundPaymentModal
         payment={refundTarget}
+        group={refundGroup}
         open={refundTarget !== null}
-        onOpenChange={(open) => !open && setRefundTarget(null)}
+        onOpenChange={(open) => {
+          if (open) return;
+          setRefundTarget(null);
+          setRefundGroup(null);
+        }}
         onRefunded={(paymentId, status) => {
           setPayments((prev) => prev.map((p) => (p.id === paymentId ? { ...p, status } : p)));
           setTotalsVersion((v) => v + 1);

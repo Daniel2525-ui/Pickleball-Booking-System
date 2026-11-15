@@ -19,12 +19,14 @@ import { Payment } from "@/lib/services/payments/paymentsTypes";
 
 interface RefundPaymentModalProps {
   payment: Payment | null;
+  /** Every court of one checkout, refunded together with one reference (one QR scan, one Xendit refund) */
+  group?: Payment[] | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRefunded: (paymentId: string, status: string) => void;
 }
 
-export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: RefundPaymentModalProps) => {
+export const RefundPaymentModal = ({ payment, group, open, onOpenChange, onRefunded }: RefundPaymentModalProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receiptReference, setReceiptReference] = useState("");
@@ -34,7 +36,8 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
   const isCash = method === "cash";
   // QR Ph payments keep the Xendit id staff look the payment up by
   const xenditId = isCash ? null : payment.payment_reference || payment.stripe_payment_id;
-  const amount = Number(payment.amount) || 0;
+  const list = group?.length ? group : [payment];
+  const amount = list.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const customer = payment.bookings?.profiles?.full_name || payment.bookings?.customer_name || "Customer";
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,21 +45,26 @@ export const RefundPaymentModal = ({ payment, open, onOpenChange, onRefunded }: 
     setLoading(true);
     setError(null);
 
-    const { status, error: refundErr } = await refundPayment(payment.id, receiptReference);
-
+    // One court at a time, so a failure says which court still needs it (a retry skips nothing: refunded ones are no longer listed)
+    let refunded = 0;
+    let queued = 0;
+    for (const p of list) {
+      const { status, error: refundErr } = await refundPayment(p.id, receiptReference);
+      if (refundErr || !status) {
+        setLoading(false);
+        const done = refunded + queued;
+        setError(`${done ? `${done} of ${list.length} recorded. ` : ""}${refundErr?.message || "Failed to refund payment."}`);
+        return;
+      }
+      if (status === "refunded") {
+        refunded++;
+        onRefunded(p.id, "refunded");
+      } else queued++;
+    }
     setLoading(false);
 
-    if (refundErr || !status) {
-      setError(refundErr?.message || "Failed to refund payment.");
-      return;
-    }
-
-    if (status === "refunded") {
-      toast.success(`₱${amount.toLocaleString()} refunded to ${customer}`);
-      onRefunded(payment.id, "refunded");
-    } else {
-      toast.info("Refund queued. It will complete automatically.");
-    }
+    if (refunded) toast.success(`₱${amount.toLocaleString()} refunded to ${customer}`);
+    if (queued) toast.info("Refund queued. It will complete automatically.");
     setReceiptReference("");
     onOpenChange(false);
   };
