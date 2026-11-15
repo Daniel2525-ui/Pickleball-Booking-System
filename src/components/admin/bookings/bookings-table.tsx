@@ -53,7 +53,7 @@ import { groupByCheckout, checkoutTotal } from "@/lib/services/bookings/basket";
 import { bookingPaymentLabel } from "@/lib/services/payments/paymentsTypes";
 import { getBookingDisplayStatus } from "@/lib/services/bookings/bookingDisplayStatus";
 import { bookingTitle, bookingRef } from "@/lib/services/openPlay/bookingTitle";
-import { gameDayBlockReason, noShowMinutesLeft, NO_SHOW_GRACE_MINUTES } from "@/lib/services/bookings/adminStatusRules";
+import { canTransition, gameDayBlockReason, noShowMinutesLeft, NO_SHOW_GRACE_MINUTES } from "@/lib/services/bookings/adminStatusRules";
 import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { createClient } from "@/lib/supabase/client";
 import { updateBookingStatus, GameDayStatus } from "@/lib/services/bookings/updateBookingStatus.service";
@@ -363,7 +363,8 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
       list.push({ key: "restore", label: "Restore Booking", icon: busy ? Loader2 : RotateCcw, disabled: busy,
         onClick: () => handleStatusChange(booking, "confirmed") });
     }
-    if (status !== "cancelled") {
+    // Same rule as the server: completed and no-show bookings can't be cancelled
+    if (canTransition(status, "cancelled")) {
       list.push({ key: "cancel", label: "Cancel Reservation", icon: XCircle, destructive: true, tone: "text-destructive focus:text-destructive",
         disabled: busy, onClick: () => handleCancelBooking(booking) });
     }
@@ -451,7 +452,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
                   const samePayment = new Set(courts.map(paymentLabel)).size === 1;
                   const toCheckIn = courts.filter((c) => c.status === "confirmed" && !c.open_play_spots && !blockReason("checked_in", c));
                   // Every court loaded and paid: cancel them together (an unpaid basket already cancels as one from any row)
-                  const paidGroup = courts.length >= size && courts.every((c) => c.status !== "cancelled" && !c.open_play_spots && firstPayment(c)?.status === "paid");
+                  const paidGroup = courts.length >= size && courts.every((c) => canTransition(c.status, "cancelled") && !c.open_play_spots && firstPayment(c)?.status === "paid");
                   const phone = head.customers?.phone || head.profiles?.phone;
 
                   return [
