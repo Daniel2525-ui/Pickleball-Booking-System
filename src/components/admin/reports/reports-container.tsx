@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatCard from "@/components/admin/dashboard/stat-card";
-import { PeriodKey, VenueReport, pctChange, periodRange, reportCsv, todayManila } from "@/lib/services/reports/reports";
-import { fetchVenueReport } from "@/lib/services/reports/reportsData.service";
+import { PeriodKey, VenueReport, pctChange, periodRange, reportCsv, todayManila, transactionsCsv } from "@/lib/services/reports/reports";
+import { fetchTransactions, fetchVenueReport } from "@/lib/services/reports/reportsData.service";
+import { toast } from "sonner";
 import { BreakdownBars } from "./breakdown-bars";
 import { BusyHeatmap } from "./busy-heatmap";
 import { RevenueChart, bucketLabel, peso } from "./revenue-chart";
@@ -59,20 +60,36 @@ export function ReportsContainer() {
     };
   }, [range, customInvalid, attempt]);
 
-  const downloadCsv = () => {
-    if (!report) return;
-    const url = URL.createObjectURL(new Blob([reportCsv(report)], { type: "text/csv" }));
+  const [exporting, setExporting] = useState(false);
+
+  const save = (csv: string, name: string) => {
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const link = document.createElement("a");
     link.href = url;
-    // Named from the report itself, so the file always matches the figures inside it
-    link.download = `reports-${period === "all" ? "all-time" : report.period.from}-to-${report.period.to}.csv`;
+    link.download = name;
     link.click();
     URL.revokeObjectURL(url);
+  };
+  // Named from the report itself, so the file always matches the figures inside it
+  const fileRange = (r: VenueReport) => `${period === "all" ? "all-time" : r.period.from}-to-${r.period.to}`;
+
+  const downloadCsv = () => {
+    if (report) save(reportCsv(report), `reports-${fileRange(report)}.csv`);
+  };
+
+  // Every payment and refund in the period, one line each, for the accountant
+  const downloadTransactions = async () => {
+    if (!report) return;
+    setExporting(true);
+    const { data, error } = await fetchTransactions(report.period.from, report.period.to);
+    setExporting(false);
+    if (!data) return void toast.error(error ?? "Could not load the transactions.");
+    save(transactionsCsv(data), `transactions-${fileRange(report)}.csv`);
   };
 
   return (
     <>
-      <AdminPageHeader title="Reports" description="How the venue is doing. Money counts only what was actually collected.">
+      <AdminPageHeader title="Reports" description="How the venue is doing. Money in counts on the day it was paid; refunds on the day they went back.">
           <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1" role="group" aria-label="Period">
             {PERIODS.map((p) => (
               <Button key={p.key} size="sm" variant={period === p.key ? "default" : "ghost"} aria-pressed={period === p.key} onClick={() => setPeriod(p.key)}>
@@ -81,7 +98,10 @@ export function ReportsContainer() {
             ))}
           </div>
           <Button variant="outline" size="sm" className="gap-2" onClick={downloadCsv} disabled={!report || loading || customInvalid}>
-            <Download className="size-4" /> Download CSV
+            <Download className="size-4" /> Daily totals CSV
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={downloadTransactions} disabled={!report || loading || customInvalid || exporting}>
+            <Download className="size-4" /> {exporting ? "Preparing..." : "Transactions CSV"}
           </Button>
       </AdminPageHeader>
 
@@ -118,7 +138,7 @@ export function ReportsContainer() {
 }
 
 function ReportBody({ report }: { report: VenueReport }) {
-  const { money, bookings, previous, so_far: soFar, occupancy, period } = report;
+  const { money, bookings, previous, so_far: soFar, occupancy, period, open_play_sessions: openPlay, outstanding } = report;
   const partial = period.through < period.to;
   // A period still under way is compared with the same number of days before it
   const against = partial ? "vs the same days before" : "vs previous period";
@@ -150,7 +170,7 @@ function ReportBody({ report }: { report: VenueReport }) {
           <CardHeader>
             <CardTitle>Revenue per {period.bucket}</CardTitle>
             <CardDescription>
-              Net of refunds.{best && best.net > 0 ? ` Best ${period.bucket}: ${bucketLabel(best.key, period.bucket)}, ${peso(best.net)}.` : ""}
+              Money in minus refunds that went back, per {period.bucket}.{best && best.net > 0 ? ` Best ${period.bucket}: ${bucketLabel(best.key, period.bucket)}, ${peso(best.net)}.` : ""}
             </CardDescription>
           </CardHeader>
           <CardContent><RevenueChart series={report.series} bucket={period.bucket} /></CardContent>
@@ -158,7 +178,7 @@ function ReportBody({ report }: { report: VenueReport }) {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Where the money came from</CardTitle>
-            <CardDescription>Check each against the cash drawer and the Xendit dashboard.</CardDescription>
+            <CardDescription>Money taken, then refunds that went back. Check each against the cash drawer and the Xendit dashboard.</CardDescription>
           </CardHeader>
           <CardContent>
             <BreakdownBars max={moneyMax} items={[
@@ -169,7 +189,21 @@ function ReportBody({ report }: { report: VenueReport }) {
             <dl className="mt-4 flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
               <div className="flex justify-between"><dt>Court bookings</dt><dd className="font-semibold tabular-nums">{peso(money.court)}</dd></div>
               <div className="flex justify-between"><dt>Open play</dt><dd className="font-semibold tabular-nums">{peso(money.open_play)}</dd></div>
+              {openPlay.sessions > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {openPlay.sessions} open play {openPlay.sessions === 1 ? "session" : "sessions"}{partial ? " so far" : ""}: {openPlay.spots_sold} of {openPlay.capacity} spots sold{openPlay.pct !== null ? ` (${openPlay.pct}%)` : ""}
+                </p>
+              )}
+              <div className="flex justify-between"><dt>Discounts given</dt><dd className="font-semibold tabular-nums">{bookings.discounts ? `−${peso(bookings.discounts)}` : peso(0)}</dd></div>
+              {bookings.discounted > 0 && <p className="text-xs text-muted-foreground">On {bookings.discounted} {bookings.discounted === 1 ? "booking" : "bookings"}, already taken off the money above</p>}
             </dl>
+            {(outstanding.to_collect > 0 || outstanding.refund_owed > 0) && (
+              <dl className="mt-3 flex flex-col gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Not settled yet (bookings in this period)</p>
+                {outstanding.to_collect > 0 && <div className="flex justify-between"><dt>Still to collect</dt><dd className="font-semibold tabular-nums">{peso(outstanding.to_collect)}</dd></div>}
+                {outstanding.refund_owed > 0 && <div className="flex justify-between"><dt>Refunds owed</dt><dd className="font-semibold tabular-nums">{peso(outstanding.refund_owed)}</dd></div>}
+              </dl>
+            )}
           </CardContent>
         </Card>
       </div>

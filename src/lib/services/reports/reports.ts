@@ -15,7 +15,7 @@ export interface ReportSeriesRow {
 export interface VenueReport {
     period: { from: string; to: string; through: string; bucket: "day" | "month" };
     money: { net: number; cash: number; gcash: number; card: number; refunded: number; refunded_count: number; court: number; open_play: number };
-    bookings: { count: number; court_hours: number; cancelled: number; no_shows: number; money_kept: number };
+    bookings: { count: number; court_hours: number; cancelled: number; no_shows: number; money_kept: number; discounts: number; discounted: number };
     /** The same number of days at the start of the period before; null for all time or a period not started yet */
     previous: { net: number; count: number; cancelled_and_no_shows: number } | null;
     /** This period's days that have happened, to compare with `previous` */
@@ -25,6 +25,35 @@ export interface VenueReport {
     heatmap: { dow: number; hour: number; pct: number }[];
     series: ReportSeriesRow[];
     top_customers: { name: string; visits: number; hours: number; spent: number; last_visit: string | null }[];
+    /** Open play sessions held so far in the period: spots sold against spots offered */
+    open_play_sessions: { sessions: number; spots_sold: number; capacity: number; pct: number | null };
+    /** Money not settled yet for bookings in the period */
+    outstanding: { to_collect: number; refund_owed: number };
+}
+
+/** One money movement for the accountant: a payment coming in or a refund going out (negative). */
+export interface TransactionRow {
+    at: string;
+    kind: "Payment" | "Refund";
+    customer: string;
+    ref: string;
+    item: string;
+    method: string;
+    amount: number;
+    reference: string;
+}
+
+/** A CSV cell: quoted when it holds a comma, quote or line break (names and references are free text). */
+const cell = (v: string | number) => {
+    const s = String(v);
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+/** Every payment and refund in the period, one line each, for reconciling against Xendit and the bank. */
+export function transactionsCsv(rows: TransactionRow[]): string {
+    const head = "Date and time,Type,Customer,Booking ref,Item,Method,Amount,Reference";
+    const lines = rows.map((r) => [r.at, r.kind, r.customer, r.ref, r.item, r.method, r.amount, r.reference].map(cell).join(","));
+    return [head, ...lines].join("\n") + "\n";
 }
 
 // Dates stay as YYYY-MM-DD strings; UTC maths on them never shifts a day
