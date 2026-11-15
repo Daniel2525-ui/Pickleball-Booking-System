@@ -81,7 +81,7 @@ export function ScheduleTable({ schedules, courts, loading, onChanged }: Props) 
                 .sort((a, b) => DAYS.indexOf(a.day_of_week) - DAYS.indexOf(b.day_of_week) || a.start_time.localeCompare(b.start_time))
                 .map((s) => (
                   <TableRow key={s.id}>
-                    <TableCell className="font-semibold">Every {s.day_of_week}</TableCell>
+                    <TableCell className="font-semibold">Every {s.day_of_week}{s.name && <span className="block text-xs font-normal text-muted-foreground">{s.name}</span>}</TableCell>
                     <TableCell>{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</TableCell>
                     <TableCell>{s.court_ids.map(courtName).join(", ")}</TableCell>
                     <TableCell className="text-right">{s.capacity}</TableCell>
@@ -138,6 +138,8 @@ function ScheduleModal({ initial, courts, onClose, onSaved, oneTime = false }: {
   const [courtIds, setCourtIds] = useState<string[]>(initial.court_ids ?? []);
   const [capacity, setCapacity] = useState(String(initial.capacity ?? 16));
   const [price, setPrice] = useState(String(initial.price_per_spot ?? 150));
+  const [name, setName] = useState(initial.name ?? "");
+  const [skill, setSkill] = useState(initial.skill_level ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,6 +158,8 @@ function ScheduleModal({ initial, courts, onClose, onSaved, oneTime = false }: {
         court_ids: courtIds,
         capacity: Number(capacity),
         price_per_spot: Number(price),
+        name,
+        skill_level: skill,
       }),
     });
     setSaving(false);
@@ -178,6 +182,14 @@ function ScheduleModal({ initial, courts, onClose, onSaved, oneTime = false }: {
               <p>{error}</p>
             </div>
           )}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="op-name" className="text-xs font-semibold">Session name (optional)</Label>
+            <Input id="op-name" maxLength={60} placeholder="Regular Open Play" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="op-skill" className="text-xs font-semibold">Skill level (optional)</Label>
+            <Input id="op-skill" maxLength={40} placeholder="Novice / High Novice" value={skill} onChange={(e) => setSkill(e.target.value)} />
+          </div>
           {oneTime ? (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="op-date" className="text-xs font-semibold">Date</Label>

@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Check, LoaderCircle, Lock, Minus, Plus } from "lucide-react";
+import { CalendarDays, Check, Clock, LoaderCircle, Lock, Minus, PhilippinePeso, Plus, Signal, Users } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -153,77 +153,56 @@ export const OpenPlayContainer = () => {
             })}
           </div>
 
-          <div className="flex flex-wrap items-start gap-7">
-            <div className="flex-[999_1_560px] min-w-0 space-y-7">
-              {[...new Set(shown.map((s) => s.session_date))].map((d) => (
-                <section key={d} className="space-y-3">
-                  <h2 className="text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {d === today ? "Today · " : ""}{dayOf(d, { weekday: "long", month: "short", day: "numeric" })}
-                  </h2>
-                  <ul className="space-y-3">
-                    {shown.filter((s) => s.session_date === d).map((s) => {
-                      const full = s.spots_left <= 0;
-                      const limit = s.my_spots >= spotLimit;
-                      const taken = s.capacity - s.spots_left;
-                      const fast = !full && taken / s.capacity >= 0.8;
-                      const late = lateNightLabel(s.session_date, s.start_time, dayEndsAt);
-                      return (
-                        <li key={s.id} className={`rounded-2xl border bg-card px-5 py-5 sm:px-6 flex flex-wrap items-center gap-x-7 gap-y-4 ${s.my_spots > 0 ? "border-amber-300" : ""} ${full ? "opacity-60" : ""}`}>
-                          <div className="min-w-[150px] space-y-1">
-                            <p className="font-display text-2xl font-bold tracking-tight">{formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}</p>
-                            {late && <p className="text-xs font-semibold text-primary">{late}</p>}
-                            <p className="text-sm text-muted-foreground">{calculateDuration(s.start_time, s.end_time)} · {s.court_names.join(", ")}</p>
-                          </div>
-                          <div className="flex-[1_1_220px] min-w-0 space-y-2">
-                            <p className="flex flex-wrap items-center gap-2 text-sm font-bold">
-                              {full ? "Full" : `${s.spots_left} of ${s.capacity} spots left`}
-                              {s.my_spots > 0 ? (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">You have {s.my_spots}</span>
-                              ) : fast ? (
-                                <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-bold text-red-800">Filling fast</span>
-                              ) : null}
-                            </p>
-                            {/* One dot per spot; yours are amber */}
-                            <div role="img" aria-label={`${taken} of ${s.capacity} spots taken`} className="flex flex-wrap gap-1 max-w-[260px]">
-                              {Array.from({ length: s.capacity }, (_, i) => (
-                                <span
-                                  key={i}
-                                  className={`size-3.5 rounded-full border-[1.5px] ${i >= taken ? "bg-card border-border" : i >= taken - s.my_spots ? "bg-amber-500 border-amber-500" : "bg-primary border-primary"}`}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                          <div className="ml-auto flex flex-col items-end gap-2">
-                            <p className="font-display text-[22px] font-bold">
-                              ₱{Number(s.price_per_spot).toLocaleString()} <span className="font-sans text-xs font-medium text-muted-foreground">/ player</span>
-                            </p>
-                            <Button
-                              onClick={() => open(s)}
-                              disabled={full || limit}
-                              variant={s.my_spots > 0 ? "outline" : "default"}
-                              aria-label={full ? `Full: ${dateLabel(s.session_date)}` : `Book a spot on ${dateLabel(s.session_date)} at ${formatTime12h(s.start_time)}`}
-                              className={`min-h-11 px-5 font-bold ${s.my_spots > 0 ? "border-primary text-primary" : ""}`}
-                            >
-                              {full ? "Full" : limit ? `${s.my_spots} booked` : s.my_spots > 0 ? "Add a spot" : "Join"}
-                            </Button>
-                          </div>
-                        </li>
-                      );
-                    })}
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] gap-5">
+            {shown.map((s) => {
+              const full = s.spots_left <= 0;
+              const limit = s.my_spots >= spotLimit;
+              const fast = !full && (s.capacity - s.spots_left) / s.capacity >= 0.8;
+              const late = lateNightLabel(s.session_date, s.start_time, dayEndsAt);
+              const fact = "flex items-center gap-3 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>svg]:text-primary";
+              return (
+                <li key={s.id} className={`rounded-[20px] border bg-card p-6 sm:p-7 flex flex-col gap-5 ${s.my_spots > 0 ? "border-amber-300" : ""} ${full ? "opacity-60" : ""}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <h2 className="font-display text-[22px] font-bold leading-tight text-balance">{s.name ?? `Open play · ${dayOf(s.session_date, { weekday: "long" })}`}</h2>
+                      <p className="text-sm text-muted-foreground">{s.court_names.join(", ")}</p>
+                    </div>
+                    {s.my_spots > 0 ? (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900">You have {s.my_spots}</span>
+                    ) : full ? (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900">Full</span>
+                    ) : fast ? (
+                      <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-800">Filling fast</span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">Open</span>
+                    )}
+                  </div>
+                  <ul className="space-y-3 text-[15px]">
+                    <li className={fact}><CalendarDays aria-hidden />{s.session_date === today ? "Today, " : ""}{dayOf(s.session_date, { weekday: "long", month: "short", day: "numeric" })}</li>
+                    <li className={fact}>
+                      <Clock aria-hidden />
+                      <span>
+                        {formatTime12h(s.start_time)} – {formatTime12h(s.end_time)} <span className="text-muted-foreground">· {calculateDuration(s.start_time, s.end_time)}</span>
+                        {late && <span className="block text-xs font-semibold text-primary">{late}</span>}
+                      </span>
+                    </li>
+                    <li className={fact}><Users aria-hidden />{full ? "Full" : `${s.spots_left} of ${s.capacity} spots left`}</li>
+                    <li className={fact}><PhilippinePeso aria-hidden />₱{Number(s.price_per_spot).toLocaleString(undefined, { minimumFractionDigits: 2 })}<span className="text-sm text-muted-foreground">per player</span></li>
+                    {s.skill_level && <li className={fact}><Signal aria-hidden /><span><span className="sr-only">Skill level: </span>{s.skill_level}</span></li>}
                   </ul>
-                </section>
-              ))}
-            </div>
-
-            <aside className="flex-[1_1_300px] space-y-4">
-              {howItWorks}
-              <section className="rounded-2xl border bg-card p-5 space-y-2.5">
-                <h2 className="font-display text-lg font-bold">Playing with your own group?</h2>
-                <p className="text-sm text-muted-foreground">Book a whole court by the hour instead.</p>
-                <Link href="/book" className={cn(buttonVariants({ variant: "outline" }), "min-h-11 px-4 font-bold border-primary text-primary")}>Book a court</Link>
-              </section>
-            </aside>
-          </div>
+                  <Button
+                    onClick={() => open(s)}
+                    disabled={full || limit}
+                    variant={s.my_spots > 0 ? "outline" : "default"}
+                    aria-label={full ? `Full: ${dateLabel(s.session_date)}` : `Book a spot on ${dateLabel(s.session_date)} at ${formatTime12h(s.start_time)}`}
+                    className={`mt-auto w-full min-h-11 font-bold ${s.my_spots > 0 ? "border-primary text-primary" : ""}`}
+                  >
+                    {full ? "Full" : limit ? `${s.my_spots} booked` : s.my_spots > 0 ? "Add a spot" : "Join"}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
         </>
       )}
 

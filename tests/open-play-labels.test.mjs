@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSpotRequest } from "../src/lib/services/openPlay/openPlayTypes.ts";
+import { parseSpotRequest, openPlayLabels } from "../src/lib/services/openPlay/openPlayTypes.ts";
 import { bookingTitle } from "../src/lib/services/openPlay/bookingTitle.ts";
 import { checkSlotAvailability } from "../src/lib/services/bookings/checkSlotAvailability.service.ts";
 
@@ -47,4 +47,12 @@ test("calculateDuration counts hours, including sessions past midnight", async (
     assert.equal(calculateDuration("22:00", "01:00"), "3 hours");
     assert.equal(calculateDuration("22:00", "24:00"), "2 hours");
     assert.equal(calculateDuration("", "10:00"), "");
+});
+
+test("openPlayLabels trims, turns blanks into null, and caps length", () => {
+    assert.deepEqual(openPlayLabels({ name: "  Regular Open Play ", skill_level: "" }), { name: "Regular Open Play", skill_level: null });
+    assert.deepEqual(openPlayLabels(null), { name: null, skill_level: null });
+    assert.deepEqual(openPlayLabels({ name: 5, skill_level: "   " }), { name: null, skill_level: null });
+    assert.ok("error" in openPlayLabels({ name: "x".repeat(61) }));
+    assert.ok("error" in openPlayLabels({ skill_level: "x".repeat(41) }));
 });

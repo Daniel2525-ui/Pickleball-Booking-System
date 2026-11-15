@@ -25,6 +25,8 @@ export interface OpenPlaySchedule {
   court_ids: string[];
   capacity: number;
   price_per_spot: number;
+  name: string | null;
+  skill_level: string | null;
 }
 
 export interface OpenPlayAdminSession {

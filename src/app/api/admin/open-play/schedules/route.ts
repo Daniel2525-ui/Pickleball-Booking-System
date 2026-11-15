@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
+import { openPlayLabels } from "@/lib/services/openPlay/openPlayTypes";
 
 export async function POST(request: NextRequest) {
     try {
@@ -7,6 +8,8 @@ export async function POST(request: NextRequest) {
         if (denied) return denied;
 
         const b = await request.json().catch(() => null);
+        const labels = openPlayLabels(b);
+        if ("error" in labels) return NextResponse.json({ error: labels.error }, { status: 400 });
         const { data: id, error } = await supabase.rpc("save_open_play_schedule", {
             p_id: b?.id ?? null,
             p_day_of_week: b?.day_of_week,
@@ -15,6 +18,8 @@ export async function POST(request: NextRequest) {
             p_court_ids: b?.court_ids,
             p_capacity: b?.capacity,
             p_price_per_spot: b?.price_per_spot,
+            p_name: labels.name,
+            p_skill_level: labels.skill_level,
         });
         if (error) {
             console.error("save_open_play_schedule failed:", error);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/server";
+import { openPlayLabels } from "@/lib/services/openPlay/openPlayTypes";
 
 /** Adds a one-time open play session on a specific date; create_open_play_session validates everything. */
 export async function POST(request: NextRequest) {
@@ -8,6 +9,8 @@ export async function POST(request: NextRequest) {
         if (denied) return denied;
 
         const b = await request.json().catch(() => null);
+        const labels = openPlayLabels(b);
+        if ("error" in labels) return NextResponse.json({ error: labels.error }, { status: 400 });
         const { data: id, error } = await supabase.rpc("create_open_play_session", {
             p_date: b?.session_date,
             p_start_time: b?.start_time,
@@ -15,6 +18,8 @@ export async function POST(request: NextRequest) {
             p_court_ids: b?.court_ids,
             p_capacity: b?.capacity,
             p_price_per_spot: b?.price_per_spot,
+            p_name: labels.name,
+            p_skill_level: labels.skill_level,
         });
         if (error) {
             console.error("create_open_play_session failed:", error);

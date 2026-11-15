@@ -23,6 +23,8 @@ export interface OpenPlaySession {
     spots_left: number;
     price_per_spot: number;
     my_spots: number;
+    name: string | null;
+    skill_level: string | null;
 }
 
 export const fetchOpenPlaySessions = async (from: string, to: string) => {

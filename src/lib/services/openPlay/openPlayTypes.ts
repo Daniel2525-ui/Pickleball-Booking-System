@@ -50,6 +50,17 @@ export function parseSpotRequest(body: unknown): { sessionId: string; spots: num
     return { sessionId, spots: b.spots, method };
 }
 
+/** Optional session name and skill level from a staff form; blank means none. Limits match the SQL CHECKs. */
+export function openPlayLabels(body: unknown): { name: string | null; skill_level: string | null } | { error: string } {
+    const b = (body ?? {}) as Record<string, unknown>;
+    const clean = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    const name = clean(b.name);
+    const skill_level = clean(b.skill_level);
+    if (name && name.length > 60) return { error: "Keep the session name to 60 characters." };
+    if (skill_level && skill_level.length > 40) return { error: "Keep the skill level to 40 characters." };
+    return { name, skill_level };
+}
+
 /** Maps the shared session-capacity SQL errors to a 409 body; null when the message is not one of them. */
 export function sessionErrorResponse(message: string | undefined): { error: string } | null {
     const msg = message ?? "";
