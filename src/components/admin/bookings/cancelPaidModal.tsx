@@ -10,10 +10,13 @@ import { Booking } from "@/lib/services/bookings/bookingsTypes";
 /** Cancelling a paid booking: staff decide case by case whether the payment is refunded or kept. */
 export const CancelPaidModal = ({
   booking,
+  count = 1,
   onClose,
   onConfirm,
 }: {
   booking: Booking | null;
+  /** More than 1: one choice for every paid booking in a group ("Cancel all") */
+  count?: number;
   onClose: () => void;
   onConfirm: (booking: Booking, keep: { note: string } | undefined) => Promise<boolean>;
 }) => {
@@ -66,13 +69,13 @@ export const CancelPaidModal = ({
     <Dialog open={!!booking} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Cancel this paid reservation?</DialogTitle>
+          <DialogTitle>{count > 1 ? `Cancel these ${count} paid bookings?` : "Cancel this paid reservation?"}</DialogTitle>
           <DialogDescription>
-            {booking?.customer_name || "This player"}&apos;s court slot will be released. Choose what happens to the payment.
+            {booking?.customer_name || "This player"}&apos;s {count > 1 ? `${count} court slots` : "court slot"} will be released. Choose what happens to the {count > 1 ? "payments" : "payment"}.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-3 py-1">
-          {option("refund", "Cancel and refund", "Then record the refund in the next step.")}
+          {option("refund", "Cancel and refund", count > 1 ? "Then record each refund from its row (Refund owed)." : "Then record the refund in the next step.")}
           {option("keep", "Cancel and keep the payment", "No refund, for example a late cancellation.")}
           {choice === "keep" && (
             <div className="flex flex-col gap-2">
@@ -98,7 +101,7 @@ export const CancelPaidModal = ({
             </Button>
             <Button type="submit" variant="destructive" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Cancel Reservation
+              {count > 1 ? `Cancel ${count} Bookings` : "Cancel Reservation"}
             </Button>
           </DialogFooter>
         </form>

@@ -136,6 +136,7 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
   const [historyBooking, setHistoryBooking] = useState<Booking | null>(null);
   const [cancelPaid, setCancelPaid] = useState<Booking | null>(null);
   const [refundFor, setRefundFor] = useState<Booking | null>(null);
+  const [cancelGroup, setCancelGroup] = useState<Booking[] | null>(null);
   // Settings' no-show grace period: Mark No-Show stays greyed out until it has passed (the server checks it too)
   const [graceMinutes, setGraceMinutes] = useState(NO_SHOW_GRACE_MINUTES);
   useEffect(() => {
@@ -280,6 +281,22 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
         };
       })
     );
+  };
+
+  // One refund-or-keep choice for every paid court in a group; each court is its own payment, refunded from its row
+  const cancelAll = async (courts: Booking[], keep?: { note: string }) => {
+    setActionLoadingId(courts[0].id);
+    const results = await Promise.all(courts.map((c) => updateBookingStatus(c.id, "cancelled", keep)));
+    const done = courts.filter((_, i) => !results[i].error).map((c) => c.id);
+    setBookingsData((prev) => prev.map((b) => (done.includes(b.id) ? { ...b, status: "cancelled", cancel_reason: keep ? "payment_kept" : "admin" } : b)));
+    const failed = courts.filter((_, i) => results[i].error);
+    if (failed.length) {
+      toast.error(`Could not cancel ${failed.map((c) => c.courts?.name || "a court").join(", ")}: ${results.find((r) => r.error)!.error}`);
+    } else {
+      toast.success(keep ? `${done.length} bookings cancelled. The payments were kept.` : `${done.length} bookings cancelled. Record each refund from its row.`);
+    }
+    setActionLoadingId(null);
+    return failed.length === 0;
   };
 
   const checkInAll = async (courts: Booking[]) => {
@@ -433,6 +450,8 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
                   const sameDate = courts.every((c) => c.booking_date === head.booking_date);
                   const samePayment = new Set(courts.map(paymentLabel)).size === 1;
                   const toCheckIn = courts.filter((c) => c.status === "confirmed" && !c.open_play_spots && !blockReason("checked_in", c));
+                  // Every court loaded and paid: cancel them together (an unpaid basket already cancels as one from any row)
+                  const paidGroup = courts.length >= size && courts.every((c) => c.status !== "cancelled" && !c.open_play_spots && firstPayment(c)?.status === "paid");
                   const phone = head.customers?.phone || head.profiles?.phone;
 
                   return [
@@ -463,12 +482,20 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
                         <TableCell className="text-right font-black text-foreground text-sm">₱{total.toLocaleString()}</TableCell>
                         <TableCell>{samePayment && renderPaymentBadge(head)}</TableCell>
                         <TableCell className="text-right">
-                          {toCheckIn.length > 0 && (
-                            <Button size="sm" variant="outline" disabled={!!actionLoadingId} onClick={() => checkInAll(toCheckIn)}>
-                              <UserCheck className="mr-1.5 h-4 w-4" />
-                              Check in all
-                            </Button>
-                          )}
+                          <div className="flex flex-wrap justify-end gap-1.5">
+                            {toCheckIn.length > 0 && (
+                              <Button size="sm" variant="outline" disabled={!!actionLoadingId} onClick={() => checkInAll(toCheckIn)}>
+                                <UserCheck className="mr-1.5 h-4 w-4" />
+                                Check in all
+                              </Button>
+                            )}
+                            {paidGroup && (
+                              <Button size="sm" variant="outline" disabled={!!actionLoadingId} onClick={() => setCancelGroup(courts)} className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                                <XCircle className="mr-1.5 h-4 w-4" />
+                                Cancel all
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ),
@@ -629,6 +656,12 @@ export default function BookingsTable({ filters, dayEndsAt }: BookingsTableProps
       />
 
       <CancelPaidModal booking={cancelPaid} onClose={() => setCancelPaid(null)} onConfirm={cancelBooking} />
+      <CancelPaidModal
+        booking={cancelGroup?.[0] ?? null}
+        count={cancelGroup?.length}
+        onClose={() => setCancelGroup(null)}
+        onConfirm={(_, keep) => cancelAll(cancelGroup ?? [], keep)}
+      />
 
       <RefundPaymentModal
         payment={refundFor ? refundablePayment(refundFor) : null}
