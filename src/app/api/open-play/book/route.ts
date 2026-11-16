@@ -5,6 +5,7 @@ import { getServiceClient } from "@/lib/supabase/service";
 import { openBasketCheckout, QR_PH_NOT_CONFIGURED } from "@/lib/services/payments/openBasketCheckout";
 import { parseSpotRequest, sessionErrorResponse } from "@/lib/services/openPlay/openPlayTypes";
 import { xenditRefused } from "@/lib/xendit";
+import { saveGuestProfile } from "@/lib/services/bookings/saveGuestProfile";
 
 export async function POST(request: NextRequest) {
     let hold: { booking_id: string; payment_id: string } | null = null;
@@ -16,16 +17,20 @@ export async function POST(request: NextRequest) {
         if (!user) {
             return Response.json({ error: "You must be logged in to book a spot." }, { status: 401 });
         }
-        // Guests (anonymous sessions) book courts only; open play needs an account
-        if (user.is_anonymous) {
-            return Response.json({ error: "Sign in or create an account to join open play." }, { status: 401 });
-        }
-
-        const parsed = parseSpotRequest(await request.json().catch(() => null));
+        const body = await request.json().catch(() => null);
+        const parsed = parseSpotRequest(body);
         if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });
 
         if (!process.env.STRIPE_SECRET_KEY && !process.env.XENDIT_SECRET_KEY) {
             return Response.json({ error: "Online payment is not configured. Please contact the administrator." }, { status: 500 });
+        }
+
+        // Saved before the hold: the hold copies the profile's name onto the booking
+        let guestEmail: string | null = null;
+        if (user.is_anonymous) {
+            const saved = await saveGuestProfile(request, user.id, body?.guest);
+            if (saved instanceof Response) return saved;
+            guestEmail = saved.email;
         }
 
         const { data: held, error: rpcError } = await supabase.rpc("hold_open_play_spots", {
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
         const { url, confirmError } = await openBasketCheckout({
             supabase,
             basketId: held.basket_id,
-            customerEmail: user.email,
+            customerEmail: guestEmail ?? user.email,
             baseUrl: request.nextUrl.origin,
             lines: [
                 {

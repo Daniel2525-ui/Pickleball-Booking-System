@@ -94,6 +94,7 @@ test("a guest creates an account afterwards and keeps the booking", async ({ pag
   await dialog(page).getByLabel("Mobile number").fill("09181234567");
   const email = `convert-${Date.now()}@example.com`;
   await dialog(page).getByLabel("Email").fill(email);
+  await dialog(page).getByLabel("Number of players").fill("2");
   await dialog(page).getByRole("button", { name: /^Pay ₱/ }).click();
   await expect(dialog(page).getByRole("alert").or(page.getByText(/QR/)).first()).toBeVisible({ timeout: 30_000 });
   const guestId = sql(`SELECT id FROM public.profiles WHERE full_name = 'Carla Convert' AND is_guest`);
@@ -112,9 +113,9 @@ test("a guest creates an account afterwards and keeps the booking", async ({ pag
   });
   expect(noDetails.status()).toBe(400);
 
-  // Open play is for accounts
-  const openPlay = await page.request.post("/api/open-play/book", { data: { session_id: "00000000-0000-0000-0000-000000000000", spots: 1 } });
-  expect(openPlay.status()).toBe(401);
+  // Open play on a guest session still needs the guest's details
+  const openPlay = await page.request.post("/api/open-play/book", { data: { sessionId: "00000000-0000-0000-0000-000000000000", spots: 1 } });
+  expect(openPlay.status()).toBe(400);
 
   await page.keyboard.press("Escape");
   await page.goto("/register");
@@ -142,6 +143,7 @@ test("a guest can choose to create an account instead, and an email in use is no
   await dialog(page).getByLabel("Full name").fill("Nora Neutral");
   await dialog(page).getByLabel("Mobile number").fill("09191234567");
   await dialog(page).getByLabel("Email").fill(`nora-${Date.now()}@example.com`);
+  await dialog(page).getByLabel("Number of players").fill("2");
   await dialog(page).getByRole("button", { name: /^Pay ₱/ }).click();
   await expect(dialog(page).getByRole("alert").or(page.getByText(/QR/)).first()).toBeVisible({ timeout: 30_000 });
   const res = await page.request.post("/api/auth/register", {
@@ -156,6 +158,7 @@ test("signing out as a guest asks first, since the bookings can't be shown again
   await dialog(page).getByLabel("Full name").fill("Sam Signout");
   await dialog(page).getByLabel("Mobile number").fill("09201234567");
   await dialog(page).getByLabel("Email").fill(`sam-${Date.now()}@example.com`);
+  await dialog(page).getByLabel("Number of players").fill("2");
   await dialog(page).getByRole("button", { name: /^Pay ₱/ }).click();
   await expect(dialog(page).getByRole("alert").or(page.getByText(/QR/)).first()).toBeVisible({ timeout: 30_000 });
   await page.keyboard.press("Escape");
@@ -168,4 +171,44 @@ test("signing out as a guest asks first, since the bookings can't be shown again
   // Still the same guest
   await menu.click();
   await expect(page.getByText("Guest · no account yet").first()).toBeVisible();
+});
+
+test("a guest joins open play with their details, without an account", async ({ page }) => {
+  const court = sql("SELECT id FROM public.courts WHERE name = 'COURT 1'");
+  sql(`DELETE FROM public.open_play_sessions WHERE session_date = '${day}';
+       INSERT INTO public.open_play_sessions (session_date, start_time, end_time, court_ids, capacity, price_per_spot, status)
+       VALUES ('${day}', '19:00', '21:00', ARRAY['${court}']::uuid[], 6, 150, 'open');`);
+  try {
+    await page.goto("/open-play", { waitUntil: "load" });
+    await page.getByRole("button", { name: /^Book a spot on/ }).first().click();
+    await expect(page).toHaveURL(/\/open-play$/);
+    await expect(dialog(page).getByText("No account needed.")).toBeVisible();
+
+    // Details are checked before anything is held
+    await dialog(page).getByRole("button", { name: "Continue to Checkout" }).click();
+    await expect(dialog(page).getByRole("alert")).toContainText("full name");
+
+    await dialog(page).getByLabel("Full name").fill("Oscar Openplay");
+    await dialog(page).getByLabel("Mobile number").fill("0919 123 4567");
+    const email = `openplay-${Date.now()}@example.com`;
+    await dialog(page).getByLabel("Email").fill(email);
+    await dialog(page).getByRole("button", { name: "One more spot" }).click();
+    await dialog(page).getByRole("button", { name: "Continue to Checkout" }).click();
+    if (!process.env.XENDIT_SECRET_KEY) {
+      // Without QR Ph the hold is made, then released: proof the guest reached the database
+      await expect(dialog(page).getByRole("alert")).not.toContainText("full name", { timeout: 30_000 });
+      await expect(dialog(page).getByRole("alert")).toBeVisible();
+    } else {
+      await page.waitForURL(/\/book\/qr\?pr=/, { timeout: 30_000 });
+    }
+    expect(
+      sql(`SELECT p.is_guest || '|' || p.phone || '|' || p.email || '|' || b.customer_name || '|' || b.open_play_spots || '|' || b.total_amount
+           FROM public.bookings b JOIN public.profiles p ON p.id = b.user_id
+           WHERE b.open_play_session_id IS NOT NULL AND b.booking_date = '${day}' ORDER BY b.created_at DESC LIMIT 1`)
+    ).toBe(`true|09191234567|${email}|Oscar Openplay|2|300.00`);
+  } finally {
+    sql(`DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE open_play_session_id IS NOT NULL);
+         DELETE FROM public.bookings WHERE open_play_session_id IS NOT NULL;
+         DELETE FROM public.open_play_sessions WHERE session_date = '${day}';`);
+  }
 });

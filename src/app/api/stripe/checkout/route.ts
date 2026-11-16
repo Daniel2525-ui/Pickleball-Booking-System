@@ -10,9 +10,9 @@ const HOLD_DATES_MISMATCH = "HOLD_DATES_MISMATCH";
 import { businessDayWindows } from "@/lib/services/schedule/hoursRules";
 import { openBasketCheckout, QR_PH_NOT_CONFIGURED } from "@/lib/services/payments/openBasketCheckout";
 import { MAX_SESSION_PAYMENTS } from "@/lib/services/payments/reconcileCheckoutSession";
-import { checkPlayerCount, maxPlayers, parseGuestDetails } from "@/lib/services/bookings/guestDetails";
+import { checkPlayerCount, maxPlayers } from "@/lib/services/bookings/guestDetails";
+import { saveGuestProfile } from "@/lib/services/bookings/saveGuestProfile";
 import { normaliseCode } from "@/lib/services/pricing/discounts";
-import { AUTH_LIMITS, checkRateLimit, clientIp, tooManyRequests } from "@/lib/rateLimit";
 import { xenditRefused } from "@/lib/xendit";
 
 interface HeldBasket {
@@ -56,28 +56,12 @@ export async function POST(request: NextRequest) {
             return Response.json({ error: "There is no such code." }, { status: 400 });
         }
 
-        // A guest pays on an anonymous session: their details go on a guest profile (the confirmation email's
-        // address, and what the front desk sees). A signed-in player's profile is never touched here.
-        const isGuest = !!user.is_anonymous;
+        // A signed-in player's profile is never touched here
         let guestEmail: string | null = null;
-        if (isGuest) {
-            const limit = await checkRateLimit(`guest-checkout:ip:${clientIp(request)}`, AUTH_LIMITS.guestCheckoutsPerIp);
-            if (!limit.allowed) return tooManyRequests("guest checkouts from this network", limit.retryAfterSeconds);
-            const guest = parseGuestDetails(body?.guest);
-            if (!guest.ok) return Response.json({ error: guest.error }, { status: 400 });
-            const admin = getServiceClient();
-            if (!admin) {
-                console.error("Guest checkout needs SUPABASE_SERVICE_ROLE_KEY to save the guest's details");
-                return Response.json({ error: "Guest checkout is not available right now. Please sign in to book." }, { status: 503 });
-            }
-            const { error: profileError } = await admin
-                .from("profiles")
-                .upsert({ id: user.id, role: "customer", is_guest: true, ...guest.value }, { onConflict: "id" });
-            if (profileError) {
-                console.error("Guest profile save failed:", profileError);
-                return Response.json({ error: "Could not save your details. Please try again." }, { status: 500 });
-            }
-            guestEmail = guest.value.email;
+        if (user.is_anonymous) {
+            const saved = await saveGuestProfile(request, user.id, body?.guest);
+            if (saved instanceof Response) return saved;
+            guestEmail = saved.email;
         }
 
         if (typeof booking_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(booking_date) || Number.isNaN(Date.parse(booking_date))) {

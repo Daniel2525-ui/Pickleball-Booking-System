@@ -1,12 +1,11 @@
 // Open play end to end: local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { requireLocalDb, writesAllowed, sql, account, login, tomorrowManila, resetBookings, openAllBookings, pickDay } from "./local-db.mjs";
+import { requireLocalDb, writesAllowed, sql, account, login, tomorrowManila, resetBookings, pickDay } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 // Desktop layout: the grid shows every court at once (phones show one court at a time)
 test.use({ viewport: { width: 1280, height: 900 } });
 
-const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 // Tomorrow's weekday: the first generated session is tomorrow, on a day with no other bookings
 const date = tomorrowManila();
 const weekday = new Date(`${date}T12:00:00+08:00`).toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Manila" });
@@ -58,6 +57,29 @@ test("admin schedules open play and the court grid shows it", async ({ page }) =
   await expect(item).toContainText("spots left");
 });
 
+test("a player books two spots and, once paid, holds them", async ({ page }) => {
+  await login(page, account("CUSTOMER"));
+  await page.goto("/open-play");
+  await page.getByRole("button", { name: new RegExp(`^Book a spot on ${shortDate}`) }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("No account needed.")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "One more spot" }).click();
+  await expect(dialog.getByText("₱300")).toBeVisible();
+  await dialog.getByRole("button", { name: "Continue to Checkout" }).click();
+  if (process.env.XENDIT_SECRET_KEY) await page.waitForURL(/\/book\/qr\?pr=/, { timeout: 30_000 });
+  else await expect(dialog.getByRole("alert")).toBeVisible({ timeout: 30_000 });
+  const booking = sql(`SELECT id FROM public.bookings WHERE open_play_session_id = '${sessionId()}' AND court_id IS NULL ORDER BY created_at DESC LIMIT 1`);
+  expect(sql(`SELECT open_play_spots || '|' || total_amount FROM public.bookings WHERE id = '${booking}'`)).toBe("2|300.00");
+
+  // Stands in for the QR Ph webhook (no Xendit key locally): the spots are paid for
+  sql(`UPDATE public.bookings SET status = 'confirmed', cancel_reason = NULL, hold_expires_at = NULL WHERE id = '${booking}';
+       UPDATE public.payments SET status = 'paid', paid_at = now() WHERE booking_id = '${booking}';`);
+  await page.goto("/open-play");
+  const card = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: new RegExp(`on ${shortDate}`) }) });
+  await expect(card.getByText("4 of 6 spots left")).toBeVisible();
+  await expect(card.getByText("You have 2")).toBeVisible();
+});
+
 test("the dashboard schedule shows how full today's open play session is", async ({ page }) => {
   // Move the approved session (2 of 6 spots) to today for this check only, then put it back
   const id = sessionId();
@@ -88,7 +110,7 @@ test("staff add a walk-up and cancel the session, and paid players can be refund
   await expect(page.getByText("Player added.")).toBeVisible();
   await expect(page.getByText("3 of 6 spots booked")).toBeVisible();
 
-  await page.getByRole("button", { name: "Cancel session", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel session & refund everyone" }).click();
   await page.getByRole("alertdialog").or(page.getByRole("dialog")).getByRole("button", { name: "Cancel session", exact: true }).click();
   await expect(page.getByText("Session cancelled. Refund players who ask from the Payments page.")).toBeVisible();
   expect(sql(`SELECT string_agg(DISTINCT status, ',') FROM public.bookings WHERE open_play_session_id = '${sessionId()}'`)).toBe("cancelled");

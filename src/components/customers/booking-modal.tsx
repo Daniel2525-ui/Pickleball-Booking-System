@@ -44,6 +44,39 @@ interface BookingModalProps {
 
 const hrs = (n: number) => `${n} ${n === 1 ? "hour" : "hours"}`;
 
+/** A guest's name, mobile and email, with links to sign in or register instead. */
+export const GuestDetailsFields = ({ value, onChange, onSignIn }: { value: GuestDetails; onChange: (v: GuestDetails) => void; onSignIn: (path: "/login" | "/register") => void }) => (
+  <section aria-labelledby="guest-details-title" className="flex flex-col gap-3">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <h3 id="guest-details-title" className="font-semibold">Your details</h3>
+      <span className="text-sm">
+        <button type="button" onClick={() => onSignIn("/login")} className="font-semibold text-primary hover:underline underline-offset-4">
+          Have an account? Sign in
+        </button>
+        <span className="text-muted-foreground"> or </span>
+        <button type="button" onClick={() => onSignIn("/register")} className="font-semibold text-primary hover:underline underline-offset-4">
+          create one
+        </button>
+      </span>
+    </div>
+    <p className="-mt-2 text-sm text-muted-foreground">For your confirmation and receipt. No account needed.</p>
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="guest-name">Full name</Label>
+      <Input id="guest-name" autoComplete="name" value={value.full_name} onChange={(e) => onChange({ ...value, full_name: e.target.value })} placeholder="Juan Dela Cruz" className="h-11" />
+    </div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="guest-phone">Mobile number</Label>
+        <Input id="guest-phone" type="tel" inputMode="tel" autoComplete="tel" value={value.phone} onChange={(e) => onChange({ ...value, phone: e.target.value })} placeholder="0917 123 4567" className="h-11" />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="guest-email">Email</Label>
+        <Input id="guest-email" type="email" autoComplete="email" value={value.email} onChange={(e) => onChange({ ...value, email: e.target.value })} placeholder="you@example.com" className="h-11" />
+      </div>
+    </div>
+  </section>
+);
+
 /**
  * Checkout: what is being bought, the player's details (guests), number of players, a discount code, how QR Ph
  * payment works, the policy, and one button that names the amount.
@@ -148,37 +181,7 @@ export const BookingModal = ({ isOpen, onOpenChange, lines, isLoading, error, on
           </section>
 
           <div className="flex flex-col gap-4">
-            {isGuest && (
-              <section aria-labelledby="guest-details-title" className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <h3 id="guest-details-title" className="font-semibold">Your details</h3>
-                  <span className="text-sm">
-                    <button type="button" onClick={() => onSignIn("/login")} className="font-semibold text-primary hover:underline underline-offset-4">
-                      Have an account? Sign in
-                    </button>
-                    <span className="text-muted-foreground"> or </span>
-                    <button type="button" onClick={() => onSignIn("/register")} className="font-semibold text-primary hover:underline underline-offset-4">
-                      create one
-                    </button>
-                  </span>
-                </div>
-                <p className="-mt-2 text-sm text-muted-foreground">For your confirmation and receipt. No account needed.</p>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="guest-name">Full name</Label>
-                  <Input id="guest-name" autoComplete="name" value={guest.full_name} onChange={(e) => setGuest({ ...guest, full_name: e.target.value })} placeholder="Juan Dela Cruz" className="h-11" />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="guest-phone">Mobile number</Label>
-                    <Input id="guest-phone" type="tel" inputMode="tel" autoComplete="tel" value={guest.phone} onChange={(e) => setGuest({ ...guest, phone: e.target.value })} placeholder="0917 123 4567" className="h-11" />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="guest-email">Email</Label>
-                    <Input id="guest-email" type="email" autoComplete="email" value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} placeholder="you@example.com" className="h-11" />
-                  </div>
-                </div>
-              </section>
-            )}
+            {isGuest && <GuestDetailsFields value={guest} onChange={setGuest} onSignIn={onSignIn} />}
 
             <section aria-label="Players" className="flex items-center justify-between gap-3 rounded-xl border p-3.5">
               <div>

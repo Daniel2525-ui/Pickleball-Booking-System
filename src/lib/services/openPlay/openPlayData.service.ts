@@ -1,3 +1,4 @@
+import type { GuestDetails } from "@/lib/services/bookings/guestDetails";
 import { supabase } from "@/lib/supabase";
 import { PastSpotRow, SpotRow } from "./openPlayTypes";
 
@@ -33,12 +34,12 @@ export const fetchOpenPlaySessions = async (from: string, to: string) => {
     return { data: (data ?? []) as OpenPlaySession[], error };
 };
 
-export const bookOpenPlay = async (sessionId: string, spots: number): Promise<{ url?: string; error?: string }> => {
+export const bookOpenPlay = async (sessionId: string, spots: number, guest: GuestDetails | null = null): Promise<{ url?: string; error?: string }> => {
     try {
         const res = await fetch("/api/open-play/book", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId, spots }),
+            body: JSON.stringify({ sessionId, spots, guest }),
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok || !body.url) return { error: body.error ?? "Could not book your spots. Please try again." };

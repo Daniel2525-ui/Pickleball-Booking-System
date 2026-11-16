@@ -13,6 +13,8 @@ import { fetchBookingPolicy } from "@/lib/services/settings/bookingPolicy";
 import { formatTime12h } from "@/lib/utils/formatTime";
 import { calculateDuration } from "@/lib/helpers/totalDuration";
 import { bookOpenPlay, fetchOpenPlaySessions, type OpenPlaySession } from "@/lib/services/openPlay/openPlayData.service";
+import { parseGuestDetails } from "@/lib/services/bookings/guestDetails";
+import { GuestDetailsFields } from "@/components/customers/booking-modal";
 
 const WINDOW_DAYS = 27;
 
@@ -24,7 +26,9 @@ export const OpenPlayContainer = () => {
   const router = useRouter();
   const [sessions, setSessions] = useState<OpenPlaySession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [signedIn, setSignedIn] = useState(false);
+  // No account (or a guest's anonymous session): the dialog asks for their details
+  const [isGuest, setIsGuest] = useState(true);
+  const [guest, setGuest] = useState({ full_name: "", phone: "", email: "" });
   const [active, setActive] = useState<OpenPlaySession | null>(null);
   const [spots, setSpots] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -52,7 +56,7 @@ export const OpenPlayContainer = () => {
         // A failed load must not read as "no sessions scheduled"
         if (res.error) setLoadFailed(true);
         setSessions(res.data);
-        setSignedIn(Boolean(auth.data.user));
+        setIsGuest(!auth.data.user || !!auth.data.user.is_anonymous);
       })
       .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
@@ -65,7 +69,6 @@ export const OpenPlayContainer = () => {
   const shown = day ? sessions.filter((s) => s.session_date === day) : sessions;
 
   const open = (s: OpenPlaySession) => {
-    if (!signedIn) return router.push("/login");
     setActive(s);
     setSpots(1);
     setError(null);
@@ -73,9 +76,20 @@ export const OpenPlayContainer = () => {
 
   const confirm = async () => {
     if (!active) return;
-    setSubmitting(true);
     setError(null);
-    const { url, error } = await bookOpenPlay(active.id, spots);
+    const parsed = isGuest ? parseGuestDetails(guest) : null;
+    if (parsed && !parsed.ok) return setError(parsed.error);
+    setSubmitting(true);
+    // A guest pays on an anonymous session, so the hold, the QR page and My Bookings on this device are theirs
+    const supabase = createClient();
+    if (isGuest && !(await supabase.auth.getUser()).data.user) {
+      const { error: anonError } = await supabase.auth.signInAnonymously();
+      if (anonError) {
+        setError("Guest checkout isn't available right now. Please sign in or create an account to book.");
+        return setSubmitting(false);
+      }
+    }
+    const { url, error } = await bookOpenPlay(active.id, spots, parsed?.ok ? parsed.value : null);
     if (url) return void (window.location.href = url);
     setError(error ?? "Could not book your spots.");
     setSubmitting(false);
@@ -211,7 +225,7 @@ export const OpenPlayContainer = () => {
       )}
 
       <Dialog open={active !== null} onOpenChange={(o) => !o && !submitting && setActive(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Book open play</DialogTitle>
             <DialogDescription>
@@ -236,6 +250,7 @@ export const OpenPlayContainer = () => {
                 <span className="text-sm text-muted-foreground">Total</span>
                 <span className="text-lg font-extrabold">₱{(spots * Number(active.price_per_spot)).toLocaleString()}</span>
               </div>
+              {isGuest && <GuestDetailsFields value={guest} onChange={setGuest} onSignIn={(path) => router.push(path)} />}
               {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
             </div>
           )}
