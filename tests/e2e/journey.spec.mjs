@@ -1,7 +1,7 @@
-// One player's whole life through the UI, then the staff side: sign up, book, pay by GCash, staff verify,
+// One player's whole life through the UI, then the staff side: sign up, book, pay by QR Ph, staff see it paid,
 // the player can't cancel a paid booking, so staff cancel and refund it. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, pickDay } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, pickDay, pickTime } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 // Desktop layout: the grid shows every court at once (phones show one court at a time)
@@ -10,24 +10,17 @@ test.use({ viewport: { width: 1280, height: 900 } });
 const stamp = Date.now();
 const player = { name: "Journey Player", phone: "09175550123", email: `e2e-journey-${stamp}@example.com`, password: "journey-pass-1" };
 const date = tomorrowManila();
-const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 let court;
-let gcashBefore;
 const problems = [];
 
 test.beforeAll(() => {
   if (!writesAllowed) return;
   resetBookings();
   court = firstCourt();
-  gcashBefore = sql("SELECT coalesce(gcash_account_name,'') || '|' || coalesce(gcash_number,'') FROM public.booking_settings");
-  sql("UPDATE public.booking_settings SET gcash_account_name = 'Journey Venue', gcash_number = '09170000999'");
 });
 test.afterAll(() => {
   if (!writesAllowed) return;
   resetBookings();
-  const [name, num] = gcashBefore.split("|");
-  sql(`UPDATE public.booking_settings SET gcash_account_name = ${name ? `'${name}'` : "NULL"}, gcash_number = ${num ? `'${num}'` : "NULL"}`);
-  // Storage blocks SQL deletes; the uploaded receipt is a 1x1 test image left in the local bucket
   sql(`DELETE FROM public.profiles WHERE email = '${player.email}'; DELETE FROM auth.users WHERE email = '${player.email}'`);
   if (problems.length) console.log("JOURNEY CONSOLE PROBLEMS:\n" + problems.join("\n"));
 });
@@ -59,7 +52,7 @@ test("1. a new player signs up through the site", async ({ page }) => {
   await login(page, player);
 });
 
-test("2. the player books two hours tomorrow and pays by GCash", async ({ page }) => {
+test("2. the player books two hours tomorrow and pays by QR Ph", async ({ page }) => {
   await login(page, player);
   await page.goto("/book");
   await pickDay(page, 1);
@@ -68,34 +61,29 @@ test("2. the player books two hours tomorrow and pays by GCash", async ({ page }
   await expect(page.getByRole("region", { name: "Your selection" }).getByText("₱400", { exact: true }).last()).toBeVisible();
   await page.locator("#booking").getByRole("button", { name: "Continue to Checkout" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("radio", { name: "GCash" }).click();
-  await dialog.getByRole("button", { name: "Continue to Checkout" }).click();
+  await dialog.getByLabel("Number of players").fill("4");
+  await dialog.getByRole("button", { name: "Pay ₱400 with QR Ph" }).click();
+  if (process.env.XENDIT_SECRET_KEY) await page.waitForURL(/\/book\/qr\?pr=/, { timeout: 30_000 });
+  else await expect(dialog.getByRole("alert")).toBeVisible({ timeout: 30_000 });
+  expect(bookingState().split("|")[3]).toBe("400.00");
 
-  await page.waitForURL(/\/book\/gcash/);
-  await expect(page.getByText("09170000999")).toBeVisible();
-  expect(bookingState()).toBe("pending|pending|gcash|400.00");
-  await page.getByLabel("GCash reference number").fill("JRN123456");
-  await page.getByLabel("Payment screenshot").setInputFiles({ name: "receipt.png", mimeType: "image/png", buffer: PNG_1X1 });
-  await page.getByRole("button", { name: "Submit payment" }).click();
-  await expect(page.getByText(/The staff will check your GCash payment/)).toBeVisible();
+  // Stands in for Xendit's paid webhook (no Xendit key locally)
+  sql(`UPDATE public.bookings SET status = 'confirmed', cancel_reason = NULL, hold_expires_at = NULL
+         WHERE user_id = (SELECT id FROM public.profiles WHERE email = '${player.email}');
+       UPDATE public.payments SET status = 'paid', paid_at = now(), stripe_payment_id = 'pr-e2e-journey-${stamp}'
+         WHERE booking_id IN (SELECT b.id FROM public.bookings b JOIN public.profiles p ON p.id = b.user_id WHERE p.email = '${player.email}');`);
+  // An online QR Ph payment has no payment_method (empty means online)
+  expect(bookingState()).toBe("confirmed|paid||400.00");
 
   await page.goto("/my-bookings");
   await expect(page.getByText(court.name).first()).toBeVisible();
 });
 
-test("3. staff verify the GCash payment and the booking is confirmed", async ({ page }) => {
+test("3. staff see the paid booking in Bookings, Customers and Payments", async ({ page }) => {
   await login(page, account("ADMIN"));
   await page.goto("/admin/bookings");
   await page.getByRole("button", { name: "Clear date filter" }).click();
-  const row = page.getByRole("row").filter({ hasText: player.name });
-  await row.getByRole("button", { name: "Open menu" }).click();
-  await page.getByRole("menuitem", { name: "Verify" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("JRN123456")).toBeVisible();
-  await expect(dialog.getByText("₱400")).toBeVisible();
-  await dialog.getByRole("button", { name: "Approve — mark paid" }).click();
-  await expect(row.getByText("Confirmed")).toBeVisible();
-  expect(bookingState()).toBe("confirmed|paid|gcash|400.00");
+  await expect(page.getByRole("row").filter({ hasText: player.name }).getByText("Confirmed")).toBeVisible();
 
   // The new player is in the customer directory with their booking and spend
   await page.goto("/admin/customers");
@@ -103,13 +91,13 @@ test("3. staff verify the GCash payment and the booking is confirmed", async ({ 
   await expect(customer).toBeVisible();
   await expect(customer.getByText("₱400")).toBeVisible();
 
-  // Payments shows the GCash money
+  // Payments shows the QR Ph money
   await page.goto("/admin/payments");
   await page.getByRole("button", { name: /Clear date/i }).click().catch(() => {});
   await expect(page.getByRole("row").filter({ hasText: player.name }).first()).toBeVisible();
 });
 
-test("4. the player sees it confirmed and non-refundable; staff cancel it with a refund on request", async ({ page }) => {
+test("4. the player sees it confirmed and non-refundable; staff cancel it and refund it on request", async ({ page }) => {
   await login(page, player);
   await page.goto("/my-bookings");
   await expect(page.getByText(/confirmed/i).first()).toBeVisible();
@@ -126,20 +114,16 @@ test("4. the player sees it confirmed and non-refundable; staff cancel it with a
   await dialog.getByLabel(/Cancel and refund/).check();
   await dialog.getByRole("button", { name: "Cancel Reservation" }).click();
   await expect.poll(() => bookingState().split("|")[0]).toBe("cancelled");
-});
 
-test("5. staff pay the GCash refund back and the player sees it", async ({ page }) => {
-  await login(page, account("ADMIN"));
-  await page.goto("/admin/payments");
-  const row = page.getByRole("row").filter({ hasText: player.name });
-  await row.getByRole("button", { name: "Refund" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("GCash reference of your refund transfer").fill("GCASHRF01");
+  // The refund step opens next: staff send the money back in Xendit, then record its reference here
+  await expect(dialog.getByRole("heading", { name: "Refund Payment" })).toBeVisible();
+  await dialog.getByLabel("Xendit refund reference").fill("XRF-JOURNEY");
   await dialog.getByRole("button", { name: "Refund ₱400" }).click();
   await expect(page.getByText(/₱400 refunded to/)).toBeVisible();
-  expect(bookingState()).toBe("cancelled|refunded|gcash|400.00");
+  expect(bookingState()).toBe("cancelled|refunded||400.00");
+});
 
-  await page.context().clearCookies();
+test("5. the player sees the refund", async ({ page }) => {
   await login(page, player);
   await page.goto("/my-bookings");
   // Cancelled bookings move to the Past tab
@@ -157,8 +141,8 @@ test("6. staff record a paid walk-in and open the dashboard", async ({ page }) =
   await dialog.getByLabel("Assigned Court").click();
   await page.getByRole("option", { name: court.name }).click();
   await dialog.getByLabel("Reservation Date").fill(date);
-  await dialog.getByLabel("Start Time").fill("19:00");
-  await dialog.getByLabel("End Time").fill("20:00");
+  await pickTime(page, dialog, "Start Time", "19:00");
+  await pickTime(page, dialog, "End Time", "20:00");
   await dialog.getByRole("button", { name: "Cash (Paid)", exact: true }).click();
   await dialog.getByRole("button", { name: "Record Reservation" }).click();
   await expect(page.getByText("Reservation recorded successfully!")).toBeVisible();

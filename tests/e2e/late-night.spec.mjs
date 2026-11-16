@@ -38,7 +38,6 @@ async function openTomorrow(page) {
 
 test("the after-midnight hours sit at the bottom of their own day, and not on the next date", async ({ page }) => {
   await openTomorrow(page);
-  await expect(grid(page).getByText("After midnight", { exact: true }).filter({ visible: true })).toBeVisible();
   await expect(slot(page, "COURT 1", "11:00 PM - 12:00 AM")).toBeVisible();
   await expect(slot(page, "COURT 1", "12:00 AM - 1:00 AM")).toBeVisible();
   await expect(slot(page, "COURT 1", "1:00 AM - 2:00 AM")).toBeVisible();

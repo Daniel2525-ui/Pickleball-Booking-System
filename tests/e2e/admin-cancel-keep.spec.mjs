@@ -41,6 +41,11 @@ async function cancel(page, name, keepNote) {
     await dialog.getByLabel("Reason for keeping the payment").fill(keepNote);
   }
   await dialog.getByRole("button", { name: "Cancel Reservation" }).click();
+  // A refund opens the Refund Payment step next; leave it for later (recorded from the Payments page)
+  if (keepNote === undefined) {
+    await expect(dialog.getByRole("heading", { name: "Refund Payment" })).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
   await expect(dialog).toHaveCount(0);
   return dialog;
 }

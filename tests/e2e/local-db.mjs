@@ -94,3 +94,15 @@ export async function openAllBookings(page) {
   await page.goto("/admin/bookings");
   await page.getByRole("button", { name: "Clear date filter" }).click();
 }
+
+/** "18:00" as the app shows it: "6:00 PM". */
+export const time12 = (hhmm) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h % 24 >= 12 ? "PM" : "AM"}`;
+};
+
+/** Picks "10:00" in the walk-in form's Start Time / End Time dropdown (options read "10:00 AM", maybe "· Started"). */
+export async function pickTime(page, scope, label, hhmm) {
+  await scope.getByLabel(label).click();
+  await page.getByRole("option", { name: new RegExp(`^${time12(hhmm)}`) }).click();
+}

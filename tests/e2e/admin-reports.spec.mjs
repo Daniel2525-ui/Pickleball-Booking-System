@@ -44,12 +44,12 @@ test("the owner opens Reports from the sidebar and sees the numbers", async ({ p
 test("CSV matches the screen", async ({ page }) => {
   await openSeptember(page);
   await expect(page.getByText("₱1,050").first()).toBeVisible();
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download CSV" }).click()]);
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Daily totals CSV" }).click()]);
   expect(download.suggestedFilename()).toBe("reports-2026-09-01-to-2026-09-30.csv");
   const lines = readFileSync(await download.path(), "utf8").trim().split("\n");
   expect(lines[0]).toBe("Date,Bookings,Court hours,Cash,QR Ph,Refunded,Net");
   expect(lines).toHaveLength(31);
-  expect(lines.find((l) => l.startsWith("2026-09-10"))).toBe("2026-09-10,3,3,400,350,300,0,1050");
+  expect(lines.find((l) => l.startsWith("2026-09-10"))).toBe("2026-09-10,3,3,400,650,0,1050");
 });
 
 test("front desk and players can't open Reports", async ({ page }) => {
@@ -91,7 +91,7 @@ test("a custom range the wrong way round is refused", async ({ page }) => {
   await page.getByLabel("To", { exact: true }).fill("2026-08-01");
   await expect(page.getByText("Pick a start date on or before the end date.")).toBeVisible();
   await expect(page.getByText("₱1,050")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Download CSV" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Daily totals CSV" })).toBeDisabled();
   // Fixing the range brings a report back (the page isn't left loading)
   await page.getByLabel("To", { exact: true }).fill("2026-09-30");
   await expect(page.getByText("₱1,050").first()).toBeVisible();

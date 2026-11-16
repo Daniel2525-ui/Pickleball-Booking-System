@@ -95,7 +95,7 @@ test("checkout holds late-night hours on their real dates and never across closi
   expect(sql(`SELECT end_time || ' ' || status FROM public.bookings WHERE booking_date = '${date}' AND start_time = '23:00'`)).toBe("24:00:00 pending");
 });
 
-test("the booking grid lists a day's late hours at its bottom under their own heading, never on the next date", async ({ page }) => {
+test("the booking grid lists a day's late hours at its bottom, never on the next date", async ({ page }) => {
   resetBookings();
   const tomorrowName = new Date(Date.now() + 86_400_000).toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Manila" });
   sql(`UPDATE public.operating_hours SET close_time = '02:00' WHERE day_of_week = '${tomorrowName}'`);
@@ -103,7 +103,6 @@ test("the booking grid lists a day's late hours at its bottom under their own he
   await page.goto("/book");
   await pickDay(page, 1);
 
-  await expect(page.getByText("After midnight", { exact: true }).filter({ visible: true })).toBeVisible();
   await page.getByRole("button", { name: `Select ${court.name} at 1:00 AM - 2:00 AM` }).filter({ visible: true }).click();
   await page.getByRole("button", { name: `Select ${court.name} at 6:00 AM - 7:00 AM` }).filter({ visible: true }).click();
   // 6-7 AM opens the day and 1-2 AM ends it: two separate bookings

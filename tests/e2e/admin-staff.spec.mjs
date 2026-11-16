@@ -2,7 +2,7 @@
 // owners manage who has which access. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { writesAllowed, requireLocalDb, sql, account, login, localSupabase, resetBookings, firstCourt, tomorrowManila, openAllBookings } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, localSupabase, resetBookings, firstCourt, tomorrowManila, openAllBookings, pickTime } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -33,17 +33,17 @@ test("the owner gives an account front-desk access", async ({ page }) => {
   await expect(page.getByText("Court Admin")).toBeVisible();
   await page.goto("/admin/settings");
 
-  await page.getByLabel("Give staff access").fill("nobody-here@example.com");
+  await page.getByLabel("Give staff/admin access").fill("nobody-here@example.com");
   await page.getByRole("button", { name: "Give access" }).click();
   await expect(page.getByText("No player account uses that email. Ask them to sign up on the booking site and confirm their email first.")).toBeVisible();
 
   // "_" is not a wildcard: a look-alike email never matches someone else's account
-  await page.getByLabel("Give staff access").fill(email.replace("-", "_"));
+  await page.getByLabel("Give staff/admin access").fill(email.replace("-", "_"));
   await page.getByRole("button", { name: "Give access" }).click();
   await expect(page.getByText("No player account uses that email. Ask them to sign up on the booking site and confirm their email first.")).toBeVisible();
   expect(access("CUSTOMER2")).toBe("customer|false");
 
-  await page.getByLabel("Give staff access").fill(email);
+  await page.getByLabel("Give staff/admin access").fill(email);
   await page.getByRole("button", { name: "Give access" }).click(); // Front desk is the default
   await expect(page.getByText(/now has front desk access/)).toBeVisible();
   expect(access("CUSTOMER2")).toBe("admin|false");
@@ -81,8 +81,8 @@ test("front desk runs the day but never sees Pricing or Settings", async ({ page
   await dialog.getByLabel("Assigned Court").click();
   await page.getByRole("option", { name: court.name }).click();
   await dialog.getByLabel("Reservation Date").fill(tomorrowManila());
-  await dialog.getByLabel("Start Time").fill("10:00");
-  await dialog.getByLabel("End Time").fill("11:00");
+  await pickTime(page, dialog, "Start Time", "10:00");
+  await pickTime(page, dialog, "End Time", "11:00");
   await dialog.getByRole("button", { name: "Cash (Paid)", exact: true }).click();
   await dialog.getByRole("button", { name: "Record Reservation" }).click();
   await expect(page.getByText("Reservation recorded successfully!")).toBeVisible();

@@ -1,6 +1,7 @@
-// One-off closed dates: staff close a day, customers can't book it, staff still can. Local Supabase stack only.
+// One-off closed dates: staff close a day, and nobody can book it, walk-ins included. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, openAllBookings, pickDay } from "./local-db.mjs";
+import { createClient } from "@supabase/supabase-js";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, openAllBookings, pickDay, localSupabase } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -58,22 +59,31 @@ test("customers see the date closed and cannot book it, even through checkout", 
   expect(sql(`SELECT count(*) FROM public.bookings WHERE booking_date = '${date}' AND start_time = '10:00'`)).toBe("0");
 });
 
-test("staff can still record a walk-in on a closed date", async ({ page }) => {
+test("staff can't record a walk-in on a closed date either", async ({ page }) => {
   await login(page, account("ADMIN"));
   await openAllBookings(page);
   await page.getByRole("button", { name: "New Reservation" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "New Walk-In" }).click();
-  await dialog.getByLabel("Full Name").fill("E2E Private Event");
+  await dialog.getByLabel("Full Name").fill("E2E Closed Day Walk-in");
   await dialog.getByLabel("Assigned Court").click();
   await page.getByRole("option", { name: court.name }).click();
   await dialog.getByLabel("Reservation Date").fill(date);
-  await dialog.getByLabel("Start Time").fill("18:00");
-  await dialog.getByLabel("End Time").fill("19:00");
-  await dialog.getByRole("button", { name: "Cash (Paid)", exact: true }).click();
-  await dialog.getByRole("button", { name: "Record Reservation" }).click();
-  await expect(page.getByText("Reservation recorded successfully!")).toBeVisible();
-  expect(sql(`SELECT status FROM public.bookings WHERE customer_name = 'E2E Private Event'`)).toBe("confirmed");
+  await expect(dialog.getByText("No open slots for this court on this date.")).toBeVisible();
+  await expect(dialog.getByLabel("Start Time")).toBeDisabled();
+
+  // The database refuses it too, even when called directly as staff
+  const { url, anonKey } = localSupabase();
+  const staff = createClient(url, anonKey, { auth: { persistSession: false } });
+  await staff.auth.signInWithPassword(account("ADMIN"));
+  const amount = Number(sql("SELECT base_hourly_rate FROM public.booking_settings"));
+  const { error } = await staff.rpc("create_walk_in_booking", {
+    p_court_id: court.id, p_customer_name: "E2E Closed Day Walk-in", p_booking_date: date, p_start_time: "18:00", p_end_time: "19:00",
+    p_amount: amount, p_customer_id: null, p_user_id: sql(`SELECT id FROM public.profiles WHERE email = '${account("ADMIN").email}'`),
+    p_payment_method: "cash", p_payment_reference: null,
+  });
+  expect(error?.message).toContain("VENUE_CLOSED");
+  expect(sql(`SELECT count(*) FROM public.bookings WHERE customer_name = 'E2E Closed Day Walk-in'`)).toBe("0");
 });
 
 test("reopening the date lets customers book it again", async ({ page }) => {

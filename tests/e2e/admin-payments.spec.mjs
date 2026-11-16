@@ -28,6 +28,9 @@ test.beforeAll(() => {
   seed("E2E GCash Player", "09:00", "confirmed", { amount: 300, status: "paid", method: "gcash", ref: "GC-7741" });
   seed("E2E Card Player", "10:00", "confirmed", { amount: 400, status: "paid", method: "stripe" });
   seed("E2E Refunded Player", "11:00", "cancelled", { amount: 250, status: "refunded", method: "stripe" });
+  // The Refunded card counts refunds completed today
+  sql(`INSERT INTO public.refund_requests (payment_id, booking_id, amount, payment_method, reason, status, idempotency_key, processed_at)
+       SELECT id, booking_id, amount, 'stripe', 'customer', 'succeeded', 'e2e-' || id, now() FROM public.payments WHERE booking_id = '${ids["E2E Refunded Player"]}'`);
   seed("E2E Unpaid Player", "12:00", "confirmed", { amount: 150, status: "pending", paidAt: "NULL" });
   seed("E2E Yesterday Player", "13:00", "completed", {
     amount: 500, status: "paid", method: "cash",
@@ -46,8 +49,10 @@ test("the page opens on today with the day's money split by method", async ({ pa
   await page.goto("/admin/payments");
   await expect(page.getByLabel("Filter by payment date")).toHaveValue(today);
 
-  await expect(card(page, "Collected").getByText("₱900.00")).toBeVisible();
-  await expect(card(page, "QR Ph").getByText("₱700.00")).toBeVisible();
+  // Money taken today counts even if it was refunded later; refunds show on their own card
+  await expect(card(page, "Collected").getByText("₱1,150.00")).toBeVisible();
+  await expect(card(page, "Cash in drawer").getByText("₱200.00")).toBeVisible();
+  await expect(card(page, "QR Ph").getByText("₱950.00")).toBeVisible();
   await expect(card(page, "Refunded").getByText("₱250.00")).toBeVisible();
 
   await expect(rowFor(page, "E2E Cash Player").getByText("Cash", { exact: true })).toBeVisible();
@@ -60,7 +65,7 @@ test("the page opens on today with the day's money split by method", async ({ pa
   // Clearing the date shows every day; totals need a day
   await page.getByRole("button", { name: "Clear date filter" }).click();
   await expect(rowFor(page, "E2E Yesterday Player")).toHaveCount(1);
-  await expect(card(page, "Cash").getByText("Pick a date to see totals")).toBeVisible();
+  await expect(card(page, "Cash in drawer").getByText("Pick a date to see totals")).toBeVisible();
 });
 
 test("search finds payments by GCash reference and booking reference on the server", async ({ page }) => {

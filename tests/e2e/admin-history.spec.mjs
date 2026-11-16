@@ -1,7 +1,7 @@
 // Booking history: who did what, recorded by the database for every path; staff only. Local Supabase stack only.
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, openAllBookings } from "./local-db.mjs";
+import { writesAllowed, requireLocalDb, sql, account, login, tomorrowManila, resetBookings, firstCourt, localSupabase, openAllBookings, pickTime } from "./local-db.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -44,8 +44,8 @@ test("a walk-in's history names the staff member for each step", async ({ page }
   await dialog.getByLabel("Assigned Court").click();
   await page.getByRole("option", { name: court.name }).click();
   await dialog.getByLabel("Reservation Date").fill(date);
-  await dialog.getByLabel("Start Time").fill("10:00");
-  await dialog.getByLabel("End Time").fill("11:00");
+  await pickTime(page, dialog, "Start Time", "10:00");
+  await pickTime(page, dialog, "End Time", "11:00");
   await dialog.getByRole("button", { name: "Pay Later", exact: true }).click();
   await dialog.getByRole("button", { name: "Record Reservation" }).click();
   await expect(dialog).toHaveCount(0);
@@ -58,28 +58,22 @@ test("a walk-in's history names the staff member for each step", async ({ page }
   await dialog.getByRole("button", { name: /Confirm ₱200 Received/ }).click();
   await expect.poll(() => sql(`SELECT p.status FROM public.payments p JOIN public.bookings b ON b.id = p.booking_id WHERE b.customer_name = 'E2E History'`)).toBe("paid");
 
-  // Move to COURT 2
-  await openMenu(page, "E2E History");
-  await page.getByRole("menuitem", { name: "Move Booking" }).click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Court").click();
-  await page.getByRole("option", { name: "COURT 2" }).click();
-  await dialog.getByRole("button", { name: "Move Booking" }).click();
-  await expect(dialog).toHaveCount(0);
-
   // Cancel
   await openMenu(page, "E2E History");
   await page.getByRole("menuitem", { name: "Cancel Reservation" }).click();
   await page.getByRole("dialog").getByLabel(/Cancel and refund/).check();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel Reservation" }).click();
   await expect.poll(() => sql(`SELECT status FROM public.bookings WHERE customer_name = 'E2E History'`)).toBe("cancelled");
+  // The Refund Payment step opens next; the refund itself isn't part of this history
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Refund Payment" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   const lines = await historyLines(page, "E2E History");
   expect(lines[0]).toMatch(/^Booked by E2E Admin/);
   expect(lines[1]).toMatch(/^Payment recorded by E2E Admin Cash · ₱200/);
-  expect(lines[2]).toMatch(new RegExp(`^Moved by E2E Admin ${court.name} · \\w+ \\d+ 10:00 AM → COURT 2 · \\w+ \\d+ 10:00 AM`));
-  expect(lines[3]).toMatch(/^Cancelled by E2E Admin/);
-  expect(lines).toHaveLength(4);
+  expect(lines[2]).toMatch(/^Cancelled by E2E Admin/);
+  expect(lines).toHaveLength(3);
 });
 
 test("check-in is recorded by name, and changes made by the system show as System", async ({ page }) => {

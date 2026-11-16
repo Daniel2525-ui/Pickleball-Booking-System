@@ -52,7 +52,11 @@ function seedMoney() {
   pay(book("2026-09-10", "08:00", "09:00"), 400, "paid", "cash", "2026-09-10 10:00");
   pay(book("2026-09-10", "09:00", "10:00"), 200, "paid", "gcash", "2026-09-10 10:00");
   pay(book("2026-09-10", "10:00", "11:00"), 300, "paid", "stripe", "2026-09-10 10:00");
-  pay(book("2026-09-10", "11:00", "12:00", { status: "cancelled", reason: "customer" }), 250, "refunded", "stripe", "2026-09-10 10:00");
+  const refundedBooking = book("2026-09-10", "11:00", "12:00", { status: "cancelled", reason: "customer" });
+  pay(refundedBooking, 250, "refunded", "stripe", "2026-09-10 10:00");
+  // Reports count a refund on the day it was completed
+  sql(`INSERT INTO public.refund_requests (payment_id, booking_id, amount, payment_method, reason, status, idempotency_key, processed_at)
+       SELECT id, booking_id, amount, 'stripe', 'customer', 'succeeded', 'e2e-' || id, '2026-09-10 15:00:00+08' FROM public.payments WHERE booking_id = '${refundedBooking}'`);
   pay(book("2026-09-10", "12:00", "13:00", { status: "pending" }), 999, "pending", null, null);
   pay(book("2026-09-10", "13:00", "14:00", { status: "cancelled", reason: "checkout_failed" }), 500, "failed", "stripe", null);
   const session = openPlaySession("2026-09-10");
@@ -66,15 +70,16 @@ test.afterAll(() => { if (writesAllowed) reset(); });
 test("the owner gets September's money right", async () => {
   seedMoney();
   const r = await report("2026-09-01", "2026-09-30");
-  expect(r.money).toEqual({ net: 1050, cash: 400, gcash: 350, card: 300, refunded: 250, refunded_count: 1, court: 900, open_play: 150 });
+  // Card counts money taken that day, refunded or not; net (and court + open play) takes the refund off once
+  expect(r.money).toEqual({ net: 1050, cash: 400, gcash: 350, card: 550, refunded: 250, refunded_count: 1, court: 900, open_play: 150 });
 });
 
 test("a refunded payment never reduces net twice", async () => {
   seedMoney();
   const r = await report("2026-09-01", "2026-09-30");
   const day = r.series.find((s) => s.key === "2026-09-10");
-  const paidThatDay = Number(sql(`SELECT sum(amount) FROM public.payments WHERE status = 'paid' AND (paid_at AT TIME ZONE 'Asia/Manila')::date = '2026-09-10'`));
-  expect(day.net).toBe(paidThatDay);
+  const takenThatDay = Number(sql(`SELECT sum(amount) FROM public.payments WHERE status IN ('paid', 'refunded') AND (paid_at AT TIME ZONE 'Asia/Manila')::date = '2026-09-10'`));
+  expect(day.net).toBe(takenThatDay - 250);
   expect(day.net).toBe(1050);
   expect(day.refunded).toBe(250);
 });
@@ -93,7 +98,7 @@ test("bookings, cancellations, no-shows and money kept", async () => {
   book("2026-09-11", "14:00", "15:00", { status: "cancelled", reason: "expired" });
   book("2026-09-11", "15:00", "16:00", { status: "pending" });
   const r = await report("2026-09-01", "2026-09-30");
-  expect(r.bookings).toEqual({ count: 4, court_hours: 4, cancelled: 2, no_shows: 1, money_kept: 400 });
+  expect(r.bookings).toEqual({ count: 4, court_hours: 4, cancelled: 2, no_shows: 1, money_kept: 400, discounts: 0, discounted: 0 });
 });
 
 test("closures and closed weekdays reduce open hours", async () => {
