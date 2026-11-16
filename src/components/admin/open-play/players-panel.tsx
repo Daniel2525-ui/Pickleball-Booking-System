@@ -127,7 +127,7 @@ export function PlayersPanel({ session, onCancel, onChanged }: Props) {
             )}
             {!hasEnded(session) && (
               <Button variant="destructive" className="font-bold" onClick={() => onCancel(session)}>
-                Cancel session &amp; refund everyone
+                Cancel session
               </Button>
             )}
           </div>
